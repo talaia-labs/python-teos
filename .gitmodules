@@ -1,0 +1,3 @@
+[submodule "src/external/statechannels"]
+	path = src/external/statechannels
+	url = https://github.com/stonecoldpat/statechannels
