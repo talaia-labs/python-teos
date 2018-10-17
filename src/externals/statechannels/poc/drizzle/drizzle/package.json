@@ -1,0 +1,59 @@
+{
+  "_args": [
+    [
+      "drizzle@1.2.2",
+      "/home/chris/dev/test-truffle/drizzle"
+    ]
+  ],
+  "_from": "drizzle@1.2.2",
+  "_id": "drizzle@1.2.2",
+  "_inBundle": false,
+  "_integrity": "sha512-3yy4BzU3M/aDf+ENBvczTqYiR7urJH/T7A4DlQ9f8eOWMP0T4RyvEGt6KfFV5h6K83RFVnETT9GTJBd4uymXSA==",
+  "_location": "/drizzle",
+  "_phantomChildren": {
+    "loose-envify": "1.3.1",
+    "symbol-observable": "1.2.0"
+  },
+  "_requested": {
+    "type": "version",
+    "registry": true,
+    "raw": "drizzle@1.2.2",
+    "name": "drizzle",
+    "escapedName": "drizzle",
+    "rawSpec": "1.2.2",
+    "saveSpec": null,
+    "fetchSpec": "1.2.2"
+  },
+  "_requiredBy": [
+    "/",
+    "/drizzle-react-components"
+  ],
+  "_resolved": "https://registry.npmjs.org/drizzle/-/drizzle-1.2.2.tgz",
+  "_spec": "1.2.2",
+  "_where": "/home/chris/dev/test-truffle/drizzle",
+  "author": {
+    "name": "Josh Quintal",
+    "email": "josh@trufflesuite.com",
+    "url": "http://truffleframework.com/drizzle"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "deepmerge": "^2.1.1",
+    "eth-block-tracker-es5": "^2.3.2",
+    "is-plain-object": "^2.0.4",
+    "redux": "^4.0.0",
+    "redux-saga": "^0.16.0",
+    "web3": "^1.0.0-beta.34"
+  },
+  "deprecated": false,
+  "description": "A reactive data store for web3 and smart contracts.",
+  "keywords": [
+    "ethereum",
+    "redux",
+    "redux-saga"
+  ],
+  "license": "ISC",
+  "main": "drizzle.js",
+  "name": "drizzle",
+  "version": "1.2.2"
+}

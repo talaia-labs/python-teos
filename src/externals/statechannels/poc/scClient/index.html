@@ -1,0 +1,128 @@
+<html>
+
+<head>
+    <script src="./dist/index.js"></script>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div>
+        <div id="controlBar">
+            <div id="blockCounterContainer">
+                <label for="blockCounter">Block counter: </label>
+                <span id="blockCounter"></span>
+                <button id="mineBlockButton">Mine a block</button>
+            </div>
+            <div>
+                <button id="deployContract">Deploy new state channel.</button>
+                <div id="deployedContractAddress"></div>
+            </div>
+        </div>
+        <div id="stateChannelContainer">
+            <div id="triggerDispute" class="stateChannelFunction">
+                <div class="stateChannelHeader"><b>Trigger dispute</b></div>
+                <div>
+                    <label for="disputingPlayerAddress">Disputing player</label>
+                    <input id="disputingPlayerAddress"></input>
+                    <button id="triggerDisputeButton">Trigger dispute</button>
+                </div>
+                <div id="triggerDisputeFeedback"></div>
+            </div>
+            <div id="setStateContainer" class="stateChannelFunction">
+                <div class="stateChannelHeader"><b>Set state</b></div>
+                <div>
+                    <div>
+                        <label for="setStatePlayer">Set state player</label>
+                        <input id="setStatePlayer"></input>
+                    </div>
+                    <div>
+                        <label for="setStatePlayer1Sig">Player 1 Sig</label>
+                        <input id="setStatePlayer1Sig"></input>
+                    </div>
+                    <div>
+                        <label for="setStatePlayer2Sig">Player 2 Sig</label>
+                        <input id="setStatePlayer2Sig"></input>
+                    </div>
+                    <div>
+                        <label for="setStateRound">Round</label>
+                        <input id="setStateRound"></input>
+                    </div>
+                    <div>
+                        <label for="setStateHState">hState</label>
+                        <input id="setStateHState"></input>
+                    </div>
+                    <button id="setStateButton">Set State</button>
+                </div>
+                <ul id="setStateFeedback"></ul>
+            </div>
+            <div id="resolveContainer" class="stateChannelFunction">
+                <div class="stateChannelHeader"><b>Resolve</b></div>
+                <div>
+                    <label for="resolvePlayerAddress">Resolve player</label>
+                    <input id="resolvePlayerAddress"></input>
+                    <button id="resolveButton">Resolve</button>
+                </div>
+                <div id="resolveFeedback"></div>
+            </div>
+        </div>
+        <div id="countingGame">
+            <div class="gameComponent">
+                <div class="playerHeader">
+                    <b>Player 1</b>
+                    <div>Address: 0xf17f52151ebef6c7334fad080c5704d77216b732</div>
+                </div>
+                <div>
+                    <label for="player1Round">Round</label>
+                    <input id="player1Round"></input>
+                    <label for="player1State">State</label>
+                    <input id="player1State"></input>
+                    <button id="player1SignButton">Hash and sign</button>
+                </div>
+                OR
+                <div>
+                    <label for="player1RoundH">Round</label>
+                    <input id="player1RoundH"></input>
+                    <label for="player1StateH">Hash</label>
+                    <input id="player1StateH"></input>
+                    <button id="player1SignButtonH">Sign</button>
+                </div>
+                <div class="playerSigs" id="player1Signatures">
+
+                </div>
+            </div>
+            <div class="gameComponent" id="counterContainer">
+                <div class="counterComponent">
+                    <b>Read the alphabet</b>
+                </div>
+                <div>
+                    <button id="counterButton" class="counterComponent">Next letter</button>
+                </div>
+                <div class="counterComponent" id="counterContent"></div>
+            </div>
+            <div class="gameComponent">
+                <div class="playerHeader">
+                    <b>Player 2</b>
+                    <div>Address: 0xc5fdf4076b8f3a5357c5e395ab970b5b54098fef</div>
+                </div>
+                <div>
+                    <label for="player2Round">Round</label>
+                    <input id="player2Round"></input>
+                    <label for="player2State">State</label>
+                    <input id="player2State"></input>
+                    <button id="player2SignButton">Hash and sign</button>
+                </div>
+                OR
+                <div>
+                    <label for="player2RoundH">Round</label>
+                    <input id="player2RoundH"></input>
+                    <label for="player2StateH">Hash</label>
+                    <input id="player2StateH"></input>
+                    <button id="player2SignButtonH">Sign</button>
+                </div>
+                <div class="playerSigs" id="player2Signatures">
+
+                </div>
+            </div>
+        </div>
+    </div>
+</body>

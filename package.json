@@ -1,0 +1,31 @@
+{
+  "name": "pisa",
+  "version": "1.0.0",
+  "description": "Arbitration Outsourcing for State Channels",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha -r ts-node/register src/**/__pisa_tests__/*.test.ts --exit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PISAresearch/pisa.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PISAresearch/pisa/issues"
+  },
+  "homepage": "https://github.com/PISAresearch/pisa#readme",
+  "dependencies": {
+    "web3": "^1.0.0-beta.36"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.1.6",
+    "@types/mocha": "^5.2.5",
+    "@types/web3": "^1.0.10",
+    "chai": "^4.2.0",
+    "mocha": "^5.2.0",
+    "ts-node": "^7.0.1",
+    "typescript": "^3.1.3"
+  }
+}

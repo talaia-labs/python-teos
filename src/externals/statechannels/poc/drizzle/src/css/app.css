@@ -1,0 +1,18 @@
+#app {
+    display: flex;
+    flex-direction: row;
+}
+
+#app>div {
+    flex: 1 1 0;
+    max-width: 50%;
+    word-wrap: break-word;
+}
+
+.pure-form.pure-form-stacked input[type=text] {
+    display: inline;
+}
+
+.pure-form {
+    display: inline;
+}

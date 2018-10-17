@@ -1,0 +1,152 @@
+<html>
+
+<head>
+
+    <script>
+        var RPS_ABI;
+        var RPS_BYTECODE;
+        // load the contract definitions
+        fetch("./../build/contracts/RockPaperScissors.json").
+            then((response) => {
+                data = response.json().then(
+                    json => {
+                        RPS_ABI = json.abi,
+                            RPS_BYTECODE = json.bytecode
+                    })
+
+            })
+
+    </script>
+    <script src="web3.min.js"></script>
+    <script src="index.js"></script>
+</head>
+
+<body>
+    <div>
+        <h1>Rock-Paper-Scissors ... in a state channel</h1>
+
+        <div>
+            <h4>Begin by deploying a Rock-Paper-Scissors contract or by connecting to an existing contract</h4>
+            <label for="address-selector">Select address to make transactions with</label>
+            <select id="address-selector">
+                <option></option>
+            </select>
+            <div>
+                <label for="state-channel-address">State channel address: </label>
+                <input id="state-channel-address" type="text" />
+                <button id="deploy-contract">Deploy new RPS</button>
+            </div>
+            <div>
+                <label for="connect-contract-address">Connect to an existing RPS</label>
+                <input id="connect-contract-address" type="text" />
+                <button id="connect-contract-button">Connect</button>
+            </div>
+            <div id="deployed-contract-address"></div>
+            <div>
+                <button id="lock">Lock</button>
+            </div>
+            <div>
+                <label for="unlock-stage">Stage: </label>
+                <input id="unlock-stage" type="number" />
+                <label for="unlock-address0">Address 0: </label>
+                <input id="unlock-address0" type="text" />
+                <label for="unlock-commitment0">Commitment 0: </label>
+                <input id="unlock-commitment0" type="text" />
+                <label for="unlock-choice0">Choice 0: </label>
+                <input id="unlock-choice0" type="text" />
+                <label for="unlock-address1">Address 1: </label>
+                <input id="unlock-address1" type="text" />
+                <label for="unlock-commitment1">Commitment 1: </label>
+                <input id="unlock-commitment1" type="text" />
+                <label for="unlock-choice1">Choice 1: </label>
+                <input id="unlock-choice1" type="text" />
+                <button id="unlock">Unlock</button>
+            </div>
+            <div>
+                Lock status:
+                <span id="lock-status"></span>
+            </div>
+        </div>
+        <hr/>
+
+        <div id="game-container" hidden="true">
+            <h2>Time to play!</h2>
+            <div id="game-state"></div>
+            <div>
+                <label for="player-selector">Select player:</label>
+                <select id="player-selector"></select>
+
+                <div id="commit-container">
+                    <h4>Commit to contract</h4>
+                    <label for="commitment-choice">Make a choice:</label>
+                    <select id="commitment-choice">
+                        <option disabled selected value="-1"> -- select an option -- </option>
+                        <option value="rock">Rock</option>
+                        <option value="paper">Paper</option>
+                        <option value="scissors">Scissors</option>
+                    </select>
+                    <div>
+                        <label for="commit-random-number">Select a random string,
+                            <b>remember it!</b>:</label>
+                        <input id="commit-random-number" type="text">
+                    </div>
+
+                    <button id="commit">Commit</button>
+                    <ul id="commitments-made"></ul>
+                </div>
+
+                <div id="reveal-container">
+                    <h4>Reveal to contract</h4>
+                    <label for="reveal-choice">Select your original choice: </label>
+                    <select id="reveal-choice">
+                        <option disabled selected value="-1"> -- select an option -- </option>
+                        <option value="rock">Rock</option>
+                        <option value="paper">Paper</option>
+                        <option value="scissors">Scissors</option>
+                    </select>
+
+                    <div>
+                        <label for="reveal-random-number">Input the random string you remembered.</label>
+                        <input id="reveal-random-number" type="text">
+                    </div>
+
+                    <button id="reveal">Reveal</button>
+                    <ul id="reveals-made"></ul>
+                </div>
+
+                <div id="distribute-container">
+                    <h4>Calculate the result and distribute the winnings</h4>
+                    <button id="distribute">Calculate and distribute</button>
+                    <ul id="distribute-results"></ul>
+                </div>
+            </div>
+        </div>
+
+
+        <!--
+                NORMAL FLOW
+                1. Deploy contract + choose params
+                2. Player 0 commit + send value
+                3. Player 1 commit + send value
+                4. Player 0 reveal
+                5. Player 1 reveal
+                6. Distribute, check balances
+            -->
+
+        <!--
+                FUNCTIONALITY
+                1. Deploy button - can be hit any time? yes - but contract is always shown at the top of the page
+                2. Commit section, can be called at any time
+                    a) Has a drop down + commit button
+                3. Reveal section, can be called at any time
+                    a) Has a drop down + reveal button
+                4. Distribute button
+
+
+                Nice- show live state of the contract any time
+            -->
+
+    </div>
+</body>
+
+</html>
