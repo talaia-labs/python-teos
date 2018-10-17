@@ -1,0 +1,3 @@
+[submodule "src/statechannels"]
+	path = src/statechannels
+	url = https://github.com/stonecoldpat/statechannels
