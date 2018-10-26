@@ -1,3 +1,5 @@
+pragma solidity ^0.4.25;
+
 contract DisputeRegistryInterface {
     
     /*
@@ -9,10 +11,10 @@ contract DisputeRegistryInterface {
      */
  
     // Get index of dispute
-    function getDispute(uint index) returns (uint _dStart, uint _dExpire, uint _stateRound); 
+    function getDispute(uint index) public returns (uint _dStart, uint _dExpire, uint _stateRound); 
     
     // Get total number of recorded disputes
-    function getTotalDisputes(address SC) returns (uint); 
+    function getTotalDisputes(address SC) public returns (uint); 
 }
 
 contract PISA {
@@ -25,7 +27,7 @@ contract PISA {
     // OK = deposit in contract. ready to accept jobs.
     // CHEATED = customer has provided evidence of cheating, and deposit forfeited
     // CLOSED = PISA has shut down serves and withdrawn their coins. 
-    struct Flag { NODEPOSIT, OK, CHEATED, CLOSING, CLOSED }
+    enum Flag { NODEPOSIT, OK, CHEATED, CLOSING, CLOSED }
     
     Flag public flag;
     uint public withdrawperiod = 0; // How long must PISA wait to withdraw coins? 
@@ -46,18 +48,17 @@ contract PISA {
     
     // Set up timers for PISA. No deposit yet.
     // Two step process. Set timers, send deposit seperately. 
-    constructor(uint _withdrawperiod, address _disputeregistry) {
+    constructor(uint _withdrawperiod, address _disputeregistry) public {
         
         withdrawperiod = _withdrawperiod; 
-        settleperiod = _settleperiod; 
         disputeregistry = _disputeregistry;
-        flag = NODEPOSIT;
+        flag = Flag.NODEPOSIT;
         owner = msg.sender; 
     }
     
     // Accept deposit from PISA and set up contract .
     // Can be re-used to topup deposit while channel is on 
-    function deposit() {
+    function deposit() public payable {
         require(msg.sender == owner); 
         require(flag == Flag.NODEPOSIT || flag == Flag.OK); 
         require(msg.value > 0); 
@@ -69,7 +70,7 @@ contract PISA {
     }
     
     // PISA wants to shut down. 
-    function stopmonitoring() {
+    function stopmonitoring() public {
         require(msg.sender == owner);
         require(flag == Flag.OK);
         
@@ -82,13 +83,13 @@ contract PISA {
     }
     
     // Let PISA withdraw deposit after time period 
-    function withdraw() { 
+    function withdraw() public { 
         require(flag == Flag.CLOSING); 
         require(withdrawtime > block.timestamp);
         require(owner == msg.sender); 
-        flag = Flag.CLOSED;
         
         // Safe from recusion - due to flag being CLOSED. 
+        flag = Flag.CLOSED;
         msg.sender.transfer(deposit);
         deposit = 0; 
         
@@ -107,7 +108,7 @@ contract PISA {
      * - addr = address(this) is the final part of the signed message! 
      * - signature = Tower signature 
      */ 
-    function recourse(uint _tStart, uint _tExpire, address _SC, uint _i, bytes32 _h, bytes32 _s, bytes _signature) {
+    function recourse(uint _tStart, uint _tExpire, address _SC, uint _i, bytes32 _h, bytes32 _s, bytes _signature) public {
         
         // This feature only works while there is a deposit! 
         require(flag == Flag.OK || flag == Flag.CLOSING); 
@@ -115,8 +116,8 @@ contract PISA {
         require(block.timestamp > _tExpire); 
         
         // Compute hash signed by the tower 
-        uint signedhash = keccak256(abi.encodePacked(_tStart, _tExpire, _SC, _i, _h, _s, address(this)));
-        require(owner == recoverEthereumSignedMessage(signedhash, signature)); 
+        bytes32 signedhash = keccak256(abi.encodePacked(_tStart, _tExpire, _SC, _i, _h, _s, address(this)));
+        require(owner == recoverEthereumSignedMessage(signedhash, _signature)); 
         
         // Valid signature. Let's now check for the dispute.
         uint totaldisputes = DisputeRegistryInterface(disputeregistry).getTotalDisputes(_SC); 
@@ -130,10 +131,10 @@ contract PISA {
             (dStart, dExpire, stateRound) = DisputeRegistryInterface(disputeregistry).getDispute(i);
             
             // Did the dispute happen after the agreed start time? 
-            if(dStart > tStart) { 
+            if(dStart > _tStart) { 
                 
                 // Did the dispute expire before the agreed expiry time? 
-                if(tExpire > dExpire) { 
+                if(_tExpire > dExpire) { 
                     
                     // OK it looks like the dispute was between 
                     // our agreed start and expiry time. 
@@ -163,6 +164,41 @@ contract PISA {
         return recover(prefixedHash, _signature);
     }
     
-    
-    
+    function recover(bytes32 _hash, bytes _signature) internal pure returns (address) {
+      bytes32 r;
+      bytes32 s;
+      uint8 v;
+      
+      // Check the signature length
+      if (_signature.length != 65) {
+          return (address(0)); 
+          
+      }
+      
+      // Divide the signature in r, s and v variables
+      // ecrecover takes the signature parameters, and the only way to get them
+      // currently is to use assembly.
+      // solium-disable-next-line security/no-inline-assembly
+      
+      assembly { 
+          r := mload(add(_signature, 32))
+          s := mload(add(_signature, 64))
+          v := byte(0, mload(add(_signature, 96)))
+          
+      }
+      
+      // Version of signature should be 27 or 28, but 0 and 1 are also possible versions
+      if (v < 27) {
+          v += 27;
+      }
+      
+      // If the version is correct return the signer address
+      if (v != 27 && v != 28) { 
+          return (address(0));
+          
+      } else {
+          // solium-disable-next-line arg-overflow
+          return ecrecover(_hash, v, r, s);
+      }
+    }
 }
