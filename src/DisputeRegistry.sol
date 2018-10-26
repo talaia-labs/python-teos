@@ -58,7 +58,7 @@ contract DailyRecord {
    }
 
    // starttime, endtime, ctr should be from the customer's receipt.
-   function testDispute(address sender, uint starttime, uint endtime, uint ctr) view public onlyOwner returns (bool) {
+   function testDispute(address sender, uint starttime, uint endtime, uint ctr) view public returns (bool) {
 
        // Nice thing: Constant look-up to find the caller's records (based on the day).
        Record[] storage sender_record = records[sender];
