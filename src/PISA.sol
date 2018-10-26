@@ -5,16 +5,11 @@ contract DisputeRegistryInterface {
     /*
      * Dispute Registry is a dedicated global contract for
      * recording state channel disputes.
-     * We can fetch the number of disputes it has for a given contract
-     * and then iterate over it. 
-     * NOTE: If a state channel has recorded too many disputes, we'll run out of gas, but this is unlikely due to time to resolve each dispute. 
+     * If a state channel has recorded too many disputes, we'll run out of gas, but this is unlikely due to time to resolve each dispute. 
      */
  
-    // Get index of dispute
-    function getDispute(uint index) public returns (uint _dStart, uint _dExpire, uint _stateRound); 
-    
-    // Get total number of recorded disputes
-    function getTotalDisputes(address SC) public returns (uint); 
+    // Test dispute. Day is 0-6 (depending on daily record). 
+    function testDispute(address _sc, uint8 _day, uint _starttime, uint _endtime, uint _stateround) returns (bool);
 }
 
 contract PISA {
@@ -108,7 +103,7 @@ contract PISA {
      * - addr = address(this) is the final part of the signed message! 
      * - signature = Tower signature 
      */ 
-    function recourse(uint _tStart, uint _tExpire, address _SC, uint _i, bytes32 _h, bytes32 _s, bytes _signature) public {
+    function recourse(uint8 _day, uint _tStart, uint _tExpire, address _SC, uint _i, bytes32 _h, bytes32 _s, bytes _signature) public {
         
         // This feature only works while there is a deposit! 
         require(flag == Flag.OK || flag == Flag.CLOSING); 
@@ -119,41 +114,15 @@ contract PISA {
         bytes32 signedhash = keccak256(abi.encodePacked(_tStart, _tExpire, _SC, _i, _h, _s, address(this)));
         require(owner == recoverEthereumSignedMessage(signedhash, _signature)); 
         
-        // Valid signature. Let's now check for the dispute.
-        uint totaldisputes = DisputeRegistryInterface(disputeregistry).getTotalDisputes(_SC); 
-        
-        // Iterate over every recorded dispute for this channel. 
-        // TODO: Perhaps the registry can be made to be an instant lookup based on H(SC || i). 
-        uint dStart; uint dExpire; uint stateRound; 
-        
-        for(uint i=0; i<totaldisputes; i++) {
-            
-            (dStart, dExpire, stateRound) = DisputeRegistryInterface(disputeregistry).getDispute(i);
-            
-            // Did the dispute happen after the agreed start time? 
-            if(dStart > _tStart) { 
-                
-                // Did the dispute expire before the agreed expiry time? 
-                if(_tExpire > dExpire) { 
-                    
-                    // OK it looks like the dispute was between 
-                    // our agreed start and expiry time. 
-                    
-                    // What about the state round? 
-                    if(i > stateRound) {
+        if(DisputeRegistryInterface(disputeregistry).testDispute(_SC, _day, _tStart, _tExpire, _i)) {
+            // Crucial: State channel records finishing round. 
+            // i.e. if tower broadcast 10 and it was accepted by state channel, 
+            // then stateRound should be 10. 
+            // If tower had "11" and didn't broadcast it, then tower cheated. 
+            flag = Flag.CHEATED; 
                         
-                        // Crucial: State channel records finishing round. 
-                        // i.e. if tower broadcast 10 and it was accepted by state channel, 
-                        // then stateRound should be 10. 
-                        // If tower had "11" and didn't broadcast it, then tower cheated. 
-                        flag = Flag.CHEATED; 
-                        
-                        // Tell the world that PISA cheated!
-                        emit PISACheated(_SC, block.timestamp);
-                    }
-                }
-            }
-            // No cheating discovered? try the next dispute record! 
+            // Tell the world that PISA cheated!
+            emit PISACheated(_SC, block.timestamp);
         }
     }
     
