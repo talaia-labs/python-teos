@@ -4,7 +4,9 @@
   "description": "Arbitration Outsourcing for State Channels",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register src/**/__pisa_tests__/*.test.ts --exit"
+    "test": "mocha -r ts-node/register src/**/__pisa_tests__/*.test.ts --exit",
+    "build-kitsune": "cd src/external/statechannels && npm i && truffle compile",
+    "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000"
   },
   "repository": {
     "type": "git",
@@ -17,10 +19,16 @@
   },
   "homepage": "https://github.com/PISAresearch/pisa#readme",
   "dependencies": {
-    "web3": "^1.0.0-beta.36"
+    "drizzle": "^1.2.3",
+    "ethereumjs-util": "^6.0.0",
+    "ethers": "^4.0.7",
+    "web3": "^1.0.0-beta.36",
+    "web3x": "^1.1.0",
+    "web3x-es": "^1.1.0"
   },
   "devDependencies": {
     "@types/chai": "^4.1.6",
+    "@types/ethereumjs-util": "^5.2.0",
     "@types/mocha": "^5.2.5",
     "@types/web3": "^1.0.10",
     "chai": "^4.2.0",
