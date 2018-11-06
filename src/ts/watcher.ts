@@ -1,5 +1,5 @@
 import { IAppointment } from "./dataEntities/appointment";
-const StateChannel = require("./external/statechannels/build/contracts/StateChannel.json");
+const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
 import { ethers } from "ethers";
 
 // TODO: better name for this

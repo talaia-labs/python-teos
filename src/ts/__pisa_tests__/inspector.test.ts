@@ -2,7 +2,7 @@ import * as chai from "chai";
 import "mocha";
 import { Inspector } from "./../inspector";
 import { KitsuneTools } from "./../kitsuneTools";
-const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
+const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { ethers } from "ethers";
 const provider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
 const expect = chai.expect;

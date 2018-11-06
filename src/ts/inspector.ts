@@ -1,10 +1,5 @@
-import Web3 = require("web3");
-import { Web3 as Web3x } from "web3x";
-import { soliditySha3 } from "web3x/utils";
-const StateChannel = require("./external/statechannels/build/contracts/StateChannel.json");
+const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
 import { IAppointmentRequest, IAppointment } from "./dataEntities/appointment";
-// TODO: maybe we dont need this with web3x / ethersjs
-import ethereumjs from "ethereumjs-util";
 import { KitsuneTools } from "./kitsuneTools";
 import { ethers } from "ethers";
 import { verifyMessage } from "ethers/utils";
