@@ -22,7 +22,6 @@ import { verifyMessage } from "ethers/utils";
 // to be valid for pisa it needs to have a set s
 export class Inspector {
     constructor(
-        private readonly web3: Web3x,
         private readonly minimumDisputePeriod: number,
         private readonly provider: ethers.providers.BaseProvider
     ) {}
@@ -33,10 +32,16 @@ export class Inspector {
     // TODO: the watchtower could accept the an invalid appointment, which it would be unable to fulfil
     // TODO: but in some cases the appointment could also not be used to penalise the tower - as it was invalid
 
+    /**
+     * Inspects an appointment to decide whether to take a job. Throws on reject.
+     * @param appointment
+     */
     public async inspect(appointment: IAppointmentRequest) {
         // TODO: check that the contract was instantiated by the correct factory
         // TODO: accept any appointment, however, if a channel is not already in a specific registry that it cannot be included! - this could be resolved at custodian dispute time
         // TODO: we could augment the state channel factory to achieve this - add a mapping there
+
+        // TODO: the validation in here is a dos vector, especially if it's expensive
 
         // const bytecode = await this.web3.eth.getCode(appointment.contractAddress);
         // console.log((bytecode as string).substring(0, 100));
@@ -69,7 +74,6 @@ export class Inspector {
                 } is not greater than channel round ${contractRound}`
             );
 
-        
         // check that the channel is not in a dispute
         const channelDisputePeriod: number = await contract.disputePeriod();
         if (appointment.expiryPeriod <= channelDisputePeriod) {
@@ -92,6 +96,7 @@ export class Inspector {
         // ON = 0, DISPUTE = 1, OFF = 2
         // TODO: better logging: ON, OFF, etc
         if (channelStatus != 0) {
+            // TODO: we actually just need to check that the status is not "dispute"
             throw new Error(`Channel status is ${channelStatus} not 0.`);
         }
     }

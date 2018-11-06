@@ -17,7 +17,7 @@ export class Watcher {
         return this.respondToDispute(eventInfo);
     }
     // TODO: this class is not thread safe, and we should have readonly here
-    private readonly appointments: IRegisteredAppointment[] = [];
+    private readonly registry: IRegisteredAppointment[] = [];
     constructor(private readonly provider: ethers.providers.BaseProvider, private readonly signer: ethers.Signer) {}
 
     async addAppointment(appointment: IAppointment) {
@@ -36,7 +36,7 @@ export class Watcher {
         contract.on(this.disputeEventName, this.disputeEventCallback);
 
         // store the appointments for later
-        this.appointments.push({
+        this.registry.push({
             appointment,
             contract
         });
@@ -51,12 +51,12 @@ export class Watcher {
 
         // respond by calling setstate
         // 1. find the appointment
-        const appointment = this.appointments.filter(
+        const registeredAppointment = this.registry.filter(
             a => a.appointment.stateUpdate.contractAddress === event.address
         )[0];
         // TODO: unsafe array access?
 
-        if (!appointment) {
+        if (!registeredAppointment) {
             // the appointment couldnt be found, this should never happen,
             // subscription should always be removed before the appointment
             throw new Error(`Missing appointment for contract ${event.address}`);
@@ -65,20 +65,20 @@ export class Watcher {
         // TODO: 2. check that the dispute was triggered within the correct time period
 
         // TODO: 3. Check that we still have time to respond - if not then we're in trouble, deposit will be lost
-        let sig0 = ethers.utils.splitSignature(appointment.appointment.stateUpdate.signatures[0]);
-        let sig1 = ethers.utils.splitSignature(appointment.appointment.stateUpdate.signatures[0]);
+        let sig0 = ethers.utils.splitSignature(registeredAppointment.appointment.stateUpdate.signatures[0]);
+        let sig1 = ethers.utils.splitSignature(registeredAppointment.appointment.stateUpdate.signatures[0]);
         // TODO: order the sigs dont expect them to be in a correct order - or do, explicitly
-        const tx = await appointment.contract.setstate(
+        const tx = await registeredAppointment.contract.setstate(
             [sig0.v - 27, sig0.r, sig0.s, sig1.v - 27, sig1.r, sig1.s],
-            appointment.appointment.stateUpdate.round,
-            appointment.appointment.stateUpdate.hashState
+            registeredAppointment.appointment.stateUpdate.round,
+            registeredAppointment.appointment.stateUpdate.hashState
         );
         await tx.wait();
 
         // remove subscription - we've satisfied our claim
-        appointment.contract.removeListener(this.disputeEventName, this.disputeEventCallback);
+        registeredAppointment.contract.removeListener(this.disputeEventName, this.disputeEventCallback);
 
         // remove the appoitment from the array
-        this.appointments.splice(this.appointments.indexOf(appointment), 1);
+        this.registry.splice(this.registry.indexOf(registeredAppointment), 1);
     }
 }
