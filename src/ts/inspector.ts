@@ -3,6 +3,7 @@ import { IAppointmentRequest, IAppointment } from "./dataEntities/appointment";
 import { KitsuneTools } from "./kitsuneTools";
 import { ethers } from "ethers";
 import { verifyMessage } from "ethers/utils";
+import logger from "./logger";
 
 // given an appointment inspect it to see if it's valid for PISA
 // 1. Assess the signature of the contract
@@ -32,7 +33,7 @@ export class Inspector {
      * @param appointment
      */
     public async inspect(appointment: IAppointmentRequest) {
-        // TODO: check that the contract was instantiated by the correct factory
+        // TODO: check that the contract was instantiated by the correct factory contract
         // TODO: accept any appointment, however, if a channel is not already in a specific registry that it cannot be included! - this could be resolved at custodian dispute time
         // TODO: we could augment the state channel factory to achieve this - add a mapping there
 
@@ -44,12 +45,16 @@ export class Inspector {
         //     throw new Error(`Contract at address ${appointment.contractAddress} does not have correct bytecode.`);
         // }
 
+        // log the appointment we're inspecting
+        logger.info("Appointment request: " + JSON.stringify(appointment));
+
         // get the participants
         const contract = new ethers.Contract(appointment.stateUpdate.contractAddress, StateChannel.abi, this.provider);
 
         // TODO: we're assuming 2 party here - this is because we would need to add plist.getLength() function
         // TODO: since at the moment we cant check for the length of an array just with an array getter
         const participants = [await contract.plist(0), await contract.plist(1)] as string[];
+        logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
 
         // check the sigs
         this.checkAllSigned(
@@ -59,18 +64,22 @@ export class Inspector {
             participants,
             appointment.stateUpdate.signatures
         );
+        logger.info("All participants have signed.");
 
         // check that the supplied state round is valid
-        const contractRound: number = await contract.bestRound();
-        if (contractRound >= appointment.stateUpdate.round)
+        const channelRound: number = await contract.bestRound();
+        logger.info(`Round at ${contract.address}: ${channelRound.toString(10)}`);
+        if (channelRound >= appointment.stateUpdate.round) {
             throw new Error(
                 `Supplied appointment round ${
                     appointment.stateUpdate.round
-                } is not greater than channel round ${contractRound}`
+                } is not greater than channel round ${channelRound}`
             );
+        }
 
         // check that the channel is not in a dispute
         const channelDisputePeriod: number = await contract.disputePeriod();
+        logger.info(`Dispute period at ${contract.address}: ${channelDisputePeriod.toString(10)}`);
         if (appointment.expiryPeriod <= channelDisputePeriod) {
             throw new Error(
                 `Supplied appointment expiryPeriod ${
@@ -88,6 +97,7 @@ export class Inspector {
         }
 
         const channelStatus: number = await contract.status();
+        logger.info(`Channel status at ${contract.address}: ${JSON.stringify(channelStatus)}`);
         // ON = 0, DISPUTE = 1, OFF = 2
         // TODO: better logging: ON, OFF, etc
         if (channelStatus != 0) {
@@ -96,6 +106,7 @@ export class Inspector {
         }
     }
 
+    // TODO: this doesnt belong in this class
     public createAppointment(request: IAppointmentRequest): IAppointment {
         const startTime = Date.now();
 
@@ -120,7 +131,7 @@ export class Inspector {
         }
 
         // form the hash
-        let setStateHash = KitsuneTools.hashForSetState(hashState, round, channelAddress);
+        const setStateHash = KitsuneTools.hashForSetState(hashState, round, channelAddress);
         const signers = sigs.map(sig => verifyMessage(ethers.utils.arrayify(setStateHash), sig));
         participants.forEach(party => {
             const signerIndex = signers.map(m => m.toLowerCase()).indexOf(party.toLowerCase());

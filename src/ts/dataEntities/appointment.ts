@@ -30,7 +30,7 @@ function isStateUpdate(obj: any) {
     propertyExistsAndIsOfType("round", "number", obj);
     propertyExistsAndIsOfType("contractAddress", "string", obj);
     doesPropertyExist("signatures", obj);
-    isArrayOfStrings(obj["signatures"])
+    isArrayOfStrings(obj["signatures"]);
 }
 
 function isArrayOfStrings(obj: any) {
