@@ -96,7 +96,7 @@ export class Inspector {
         }
     }
 
-    public createReceipt(request: IAppointmentRequest): IAppointment {
+    public createAppointment(request: IAppointmentRequest): IAppointment {
         const startTime = Date.now();
 
         return {

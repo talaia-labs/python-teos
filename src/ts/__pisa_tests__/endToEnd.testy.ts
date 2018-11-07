@@ -59,7 +59,7 @@ describe("End to end", () => {
         };
         await inspector.inspect(appointmentRequest);
         // 2. If correct create a receipt
-        const appointment = inspector.createReceipt(appointmentRequest);
+        const appointment = inspector.createAppointment(appointmentRequest);
 
         // 3. pass this appointment to the watcher
         const watcher = new Watcher(provider, provider.getSigner(pisaAccount));

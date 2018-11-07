@@ -66,7 +66,9 @@ export class Watcher {
 
         // TODO: 3. Check that we still have time to respond - if not then we're in trouble, deposit will be lost
         let sig0 = ethers.utils.splitSignature(registeredAppointment.appointment.stateUpdate.signatures[0]);
-        let sig1 = ethers.utils.splitSignature(registeredAppointment.appointment.stateUpdate.signatures[0]);
+        let sig1 = ethers.utils.splitSignature(registeredAppointment.appointment.stateUpdate.signatures[1]);
+
+
         // TODO: order the sigs dont expect them to be in a correct order - or do, explicitly
         const tx = await registeredAppointment.contract.setstate(
             [sig0.v - 27, sig0.r, sig0.s, sig1.v - 27, sig1.r, sig1.s],

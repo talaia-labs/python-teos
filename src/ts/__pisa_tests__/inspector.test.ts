@@ -18,6 +18,8 @@ const isRejected = async (result: Promise<any>) => {
     );
 };
 
+// TODO: test constructor, and create receipt
+
 describe("Inspector", () => {
     let account0, account1, channelContract, hashState, disputePeriod;
 

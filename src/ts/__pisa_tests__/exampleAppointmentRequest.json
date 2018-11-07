@@ -1,0 +1,12 @@
+{
+    "expiryPeriod": 11,
+    "stateUpdate": {
+        "contractAddress": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+        "hashState": "0xa2092ea24441ee16935c133fe2d1ed0e32943170e152dc2bedb5d2a77329ff97",
+        "round": 1,
+        "signatures": [
+            "0x6aad190f783465ae794e2b50f70101f1a687003018fcba851ba0c3014ba456db0f1029fdd3bf663861b851ceaa6945b514252cfffe0fd2d0d0b38b5b024727ed01",
+            "0x0a20bba9a3229d2273b1f1d5e5c4cd4680173b18001dcf6c16a2dcf128c1d30114b376ec91abfed0c9f9b59bdedbfbe50f305635aa78d3a155754057108ff97a00"
+        ]
+    }
+}
