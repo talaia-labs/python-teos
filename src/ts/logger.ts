@@ -1,32 +1,29 @@
 import { createLogger, format, transports } from "winston";
-// TODO: we're importing this logger in other places - we should allow it to be injected
 import httpContext from "express-http-context";
-
 
 // TODO: do we need tests for this? not really
 const myFormat = format.printf(info => {
     // get the current request id
     // TODO: is this performant? run a test
+    // TODO: this only works because we're creating a logger for every request right?
     const requestId = httpContext.get("requestId");
-    return `${info.timestamp} [${requestId}] ${info.level}: ${info.message}`;
-  });
+    const requestString = requestId ? `[${requestId}] ` : "";
+    return `${info.timestamp} ${requestString}${info.level}: ${info.message}`;
+});
 
-  const combinedFormats = format.combine(
-    format.timestamp(),
-    myFormat
-    )
+const combinedFormats = format.combine(format.timestamp(), myFormat);
 
 const logger = createLogger({
     level: "info",
     format: combinedFormats,
     transports: [
-        // - Write to all logs with level `info` and below to `combined.log`
-        // - Write all logs error (and below) to `error.log`.
         new transports.File({ filename: "error.log", level: "error" }),
-        new transports.File({ filename: "combined.log" })
+        new transports.File({ filename: "info.log", level: "info" }),
+        new transports.File({ filename: "debug.log", level: "debug" })
     ]
 });
 
+// TODO: we dont want to log during tests
 //
 // If we're not in production then log to the `console` with the format:
 // `${info.level}: ${info.message} JSON.stringify({ ...rest }) `

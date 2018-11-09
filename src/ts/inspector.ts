@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import { verifyMessage } from "ethers/utils";
 import logger from "./logger";
 
+
 // given an appointment inspect it to see if it's valid for PISA
 // 1. Assess the signature of the contract
 // 2. Assess the participants of the channel to see if the appointee is valid
@@ -19,7 +20,13 @@ import logger from "./logger";
 export class Inspector {
     constructor(
         private readonly minimumDisputePeriod: number,
-        private readonly provider: ethers.providers.BaseProvider
+        private readonly provider: ethers.providers.BaseProvider,
+        private readonly channelAbi: any,
+        private readonly hashForSetState: (hState: string, round: number, channelAddress: string) => string,
+        private readonly participants: (contract: ethers.Contract) => Promise<string[]>,
+        private readonly round: (contract: ethers.Contract) => Promise<number>,
+        private readonly disputePeriod: (contract: ethers.Contract) => Promise<number>,
+        private readonly status: (contract: ethers.Contract) => Promise<number>
     ) {}
     // TODO: break this class
     // TODO: document public methods
@@ -46,28 +53,30 @@ export class Inspector {
         // }
 
         // log the appointment we're inspecting
-        logger.info("Appointment request: " + JSON.stringify(appointment));
+        logger.info(`Inspecting appointment ${appointment.stateUpdate.hashState} for contract ${appointment.stateUpdate.contractAddress}.`)
+        logger.debug("Appointment request: " + JSON.stringify(appointment));
 
         // get the participants
-        const contract = new ethers.Contract(appointment.stateUpdate.contractAddress, StateChannel.abi, this.provider);
+        const contract = new ethers.Contract(appointment.stateUpdate.contractAddress, this.channelAbi, this.provider);
 
         // TODO: we're assuming 2 party here - this is because we would need to add plist.getLength() function
         // TODO: since at the moment we cant check for the length of an array just with an array getter
-        const participants = [await contract.plist(0), await contract.plist(1)] as string[];
+        const participants = await this.participants(contract);
         logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
 
-        // check the sigs
-        this.checkAllSigned(
+        // form the hash
+        const setStateHash = this.hashForSetState(
             appointment.stateUpdate.hashState,
-            appointment.stateUpdate.contractAddress,
             appointment.stateUpdate.round,
-            participants,
-            appointment.stateUpdate.signatures
+            appointment.stateUpdate.contractAddress
         );
+
+        // check the sigs
+        this.checkAllSigned(setStateHash, participants, appointment.stateUpdate.signatures);
         logger.info("All participants have signed.");
 
         // check that the supplied state round is valid
-        const channelRound: number = await contract.bestRound();
+        const channelRound: number = await this.round(contract);
         logger.info(`Round at ${contract.address}: ${channelRound.toString(10)}`);
         if (channelRound >= appointment.stateUpdate.round) {
             throw new Error(
@@ -78,7 +87,7 @@ export class Inspector {
         }
 
         // check that the channel is not in a dispute
-        const channelDisputePeriod: number = await contract.disputePeriod();
+        const channelDisputePeriod: number = await this.disputePeriod(contract);
         logger.info(`Dispute period at ${contract.address}: ${channelDisputePeriod.toString(10)}`);
         if (appointment.expiryPeriod <= channelDisputePeriod) {
             throw new Error(
@@ -96,7 +105,7 @@ export class Inspector {
             );
         }
 
-        const channelStatus: number = await contract.status();
+        const channelStatus: number = await this.status(contract);
         logger.info(`Channel status at ${contract.address}: ${JSON.stringify(channelStatus)}`);
         // ON = 0, DISPUTE = 1, OFF = 2
         // TODO: better logging: ON, OFF, etc
@@ -107,6 +116,9 @@ export class Inspector {
     }
 
     // TODO: this doesnt belong in this class
+    // TODO: actually it does but it shouldnt be called at a time
+    // TODO: different to the inspection since an inspection might
+    // TODO: be time dependent
     public createAppointment(request: IAppointmentRequest): IAppointment {
         const startTime = Date.now();
 
@@ -117,22 +129,20 @@ export class Inspector {
         };
     }
 
-    private checkAllSigned(
-        hashState: string,
-        channelAddress: string,
-        round: number,
-        participants: string[],
-        sigs: string[]
-    ) {
+    /**
+     * Check that every participant that every participant has signed the message.
+     * @param message
+     * @param participants
+     * @param sigs 
+     */
+    private checkAllSigned(message: string, participants: string[], sigs: string[]) {
         if (participants.length !== sigs.length) {
             throw new Error(
                 `Incorrect number of signatures supplied. Participants: ${participants.length}, signers: ${sigs.length}`
             );
         }
 
-        // form the hash
-        const setStateHash = KitsuneTools.hashForSetState(hashState, round, channelAddress);
-        const signers = sigs.map(sig => verifyMessage(ethers.utils.arrayify(setStateHash), sig));
+        const signers = sigs.map(sig => verifyMessage(ethers.utils.arrayify(message), sig));
         participants.forEach(party => {
             const signerIndex = signers.map(m => m.toLowerCase()).indexOf(party.toLowerCase());
             if (signerIndex === -1) throw new Error(`Party ${party} not present in signatures.`);
@@ -143,5 +153,19 @@ export class Inspector {
     }
 }
 
+export class KitsuneInspector extends Inspector {
+    constructor(disputePeriod: number, provider: ethers.providers.BaseProvider) {
+        super(
+            disputePeriod,
+            provider,
+            StateChannel.abi,
+            KitsuneTools.hashForSetState,
+            KitsuneTools.participants,
+            KitsuneTools.round,
+            KitsuneTools.disputePeriod,
+            KitsuneTools.status
+        );
+    }
+}
 //QUESTION: is there preference over offchain message being signed with the Ethereum Signed Message - currently necessary for web3 users
 //QUESTION: do L4 use block.number or block.timestamp

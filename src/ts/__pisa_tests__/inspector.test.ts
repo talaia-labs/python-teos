@@ -1,6 +1,6 @@
 import * as chai from "chai";
 import "mocha";
-import { Inspector } from "./../inspector";
+import { KitsuneInspector } from "./../inspector";
 import { KitsuneTools } from "./../kitsuneTools";
 const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { ethers } from "ethers";
@@ -49,7 +49,7 @@ describe("Inspector", () => {
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash)),
             expiryPeriod = disputePeriod + 1;
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await inspector.inspect({
             expiryPeriod,
             stateUpdate: {
@@ -68,8 +68,7 @@ describe("Inspector", () => {
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash)),
             expiryPeriod = disputePeriod + 1;
 
-        const inspector = new Inspector(10, provider);
-
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -90,8 +89,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
-
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -112,8 +110,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
-
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -134,7 +131,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -156,7 +153,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
 
         // TODO: raise an isse on ethers js about this unhandled promise rejection
         await isRejected(
@@ -180,7 +177,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -202,7 +199,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -225,7 +222,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(hashState)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(hashState));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -247,7 +244,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -268,7 +265,7 @@ describe("Inspector", () => {
             //sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -290,7 +287,7 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash));
 
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         await inspector.inspect({
             expiryPeriod,
             stateUpdate: {

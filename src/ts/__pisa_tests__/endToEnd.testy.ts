@@ -1,7 +1,7 @@
 import * as chai from "chai";
 import "mocha";
-import { Inspector } from "./../inspector";
-import { Watcher } from "./../watcher";
+import { KitsuneInspector } from "./../inspector";
+import { KitsuneWatcher } from "./../watcher";
 const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { KitsuneTools } from "./../kitsuneTools";
 import { ethers } from "ethers";
@@ -18,7 +18,6 @@ describe("End to end", () => {
         channelContract: ethers.Contract,
         round: number,
         provider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
-    
 
     before(async () => {
         provider.pollingInterval = 100;
@@ -46,7 +45,7 @@ describe("End to end", () => {
     });
 
     it("inspect and watch a contract", async () => {
-        const inspector = new Inspector(10, provider);
+        const inspector = new KitsuneInspector(10, provider);
         // 1. Verify appointment
         const appointmentRequest = {
             stateUpdate: {
@@ -62,10 +61,10 @@ describe("End to end", () => {
         const appointment = inspector.createAppointment(appointmentRequest);
 
         // 3. pass this appointment to the watcher
-        const watcher = new Watcher(provider, provider.getSigner(pisaAccount));
+        const watcher = new KitsuneWatcher(provider, provider.getSigner(pisaAccount));
         const player0Contract = channelContract.connect(provider.getSigner(player0));
-
-        await watcher.addAppointment(appointment);
+        await watcher.watch(appointment);
+        
         // 4. Trigger a dispute
         const tx = await player0Contract.triggerDispute();
         const face = await tx.wait();
