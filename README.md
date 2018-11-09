@@ -11,7 +11,7 @@ The customer wants to hire the Pisa service to watch the channel on their behalf
 * Pisa generates a secret "s" and hashes it to compute the receiptHash i.e. receiptHash = H(S). 
 * Pisa sends the appointment (and the receiptHash) to all watchers under its control (i.e. independent servers running geth + watching service)
 * All watchers will inspect the appointment (i.e. again, verify that its legitimate and can be used to resolve a future dispute) 
-* Each watcher will sign a receipt and send it back to Pisa. 
+* Each watcher will sign a receipt, send it back to Pisa and start watching the customer's channel.  
 * Once Pisa has received k of n signatures, all signatures are aggregated into a single signature. 
 ** In other words, there will be a threshold scheme to ensure that a sufficient number of watchers have accepted the job before the receipt is signed by Pisa's public key. 
 * Pisa will send the signed receipt back to the customer 
