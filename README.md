@@ -21,5 +21,5 @@ The customer wants to hire the Pisa service to watch the channel on their behalf
 ## Limitations of above design 
 
 * The customer can send an appointment to Pisa, but not pay Pisa. 
-** Our focus is on resilience / dependability. We want to outsource the job to several watchers, and then not "cancel" it in the future. If a customer doesn't pay, then Pisa will refuse all future jobs from the customer's key + state channel. 
-** This isn't an issue with the Pisa protocol, but just our current architecture design. 
+  * Our focus is on resilience / dependability. We want to outsource the job to several watchers, and then not "cancel" it in the future. If a customer doesn't pay, then Pisa will refuse all future jobs from the customer's key + state channel. 
+  * This isn't an issue with the Pisa protocol, but just our current architecture design. 
