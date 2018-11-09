@@ -13,7 +13,7 @@ The customer wants to hire the Pisa service to watch the channel on their behalf
 * All watchers will inspect the appointment (i.e. again, verify that its legitimate and can be used to resolve a future dispute) 
 * Each watcher will sign a receipt, send it back to Pisa and start watching the customer's channel.  
 * Once Pisa has received k of n signatures, all signatures are aggregated into a single signature. 
-** In other words, there will be a threshold scheme to ensure that a sufficient number of watchers have accepted the job before the receipt is signed by Pisa's public key. 
+  * In other words, there will be a threshold scheme to ensure that a sufficient number of watchers have accepted the job before the receipt is signed by Pisa's public key. 
 * Pisa will send the signed receipt back to the customer 
 * Customer sets up the conditional transfer to Pisa
 * Pisa reveals the secret "s" to the customer, and the transfer is complete. 
