@@ -2,6 +2,12 @@
 
 This repository focuses on building an accountable third party service called Pisa that can be hired to watch channels on behalf of its users. The aim is to let anyone run a Pisa service and watch over several channel constructions (Kitsune, Counterfactual, Funfair, etc). We'll shortly present our architecture for this implementation of Pisa - but fundamentally it will let the Pisa service host "watchers" on several computers, and a central service is responsible for interacting with the state channel customer. 
 
+## Short-term VS Long-term Goals
+
+In the short-term, our plan is to build an MVP of Pisa that is free to use. We'll host it on several servers, and battle-test it in the wild. We hope our initial MVP will be compatible with Kitsune and Counterfactual, although new channels can be "plugged in" as required. 
+
+In the long-term, we hope to build the full life-cycle below. 
+
 ## The Life-Cycle of Hiring Pisa 
 
 The customer wants to hire the Pisa service to watch the channel on their behalf. Briefly, it'll involve the following: 
