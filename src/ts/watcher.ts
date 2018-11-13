@@ -58,6 +58,7 @@ export class Watcher {
         // watch the supplied event
         contract.on(this.eventName, async (...args: any[]) => {
             // this callback should not throw exceptions as they cannot be handled elsewhere
+            
 
             // call the callback
             try {

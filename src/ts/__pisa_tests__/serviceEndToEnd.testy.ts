@@ -8,11 +8,11 @@ const provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
 provider.pollingInterval = 100;
 
 describe("Service end-to-end", () => {
-    let account0,
-        account1,
+    let account0: string,
+        account1: string,
         channelContract: ethers.Contract,
-        hashState,
-        disputePeriod,
+        hashState: string,
+        disputePeriod: number,
         pisaUrl = "http://localhost:3000";
 
     before(async () => {
@@ -76,7 +76,7 @@ describe("Service end-to-end", () => {
 });
 
 // assess the value of a predicate after a timeout, throws if predicate does not evaluate to true
-const waitForPredicate = <T1>(successResult: T1, predicate: (a: T1) => boolean, timeout) => {
+const waitForPredicate = <T1>(successResult: T1, predicate: (a: T1) => boolean, timeout: number) => {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
             if (predicate(successResult)) {

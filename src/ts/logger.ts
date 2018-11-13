@@ -1,12 +1,13 @@
 import { createLogger, format, transports } from "winston";
-import httpContext from "express-http-context";
+import { getRequestId } from "./customExpressHttpContext";
+
 
 // TODO: do we need tests for this? not really
 const myFormat = format.printf(info => {
     // get the current request id
     // TODO: is this performant? run a test
     // TODO: this only works because we're creating a logger for every request right?
-    const requestId = httpContext.get("requestId");
+    const requestId = getRequestId();
     const requestString = requestId ? `[${requestId}] ` : "";
     return `${info.timestamp} ${requestString}${info.level}: ${info.message}`;
 });
