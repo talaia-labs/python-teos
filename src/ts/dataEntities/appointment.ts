@@ -7,6 +7,7 @@ export interface IAppointment {
     stateUpdate: IStateUpdate;
     startTime: number;
     endTime: number;
+    inspectionTime: number;
 }
 
 export interface IStateUpdate {
@@ -16,7 +17,6 @@ export interface IStateUpdate {
     contractAddress: string;
 }
 
-// TODO: tests for these
 export function parseAppointment(obj: any) {
     if (!obj) throw new Error("Appointment not defined.");
     propertyExistsAndIsOfType("expiryPeriod", "number", obj);

@@ -2,7 +2,6 @@ import * as chai from "chai";
 import "mocha";
 import { KitsuneInspector } from "./../inspector";
 import { KitsuneTools } from "./../kitsuneTools";
-const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { ethers } from "ethers";
 import Ganache from "ganache-core";
 const ganache = Ganache.provider({
@@ -38,8 +37,8 @@ describe("Inspector", () => {
 
         // contract
         const channelContractFactory = new ethers.ContractFactory(
-            StateChannel.abi,
-            StateChannel.bytecode,
+            KitsuneTools.ContractAbi,
+            KitsuneTools.ContractBytecode,
             provider.getSigner()
         );
         channelContract = await channelContractFactory.deploy([account0, account1], disputePeriod);
@@ -63,6 +62,9 @@ describe("Inspector", () => {
                 signatures: [sig0, sig1]
             }
         });
+
+        // TODO: test the return value of inspect in all cases
+
     });
 
     it("throws for round too low", async () => {

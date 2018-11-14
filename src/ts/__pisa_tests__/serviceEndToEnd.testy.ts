@@ -1,6 +1,5 @@
 import * as chai from "chai";
 import "mocha";
-const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import request from "request-promise";
 import { KitsuneTools } from "./../kitsuneTools";
 import { ethers } from "ethers";
@@ -12,8 +11,6 @@ import Ganache from "ganache-core";
 const ganache = Ganache.provider({
     mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
 });
-
-// TODO: more useful errors when loading config? - or just fail at the given point
 const config: IConfig = {
     host: {
         name: "localhost",
@@ -34,7 +31,6 @@ describe("Service end-to-end", () => {
         service: PisaService;
 
     before(async () => {
-        // TODO: add logging and timing throughout
         const watcherWallet = new ethers.Wallet(config.watcherKey, provider);
         const watcher = new KitsuneWatcher(provider, watcherWallet);
         const inspector = new KitsuneInspector(10, provider);
@@ -50,8 +46,8 @@ describe("Service end-to-end", () => {
 
         // contract
         const channelContractFactory = new ethers.ContractFactory(
-            StateChannel.abi,
-            StateChannel.bytecode,
+            KitsuneTools.ContractAbi,
+            KitsuneTools.ContractBytecode,
             provider.getSigner()
         );
         channelContract = await channelContractFactory.deploy([account0, account1], disputePeriod);
@@ -77,8 +73,7 @@ describe("Service end-to-end", () => {
                 signatures: [sig0, sig1]
             }
         };
-
-        // TODO: should be starting the service ourselves here, for now assume started
+        
         await request.post(`http://${config.host.name}:${config.host.port}/appointment`, { json: appointmentRequest });
 
         // now register a callback on the setstate event and trigger a response

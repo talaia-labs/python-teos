@@ -1,6 +1,7 @@
 import { solidityKeccak256 } from "ethers/utils";
 import { IAppointment } from "./dataEntities/appointment";
 import { Contract, utils } from "ethers";
+const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
 
 // TODO: this class...
 
@@ -38,4 +39,7 @@ export class KitsuneTools {
     public static async status(contract: Contract) {
         return await contract.status();
     }
+
+    public static ContractBytecode = StateChannel.bytecode;
+    public static ContractAbi = StateChannel.abi;
 }

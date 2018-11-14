@@ -1,12 +1,9 @@
 import { createLogger, format, transports } from "winston";
 import { getRequestId } from "./customExpressHttpContext";
 
-
-// TODO: do we need tests for this? not really
 const myFormat = format.printf(info => {
     // get the current request id
     // TODO: is this performant? run a test
-    // TODO: this only works because we're creating a logger for every request right?
     const requestId = getRequestId();
     const requestString = requestId ? `[${requestId}] ` : "";
     return `${info.timestamp} ${requestString}${info.level}: ${info.message}`;
@@ -23,12 +20,7 @@ const logger = createLogger({
         new transports.File({ filename: "debug.log", level: "debug" })
     ]
 });
-
-// TODO: we dont want to log during tests
-//
-// If we're not in production then log to the `console` with the format:
-// `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
-//
+// console log if we're not in production
 if (process.env.NODE_ENV !== "production") {
     logger.add(
         new transports.Console({

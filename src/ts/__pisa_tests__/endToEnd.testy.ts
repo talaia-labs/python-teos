@@ -2,15 +2,12 @@ import * as chai from "chai";
 import "mocha";
 import { KitsuneInspector } from "./../inspector";
 import { KitsuneWatcher } from "./../watcher";
-const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { KitsuneTools } from "./../kitsuneTools";
 import { ethers } from "ethers";
 import Ganache from "ganache-core";
 const ganache = Ganache.provider({ 
     mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
 });
-
-// TODO: great tidying ensues
 
 describe("End to end", () => {
     let player0: string,
@@ -33,8 +30,8 @@ describe("End to end", () => {
 
         // deploy the channel
         const channelContractFactory = new ethers.ContractFactory(
-            StateChannel.abi,
-            StateChannel.bytecode,
+            KitsuneTools.ContractAbi,
+            KitsuneTools.ContractBytecode,
             provider.getSigner(accounts[3])
         );
         channelContract = await channelContractFactory.deploy([player0, player1], 10);
@@ -60,16 +57,14 @@ describe("End to end", () => {
             },
             expiryPeriod: 11
         };
-        await inspector.inspect(appointmentRequest);
-        // 2. If correct create a receipt
-        const appointment = inspector.createAppointment(appointmentRequest);
+        const appointment = await inspector.inspect(appointmentRequest);         
 
-        // 3. pass this appointment to the watcher
+        // 2. pass this appointment to the watcher
         const watcher = new KitsuneWatcher(provider, provider.getSigner(pisaAccount));
         const player0Contract = channelContract.connect(provider.getSigner(player0));
         await watcher.watch(appointment);
         
-        // 4. Trigger a dispute
+        // 3. Trigger a dispute
         const tx = await player0Contract.triggerDispute();
         const face = await tx.wait();
         await wait(2000);

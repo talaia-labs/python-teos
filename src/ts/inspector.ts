@@ -1,23 +1,12 @@
-// TODO: access this json via the kitsune tools
-const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
 import { IAppointmentRequest, IAppointment } from "./dataEntities/appointment";
 import { KitsuneTools } from "./kitsuneTools";
 import { ethers } from "ethers";
 import { verifyMessage } from "ethers/utils";
 import logger from "./logger";
 
-
-// given an appointment inspect it to see if it's valid for PISA
-// 1. Assess the signature of the contract
-// 2. Assess the participants of the channel to see if the appointee is valid
-// *** 3. Assess that the appointment has indeed been signed by these participants
-// *** 4. Check that the state round > round in channel
-// *** 5. Check that expiry is positive and that it is greater than the time specified in the channel
-// *** 6. Check that the channel is ok state - not dispute
-// 8. Check that the channel settle time is reasonable, not too small
-// 9. If so, we sign a new appointment
-
-// to be valid for pisa it needs to have a set s
+/**
+ * Responsible for deciding whether to accept appointments
+ */
 export class Inspector {
     constructor(
         private readonly minimumDisputePeriod: number,
@@ -29,30 +18,12 @@ export class Inspector {
         private readonly disputePeriod: (contract: ethers.Contract) => Promise<number>,
         private readonly status: (contract: ethers.Contract) => Promise<number>
     ) {}
-    // TODO: break this class
-    // TODO: document this class and public methods
-
-    // TODO: some of the validation below is not strictly necessary right?
-    // TODO: the watchtower could accept the an invalid appointment, which it would be unable to fulfil
-    // TODO: but in some cases the appointment could also not be used to penalise the tower - as it was invalid
 
     /**
-     * Inspects an appointment to decide whether to take a job. Throws on reject.
+     * Inspects an appointment to decide whether to accept it. Throws on reject.
      * @param appointment
      */
     public async inspect(appointment: IAppointmentRequest) {
-        // TODO: check that the contract was instantiated by the correct factory contract
-        // TODO: accept any appointment, however, if a channel is not already in a specific registry that it cannot be included! - this could be resolved at custodian dispute time
-        // TODO: we could augment the state channel factory to achieve this - add a mapping there
-
-        // TODO: the validation in here is a dos vector, especially if it's expensive
-
-        // const bytecode = await this.web3.eth.getCode(appointment.contractAddress);
-        // console.log((bytecode as string).substring(0, 100));
-        // if (bytecode != StateChannel.bytecode) {
-        //     throw new Error(`Contract at address ${appointment.contractAddress} does not have correct bytecode.`);
-        // }
-
         // log the appointment we're inspecting
         logger.info(`Inspecting appointment ${appointment.stateUpdate.hashState} for contract ${appointment.stateUpdate.contractAddress}.`)
         logger.debug("Appointment request: " + JSON.stringify(appointment));
@@ -60,8 +31,6 @@ export class Inspector {
         // get the participants
         const contract = new ethers.Contract(appointment.stateUpdate.contractAddress, this.channelAbi, this.provider);
 
-        // TODO: we're assuming 2 party here - this is because we would need to add plist.getLength() function
-        // TODO: since at the moment we cant check for the length of an array just with an array getter
         const participants = await this.participants(contract);
         logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
 
@@ -109,24 +78,25 @@ export class Inspector {
         const channelStatus: number = await this.status(contract);
         logger.info(`Channel status at ${contract.address}: ${JSON.stringify(channelStatus)}`);
         // ON = 0, DISPUTE = 1, OFF = 2
-        // TODO: better logging: ON, OFF, etc
         if (channelStatus != 0) {
-            // TODO: we actually just need to check that the status is not "dispute"
             throw new Error(`Channel status is ${channelStatus} not 0.`);
         }
+
+        return this.createAppointment(appointment);
     }
 
-    // TODO: this doesnt belong in this class
-    // TODO: actually it does but it shouldnt be called at a time
-    // TODO: different to the inspection since an inspection might
-    // TODO: be time dependent
-    public createAppointment(request: IAppointmentRequest): IAppointment {
+    /**
+     * Converts an appointment request into an appointment
+     * @param request
+     */
+    private createAppointment(request: IAppointmentRequest): IAppointment {
         const startTime = Date.now();
 
         return {
             stateUpdate: request.stateUpdate,
             startTime: startTime,
-            endTime: startTime + request.expiryPeriod
+            endTime: startTime + request.expiryPeriod,
+            inspectionTime : Date.now()
         };
     }
 
@@ -159,7 +129,7 @@ export class KitsuneInspector extends Inspector {
         super(
             disputePeriod,
             provider,
-            StateChannel.abi,
+            KitsuneTools.ContractAbi,
             KitsuneTools.hashForSetState,
             KitsuneTools.participants,
             KitsuneTools.round,
@@ -168,5 +138,3 @@ export class KitsuneInspector extends Inspector {
         );
     }
 }
-//QUESTION: is there preference over offchain message being signed with the Ethereum Signed Message - currently necessary for web3 users
-//QUESTION: do L4 use block.number or block.timestamp
