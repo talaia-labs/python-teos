@@ -16,7 +16,7 @@ const inspector = new KitsuneInspector(10, provider);
 // start the pisa service
 const service = new PisaService(config.host.name, config.host.port, inspector, watcher);
 
-// wait for a stop
+// wait for a stop signal
 waitForStop();
 
 function waitForStop() {
@@ -28,18 +28,16 @@ function waitForStop() {
     // resume stdin in the parent process (node app won't quit all by itself
     // unless an error or process.exit() happens)
     stdin.resume();
-
-    // i don't want binary, do you?
     stdin.setEncoding("utf8");
-
-    // on any data into stdin
     stdin.on("data", key => {
         // ctrl-c ( end of text )
         if (key === "\u0003") {
+            // stop the pisa service
             service.stop()
+            // exit the process
             process.exit();
         }
-        // write the key to stdout all normal like
+        // otherwise write the key to stdout all normal like
         process.stdout.write(key);
     });
 }
