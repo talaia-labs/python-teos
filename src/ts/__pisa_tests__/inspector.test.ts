@@ -4,7 +4,11 @@ import { KitsuneInspector } from "./../inspector";
 import { KitsuneTools } from "./../kitsuneTools";
 const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { ethers } from "ethers";
-const provider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+import Ganache from "ganache-core";
+const ganache = Ganache.provider({
+    mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
+});
+const provider: ethers.providers.Web3Provider = new ethers.providers.Web3Provider(ganache);
 const expect = chai.expect;
 
 const isRejected = async (result: Promise<any>) => {
@@ -21,7 +25,7 @@ const isRejected = async (result: Promise<any>) => {
 // TODO: test constructor, and create receipt
 
 describe("Inspector", () => {
-    let account0, account1, channelContract, hashState, disputePeriod;
+    let account0: string, account1: string, channelContract: ethers.Contract, hashState: string, disputePeriod: number;
 
     before(async () => {
         // accounts

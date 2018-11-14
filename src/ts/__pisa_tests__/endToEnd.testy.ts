@@ -5,19 +5,23 @@ import { KitsuneWatcher } from "./../watcher";
 const StateChannel = require("./../../external/statechannels/build/contracts/StateChannel.json");
 import { KitsuneTools } from "./../kitsuneTools";
 import { ethers } from "ethers";
+import Ganache from "ganache-core";
+const ganache = Ganache.provider({ 
+    mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
+});
 
 // TODO: great tidying ensues
 
 describe("End to end", () => {
     let player0: string,
         player1: string,
-        pisaAccount,
+        pisaAccount: string,
         hashState: string,
         sig0: string,
         sig1: string,
         channelContract: ethers.Contract,
         round: number,
-        provider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+        provider: ethers.providers.Web3Provider = new ethers.providers.Web3Provider(ganache);
 
     before(async () => {
         provider.pollingInterval = 100;
@@ -72,7 +76,7 @@ describe("End to end", () => {
     }).timeout(3000);
 });
 
-const wait = async timeout => {
+const wait = async (timeout: number) => {
     const testPromise = new Promise(function(resolve, reject) {
         setTimeout(function() {
             resolve();

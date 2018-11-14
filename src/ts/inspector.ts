@@ -1,3 +1,4 @@
+// TODO: access this json via the kitsune tools
 const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
 import { IAppointmentRequest, IAppointment } from "./dataEntities/appointment";
 import { KitsuneTools } from "./kitsuneTools";
@@ -29,7 +30,7 @@ export class Inspector {
         private readonly status: (contract: ethers.Contract) => Promise<number>
     ) {}
     // TODO: break this class
-    // TODO: document public methods
+    // TODO: document this class and public methods
 
     // TODO: some of the validation below is not strictly necessary right?
     // TODO: the watchtower could accept the an invalid appointment, which it would be unable to fulfil

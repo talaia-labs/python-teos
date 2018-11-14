@@ -4,7 +4,25 @@ const StateChannel = require("./../../external/statechannels/build/contracts/Sta
 import request from "request-promise";
 import { KitsuneTools } from "./../kitsuneTools";
 import { ethers } from "ethers";
-const provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+import { KitsuneInspector } from "./../inspector";
+import { KitsuneWatcher } from "./../watcher";
+import { PisaService } from "./../service";
+import { IConfig } from "./../dataEntities/config";
+import Ganache from "ganache-core";
+const ganache = Ganache.provider({
+    mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
+});
+
+// TODO: more useful errors when loading config? - or just fail at the given point
+const config: IConfig = {
+    host: {
+        name: "localhost",
+        port: 3000
+    },
+    jsonRpcUrl: "http://localhost:8545",
+    watcherKey: "0x6370fd033278c143179d81c5526140625662b8daa446c22ee2d73db3707e620c"
+};
+const provider = new ethers.providers.Web3Provider(ganache);
 provider.pollingInterval = 100;
 
 describe("Service end-to-end", () => {
@@ -13,9 +31,15 @@ describe("Service end-to-end", () => {
         channelContract: ethers.Contract,
         hashState: string,
         disputePeriod: number,
-        pisaUrl = "http://localhost:3000";
+        service: PisaService;
 
     before(async () => {
+        // TODO: add logging and timing throughout
+        const watcherWallet = new ethers.Wallet(config.watcherKey, provider);
+        const watcher = new KitsuneWatcher(provider, watcherWallet);
+        const inspector = new KitsuneInspector(10, provider);
+        service = new PisaService(config.host.name, config.host.port, inspector, watcher);
+
         // accounts
         const accounts = await provider.listAccounts();
         account0 = accounts[0];
@@ -32,6 +56,10 @@ describe("Service end-to-end", () => {
         );
         channelContract = await channelContractFactory.deploy([account0, account1], disputePeriod);
         hashState = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("face-off"));
+    });
+
+    after(() => {
+        service.stop();
     });
 
     it("create channel, submit appointment, trigger dispute, wait for response", async () => {
@@ -51,7 +79,7 @@ describe("Service end-to-end", () => {
         };
 
         // TODO: should be starting the service ourselves here, for now assume started
-        await request.post(pisaUrl, { json: appointmentRequest });
+        await request.post(`http://${config.host.name}:${config.host.port}/appointment`, { json: appointmentRequest });
 
         // now register a callback on the setstate event and trigger a response
         const setStateEvent = "EventEvidence(uint256, bytes32)";
@@ -64,7 +92,7 @@ describe("Service end-to-end", () => {
         // trigger a dispute
         const tx = await channelContract.triggerDispute();
         await tx.wait();
-        
+
         try {
             // wait for the success result
             await waitForPredicate(successResult, s => s.success, 400);

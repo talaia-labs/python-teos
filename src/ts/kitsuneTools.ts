@@ -1,6 +1,6 @@
 import { solidityKeccak256 } from "ethers/utils";
 import { IAppointment } from "./dataEntities/appointment";
-import { ethers } from "ethers";
+import { Contract, utils } from "ethers";
 
 // TODO: this class...
 
@@ -10,10 +10,10 @@ export class KitsuneTools {
     }
 
     public static disputeEvent = "EventDispute(uint256)";
-    public static async respond(contract: ethers.Contract, appointment: IAppointment) {
-        let sig0 = ethers.utils.splitSignature(appointment.stateUpdate.signatures[0]);
-        let sig1 = ethers.utils.splitSignature(appointment.stateUpdate.signatures[1]);
-
+    public static async respond(contract: Contract, appointment: IAppointment) {
+        let sig0 = utils.splitSignature(appointment.stateUpdate.signatures[0]);
+        let sig1 = utils.splitSignature(appointment.stateUpdate.signatures[1]);
+        
         // TODO: order the sigs dont expect them to be in a correct order - or do, explicitly
         const tx = await contract.setstate(
             [sig0.v - 27, sig0.r, sig0.s, sig1.v - 27, sig1.r, sig1.s],
@@ -23,19 +23,19 @@ export class KitsuneTools {
         return await tx.wait();
     }
 
-    public static async participants(contract: ethers.Contract) {
+    public static async participants(contract: Contract) {
         return [await contract.plist(0), await contract.plist(1)] as string[];
     }
 
-    public static async round(contract: ethers.Contract) {
+    public static async round(contract: Contract) {
         return await contract.bestRound();
     }
 
-    public static async disputePeriod(contract: ethers.Contract) {
+    public static async disputePeriod(contract: Contract) {
         return await contract.disputePeriod();
     }
 
-    public static async status(contract: ethers.Contract) {
+    public static async status(contract: Contract) {
         return await contract.status();
     }
 }

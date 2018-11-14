@@ -6,3 +6,4 @@ export interface IConfig {
     },
     watcherKey: string;
 }
+// TODO: the inspector should take the dispute period value from config
