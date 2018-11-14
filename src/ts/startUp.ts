@@ -6,6 +6,7 @@ import { KitsuneInspector } from "./inspector";
 const config = require("./config.json") as IConfig;
 
 // TODO: to start the service we need a valid provider - we should be doing a provider check first
+// TODO: should we have the option of starting up a local ganache-core rather than supplying a url
 const provider = new ethers.providers.JsonRpcProvider(config.jsonRpcUrl);
 provider.pollingInterval = 100;
 const watcherWallet = new ethers.Wallet(config.watcherKey, provider);
