@@ -21,37 +21,80 @@ export class Inspector {
 
     /**
      * Inspects an appointment to decide whether to accept it. Throws on reject.
-     * @param appointment
+     * @param appointmentRequest
      */
-    public async inspect(appointment: IAppointmentRequest) {
+    public async inspect(appointmentRequest: IAppointmentRequest) {
         // log the appointment we're inspecting
-        logger.info(`Inspecting appointment ${appointment.stateUpdate.hashState} for contract ${appointment.stateUpdate.contractAddress}.`)
-        logger.debug("Appointment request: " + JSON.stringify(appointment));
+        logger.info(
+            `Inspecting appointment ${appointmentRequest.stateUpdate.hashState} for contract ${
+                appointmentRequest.stateUpdate.contractAddress
+            }.`
+        );
+        logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
+
+        try {
+            //TODO: this check should be done when we make an appointment request, it's a type isse
+            // is this a valid address?
+            ethers.utils.getAddress(appointmentRequest.stateUpdate.contractAddress);
+        } catch (doh) {
+            throw new PublicInspectionError(
+                `${appointmentRequest.stateUpdate.contractAddress} is not a valid address.`
+            );
+        }
+
+        //TODO: should also be part of appointment request validation, not done in here
+        let hexLength = ethers.utils.hexDataLength(appointmentRequest.stateUpdate.hashState);
+        if (hexLength !== 32)
+            throw new PublicInspectionError(`Invalid bytes32: ${appointmentRequest.stateUpdate.hashState}`);
+
+        let code = await this.provider.getCode(appointmentRequest.stateUpdate.contractAddress);
+        if (code === "0x00")
+            throw new PublicInspectionError(
+                `No code found at address ${appointmentRequest.stateUpdate.contractAddress}`
+            );
 
         // get the participants
-        const contract = new ethers.Contract(appointment.stateUpdate.contractAddress, this.channelAbi, this.provider);
+        let contract;
+        try {
+            contract = new ethers.Contract(
+                appointmentRequest.stateUpdate.contractAddress,
+                this.channelAbi,
+                this.provider
+            );
+        } catch (d) {
+            console.error("AAAAA");
+            console.error(d);
+            throw d;
+        }
 
-        const participants = await this.participants(contract);
-        logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
+        let participants;
+        try {
+            participants = await this.participants(contract);
+            logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
+        } catch (d) {
+            console.log("bbbbb");
+            console.log(d);
+            throw d;
+        }
 
         // form the hash
         const setStateHash = this.hashForSetState(
-            appointment.stateUpdate.hashState,
-            appointment.stateUpdate.round,
-            appointment.stateUpdate.contractAddress
+            appointmentRequest.stateUpdate.hashState,
+            appointmentRequest.stateUpdate.round,
+            appointmentRequest.stateUpdate.contractAddress
         );
 
         // check the sigs
-        this.checkAllSigned(setStateHash, participants, appointment.stateUpdate.signatures);
+        this.checkAllSigned(setStateHash, participants, appointmentRequest.stateUpdate.signatures);
         logger.info("All participants have signed.");
 
         // check that the supplied state round is valid
         const channelRound: number = await this.round(contract);
         logger.info(`Round at ${contract.address}: ${channelRound.toString(10)}`);
-        if (channelRound >= appointment.stateUpdate.round) {
-            throw new Error(
+        if (channelRound >= appointmentRequest.stateUpdate.round) {
+            throw new PublicInspectionError(
                 `Supplied appointment round ${
-                    appointment.stateUpdate.round
+                    appointmentRequest.stateUpdate.round
                 } is not greater than channel round ${channelRound}`
             );
         }
@@ -59,16 +102,16 @@ export class Inspector {
         // check that the channel is not in a dispute
         const channelDisputePeriod: number = await this.disputePeriod(contract);
         logger.info(`Dispute period at ${contract.address}: ${channelDisputePeriod.toString(10)}`);
-        if (appointment.expiryPeriod <= channelDisputePeriod) {
-            throw new Error(
+        if (appointmentRequest.expiryPeriod <= channelDisputePeriod) {
+            throw new PublicInspectionError(
                 `Supplied appointment expiryPeriod ${
-                    appointment.expiryPeriod
+                    appointmentRequest.expiryPeriod
                 } is not greater than the channel dispute period ${channelDisputePeriod}`
             );
         }
         // TODO: dispute period is a block number! we're comparing apples to oranges here
         if (channelDisputePeriod < this.minimumDisputePeriod) {
-            throw new Error(
+            throw new PublicInspectionError(
                 `Channel dispute period ${channelDisputePeriod} is less than the minimum acceptable dispute period ${
                     this.minimumDisputePeriod
                 }`
@@ -79,10 +122,12 @@ export class Inspector {
         logger.info(`Channel status at ${contract.address}: ${JSON.stringify(channelStatus)}`);
         // ON = 0, DISPUTE = 1, OFF = 2
         if (channelStatus != 0) {
-            throw new Error(`Channel status is ${channelStatus} not 0.`);
+            throw new PublicInspectionError(`Channel status is ${channelStatus} not 0.`);
         }
 
-        return this.createAppointment(appointment);
+        const appointment = this.createAppointment(appointmentRequest);
+        logger.debug("Appointment: ", appointment);
+        return appointment;
     }
 
     /**
@@ -96,7 +141,7 @@ export class Inspector {
             stateUpdate: request.stateUpdate,
             startTime: startTime,
             endTime: startTime + request.expiryPeriod,
-            inspectionTime : Date.now()
+            inspectionTime: Date.now()
         };
     }
 
@@ -104,23 +149,36 @@ export class Inspector {
      * Check that every participant that every participant has signed the message.
      * @param message
      * @param participants
-     * @param sigs 
+     * @param sigs
      */
     private checkAllSigned(message: string, participants: string[], sigs: string[]) {
         if (participants.length !== sigs.length) {
-            throw new Error(
-                `Incorrect number of signatures supplied. Participants: ${participants.length}, signers: ${sigs.length}`
+            throw new PublicInspectionError(
+                `Incorrect number of signatures supplied. Participants: ${participants.length}, signers: ${
+                    sigs.length
+                }.`
             );
         }
 
         const signers = sigs.map(sig => verifyMessage(ethers.utils.arrayify(message), sig));
         participants.forEach(party => {
             const signerIndex = signers.map(m => m.toLowerCase()).indexOf(party.toLowerCase());
-            if (signerIndex === -1) throw new Error(`Party ${party} not present in signatures.`);
+            if (signerIndex === -1) {
+                throw new PublicInspectionError(`Party ${party} not present in signatures.`);
+            }
 
             // remove the signer, so that we never look for it again
             signers.splice(signerIndex, 1);
         });
+    }
+}
+
+/**
+ * Contains error messages that are safe to expose publicly
+ */
+export class PublicInspectionError extends Error {
+    constructor(message?: string) {
+        super(message);
     }
 }
 

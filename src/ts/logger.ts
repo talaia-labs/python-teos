@@ -10,7 +10,6 @@ const myFormat = format.printf(info => {
 });
 
 const combinedFormats = format.combine(format.timestamp(), myFormat);
-
 const logger = createLogger({
     level: "info",
     format: combinedFormats,

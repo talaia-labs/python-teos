@@ -51,7 +51,7 @@ function propertyExistsAndIsOfType(property: string, basicType: string, obj: any
 }
 
 function doesPropertyExist(property: string, obj: any) {
-    if (!obj[property]) throw new Error(`${property} not defined.`);
+    if (typeof obj[property] === typeof undefined) throw new Error(`${property} not defined.`);
 }
 
 function isPropertyOfType(property: string, basicType: string, obj: any) {

@@ -1,11 +1,12 @@
-import express from "express";
+import express, { Response } from "express";
 import httpContext from "express-http-context";
 import logger from "./logger";
 import { parseAppointment } from "./dataEntities/appointment";
-import { Inspector } from "./inspector";
+import { Inspector, PublicInspectionError } from "./inspector";
 import { Watcher } from "./watcher";
 import { setRequestId } from "./customExpressHttpContext";
 import { Server } from "http";
+import { inspect } from "util";
 
 /**
  * Hosts a PISA service at the supplied host.
@@ -40,12 +41,25 @@ export class PisaService {
                 await watcher.watch(appointment);
 
                 // TODO: only copy the relevant parts of the appointment - eg not the request id
+                res.status(200);
                 res.send(appointment);
             } catch (doh) {
-                // we pass errors to the next the default error handler
-                next(doh);
+                if (doh instanceof PublicInspectionError) this.logAndSend(400, doh.message, doh, res);
+                else if (doh instanceof Error) this.logAndSend(500, "Internal server error.", doh, res);
+                else {
+                    logger.error("Error: 500. " + inspect(doh));
+                    res.status(500);
+                    res.send("Internal server error.");
+                }
             }
         };
+    }
+
+    private logAndSend(code: number, responseMessage: string, error: Error, res: Response) {
+        logger.error(`HTTP Status: ${code}.`);
+        logger.error(error.stack);
+        res.status(code);
+        res.send(responseMessage);
     }
 
     private closed = false;
