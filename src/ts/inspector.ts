@@ -32,26 +32,12 @@ export class Inspector {
         );
         logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
 
-        try {
-            //TODO: this check should be done when we make an appointment request, it's a type isse
-            // is this a valid address?
-            ethers.utils.getAddress(appointmentRequest.stateUpdate.contractAddress);
-        } catch (doh) {
-            throw new PublicInspectionError(
-                `${appointmentRequest.stateUpdate.contractAddress} is not a valid address.`
-            );
-        }
-
-        //TODO: should also be part of appointment request validation, not done in here
-        let hexLength = ethers.utils.hexDataLength(appointmentRequest.stateUpdate.hashState);
-        if (hexLength !== 32)
-            throw new PublicInspectionError(`Invalid bytes32: ${appointmentRequest.stateUpdate.hashState}`);
-
         let code = await this.provider.getCode(appointmentRequest.stateUpdate.contractAddress);
-        if (code === "0x00")
+        if (code === "0x00") {
             throw new PublicInspectionError(
                 `No code found at address ${appointmentRequest.stateUpdate.contractAddress}`
             );
+        }
 
         // get the participants
         let contract;

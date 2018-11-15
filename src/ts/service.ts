@@ -1,7 +1,7 @@
 import express, { Response } from "express";
 import httpContext from "express-http-context";
 import logger from "./logger";
-import { parseAppointment } from "./dataEntities/appointment";
+import { parseAppointment, PublicValidationError } from "./dataEntities/appointment";
 import { Inspector, PublicInspectionError } from "./inspector";
 import { Watcher } from "./watcher";
 import { setRequestId } from "./customExpressHttpContext";
@@ -45,6 +45,7 @@ export class PisaService {
                 res.send(appointment);
             } catch (doh) {
                 if (doh instanceof PublicInspectionError) this.logAndSend(400, doh.message, doh, res);
+                else if (doh instanceof PublicValidationError) this.logAndSend(400, doh.message, doh, res);
                 else if (doh instanceof Error) this.logAndSend(500, "Internal server error.", doh, res);
                 else {
                     logger.error("Error: 500. " + inspect(doh));

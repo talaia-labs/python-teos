@@ -1,3 +1,5 @@
+import { utils } from "ethers";
+
 export interface IAppointmentRequest {
     stateUpdate: IStateUpdate;
     expiryPeriod: number;
@@ -17,18 +19,35 @@ export interface IStateUpdate {
     contractAddress: string;
 }
 
+export class PublicValidationError extends Error {}
+
 export function parseAppointment(obj: any) {
-    if (!obj) throw new Error("Appointment not defined.");
+    if (!obj) throw new PublicValidationError("Appointment not defined.");
     propertyExistsAndIsOfType("expiryPeriod", "number", obj);
     doesPropertyExist("stateUpdate", obj);
     isStateUpdate(obj["stateUpdate"]);
     return obj as IAppointmentRequest;
 }
+
 function isStateUpdate(obj: any) {
-    if (!obj) throw new Error("State update does not exist.");
+    if (!obj) throw new PublicValidationError("stateUpdate does not exist.");
     propertyExistsAndIsOfType("hashState", "string", obj);
+    const hexLength = utils.hexDataLength(obj.hashState);
+    if (hexLength !== 32) {
+        throw new PublicValidationError(`Invalid bytes32: ${obj.hashState}`);
+    }
+
     propertyExistsAndIsOfType("round", "number", obj);
     propertyExistsAndIsOfType("contractAddress", "string", obj);
+    try {
+        // is this a valid address?
+        utils.getAddress(obj.contractAddress);
+    } catch (doh) {
+        throw new PublicValidationError(
+            `${obj.contractAddress} is not a valid address.`
+        );
+    }
+
     doesPropertyExist("signatures", obj);
     isArrayOfStrings(obj["signatures"]);
 }
@@ -51,11 +70,11 @@ function propertyExistsAndIsOfType(property: string, basicType: string, obj: any
 }
 
 function doesPropertyExist(property: string, obj: any) {
-    if (typeof obj[property] === typeof undefined) throw new Error(`${property} not defined.`);
+    if (typeof obj[property] === typeof undefined) throw new PublicValidationError(`${property} not defined.`);
 }
 
 function isPropertyOfType(property: string, basicType: string, obj: any) {
     if (typeof obj[property] !== basicType) {
-        throw new Error(`${property} is of type: ${typeof obj[property]} not ${basicType}.`);
+        throw new PublicValidationError(`${property} is of type: ${typeof obj[property]} not ${basicType}.`);
     }
 }
