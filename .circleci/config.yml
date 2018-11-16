@@ -7,6 +7,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: submodule 
+          command: git submodule init && git submodule update 
+      - run:
           name: update-npm
           command: 'sudo npm install -g npm@latest'
       - restore_cache:
@@ -18,9 +21,6 @@ jobs:
           key: dependency-cache-{{ checksum "package.json" }}
           paths:
             - ./node_modules
-      - run:
-          name: submodule 
-          command: git submodule init && git submodule update && cd src/external/statechannels && npm install
       - run:
           name: build kitsune
           command: npm run build-kitsune
