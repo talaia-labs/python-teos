@@ -23,10 +23,10 @@ jobs:
           command: git submodule init && git submodule update
       - run:
           name: build kitsune
-          command: npm build-kitsune
+          command: npm run build-kitsune
       - run:
           name: test
-          command: npm test
+          command: npm run test
   deploy:
     machine:
       enabled: true
