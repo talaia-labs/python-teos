@@ -1,6 +1,7 @@
 import Ganache from "ganache-core";
-import ethers from "ethers";
-
+import { ethers } from "ethers";
+import { IConfig } from "./dataEntities/config";
+const config = require("./config.json") as IConfig;
 // provide the ability to get different providers
 const getGanacheProvider = () => {
     const ganache = Ganache.provider({
@@ -10,3 +11,13 @@ const getGanacheProvider = () => {
     ganacheProvider.pollingInterval = 100;
     return ganache;
 };
+
+
+const getInfuraProvider = (): ethers.providers.InfuraProvider => {
+
+    const infura: any = config.infura;
+
+    const infuraProvider = new ethers.providers.InfuraProvider(config.infura.currentNetwork, infura[`${config.infura.currentNetwork}`].apikey)
+
+    return infuraProvider
+}
