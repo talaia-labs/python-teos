@@ -3,7 +3,7 @@ import { IAppointment } from "./dataEntities/appointment";
 import { Contract, utils } from "ethers";
 const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
 
-// TODO: this class...
+// PISA: this class...
 
 export class KitsuneTools {
     public static hashForSetState(hState: string, round: number, channelAddress: string) {
@@ -15,7 +15,7 @@ export class KitsuneTools {
         let sig0 = utils.splitSignature(appointment.stateUpdate.signatures[0]);
         let sig1 = utils.splitSignature(appointment.stateUpdate.signatures[1]);
         
-        // TODO: order the sigs dont expect them to be in a correct order - or do, explicitly
+        // PISA: order the sigs dont expect them to be in a correct order - or do, explicitly
         const tx = await contract.setstate(
             [sig0.v - 27, sig0.r, sig0.s, sig1.v - 27, sig1.r, sig1.s],
             appointment.stateUpdate.round,

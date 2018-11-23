@@ -95,7 +95,7 @@ export class Inspector {
                 } is not greater than the channel dispute period ${channelDisputePeriod}`
             );
         }
-        // TODO: dispute period is a block number! we're comparing apples to oranges here
+        // PISA: dispute period is a block number! we're comparing apples to oranges here
         if (channelDisputePeriod < this.minimumDisputePeriod) {
             throw new PublicInspectionError(
                 `Channel dispute period ${channelDisputePeriod} is less than the minimum acceptable dispute period ${

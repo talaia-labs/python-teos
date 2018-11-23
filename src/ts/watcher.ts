@@ -25,7 +25,7 @@ export class Watcher {
      * @param appointment Contains information about where to watch for events, and what information to suppli as part of a response
      */
     async watch(appointment: IAppointment) {
-        // TODO: safety check the appointment - check the inspection time?
+        // PSA: safety check the appointment - check the inspection time?
 
         // create a contract
         logger.info(
@@ -43,7 +43,7 @@ export class Watcher {
         contract.on(this.eventName, async (...args: any[]) => {
             // this callback should not throw exceptions as they cannot be handled elsewhere
 
-            // TODO: 2. check that the dispute was triggered within the correct time period
+            // PISA: 2. check that the dispute was triggered within the correct time period
 
             // call the callback
             try {

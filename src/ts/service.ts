@@ -40,7 +40,7 @@ export class PisaService {
                 // start watching it if it passed inspection
                 await watcher.watch(appointment);
 
-                // TODO: only copy the relevant parts of the appointment - eg not the request id
+                // PISA: only copy the relevant parts of the appointment - eg not the request id
                 res.status(200);
                 res.send(appointment);
             } catch (doh) {
