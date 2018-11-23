@@ -1,0 +1,37 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/test
+    docker:
+      - image: circleci/node:8.11.1
+    steps:
+      - checkout
+      - run:
+          name: submodule 
+          command: git submodule init && git submodule update 
+      - run:
+          name: update-npm
+          command: 'sudo npm install -g npm@latest'
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: install
+          command: npm install
+      - save_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+          paths:
+            - ./node_modules
+      - run:
+          name: build kitsune
+          command: npm run build-kitsune
+      - run:
+          name: test
+          command: npm run test
+      - run:
+          name: test service
+          command: npm run test-service
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
