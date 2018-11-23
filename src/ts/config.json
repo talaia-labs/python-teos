@@ -4,5 +4,16 @@
         "name": "localhost",
         "port": 3000
     },
-    "watcherKey": "0x6370fd033278c143179d81c5526140625662b8daa446c22ee2d73db3707e620c"
+    "watcherKey": "0x6370fd033278c143179d81c5526140625662b8daa446c22ee2d73db3707e620c",
+    "infura" : {
+        "currentNetwork": "ropsten",
+        "ropsten": {
+            "apikey":"e587e78efcdd4c1eb5b068ee99a6ec0b",
+            "url":"https://ropsten.infura.io/v3/"
+        },
+        "rinkeby":{
+            "apikey": "e587e78efcdd4c1eb5b068ee99a6ec0b",
+            "url":"https://rinkeby.infura.io/v3/"
+        }
+    }
 }
