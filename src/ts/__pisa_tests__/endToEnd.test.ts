@@ -1,4 +1,3 @@
-import * as chai from "chai";
 import "mocha";
 import { KitsuneInspector } from "./../inspector";
 import { KitsuneWatcher } from "./../watcher";
@@ -66,7 +65,7 @@ describe("End to end", () => {
         
         // 3. Trigger a dispute
         const tx = await player0Contract.triggerDispute();
-        const face = await tx.wait();
+        await tx.wait();
         await wait(2000);
     }).timeout(3000);
 });

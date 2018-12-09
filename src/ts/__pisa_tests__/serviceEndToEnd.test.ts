@@ -1,15 +1,15 @@
 import * as chai from "chai";
 import "mocha";
 import request from "request-promise";
-import { KitsuneTools } from "./../kitsuneTools";
+import { KitsuneTools } from "../kitsuneTools";
 import { ethers } from "ethers";
-import { KitsuneInspector } from "./../inspector";
-import { KitsuneWatcher } from "./../watcher";
-import { PisaService } from "./../service";
-import { IConfig } from "./../dataEntities/config";
+import { KitsuneInspector } from "../inspector";
+import { KitsuneWatcher } from "../watcher";
+import { PisaService } from "../service";
+import { IConfig } from "../dataEntities/config";
 import Ganache from "ganache-core";
 import { IAppointmentRequest } from "../dataEntities/appointment";
-import logger from "./../logger";
+import logger from "../logger";
 logger.transports.forEach(l => (l.level = "max"));
 
 const ganache = Ganache.provider({

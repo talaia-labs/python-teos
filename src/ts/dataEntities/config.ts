@@ -5,7 +5,7 @@ export interface IConfig {
         port: number;
     },
     watcherKey: string;
-    infura: {
+    infura?: {
         currentNetwork: string
         ropsten: {
             apikey: string;

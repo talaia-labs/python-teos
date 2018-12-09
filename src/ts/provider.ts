@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { IConfig } from "./dataEntities/config";
 const config = require("./config.json") as IConfig;
 // provide the ability to get different providers
-const getGanacheProvider = () => {
+export const getGanacheProvider = () => {
     const ganache = Ganache.provider({
         mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
     });
@@ -13,7 +13,7 @@ const getGanacheProvider = () => {
 };
 
 
-const getInfuraProvider = (): ethers.providers.InfuraProvider => {
+export const getInfuraProvider = (): ethers.providers.InfuraProvider => {
 
     const infura: any = config.infura;
 
