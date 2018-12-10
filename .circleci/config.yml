@@ -22,6 +22,9 @@ jobs:
           paths:
             - ./node_modules
       - run:
+          name: build typescipt
+          command: npm run build
+      - run:
           name: build kitsune
           command: npm run build-kitsune
       - run:
