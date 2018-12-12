@@ -3,7 +3,6 @@ import { getRequestId } from "./customExpressHttpContext";
 
 const myFormat = format.printf(info => {
     // get the current request id
-    // PISA: is this performant? run a test
     const requestId = getRequestId();
     const requestString = requestId ? `[${requestId}] ` : "";
     return `${info.timestamp} ${requestString}${info.level}: ${info.message}`;

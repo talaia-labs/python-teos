@@ -17,4 +17,3 @@ export interface IConfig {
         }
     }
 }
-// PISA: the inspector should take the dispute period value from config

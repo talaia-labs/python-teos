@@ -21,8 +21,6 @@ const isRejected = async (result: Promise<any>) => {
     );
 };
 
-// PISA: test constructor, and create receipt
-
 describe("Inspector", () => {
     let account0: string, account1: string, channelContract: ethers.Contract, hashState: string, disputePeriod: number;
 
@@ -62,8 +60,6 @@ describe("Inspector", () => {
                 signatures: [sig0, sig1]
             }
         });
-
-        // PISA: test the return value of inspect in all cases
 
     });
 
@@ -161,7 +157,6 @@ describe("Inspector", () => {
 
         const inspector = new KitsuneInspector(10, provider);
 
-        // PISA: raise an isse on ethers js about this unhandled promise rejection
         await isRejected(
             inspector.inspect({
                 expiryPeriod,
@@ -286,7 +281,6 @@ describe("Inspector", () => {
     });
 
     it("accepts sigs in wrong order", async () => {
-        // PISA: shouldnt we support changing the order?
         const expiryPeriod = disputePeriod + 1,
             round = 1,
             setStateHash = KitsuneTools.hashForSetState(hashState, round, channelContract.address),
