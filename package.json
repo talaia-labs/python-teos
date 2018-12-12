@@ -5,11 +5,12 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha -r ts-node/register src/**/__pisa_tests__/*.test.ts --exit",
-    "test-service": "mocha -r ts-node/register src/ts/__pisa_tests__/serviceEndToEnd.testy.ts --exit",
-    "test-etoe": "mocha -r ts-node/register src/ts/__pisa_tests__/endToEnd.testy.ts --exit",
+    "test-service": "mocha -r ts-node/register src/ts/__pisa_tests__/serviceEndToEnd.test.ts --exit",
+    "test-etoe": "mocha -r ts-node/register src/ts/__pisa_tests__/endToEnd.test.ts --exit",
     "build-kitsune": "cd src/external/statechannels && npm i && npx truffle compile",
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
-    "start": "ts-node src/ts/service.ts"
+    "start": "ts-node src/ts/service.ts",
+    "build": "npx tsc"
   },
   "repository": {
     "type": "git",

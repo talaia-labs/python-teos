@@ -24,44 +24,39 @@ export class Inspector {
      * @param appointmentRequest
      */
     public async inspect(appointmentRequest: IAppointmentRequest) {
+
+        const contractAddress: string = appointmentRequest.stateUpdate.contractAddress
+
         // log the appointment we're inspecting
         logger.info(
             `Inspecting appointment ${appointmentRequest.stateUpdate.hashState} for contract ${
-                appointmentRequest.stateUpdate.contractAddress
+                contractAddress
             }.`
         );
         logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
 
-        let code = await this.provider.getCode(appointmentRequest.stateUpdate.contractAddress);
-        if (code === "0x00") {
+        const code: string = await this.provider.getCode(contractAddress);
+        if (code === "0x" || code === "0x00") {
             throw new PublicInspectionError(
-                `No code found at address ${appointmentRequest.stateUpdate.contractAddress}`
+                `No code found at address ${contractAddress}`
             );
         }
 
         // get the participants
-        let contract;
+        let contract: ethers.Contract, participants: string[];
         try {
             contract = new ethers.Contract(
-                appointmentRequest.stateUpdate.contractAddress,
+                contractAddress,
                 this.channelAbi,
                 this.provider
             );
-        } catch (d) {
-            console.error("AAAAA");
-            console.error(d);
-            throw d;
-        }
-
-        let participants;
-        try {
             participants = await this.participants(contract);
             logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
-        } catch (d) {
-            console.log("bbbbb");
-            console.log(d);
-            throw d;
+        } catch (error) {
+            console.error(error);
+            throw error;
         }
+
 
         // form the hash
         const setStateHash = this.hashForSetState(
