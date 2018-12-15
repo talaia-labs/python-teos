@@ -16,7 +16,8 @@ export class Inspector {
         private readonly participants: (contract: ethers.Contract) => Promise<string[]>,
         private readonly round: (contract: ethers.Contract) => Promise<number>,
         private readonly disputePeriod: (contract: ethers.Contract) => Promise<number>,
-        private readonly status: (contract: ethers.Contract) => Promise<number>
+        private readonly status: (contract: ethers.Contract) => Promise<number>,
+        private readonly deployedBytecode: string
     ) {}
 
     /**
@@ -24,39 +25,32 @@ export class Inspector {
      * @param appointmentRequest
      */
     public async inspect(appointmentRequest: IAppointmentRequest) {
-
-        const contractAddress: string = appointmentRequest.stateUpdate.contractAddress
+        const contractAddress: string = appointmentRequest.stateUpdate.contractAddress;
 
         // log the appointment we're inspecting
         logger.info(
-            `Inspecting appointment ${appointmentRequest.stateUpdate.hashState} for contract ${
-                contractAddress
-            }.`
+            `Inspecting appointment ${appointmentRequest.stateUpdate.hashState} for contract ${contractAddress}.`
         );
         logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
 
         const code: string = await this.provider.getCode(contractAddress);
         if (code === "0x" || code === "0x00") {
-            throw new PublicInspectionError(
-                `No code found at address ${contractAddress}`
-            );
+            throw new PublicInspectionError(`No code found at address: ${contractAddress}`);
+        }
+        if (code != this.deployedBytecode) {
+            throw new PublicInspectionError(`Contract at: ${contractAddress} does not have correct bytecode.`);
         }
 
         // get the participants
         let contract: ethers.Contract, participants: string[];
         try {
-            contract = new ethers.Contract(
-                contractAddress,
-                this.channelAbi,
-                this.provider
-            );
+            contract = new ethers.Contract(contractAddress, this.channelAbi, this.provider);
             participants = await this.participants(contract);
             logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
         } catch (error) {
             console.error(error);
             throw error;
         }
-
 
         // form the hash
         const setStateHash = this.hashForSetState(
@@ -172,7 +166,8 @@ export class KitsuneInspector extends Inspector {
             KitsuneTools.participants,
             KitsuneTools.round,
             KitsuneTools.disputePeriod,
-            KitsuneTools.status
+            KitsuneTools.status,
+            KitsuneTools.ContractDeployedBytecode
         );
     }
 }

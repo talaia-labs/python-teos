@@ -42,5 +42,6 @@ export class KitsuneTools {
     }
 
     public static ContractBytecode = StateChannel.bytecode;
+    public static ContractDeployedBytecode = StateChannel.deployedBytecode;
     public static ContractAbi = StateChannel.abi;
 }

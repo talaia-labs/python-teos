@@ -10,6 +10,7 @@ import { IConfig } from "../dataEntities/config";
 import Ganache from "ganache-core";
 import { IAppointmentRequest } from "../dataEntities/appointment";
 import logger from "../logger";
+const StateChannelFactory = require("../../statechannels/build/contracts/StateChannelFactory.json");
 logger.transports.forEach(l => (l.level = "max"));
 
 const ganache = Ganache.provider({
@@ -194,7 +195,43 @@ describe("Service end-to-end", () => {
             }
         };
 
-        await failWithCode(`400 - "No code found at address ${appointmentRequest.stateUpdate.contractAddress}`, appointmentRequest);
+        await failWithCode(
+            `400 - "No code found at address: ${appointmentRequest.stateUpdate.contractAddress}`,
+            appointmentRequest
+        );
+    }).timeout(3000);
+
+    it("create channel, wront bytecode contact returns 400", async () => {
+        // deply an unrelated contract with different bytecode
+
+        // contract
+        const channelContractFactoryFactory = new ethers.ContractFactory(
+            StateChannelFactory.abi,
+            StateChannelFactory.bytecode,
+            provider.getSigner()
+        );
+        const channelFactoryContract = await channelContractFactoryFactory.deploy();
+        
+        const round = 1,
+            setStateHash = KitsuneTools.hashForSetState(hashState, round, channelContract.address),
+            sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
+            sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash)),
+            expiryPeriod = disputePeriod + 1;
+        const appointmentRequest = {
+            expiryPeriod,
+            stateUpdate: {
+                // random address
+                contractAddress: channelFactoryContract.address,
+                hashState,
+                round,
+                signatures: [sig0, sig1]
+            }
+        };
+
+        await failWithCode(
+            `400 - "Contract at: ${appointmentRequest.stateUpdate.contractAddress} does not have correct bytecode.`,
+            appointmentRequest
+        );
     }).timeout(3000);
 
     it("create channel, invalid contract address returns 400", async () => {
