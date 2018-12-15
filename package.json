@@ -4,13 +4,12 @@
   "description": "Arbitration Outsourcing for State Channels",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r ts-node/register src/**/__pisa_tests__/*.test.ts --exit",
-    "test-service": "mocha -r ts-node/register src/ts/__pisa_tests__/serviceEndToEnd.test.ts --exit",
-    "test-etoe": "mocha -r ts-node/register src/ts/__pisa_tests__/endToEnd.test.ts --exit",
-    "build-kitsune": "cd src/external/statechannels && npm i && npx truffle compile",
+    "test": "npx tsc && mocha build/__pisa_tests__ --exit",
+    "build-kitsune": "cd statechannels && npm i && npx truffle compile",
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
     "start": "ts-node src/ts/service.ts",
-    "build": "npx tsc"
+    "build": "npx tsc",
+    "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit"
   },
   "repository": {
     "type": "git",
@@ -42,6 +41,7 @@
     "@types/winston": "^2.4.4",
     "chai": "^4.2.0",
     "mocha": "^5.2.0",
+    "nyc": "^13.1.0",
     "ts-node": "^7.0.1",
     "typescript": "^3.1.3"
   }

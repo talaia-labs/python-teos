@@ -1,7 +1,7 @@
 import { solidityKeccak256 } from "ethers/utils";
 import { IAppointment } from "./dataEntities/appointment";
 import { Contract, utils } from "ethers";
-const StateChannel = require("./../external/statechannels/build/contracts/StateChannel.json");
+const StateChannel = require("../statechannels/build/contracts/StateChannel.json");
 
 
 /**
