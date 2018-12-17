@@ -9,7 +9,9 @@
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
     "start": "ts-node src/ts/service.ts",
     "build": "npx tsc",
-    "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit"
+    "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit",
+    "submodule": "git submodule init && git submodule update",
+    "init": "npm run submodule && npm run build-kitsune"
   },
   "repository": {
     "type": "git",
