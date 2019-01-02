@@ -3,7 +3,9 @@ import "mocha";
 import request from "request-promise";
 import { KitsuneTools } from "../kitsuneTools";
 import { ethers } from "ethers";
+import { IConfig } from "../dataEntities/config";
 import { getJsonRPCProvider } from "./../provider";
+const config = require("./../../config.json") as IConfig;
 const provider = getJsonRPCProvider();
 provider.pollingInterval = 100;
 
