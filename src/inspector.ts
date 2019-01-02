@@ -32,15 +32,15 @@ export class Inspector {
             `Inspecting appointment ${appointmentRequest.stateUpdate.hashState} for contract ${contractAddress}.`
         );
         logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
-
+        
         const code: string = await this.provider.getCode(contractAddress);
+
         if (code === "0x" || code === "0x00") {
             throw new PublicInspectionError(`No code found at address: ${contractAddress}`);
         }
         if (code != this.deployedBytecode) {
             throw new PublicInspectionError(`Contract at: ${contractAddress} does not have correct bytecode.`);
         }
-
         // get the participants
         let contract: ethers.Contract, participants: string[];
         try {
@@ -48,7 +48,7 @@ export class Inspector {
             participants = await this.participants(contract);
             logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
         } catch (error) {
-            console.error(error);
+            logger.error(error);
             throw error;
         }
 
