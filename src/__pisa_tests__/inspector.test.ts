@@ -31,7 +31,7 @@ describe("Inspector", () => {
         account1 = accounts[1];
 
         // set the dispute period
-        disputePeriod = 10;
+        disputePeriod = 11;
 
         // contract
         const channelContractFactory = new ethers.ContractFactory(
@@ -49,7 +49,6 @@ describe("Inspector", () => {
             sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
             sig1 = await provider.getSigner(account1).signMessage(ethers.utils.arrayify(setStateHash)),
             expiryPeriod = disputePeriod + 1;
-
         const inspector = new KitsuneInspector(10, provider);
         await inspector.inspect({
             expiryPeriod,
