@@ -3,9 +3,8 @@ import "mocha";
 import request from "request-promise";
 import { KitsuneTools } from "../kitsuneTools";
 import { ethers } from "ethers";
-import { IConfig } from "../dataEntities/config";
-const config = require("./../../config.json") as IConfig;
-const provider = new ethers.providers.JsonRpcProvider(config.jsonRpcUrl);
+import { getJsonRPCProvider } from "./../provider";
+const provider = getJsonRPCProvider();
 provider.pollingInterval = 100;
 
 describe("Docker smoke test!", () => {
