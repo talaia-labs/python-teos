@@ -33,7 +33,7 @@ describe("End to end", () => {
             KitsuneTools.ContractBytecode,
             provider.getSigner(accounts[3])
         );
-        channelContract = await channelContractFactory.deploy([player0, player1], 10);
+        channelContract = await channelContractFactory.deploy([player0, player1], 11);
         // set the round
         round = 1;
         // set the hash state
@@ -54,7 +54,7 @@ describe("End to end", () => {
                 round: 1,
                 signatures: [sig0, sig1]
             },
-            expiryPeriod: 11
+            expiryPeriod: 12
         };
         const appointment = await inspector.inspect(appointmentRequest);         
 

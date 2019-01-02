@@ -20,6 +20,8 @@ export class Inspector {
         private readonly deployedBytecode: string
     ) {}
 
+    
+
     /**
      * Inspects an appointment to decide whether to accept it. Throws on reject.
      * @param appointmentRequest
@@ -34,47 +36,31 @@ export class Inspector {
         logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
         
         const code: string = await this.provider.getCode(contractAddress);
-
+        // check that the channel is a contract
         if (code === "0x" || code === "0x00") {
-            throw new PublicInspectionError(`No code found at address: ${contractAddress}`);
+            throw new PublicInspectionError(`No code found at address ${contractAddress}`);
         }
         if (code != this.deployedBytecode) {
             throw new PublicInspectionError(`Contract at: ${contractAddress} does not have correct bytecode.`);
         }
-        // get the participants
-        let contract: ethers.Contract, participants: string[];
-        try {
-            contract = new ethers.Contract(contractAddress, this.channelAbi, this.provider);
-            participants = await this.participants(contract);
-            logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
-        } catch (error) {
-            logger.error(error);
-            throw error;
-        }
 
-        // form the hash
-        const setStateHash = this.hashForSetState(
-            appointmentRequest.stateUpdate.hashState,
+        // create a contract reference
+        const contract: ethers.Contract = new ethers.Contract(contractAddress, this.channelAbi, this.provider);
+
+        // verify the appointment
+        await this.verifyAppointment(
+            appointmentRequest.stateUpdate.signatures,
+            contract,
             appointmentRequest.stateUpdate.round,
-            appointmentRequest.stateUpdate.contractAddress
+            appointmentRequest.stateUpdate.hashState,
+            this.minimumDisputePeriod
         );
+        
 
-        // check the sigs
-        this.checkAllSigned(setStateHash, participants, appointmentRequest.stateUpdate.signatures);
-        logger.info("All participants have signed.");
-
-        // check that the supplied state round is valid
-        const channelRound: number = await this.round(contract);
-        logger.info(`Round at ${contract.address}: ${channelRound.toString(10)}`);
-        if (channelRound >= appointmentRequest.stateUpdate.round) {
-            throw new PublicInspectionError(
-                `Supplied appointment round ${
-                    appointmentRequest.stateUpdate.round
-                } is not greater than channel round ${channelRound}`
-            );
-        }
-
-        // check that the channel is not in a dispute
+        // an additional check to help the client, and the perception of PISA - 
+        // this isn't strictly necessary but it might catch some mistakes
+        // if a client submits a request for an appointment that will always expire before a dispute can complete then
+        // there is never any recourse against PISA.
         const channelDisputePeriod: number = await this.disputePeriod(contract);
         logger.info(`Dispute period at ${contract.address}: ${channelDisputePeriod.toString(10)}`);
         if (appointmentRequest.expiryPeriod <= channelDisputePeriod) {
@@ -84,14 +70,48 @@ export class Inspector {
                 } is not greater than the channel dispute period ${channelDisputePeriod}`
             );
         }
-        if (channelDisputePeriod < this.minimumDisputePeriod) {
+
+        const appointment = this.createAppointment(appointmentRequest);
+        logger.debug("Appointment: ", appointment);
+        return appointment;
+    }
+
+    /**
+     * ******** SPEC **********
+     * VerifyAppointment implements the spec described in the paper
+     * http://www0.cs.ucl.ac.uk/staff/P.McCorry/pisa.pdf
+     * @param signatures 
+     * @param contract 
+     * @param appointmentRound 
+     * @param hState 
+     * @param minimumDisputePeriod 
+     */
+    public async verifyAppointment(
+        signatures: string[],
+        contract: ethers.Contract,
+        appointmentRound: number,
+        hState: string,
+        minimumDisputePeriod: number
+    ) {
+        // check that the channel round is greater than the current round
+        const currentChannelRound: number = await this.round(contract);
+        logger.info(`Round at ${contract.address}: ${currentChannelRound.toString(10)}`);
+        if (appointmentRound <= currentChannelRound) {
             throw new PublicInspectionError(
-                `Channel dispute period ${channelDisputePeriod} is less than the minimum acceptable dispute period ${
-                    this.minimumDisputePeriod
-                }`
+                `Supplied appointment round ${appointmentRound} is not greater than channel round ${currentChannelRound}`
             );
         }
 
+        // check that the channel has a reasonable dispute period
+        const channelDisputePeriod: number = await this.disputePeriod(contract);
+        logger.info(`Dispute period at ${contract.address}: ${channelDisputePeriod.toString(10)}`);
+        if (channelDisputePeriod <= minimumDisputePeriod) {
+            throw new PublicInspectionError(
+                `Channel dispute period ${channelDisputePeriod} is less than or equal the minimum acceptable dispute period ${minimumDisputePeriod}`
+            );
+        }
+
+        // check that the channel is currently in the ON state
         const channelStatus: number = await this.status(contract);
         logger.info(`Channel status at ${contract.address}: ${JSON.stringify(channelStatus)}`);
         // ON = 0, DISPUTE = 1, OFF = 2
@@ -99,9 +119,17 @@ export class Inspector {
             throw new PublicInspectionError(`Channel status is ${channelStatus} not 0.`);
         }
 
-        const appointment = this.createAppointment(appointmentRequest);
-        logger.debug("Appointment: ", appointment);
-        return appointment;
+        //verify all the signatures
+        // get the participants
+        let participants: string[] = await this.participants(contract);
+        logger.info(`Participants at ${contract.address}: ${JSON.stringify(participants)}`);
+
+        // form the hash
+        const setStateHash = this.hashForSetState(hState, appointmentRound, contract.address);
+
+        // check the sigs
+        this.verifySignatures(participants, setStateHash, signatures);
+        logger.info("All participants have signed.");
     }
 
     /**
@@ -125,7 +153,7 @@ export class Inspector {
      * @param participants
      * @param sigs
      */
-    private checkAllSigned(message: string, participants: string[], sigs: string[]) {
+    private verifySignatures(participants: string[], message: string, sigs: string[]) {
         if (participants.length !== sigs.length) {
             throw new PublicInspectionError(
                 `Incorrect number of signatures supplied. Participants: ${participants.length}, signers: ${

@@ -19,4 +19,4 @@ RUN ["npm", "run", "build"]
 EXPOSE 3000
 
 # start the application
-CMD ["npm", "run", "start-dev"]
+CMD ["npm", "run", "dev"]
