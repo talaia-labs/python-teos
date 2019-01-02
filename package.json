@@ -4,8 +4,8 @@
   "description": "Arbitration Outsourcing for State Channels",
   "main": "index.js",
   "scripts": {
-    "test": "npm run build && mocha $(find ./build/__pisa_tests__/*.js ! -path '*quickTest*') --exit",
-    "test-docker": "mocha ./build/__pisa_tests__/quickTest.js --exit",
+    "test": "npm run build && mocha $(find build/__pisa_tests__/*.js ! -path '*quickTest*') --exit",
+    "test-docker": "mocha build/__pisa_tests__/quickTest.js --exit",
     "build-kitsune": "cd statechannels && npm ci && npx truffle compile",
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
     "start-dev": "ts-node src/startUp.ts",

@@ -1,7 +1,7 @@
 import Ganache from "ganache-core";
 import { ethers } from "ethers";
 import { IConfig } from "./dataEntities/config";
-const config = require("./../config.json") as IConfig;
+const config = require("../config.json") as IConfig;
 // provide the ability to get different providers
 export const getGanacheProvider = () => {
     const ganache = Ganache.provider({

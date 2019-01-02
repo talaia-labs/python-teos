@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { IConfig } from "./dataEntities/config";
 import { KitsuneWatcher } from "./watcher";
 import { KitsuneInspector } from "./inspector";
-const config = require("./../config.json") as IConfig;
+const config = require("../config.json") as IConfig;
 const provider = new ethers.providers.JsonRpcProvider(config.jsonRpcUrl);
 provider.pollingInterval = 100;
 
