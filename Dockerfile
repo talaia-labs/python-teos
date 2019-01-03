@@ -2,9 +2,6 @@ FROM node:10.14.2 as builder
 # set a location
 WORKDIR /usr/pisa
 
-# also copy the build artifacts from the statechannels folder
-COPY ./statechannels/build ./statechannels/build
-
 # copy the package files
 COPY package*.json ./
 # install packages

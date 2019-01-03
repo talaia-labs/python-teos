@@ -9,7 +9,7 @@
     "build-kitsune": "cd statechannels && npm ci && npx truffle compile",
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
     "dev": "ts-node src/startUp.ts",
-    "start": "node ./build/startUp.js",
+    "start": "mkdir -p ./logs && node ./build/startUp.js",
     "build": "mkdir -p ./build && cp ./config.json ./build/ && tsc",
     "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit",
     "submodule": "git submodule init && git submodule update",
