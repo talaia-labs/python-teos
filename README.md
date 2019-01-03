@@ -29,3 +29,37 @@ The customer wants to hire the Pisa service to watch the channel on their behalf
 * The customer can send an appointment to Pisa, but not pay Pisa. 
   * Our focus is on resilience / dependability. We want to outsource the job to several watchers, and then not "cancel" it in the future. If a customer doesn't pay, then Pisa will refuse all future jobs from the customer's key + state channel. 
   * This isn't an issue with the Pisa protocol, but just our current architecture design. 
+
+## Docker
+
+
+PISA is available as a docker image. To run PISA with a local instance of ganache download the docker-compose file at /docker/docker-compose.yml, then run:
+```
+docker-compose up
+```
+To stop PISA be sure to run:
+```
+docker-compose down
+```
+this safely shutdown containers and networks.
+If you are experiencing network issues ensure that you aren't using a local VPN, and ensure that the last containers were safely terminated by runnin 'docker-compose down'.
+
+
+To run PISA on it's own without ganache execute:
+```
+docker run -d -p 3000:3000 pisaresearch/pisa:latest
+```
+
+### Smoke testing you installation
+Smoke testing your installation. Some test are available within the docker container to ensure that PISA has properly installed. First find the id of the docker container using:
+```
+docker ps
+```
+then run to attach to the container:
+```
+docker exec -it <container_image_here> bash
+```
+Finally run the tests with:
+```
+npm run test-docker
+```

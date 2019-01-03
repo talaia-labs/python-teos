@@ -1,0 +1,22 @@
+// pisa net
+docker network create pisa-net
+
+// ganache
+docker run -d -p 8545:8545 --network pisa-net --name ganache trufflesuite/ganache-cli:latest -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000
+
+// pisa
+docker run -d -p 3000:3000 --network pisa-net --name pisa pisaresearch/pisa:latest
+
+//build
+docker build -t pisaresearch/pisa:latest .
+
+//push
+docker push pisaresearch/pisa:latest
+
+// attach
+docker exec -it pisa bash
+
+// in dir with docker-compose.yml
+docker-compose up
+//then to bring down
+docker-compose down

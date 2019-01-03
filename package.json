@@ -4,12 +4,13 @@
   "description": "Arbitration Outsourcing for State Channels",
   "main": "index.js",
   "scripts": {
-    "test": "npx tsc && mocha build/__pisa_tests__ --exit",
+    "test": "npm run build && mocha build/__pisa_tests__ --exit",
+    "test-docker": "mocha build/__docker_tests__/quickTest.js --exit",
     "build-kitsune": "cd statechannels && npm ci && npx truffle compile",
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
-    "start": "node build/startUp.js",
     "dev": "ts-node src/startUp.ts",
-    "build": "npx tsc",
+    "start": "node ./build/startUp.js",
+    "build": "mkdir -p ./build && cp ./config.json ./build/ && tsc",
     "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit",
     "submodule": "git submodule init && git submodule update",
     "init": "npm run submodule && npm run build-kitsune"
