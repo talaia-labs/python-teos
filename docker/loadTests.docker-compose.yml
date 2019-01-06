@@ -1,0 +1,34 @@
+version: "3"
+services:
+  pisatest:
+      image: pisaresearch/pisa-test:latest
+      volumes:
+        - ${PWD}/configs/test.json:/usr/pisa/build/config.json
+      networks:
+        pisanet:
+          aliases:
+            - pisaTest
+      depends_on:
+        - ganache
+        - pisa
+  ganache:
+    image: trufflesuite/ganache-cli:latest
+    ports:
+      - "8545:8545"
+    entrypoint: "node /app/ganache-core.docker.cli.js --mnemonic 'myth like bonus scare over problem client lizard pioneer submit female collect' -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000"
+    networks:
+      pisanet:
+        aliases:
+          - ganache
+  pisa:
+    image: pisaresearch/pisa:latest
+    ports:
+      - "3000:3000"
+    networks:
+      pisanet:
+        aliases:
+          - pisa
+    depends_on:
+      - ganache
+networks:
+  pisanet:

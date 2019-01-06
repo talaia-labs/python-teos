@@ -8,7 +8,8 @@ docker run -d -p 8545:8545 --network pisa-net --name ganache trufflesuite/ganach
 docker run -d -p 3000:3000 --network pisa-net --name pisa pisaresearch/pisa:latest
 
 //build
-docker build -t pisaresearch/pisa:latest .
+docker build --target deploy -t pisaresearch/pisa:latest -f docker/app.Dockerfile .
+docker build --target test -t pisaresearch/pisa-test:latest -f docker/app.Dockerfile .
 
 //push
 docker push pisaresearch/pisa:latest
@@ -20,3 +21,8 @@ docker exec -it pisa bash
 docker-compose up
 //then to bring down
 docker-compose down
+
+// load tests
+docker run -it --volume ${PWD}/configs/test.json:/usr/pisa/build/config.json --network docker_pisanet --name pisatest pisaresearch/pisa-test:latest
+// or
+docker-compose -f docker/loadTests.docker-compose.yml up --abort-on-container-exit --exit-code-from pisatest; echo $?

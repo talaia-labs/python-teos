@@ -4,12 +4,13 @@ import logger from "./logger";
 import { parseAppointment, PublicValidationError } from "./dataEntities/appointment";
 import { Inspector, PublicInspectionError } from "./inspector";
 import { Watcher } from "./watcher";
+// TODO: this isn working properly, it seems that watchers are sharing the last set value...
 import { setRequestId } from "./customExpressHttpContext";
 import { Server } from "http";
 import { inspect } from "util";
 
 /**
- * Hosts a PISA service at the supplied host.
+ * Hosts a PISA service at the endpoint.
  */
 export class PisaService {
     private readonly server: Server;

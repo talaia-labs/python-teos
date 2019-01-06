@@ -1,16 +1,14 @@
 import request from "request-promise";
-import { KitsuneTools } from "../kitsuneTools";
+import { KitsuneTools } from "../../src/kitsuneTools";
 import { ethers } from "ethers";
-import { IConfig } from "../dataEntities/config";
-import { getJsonRPCProvider } from "./../provider";
-const config = require("./../../config.json") as IConfig;
-const provider = getJsonRPCProvider();
-provider.pollingInterval = 100;
-
+import { IConfig } from "../../src/dataEntities/config";
+import { getJsonRPCProvider } from "../../src/provider";
+const config = require("../../config.json") as IConfig;
 let account0: string, account1: string, channelContract: ethers.Contract, hashState: string, disputePeriod: number;
 
 let setup = async () => {
     // accounts
+    const provider = await getJsonRPCProvider();
     const accounts = await provider.listAccounts();
     account0 = accounts[0];
     account1 = accounts[1];
@@ -29,6 +27,7 @@ let setup = async () => {
 };
 
 let execute = async () => {
+    const provider = await getJsonRPCProvider();
     const round = 1,
         setStateHash = KitsuneTools.hashForSetState(hashState, round, channelContract.address),
         sig0 = await provider.getSigner(account0).signMessage(ethers.utils.arrayify(setStateHash)),
@@ -44,7 +43,9 @@ let execute = async () => {
         }
     };
 
-    await request.post(`http://${config.host.name}:${config.host.port}/appointment`, { json: appointmentRequest });
+    await request.post(`http://${config.host.name}:${config.host.port}/appointment`, {
+        json: appointmentRequest
+    });
 
     // now register a callback on the setstate event and trigger a response
     const setStateEvent = "EventEvidence(uint256, bytes32)";
@@ -58,14 +59,8 @@ let execute = async () => {
     const tx = await channelContract.triggerDispute();
     await tx.wait();
 
-    try {
-        // wait for the success result
-        await waitForPredicate(successResult, s => s.success, 400);
-    } catch (doh) {
-        // fail if we dont get it
-        console.error("TEST FAILED!!!");
-        console.log(doh);
-    }
+    // wait for the success result
+    await waitForPredicate(successResult, s => s.success, 1000);
 };
 
 // assess the value of a predicate after a timeout, throws if predicate does not evaluate to true
@@ -81,7 +76,19 @@ const waitForPredicate = <T1>(successResult: T1, predicate: (a: T1) => boolean, 
     });
 };
 
+let flow = async () => {
+    await setup();
+    await execute();
+};
 console.log("Executing smoke tests");
-setup().then(() => {
-    execute().then(() => console.log("Tests passed!"));
-});
+flow().then(
+    () => {
+        console.log("Tests passed.");
+        process.exit(0);
+    },
+    err => {
+        console.log("Tests failed!");
+        console.log(err);
+        process.exit(1);
+    }
+);
