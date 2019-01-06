@@ -17,6 +17,7 @@ export const getGanacheProvider = () => {
 
 export const getJsonRPCProvider = () => {
   const provider = new ethers.providers.JsonRpcProvider(config.jsonRpcUrl);
+  provider.pollingInterval = 100;
   validateProvider(provider);
   return provider;
 };
@@ -27,6 +28,7 @@ export const getInfuraProvider = (): ethers.providers.InfuraProvider => {
     config.infura.currentNetwork,
     infura[`${config.infura.currentNetwork}`].apikey
   );
+  infuraProvider.pollingInterval = 100;
 
   validateProvider(infuraProvider);
 
