@@ -10,7 +10,7 @@
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
     "dev": "ts-node src/startUp.ts",
     "start": "node ./build/startUp.js",
-    "build": "mkdir -p ./build && cp ./config.json ./build/ && tsc",
+    "build": "tsc",
     "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit",
     "submodule": "git submodule init && git submodule update",
     "init": "npm run submodule && npm run build-kitsune"
@@ -42,7 +42,6 @@
     "@types/mocha": "^5.2.5",
     "@types/request-promise": "^4.1.42",
     "@types/uuid": "^3.4.4",
-    "@types/winston": "^2.4.4",
     "chai": "^4.2.0",
     "mocha": "^5.2.0",
     "nyc": "^13.1.0",
