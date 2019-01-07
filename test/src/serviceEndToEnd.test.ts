@@ -1,15 +1,15 @@
 import * as chai from "chai";
 import "mocha";
 import request from "request-promise";
-import { KitsuneTools } from "../kitsuneTools";
+import { KitsuneTools } from "../../src/kitsuneTools";
 import { ethers } from "ethers";
-import { KitsuneInspector } from "../inspector";
-import { KitsuneWatcher } from "../watcher";
-import { PisaService } from "../service";
-import { IConfig } from "../dataEntities/config";
+import { KitsuneInspector } from "../../src/inspector";
+import { KitsuneWatcher } from "../../src/watcher";
+import { PisaService } from "../../src/service";
+import { IConfig } from "../../src/dataEntities/config";
 import Ganache from "ganache-core";
-import { IAppointmentRequest } from "../dataEntities/appointment";
-import logger from "../logger";
+import { IAppointmentRequest } from "../../src/dataEntities/appointment";
+import logger from "../../src/logger";
 const StateChannelFactory = require("../../statechannels/build/contracts/StateChannelFactory.json");
 logger.transports.forEach(l => (l.level = "max"));
 

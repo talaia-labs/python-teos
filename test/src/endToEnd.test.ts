@@ -1,7 +1,7 @@
 import "mocha";
-import { KitsuneInspector } from "./../inspector";
-import { KitsuneWatcher } from "./../watcher";
-import { KitsuneTools } from "./../kitsuneTools";
+import { KitsuneInspector } from "../../src/inspector";
+import { KitsuneWatcher } from "../../src/watcher";
+import { KitsuneTools } from "../../src/kitsuneTools";
 import { ethers } from "ethers";
 import Ganache from "ganache-core";
 const ganache = Ganache.provider({ 

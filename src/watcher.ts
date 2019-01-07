@@ -55,6 +55,7 @@ export class Watcher {
                 await this.eventCallback(contract, appointment, ...args);
             } catch (doh) {
                 // an error occured whilst responding to the callback - this is serious and the problem needs to be correctly diagnosed
+                logger.error(doh);
                 logger.error(
                     `Error occured whilst responding to event ${this.eventName} in contract ${contract.address}.`
                 );

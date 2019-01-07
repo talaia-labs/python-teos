@@ -1,7 +1,7 @@
 import * as chai from "chai";
 import "mocha";
-import { KitsuneInspector } from "./../inspector";
-import { KitsuneTools } from "./../kitsuneTools";
+import { KitsuneInspector } from "../../src/inspector";
+import { KitsuneTools } from "../../src/kitsuneTools";
 import { ethers } from "ethers";
 import Ganache from "ganache-core";
 const ganache = Ganache.provider({

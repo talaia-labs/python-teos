@@ -4,16 +4,17 @@
   "description": "Arbitration Outsourcing for State Channels",
   "main": "index.js",
   "scripts": {
-    "test": "npm run build && mocha build/__pisa_tests__ --exit",
-    "test-docker": "mocha build/__docker_tests__/quickTest.js --exit",
-    "build-kitsune": "cd statechannels && npm ci && npx truffle compile",
+    "build": "tsc && cp config.json build/config.json",
+    "build-kitsune": "cd statechannels && npm ci && npx truffle compile && mkdir -p ../build/statechannels && cp -R build/ ../build/statechannels/build",
+    "init": "npm run submodule && npm run build-kitsune",
+    "start": "node ./build/src/startUp.js",
+    "start-dev": "ts-node src/startUp.ts",
     "start-evm": "ganache-cli -d -l 15000000 --allowUnlimitedContractSize --defaultBalanceEther 1000000",
-    "dev": "ts-node src/startUp.ts",
-    "start": "node ./build/startUp.js",
-    "build": "tsc",
-    "test-coverage": "npx tsc && nyc mocha build/__pisa_tests__ --exit",
     "submodule": "git submodule init && git submodule update",
-    "init": "npm run submodule && npm run build-kitsune"
+    "test": "npm run build && mocha build/test/src --exit",
+    "test-load": "node build/test/load/loadTest.js 10 20000",
+    "test-coverage": "npx tsc && nyc mocha build/test/src --exit",
+    "test-smoke": "node build/test/smoke/smokeTests.js"
   },
   "repository": {
     "type": "git",
@@ -32,6 +33,7 @@
     "ganache-core": "^2.2.1",
     "request": "^2.88.0",
     "request-promise": "^4.2.2",
+    "source-map-support": "^0.5.9",
     "uuid": "^3.3.2",
     "winston": "^3.1.0"
   },
