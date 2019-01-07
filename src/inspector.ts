@@ -34,6 +34,7 @@ export class Inspector {
             `Inspecting appointment ${appointmentRequest.stateUpdate.hashState} for contract ${contractAddress}.`
         );
         logger.debug("Appointment request: " + JSON.stringify(appointmentRequest));
+        
         const code: string = await this.provider.getCode(contractAddress);
         // check that the channel is a contract
         if (code === "0x" || code === "0x00") {
