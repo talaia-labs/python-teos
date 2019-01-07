@@ -1,18 +1,7 @@
-import Ganache from "ganache-core";
 import { ethers } from "ethers";
 import { IConfig } from "./dataEntities/config";
 const config = require("../config.json") as IConfig;
 // provide the ability to get different providers
-
-export const getGanacheProvider = async () => {
-    const ganache = Ganache.provider({
-        mnemonic: "myth like bonus scare over problem client lizard pioneer submit female collect"
-    });
-    const ganacheProvider = new ethers.providers.Web3Provider(ganache);
-    ganacheProvider.pollingInterval = 100;
-    await validateProvider(ganacheProvider);
-    return ganache;
-};
 
 export const getJsonRPCProvider = async (url?: string) => {
     const provider = new ethers.providers.JsonRpcProvider(url || config.jsonRpcUrl);
