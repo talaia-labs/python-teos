@@ -44,7 +44,6 @@
     "@types/mocha": "^5.2.5",
     "@types/request-promise": "^4.1.42",
     "@types/uuid": "^3.4.4",
-    "@types/winston": "^2.4.4",
     "chai": "^4.2.0",
     "mocha": "^5.2.0",
     "nyc": "^13.1.0",
