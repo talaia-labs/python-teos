@@ -201,7 +201,7 @@ describe("Service end-to-end", () => {
         );
     }).timeout(3000);
 
-    it("create channel, wront bytecode contact returns 400", async () => {
+    it("create channel, wrong bytecode contact returns 400", async () => {
         // deply an unrelated contract with different bytecode
 
         // contract
