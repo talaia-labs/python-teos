@@ -8,3 +8,11 @@ node_modules/
 *.log
 .nyc_output
 logs/
+
+.DS_Store
+.idea
+conf.py
+bitcoin.conf
+__pycache__/*
+.pending*
+

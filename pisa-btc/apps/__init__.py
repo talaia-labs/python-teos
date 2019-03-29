@@ -1,0 +1,2 @@
+PISA_API_SERVER = 'localhost'
+PISA_API_PORT = 2222

@@ -1,0 +1,11 @@
+# bitcoind
+BTC_RPC_USER = None
+BTC_RPC_PASSWD = None
+BTC_RPC_HOST = None
+BTC_RPC_PORT = None
+
+
+# ZMQ
+FEED_PROTOCOL = None
+FEED_ADDR = None
+FEED_PORT = None
