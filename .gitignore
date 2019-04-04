@@ -13,6 +13,6 @@ logs/
 .idea
 conf.py
 bitcoin.conf
-__pycache__/*
+*__pycache__
 .pending*
 
