@@ -5,7 +5,7 @@ from pisa.inspector import Inspector
 from multiprocessing.connection import Listener
 
 
-def manage_api(debug, host=HOST, port=PORT):
+def manage_api(debug, logging, host=HOST, port=PORT):
     listener = Listener((host, port))
     watcher = Watcher()
     inspector = Inspector()
@@ -13,16 +13,18 @@ def manage_api(debug, host=HOST, port=PORT):
     while True:
         conn = listener.accept()
 
+        remote_addr, remote_port = listener.last_accepted
+
         if debug:
-            print('Connection accepted from', listener.last_accepted)
+            logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
 
         # Maintain metadata up to date.
-        t_serve = threading.Thread(target=manage_request, args=[conn, listener.last_accepted, inspector, watcher,
-                                                                debug])
+        t_serve = threading.Thread(target=manage_request, args=[conn, remote_addr, remote_port, inspector, watcher,
+                                                                debug, logging])
         t_serve.start()
 
 
-def manage_request(conn, remote_addr, inspector, watcher, debug):
+def manage_request(conn, remote_addr, remote_port, inspector, watcher, debug, logging):
     while not conn.closed:
         try:
             response = "Unknown command"
@@ -35,7 +37,7 @@ def manage_request(conn, remote_addr, inspector, watcher, debug):
                     if command == "add_appointment":
                         appointment = inspector.inspect(msg, debug)
                         if appointment:
-                            appointment_added = watcher.add_appointment(appointment, debug)
+                            appointment_added = watcher.add_appointment(appointment, debug, logging)
 
                             if appointment_added:
                                 response = "Appointment accepted"
@@ -46,11 +48,12 @@ def manage_request(conn, remote_addr, inspector, watcher, debug):
 
             # Send response back. Change multiprocessing.connection for an http based connection
             if debug:
-                print('Sending response and disconnecting:', response, remote_addr)
+                logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr,
+                                                                                             remote_port))
             conn.close()
 
         except (IOError, EOFError):
             if debug:
-                print('Disconnecting from', remote_addr)
+                logging.info('[API] disconnecting from {}:{}'.format(remote_addr, remote_port))
 
             conn.close()
