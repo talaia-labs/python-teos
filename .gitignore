@@ -15,4 +15,13 @@ conf.py
 bitcoin.conf
 *__pycache__
 .pending*
+pisa.log
 
+.\#*
+build/
+dist/
+node_modules/
+.vscode/
+*.log
+.nyc_output
+logs/

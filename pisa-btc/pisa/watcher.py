@@ -17,7 +17,7 @@ class ZMQHandler:
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
         self.zmqSubSocket.connect("%s://%s:%s" % (FEED_PROTOCOL, FEED_ADDR, FEED_PORT))
 
-    def handle(self, block_queue, debug):
+    def handle(self, block_queue, debug, logging):
         msg = self.zmqSubSocket.recv_multipart()
         topic = msg[0]
         body = msg[1]
@@ -27,7 +27,7 @@ class ZMQHandler:
             block_queue.put(block_hash)
 
             if debug:
-                print("New block received from Core ", block_hash)
+                logging.info("[ZMQHandler] new block received via ZMQ".format(block_hash))
 
 
 class Watcher:
@@ -37,7 +37,7 @@ class Watcher:
         self.asleep = True
         self.max_appointments = max_appointments
 
-    def add_appointment(self, appointment, debug):
+    def add_appointment(self, appointment, debug, logging):
         # ToDo: Discuss about validation of input data
 
         # Rationale:
@@ -63,8 +63,8 @@ class Watcher:
 
             if self.asleep:
                 self.asleep = False
-                zmq_subscriber = Thread(target=self.do_subscribe, args=[self.block_queue, debug])
-                watcher = Thread(target=self.do_watch, args=[debug])
+                zmq_subscriber = Thread(target=self.do_subscribe, args=[self.block_queue, debug, logging])
+                watcher = Thread(target=self.do_watch, args=[debug, logging])
                 zmq_subscriber.start()
                 watcher.start()
 
@@ -75,11 +75,11 @@ class Watcher:
 
         return appointment_added
 
-    def do_subscribe(self, block_queue, debug):
+    def do_subscribe(self, block_queue, debug, logging):
         daemon = ZMQHandler()
-        daemon.handle(block_queue, debug)
+        daemon.handle(block_queue, debug, logging)
 
-    def do_watch(self, debug):
+    def do_watch(self, debug, logging):
         bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
                                                                BTC_RPC_PORT))
 
@@ -88,13 +88,14 @@ class Watcher:
 
             try:
                 block = bitcoin_cli.getblock(block_hash)
+                # ToDo: prev_block_id will be to store chain state and handle reorgs
                 prev_block_id = block.get('previousblockhash')
                 txs = block.get('tx')
 
                 if debug:
-                    print("New block received", block_hash)
-                    print("Prev. block hash", prev_block_id)
-                    print("List of transactions", txs)
+                    logging.info("[Watcher] new block received {}".format(block_hash))
+                    logging.info("[Watcher] prev. block hash {}".format(prev_block_id))
+                    logging.info("[Watcher] list of transactions: {}".format(txs))
 
                 potential_matches = []
 
@@ -103,11 +104,11 @@ class Watcher:
 
                 if debug:
                     if len(potential_matches) > 0:
-                        print("List of potential matches", potential_matches)
+                        logging.info("[Watcher] list of potential matches: {}".format(potential_matches))
                     else:
-                        print("No potential matches found")
+                        logging.info("[Watcher] no potential matches found")
 
-                matches = self.check_potential_matches(potential_matches, bitcoin_cli)
+                matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
 
                 # ToDo: Handle matches
                 # ToDo: Matches will be empty list if no matches, list of matches otherwise
@@ -115,10 +116,10 @@ class Watcher:
                 # ToDo: Get rid of appointment? Set appointment to a different state (create appointment state first)?
 
             except JSONRPCException as e:
-                print(e)
+                logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
                 continue
 
-    def check_potential_matches(self, potential_matches, bitcoin_cli):
+    def check_potential_matches(self, potential_matches, bitcoin_cli, debug, logging):
         matches = []
 
         for locator, k in potential_matches:
@@ -130,7 +131,8 @@ class Watcher:
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
-                    print(e)
+                    if debug:
+                        logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
                     continue
 
         return matches
