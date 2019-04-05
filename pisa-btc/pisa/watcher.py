@@ -34,11 +34,20 @@ class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
         self.block_queue = Queue()
-        self.sleep = True
+        self.asleep = True
         self.max_appointments = max_appointments
 
     def add_appointment(self, appointment, debug):
         # ToDo: Discuss about validation of input data
+
+        # Rationale:
+        # The Watcher will analyze every received block looking for appointment matches. If there is no work
+        # to do the watcher can sleep (appointments = {} and sleep = True) otherwise for every received block
+        # the watcher will get the list of transactions and compare it with the list of appointments.
+        # If the watcher is awake, every new appointment will just be added to the appointment list until
+        # max_appointments is reached.
+
+        # ToDo: Check how to handle appointment completion
 
         if len(self.appointments) < self.max_appointments:
             # Appointments are identified by the locator: the most significant 16 bytes of the commitment txid.
@@ -52,8 +61,8 @@ class Watcher:
             appointment.id = len(self.appointments[appointment.locator])
             self.appointments[appointment.locator].append(appointment)
 
-            if self.sleep:
-                self.sleep = False
+            if self.asleep:
+                self.asleep = False
                 zmq_subscriber = Thread(target=self.do_subscribe, args=[self.block_queue, debug])
                 watcher = Thread(target=self.do_watch, args=[debug])
                 zmq_subscriber.start()
@@ -61,10 +70,6 @@ class Watcher:
 
             appointment_added = True
 
-            # Rationale:
-            # The Watcher will analyze every received block looking for appointment matches. If there is no work
-            # to do the watcher can sleep (appointments = [] and sleep = True) otherwise for every received block
-            # the watcher will get the list of transactions and compare it with the list of appointments
         else:
             appointment_added = False
 
