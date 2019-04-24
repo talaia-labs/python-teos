@@ -35,7 +35,7 @@ def manage_request(conn, remote_addr, remote_port, inspector, watcher, debug, lo
                     command, arg = msg
 
                     if command == "add_appointment":
-                        appointment = inspector.inspect(msg, debug)
+                        appointment = inspector.inspect(arg, debug)
                         if appointment:
                             appointment_added = watcher.add_appointment(appointment, debug, logging)
 
