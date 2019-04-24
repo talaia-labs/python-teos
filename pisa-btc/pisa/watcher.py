@@ -42,7 +42,7 @@ class Watcher:
 
         # Rationale:
         # The Watcher will analyze every received block looking for appointment matches. If there is no work
-        # to do the watcher can sleep (appointments = {} and sleep = True) otherwise for every received block
+        # to do the watcher can go sleep (if appointments = {} then asleep = True) otherwise for every received block
         # the watcher will get the list of transactions and compare it with the list of appointments.
         # If the watcher is awake, every new appointment will just be added to the appointment list until
         # max_appointments is reached.
@@ -56,9 +56,6 @@ class Watcher:
             if not self.appointments.get(appointment.locator):
                 self.appointments[appointment.locator] = []
 
-            # Use an internal id (position in the list) to distinguish between different appointments with the same
-            # locator
-            appointment.id = len(self.appointments[appointment.locator])
             self.appointments[appointment.locator].append(appointment)
 
             if self.asleep:
@@ -70,8 +67,15 @@ class Watcher:
 
             appointment_added = True
 
+            if debug:
+                logging.info('[Watcher] new appointment accepted (locator = {})'.format(appointment.locator))
+
         else:
             appointment_added = False
+
+            if debug:
+                logging.info('[Watcher] maximum appointments reached, appointment rejected (locator = {}).'
+                             .format(appointment.locator))
 
         return appointment_added
 
@@ -88,7 +92,7 @@ class Watcher:
 
             try:
                 block = bitcoin_cli.getblock(block_hash)
-                # ToDo: prev_block_id will be to store chain state and handle reorgs
+                # ToDo: prev_block_id will be used  to store chain state and handle reorgs
                 prev_block_id = block.get('previousblockhash')
                 txs = block.get('tx')
 
@@ -99,8 +103,8 @@ class Watcher:
 
                 potential_matches = []
 
-                for k in self.appointments.keys():
-                    potential_matches += [(k, tx[32:]) for tx in txs if tx.startswith(k)]
+                for locator in self.appointments.keys():
+                    potential_matches += [(locator, tx[32:]) for tx in txs if tx.startswith(locator)]
 
                 if debug:
                     if len(potential_matches) > 0:
@@ -110,11 +114,21 @@ class Watcher:
 
                 matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
 
-                # ToDo: Handle matches
-                # ToDo: Matches will be empty list if no matches, list of matches otherwise
-                # ToDo: Notify responder with every match.
-                # ToDo: Get rid of appointment? Set appointment to a different state (create appointment state first)?
+                for locator, appointment_pos, transaction in matches:
+                    # ToDo: Notify responder with every match.
+                    # notify_responder(transaction)
 
+                    # If there was only one appointment that matches the locator we can delete the whole list
+                    # ToDo: We may want to use locks before adding / removing appointment
+                    if len(self.appointments[locator]) == 1:
+                        del self.appointments[locator]
+                    else:
+                        # Otherwise we just delete the appointment that matches locator:appointment_pos
+                        del self.appointments[locator][appointment_pos]
+
+                    if debug:
+                        logging.error("[Watcher] Notifying responder about {}:{} and deleting appointment"
+                                      .format(locator, appointment_pos))
             except JSONRPCException as e:
                 logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
                 continue
@@ -123,16 +137,24 @@ class Watcher:
         matches = []
 
         for locator, k in potential_matches:
-            for appointment in self.appointments.get(locator):
+            for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
-                    decrypted_data = decrypt_tx(appointment.encrypted_blob, k, appointment.cypher)
+                    # ToDo: Put this back
+                    # decrypted_data = decrypt_tx(appointment.encrypted_blob, k, appointment.cypher)
+                    # ToDo: Remove this. Temporary hack, since we are not working with blobs but with ids for now
+                    # ToDo: just get the raw transaction that matches both parts of the id
+                    decrypted_data = bitcoin_cli.getrawtransaction(locator + k)
+
                     bitcoin_cli.decoderawtransaction(decrypted_data)
-                    matches.append((locator, appointment.id, decrypted_data))
+                    matches.append((locator, appointment_pos, decrypted_data))
+
+                    if debug:
+                        logging.error("[Watcher] Match found for {}:{}! {}".format(locator, appointment_pos, locator+k))
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
                     if debug:
-                        logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
+                        logging.error("[Watcher] Can't build transaction from decoded data. Error code {}".format(e))
                     continue
 
         return matches
