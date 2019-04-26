@@ -1,33 +1,9 @@
-import zmq
-import binascii
 from queue import Queue
 from threading import Thread
 from pisa.tools import decrypt_tx
+from pisa.zmq_subscriber import ZMQHandler
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
-from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, FEED_PROTOCOL, FEED_ADDR, FEED_PORT, \
-    MAX_APPOINTMENTS
-
-
-class ZMQHandler:
-    """ Adapted from https://github.com/bitcoin/bitcoin/blob/master/contrib/zmq/zmq_sub.py"""
-    def __init__(self):
-        self.zmqContext = zmq.Context()
-        self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
-        self.zmqSubSocket.setsockopt(zmq.RCVHWM, 0)
-        self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
-        self.zmqSubSocket.connect("%s://%s:%s" % (FEED_PROTOCOL, FEED_ADDR, FEED_PORT))
-
-    def handle(self, block_queue, debug, logging):
-        msg = self.zmqSubSocket.recv_multipart()
-        topic = msg[0]
-        body = msg[1]
-
-        if topic == b"hashblock":
-            block_hash = binascii.hexlify(body).decode('UTF-8')
-            block_queue.put(block_hash)
-
-            if debug:
-                logging.info("[ZMQHandler] new block received via ZMQ".format(block_hash))
+from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 
 class Watcher:
