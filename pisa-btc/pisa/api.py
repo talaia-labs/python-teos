@@ -39,6 +39,7 @@ def manage_request(conn, remote_addr, remote_port, inspector, watcher, debug, lo
                         if appointment:
                             appointment_added = watcher.add_appointment(appointment, debug, logging)
 
+                            # FIXME: Response should be signed receipt (created and signed by the API)
                             if appointment_added:
                                 response = "Appointment accepted"
                             else:
