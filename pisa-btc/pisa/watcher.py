@@ -1,6 +1,7 @@
 from queue import Queue
 from threading import Thread
 from pisa.tools import decrypt_tx
+from pisa.responder import Responder
 from pisa.zmq_subscriber import ZMQHandler
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
@@ -14,7 +15,7 @@ class Watcher:
         self.max_appointments = max_appointments
 
     def add_appointment(self, appointment, debug, logging):
-        # ToDo: Discuss about validation of input data
+        # DISCUSS: about validation of input data
 
         # Rationale:
         # The Watcher will analyze every received block looking for appointment matches. If there is no work
@@ -22,8 +23,6 @@ class Watcher:
         # the watcher will get the list of transactions and compare it with the list of appointments.
         # If the watcher is awake, every new appointment will just be added to the appointment list until
         # max_appointments is reached.
-
-        # ToDo: Check how to handle appointment completion
 
         if len(self.appointments) < self.max_appointments:
             # Appointments are identified by the locator: the most significant 16 bytes of the commitment txid.
@@ -37,7 +36,8 @@ class Watcher:
             if self.asleep:
                 self.asleep = False
                 zmq_subscriber = Thread(target=self.do_subscribe, args=[self.block_queue, debug, logging])
-                watcher = Thread(target=self.do_watch, args=[debug, logging])
+                responder = Responder()
+                watcher = Thread(target=self.do_watch, args=[responder, debug, logging])
                 zmq_subscriber.start()
                 watcher.start()
 
@@ -59,7 +59,7 @@ class Watcher:
         daemon = ZMQHandler()
         daemon.handle(block_queue, debug, logging)
 
-    def do_watch(self, debug, logging):
+    def do_watch(self, responder, debug, logging):
         bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
                                                                BTC_RPC_PORT))
 
@@ -68,13 +68,10 @@ class Watcher:
 
             try:
                 block = bitcoin_cli.getblock(block_hash)
-                # ToDo: prev_block_id will be used  to store chain state and handle reorgs
-                prev_block_id = block.get('previousblockhash')
                 txs = block.get('tx')
 
                 if debug:
                     logging.info("[Watcher] new block received {}".format(block_hash))
-                    logging.info("[Watcher] prev. block hash {}".format(prev_block_id))
                     logging.info("[Watcher] list of transactions: {}".format(txs))
 
                 potential_matches = []
@@ -90,12 +87,12 @@ class Watcher:
 
                 matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
 
-                for locator, appointment_pos, transaction in matches:
-                    # ToDo: Notify responder with every match.
-                    # notify_responder(transaction)
+                for locator, appointment_pos, txid, tx in matches:
+                    # FIXME: Notify responder with every match.
+                    responder.add_response(txid, tx, self.appointments[locator].end_time, debug, logging)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
-                    # ToDo: We may want to use locks before adding / removing appointment
+                    # DISCUSS: We may want to use locks before adding / removing appointment
                     if len(self.appointments[locator]) == 1:
                         del self.appointments[locator]
                     else:
@@ -103,11 +100,18 @@ class Watcher:
                         del self.appointments[locator][appointment_pos]
 
                     if debug:
-                        logging.error("[Watcher] Notifying responder about {}:{} and deleting appointment"
+                        logging.error("[Watcher] notifying responder about {}:{} and deleting appointment"
                                       .format(locator, appointment_pos))
             except JSONRPCException as e:
-                logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
+                if debug:
+                    logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
                 continue
+
+        # Go back to sleep if there are no more appointments
+        self.asleep = True
+
+        if debug:
+            logging.error("[Watcher] no more pending appointments, going back to sleep.")
 
     def check_potential_matches(self, potential_matches, bitcoin_cli, debug, logging):
         matches = []
@@ -115,22 +119,23 @@ class Watcher:
         for locator, k in potential_matches:
             for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
-                    # ToDo: Put this back
-                    # decrypted_data = decrypt_tx(appointment.encrypted_blob, k, appointment.cypher)
-                    # ToDo: Remove this. Temporary hack, since we are not working with blobs but with ids for now
-                    # ToDo: just get the raw transaction that matches both parts of the id
-                    decrypted_data = bitcoin_cli.getrawtransaction(locator + k)
+                    txid = locator + k
+                    # FIXME: Put this back
+                    # tx = decrypt_tx(appointment.encrypted_blob, k, appointment.cypher)
+                    # FIXME: Remove this. Temporary hack, since we are not working with blobs but with ids for now
+                    # FIXME: just get the raw transaction that matches both parts of the id
+                    tx = bitcoin_cli.getrawtransaction(txid)
 
-                    bitcoin_cli.decoderawtransaction(decrypted_data)
-                    matches.append((locator, appointment_pos, decrypted_data))
+                    bitcoin_cli.decoderawtransaction(tx)
+                    matches.append((locator, appointment_pos, txid, tx))
 
                     if debug:
-                        logging.error("[Watcher] Match found for {}:{}! {}".format(locator, appointment_pos, locator+k))
+                        logging.error("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos, locator+k))
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
                     if debug:
-                        logging.error("[Watcher] Can't build transaction from decoded data. Error code {}".format(e))
+                        logging.error("[Watcher] can't build transaction from decoded data. Error code {}".format(e))
                     continue
 
         return matches
