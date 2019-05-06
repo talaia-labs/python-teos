@@ -87,9 +87,13 @@ class Watcher:
 
                 matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
 
-                for locator, appointment_pos, txid, tx in matches:
-                    # FIXME: Notify responder with every match.
-                    responder.add_response(txid, tx, self.appointments[locator].end_time, debug, logging)
+                for locator, appointment_pos, dispute_txid, txid, rawtx in matches:
+                    if debug:
+                        logging.error("[Watcher] notifying responder about {}:{} and deleting appointment".format(
+                            locator, appointment_pos))
+
+                    responder.add_response(dispute_txid, txid, rawtx,
+                                           self.appointments[locator][appointment_pos].end_time, debug, logging)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
                     # DISCUSS: We may want to use locks before adding / removing appointment
@@ -99,9 +103,6 @@ class Watcher:
                         # Otherwise we just delete the appointment that matches locator:appointment_pos
                         del self.appointments[locator][appointment_pos]
 
-                    if debug:
-                        logging.error("[Watcher] notifying responder about {}:{} and deleting appointment"
-                                      .format(locator, appointment_pos))
             except JSONRPCException as e:
                 if debug:
                     logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
@@ -119,18 +120,15 @@ class Watcher:
         for locator, k in potential_matches:
             for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
-                    txid = locator + k
-                    # FIXME: Put this back
-                    # tx = decrypt_tx(appointment.encrypted_blob, k, appointment.cypher)
-                    # FIXME: Remove this. Temporary hack, since we are not working with blobs but with ids for now
-                    # FIXME: just get the raw transaction that matches both parts of the id
-                    tx = bitcoin_cli.getrawtransaction(txid)
+                    dispute_txid = locator + k
+                    rawtx = decrypt_tx(appointment.encrypted_blob, k, appointment.cipher)
 
-                    bitcoin_cli.decoderawtransaction(tx)
-                    matches.append((locator, appointment_pos, txid, tx))
+                    txid = bitcoin_cli.decoderawtransaction(rawtx).get('txid')
+                    matches.append((locator, appointment_pos, dispute_txid, txid, rawtx))
 
                     if debug:
-                        logging.error("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos, locator+k))
+                        logging.error("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos,
+                                                                                   dispute_txid))
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
