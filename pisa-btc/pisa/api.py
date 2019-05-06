@@ -1,60 +1,57 @@
-import threading
 from pisa import *
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
-from multiprocessing.connection import Listener
+from flask import Flask, request, Response
+import json
+
+app = Flask(__name__)
 
 
-def manage_api(debug, logging, host=HOST, port=PORT):
-    listener = Listener((host, port))
+@app.route('/', methods=['POST'])
+def add_appointment():
+    remote_addr = request.environ.get('REMOTE_ADDR')
+    remote_port = request.environ.get('REMOTE_PORT')
+
+    if debug:
+        logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
+
+    # Check content type once if properly defined
+    # FIXME: Temporary patch until Paddy set's the client properly
+    request_data = json.loads(request.form['data'])
+    appointment = inspector.inspect(request_data, debug)
+
+    if appointment:
+        appointment_added = watcher.add_appointment(appointment, debug, logging)
+        rcode = 200
+
+        # FIXME: Response should be signed receipt (created and signed by the API)
+        if appointment_added:
+            response = "Appointment accepted"
+        else:
+            response = "Appointment rejected"
+            # FIXME: change the response code maybe?
+
+    else:
+        rcode = 400
+        response = "Appointment rejected. Request does not match the standard"
+
+    # Send response back. Change multiprocessing.connection for an http based connection
+    if debug:
+        logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr,
+                                                                                     remote_port))
+
+    return Response(response, status=rcode, mimetype='text/plain')
+
+
+def start_api(d, l):
+    # FIXME: Pretty ugly but I haven't found a proper way to pass it to add_appointment
+    global debug, logging, watcher, inspector
+    debug = d
+    logging = l
     watcher = Watcher()
     inspector = Inspector()
 
-    while True:
-        conn = listener.accept()
+    # Setting Flask log t ERROR only so it does not mess with out logging
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
-        remote_addr, remote_port = listener.last_accepted
-
-        if debug:
-            logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
-
-        # Maintain metadata up to date.
-        t_serve = threading.Thread(target=manage_request, args=[conn, remote_addr, remote_port, inspector, watcher,
-                                                                debug, logging])
-        t_serve.start()
-
-
-def manage_request(conn, remote_addr, remote_port, inspector, watcher, debug, logging):
-    while not conn.closed:
-        try:
-            response = "Unknown command"
-            msg = conn.recv()
-
-            if type(msg) == tuple:
-                if len(msg) is 2:
-                    command, arg = msg
-
-                    if command == "add_appointment":
-                        appointment = inspector.inspect(arg, debug)
-                        if appointment:
-                            appointment_added = watcher.add_appointment(appointment, debug, logging)
-
-                            # FIXME: Response should be signed receipt (created and signed by the API)
-                            if appointment_added:
-                                response = "Appointment accepted"
-                            else:
-                                response = "Appointment rejected"
-                        else:
-                            response = "Appointment rejected"
-
-            # Send response back. Change multiprocessing.connection for an http based connection
-            if debug:
-                logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr,
-                                                                                             remote_port))
-            conn.close()
-
-        except (IOError, EOFError):
-            if debug:
-                logging.info('[API] disconnecting from {}:{}'.format(remote_addr, remote_port))
-
-            conn.close()
+    app.run(host=HOST, port=PORT)
