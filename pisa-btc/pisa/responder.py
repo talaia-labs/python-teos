@@ -58,8 +58,7 @@ class Responder:
                     logging.info("[Responder] waking up!")
                 logging.info("[Responder] pushing transaction to the network (txid: {})".format(txid))
 
-            response = bitcoin_cli.sendrawtransaction(rawtx)
-            print(response)
+            bitcoin_cli.sendrawtransaction(rawtx)
 
             # handle_responses can call add_response recursively if a broadcast transaction does not get confirmations
             # retry holds such information.
