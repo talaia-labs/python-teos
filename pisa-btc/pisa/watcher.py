@@ -10,9 +10,10 @@ from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_A
 class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
-        self.block_queue = Queue()
+        self.block_queue = None
         self.asleep = True
         self.max_appointments = max_appointments
+        self.zmq_subscriber = None
 
     def add_appointment(self, appointment, debug, logging):
         # DISCUSS: about validation of input data
@@ -35,11 +36,15 @@ class Watcher:
 
             if self.asleep:
                 self.asleep = False
-                zmq_subscriber = Thread(target=self.do_subscribe, args=[self.block_queue, debug, logging])
+                self.block_queue = Queue()
+                zmq_thread = Thread(target=self.do_subscribe, args=[self.block_queue, debug, logging])
                 responder = Responder()
                 watcher = Thread(target=self.do_watch, args=[responder, debug, logging])
-                zmq_subscriber.start()
+                zmq_thread.start()
                 watcher.start()
+
+                if debug:
+                    logging.info("[Watcher] waking up!")
 
             appointment_added = True
 
@@ -56,8 +61,8 @@ class Watcher:
         return appointment_added
 
     def do_subscribe(self, block_queue, debug, logging):
-        daemon = ZMQHandler()
-        daemon.handle(block_queue, debug, logging)
+        self.zmq_subscriber = ZMQHandler(parent='Watcher')
+        self.zmq_subscriber.handle(block_queue, debug, logging)
 
     def do_watch(self, responder, debug, logging):
         bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
@@ -110,6 +115,7 @@ class Watcher:
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
+        self.zmq_subscriber.terminate = True
 
         if debug:
             logging.error("[Watcher] no more pending appointments, going back to sleep.")

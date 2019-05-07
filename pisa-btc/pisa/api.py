@@ -5,6 +5,8 @@ from flask import Flask, request, Response
 import json
 
 app = Flask(__name__)
+HTTP_OK = 200
+HTTP_BAD_REQUEST = 400
 
 
 @app.route('/', methods=['POST'])
@@ -21,7 +23,7 @@ def add_appointment():
 
     if appointment:
         appointment_added = watcher.add_appointment(appointment, debug, logging)
-        rcode = 200
+        rcode = HTTP_OK
 
         # FIXME: Response should be signed receipt (created and signed by the API)
         if appointment_added:
@@ -31,7 +33,7 @@ def add_appointment():
             # FIXME: change the response code maybe?
 
     else:
-        rcode = 400
+        rcode = HTTP_BAD_REQUEST
         response = "Appointment rejected. Request does not match the standard"
 
     # Send response back. Change multiprocessing.connection for an http based connection

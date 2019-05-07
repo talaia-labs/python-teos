@@ -6,7 +6,7 @@ class Inspector:
         pass
 
     def inspect(self, data, debug):
-        # TODO: We need to define standard names for the json fields, using Paddy's ones for now
+        # TODO: We need to define standard names for the json fields, using Paddy's for now
 
         appointment = None
 
