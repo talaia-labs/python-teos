@@ -52,7 +52,6 @@ class Responder:
         bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
                                                                BTC_RPC_PORT))
         try:
-            # ToDo: All errors should be handled as JSONRPCException, check that holds (if so response if no needed)
             if debug:
                 if self.asleep:
                     logging.info("[Responder] waking up!")
@@ -73,6 +72,10 @@ class Responder:
                 pass
             elif e.code == RPC_VERIFY_ALREADY_IN_CHAIN:
                 try:
+                    if debug:
+                        logging.error("[Responder] {} is already in the blockchain. Getting the confirmation count"
+                                      "and start monitoring the transaction".format(txid))
+
                     # If the transaction is already in the chain, we get the number of confirmations and watch the job
                     # until the end of the appointment
                     tx_info = bitcoin_cli.gettransaction(txid)
@@ -160,7 +163,6 @@ class Responder:
                     del self.confirmation_counter[job_id]
 
             else:
-                # ToDo: REORG!!
                 if debug:
                     logging.error("[Responder] reorg found! local prev. block id = {}, remote prev. block id = {}"
                                   .format(prev_block_hash, block.get('previousblockhash')))
@@ -193,10 +195,11 @@ class Responder:
                     self.add_response(job.dispute_txid, job_id, job.rawtx, job.appointment_end, debug, logging)
                 except JSONRPCException as e:
                     # FIXME: It should be safe but check Exception code anyway
-                    # ToDO: Dispute transaction if not there either, call reorg manager
                     if debug:
                         logging.error("[Responder] dispute transaction (txid = {}) not found either!"
                                       .format(job.dispute_txid))
+
+                    # ToDO: Dispute transaction is not there either, call reorg manager
                     pass
 
     def do_subscribe(self, block_queue, debug, logging):
