@@ -73,7 +73,7 @@ class Responder:
             elif e.code == RPC_VERIFY_ALREADY_IN_CHAIN:
                 try:
                     if debug:
-                        logging.error("[Responder] {} is already in the blockchain. Getting the confirmation count"
+                        logging.info("[Responder] {} is already in the blockchain. Getting the confirmation count"
                                       "and start monitoring the transaction".format(txid))
 
                     # If the transaction is already in the chain, we get the number of confirmations and watch the job
@@ -139,7 +139,7 @@ class Responder:
                         self.add_response(self.jobs[job_id].dispute_txid, job_id, self.jobs[job_id].tx,
                                           self.jobs[job_id].appointment_end, debug, logging, retry=True)
                         if debug:
-                            logging.info("[Responder] txid = {} has missed {} confirmations. Rebroadcast"
+                            logging.warning("[Responder] txid = {} has missed {} confirmations. Rebroadcasting"
                                          .format(job_id, CONFIRMATIONS_BEFORE_RETRY))
                     else:
                         # Otherwise we increase the number of missed confirmations
@@ -164,7 +164,7 @@ class Responder:
 
             else:
                 if debug:
-                    logging.error("[Responder] reorg found! local prev. block id = {}, remote prev. block id = {}"
+                    logging.warning("[Responder] reorg found! local prev. block id = {}, remote prev. block id = {}"
                                   .format(prev_block_hash, block.get('previousblockhash')))
 
                 self.handle_reorgs(bitcoin_cli, debug, logging)
@@ -176,7 +176,7 @@ class Responder:
         self.zmq_subscriber.terminate = True
 
         if debug:
-            logging.error("[Responder] no more pending jobs, going back to sleep.")
+            logging.info("[Responder] no more pending jobs, going back to sleep.")
 
     def handle_reorgs(self, bitcoin_cli, debug, logging):
         for job_id, job in self.jobs.items():
@@ -187,7 +187,7 @@ class Responder:
             except JSONRPCException as e:
                 # FIXME: It should be safe but check Exception code anyway
                 if debug:
-                    logging.error("[Responder] justice transaction (txid = {}) not found!".format(job_id))
+                    logging.warning("[Responder] justice transaction (txid = {}) not found!".format(job_id))
 
                 try:
                     bitcoin_cli.gettransaction(job.dispute_txid)
@@ -196,7 +196,7 @@ class Responder:
                 except JSONRPCException as e:
                     # FIXME: It should be safe but check Exception code anyway
                     if debug:
-                        logging.error("[Responder] dispute transaction (txid = {}) not found either!"
+                        logging.warning("[Responder] dispute transaction (txid = {}) not found either!"
                                       .format(job.dispute_txid))
 
                     # ToDO: Dispute transaction is not there either, call reorg manager
