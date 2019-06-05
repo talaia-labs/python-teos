@@ -1,6 +1,5 @@
 from queue import Queue
 from threading import Thread
-from pisa.tools import decrypt_tx
 from pisa.responder import Responder
 from pisa.zmq_subscriber import ZMQHandler
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
