@@ -1,7 +1,7 @@
 import logging
 from sys import argv
 from getopt import getopt
-from conf import LOG_FILE
+from conf import SERVER_LOG_FILE
 from threading import Thread
 from pisa.api import start_api
 
@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # Configure logging
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
-        logging.FileHandler(LOG_FILE),
+        logging.FileHandler(SERVER_LOG_FILE),
         logging.StreamHandler()
     ])
 

@@ -16,6 +16,7 @@ bitcoin.conf
 *__pycache__
 .pending*
 pisa.log
+pisa-btc/apps/*.json
 
 .\#*
 build/
