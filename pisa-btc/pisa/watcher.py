@@ -94,7 +94,7 @@ class Watcher:
 
                 for locator, appointment_pos, dispute_txid, txid, rawtx in matches:
                     if debug:
-                        logging.error("[Watcher] notifying responder about {}:{} and deleting appointment".format(
+                        logging.info("[Watcher] notifying responder about {}:{} and deleting appointment".format(
                             locator, appointment_pos))
 
                     responder.add_response(dispute_txid, txid, rawtx,
@@ -110,7 +110,7 @@ class Watcher:
 
             except JSONRPCException as e:
                 if debug:
-                    logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
+                    logging.info("[Watcher] JSONRPCException. Error code {}".format(e))
                 continue
 
         # Go back to sleep if there are no more appointments
@@ -132,7 +132,7 @@ class Watcher:
                     matches.append((locator, appointment_pos, dispute_txid, txid, raw_tx))
 
                     if debug:
-                        logging.error("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos,
+                        logging.info("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos,
                                                                                    dispute_txid))
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
