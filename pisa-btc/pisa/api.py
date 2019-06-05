@@ -16,8 +16,7 @@ def add_appointment():
         logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
 
     # Check content type once if properly defined
-    # FIXME: Temporary patch until Paddy set's the client properly
-    request_data = json.loads(request.form['data'])
+    request_data = json.loads(request.get_json())
     appointment = inspector.inspect(request_data, debug)
 
     if appointment:

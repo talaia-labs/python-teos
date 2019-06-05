@@ -121,10 +121,9 @@ class Watcher:
             for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
                     dispute_txid = locator + k
-                    rawtx = decrypt_tx(appointment.encrypted_blob, k, appointment.cipher)
-
-                    txid = bitcoin_cli.decoderawtransaction(rawtx).get('txid')
-                    matches.append((locator, appointment_pos, dispute_txid, txid, rawtx))
+                    raw_tx = appointment.encrypted_blob.decrypt(k)
+                    txid = bitcoin_cli.decoderawtransaction(raw_tx).get('txid')
+                    matches.append((locator, appointment_pos, dispute_txid, txid, raw_tx))
 
                     if debug:
                         logging.error("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos,
