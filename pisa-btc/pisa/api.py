@@ -27,14 +27,14 @@ def add_appointment():
 
         # FIXME: Response should be signed receipt (created and signed by the API)
         if appointment_added:
-            response = "Appointment accepted"
+            response = "appointment accepted"
         else:
-            response = "Appointment rejected"
+            response = "appointment rejected"
             # FIXME: change the response code maybe?
 
     else:
         rcode = HTTP_BAD_REQUEST
-        response = "Appointment rejected. Request does not match the standard"
+        response = "appointment rejected. Request does not match the standard"
 
     # Send response back. Change multiprocessing.connection for an http based connection
     if debug:

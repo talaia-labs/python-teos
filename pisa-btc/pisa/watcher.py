@@ -1,3 +1,4 @@
+from binascii import hexlify, unhexlify
 from queue import Queue
 from threading import Thread
 from pisa.responder import Responder
@@ -54,7 +55,7 @@ class Watcher:
             appointment_added = False
 
             if debug:
-                logging.info('[Watcher] maximum appointments reached, appointment rejected (locator = {}).'
+                logging.info('[Watcher] maximum appointments reached, appointment rejected (locator = {})'
                              .format(appointment.locator))
 
         return appointment_added
@@ -72,16 +73,16 @@ class Watcher:
 
             try:
                 block = bitcoin_cli.getblock(block_hash)
-                txs = block.get('tx')
+                tx_ids = block.get('tx')
 
                 if debug:
                     logging.info("[Watcher] new block received {}".format(block_hash))
-                    logging.info("[Watcher] list of transactions: {}".format(txs))
+                    logging.info("[Watcher] list of transactions: {}".format(tx_ids))
 
                 potential_matches = []
 
                 for locator in self.appointments.keys():
-                    potential_matches += [(locator, tx[32:]) for tx in txs if tx.startswith(locator)]
+                    potential_matches += [(locator, txid[32:]) for txid in tx_ids if txid.startswith(locator)]
 
                 if debug:
                     if len(potential_matches) > 0:
@@ -117,7 +118,7 @@ class Watcher:
         self.zmq_subscriber.terminate = True
 
         if debug:
-            logging.error("[Watcher] no more pending appointments, going back to sleep.")
+            logging.error("[Watcher] no more pending appointments, going back to sleep")
 
     def check_potential_matches(self, potential_matches, bitcoin_cli, debug, logging):
         matches = []
@@ -126,7 +127,8 @@ class Watcher:
             for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
                     dispute_txid = locator + k
-                    raw_tx = appointment.encrypted_blob.decrypt(k)
+                    raw_tx = appointment.encrypted_blob.decrypt(unhexlify(k), debug, logging)
+                    raw_tx = hexlify(raw_tx).decode()
                     txid = bitcoin_cli.decoderawtransaction(raw_tx).get('txid')
                     matches.append((locator, appointment_pos, dispute_txid, txid, raw_tx))
 

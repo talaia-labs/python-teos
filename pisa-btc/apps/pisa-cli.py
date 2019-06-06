@@ -14,8 +14,8 @@ from apps import PISA_API_SERVER, PISA_API_PORT
 commands = ['add_appointment']
 
 
-def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
-    locator = tx_id[:16]
+def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, logging):
+    locator = tx_id[:32]
 
     cipher = "AES-GCM-128"
     hash_function = "SHA256"
@@ -24,7 +24,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
     blob = Blob(tx, cipher, hash_function)
 
     # FIXME: tx_id should not be necessary (can be derived from tx SegWit-like). Passing it for now
-    encrypted_blob = blob.encrypt(tx_id)
+    encrypted_blob = blob.encrypt(tx_id, debug, logging)
 
     appointment = {"locator": locator, "start_block": start_block, "end_block": end_block,
                    "dispute_delta": dispute_delta, "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function":
@@ -48,7 +48,22 @@ def show_usage():
 
 
 if __name__ == '__main__':
-    opts, args = getopt(argv[1:], '', commands)
+    debug = False
+    command = None
+
+    opts, args = getopt(argv[1:], 'a:d', ['add_appointment, debug'])
+    for opt, arg in opts:
+        if opt in ['-a', '--add_appointment']:
+            if arg:
+                if not os.path.isfile(arg):
+                    raise Exception("Can't find file " + arg)
+                else:
+                    command = 'add_appointment'
+                    json_file = arg
+            else:
+                raise Exception("Path to appointment_data.json missing.")
+        if opt in ['-d', '--debug']:
+            debug = True
 
     # Configure logging
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
@@ -56,33 +71,24 @@ if __name__ == '__main__':
         logging.StreamHandler()
     ])
 
-    # Get args
-    if len(args) > 0:
-        command = args[0]
-    else:
-        raise Exception("Argument missing. Use help for usage information.")
-
     if command in commands:
-
-        if command in commands:
-            if len(args) != 2:
-                raise Exception("Path to appointment_data.json missing.")
-
-            if not os.path.isfile(args[1]):
-                raise Exception("Can't find file " + args[1])
-
-            appointment_data = json.load(open(args[1]))
+        if command == 'add_appointment':
+            appointment_data = json.load(open(json_file))
             valid_locator = check_txid_format(appointment_data.get('tx_id'))
 
             if valid_locator:
                 pisa_url = "http://{}:{}".format(PISA_API_SERVER, PISA_API_PORT)
                 appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
                                                 appointment_data.get('start_time'), appointment_data.get('end_time'),
-                                                appointment_data.get('dispute_delta'))
+                                                appointment_data.get('dispute_delta'), debug, logging)
+
+                if debug:
+                    logging.info("[Client] sending appointment to PISA")
 
                 r = requests.post(url=pisa_url, json=json.dumps(appointment))
 
-                logging.info("[Client] {} (code: {})".format(r.text, r.status_code))
+                if debug:
+                    logging.info("[Client] {} (code: {})".format(r.text, r.status_code))
             else:
                 raise ValueError("The provided locator is not valid.")
 
