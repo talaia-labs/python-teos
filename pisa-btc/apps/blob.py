@@ -1,9 +1,12 @@
-import hashlib
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
 
-SUPPORTED_HASH_FUNCTIONS = ['SHA256']
-SUPPORTED_CYPHERS = ['AES-GCM-128']
+SUPPORTED_HASH_FUNCTIONS = ["SHA256"]
+SUPPORTED_CYPHERS = ["AES-GCM-128"]
+SALT = "lightningwatcher"
 
 
 class Blob:
@@ -14,23 +17,32 @@ class Blob:
 
         # FIXME: We only support SHA256 for now
         if self.hash_function.upper() not in SUPPORTED_HASH_FUNCTIONS:
-            raise Exception('Hash function not supported ({}). Supported Hash functions: {}'
+            raise Exception("Hash function not supported ({}). Supported Hash functions: {}"
                             .format(self.hash_function, SUPPORTED_HASH_FUNCTIONS))
 
         # FIXME: We only support SHA256 for now
         if self.cypher.upper() not in SUPPORTED_CYPHERS:
-            raise Exception('Cypher not supported ({}). Supported cyphers: {}'.format(self.hash_function,
+            raise Exception("Cypher not supported ({}). Supported cyphers: {}".format(self.hash_function,
                                                                                       SUPPORTED_CYPHERS))
 
-    def encrypt(self, tx_id):
+    def encrypt(self, tx_id, debug, logging):
         # Transaction to be encrypted
         # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
-        tx = self.data.encode()
+        tx = unhexlify(self.data)
 
         # FIXME: tx_id should not be necessary (can be derived from tx SegWit-like). Passing it for now
-        # Extend the key using SHA256 as a KDF
-        tx_id = tx_id.encode()
-        extended_key = hashlib.sha256(tx_id[:16]).digest()
+        # Extend the key using HKDF
+        tx_id = unhexlify(tx_id)
+
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=SALT.encode(),
+            info=None,
+            backend=default_backend()
+        )
+
+        extended_key = hkdf.derive(tx_id[16:])
 
         # The 16 MSB of the extended key will serve as the AES GCM 128 secret key. The 16 LSB will serve as the IV.
         sk = extended_key[:16]
@@ -38,6 +50,14 @@ class Blob:
 
         # Encrypt the data
         aesgcm = AESGCM(sk)
-        encrypted_blob = hexlify(aesgcm.encrypt(nonce=nonce, data=tx, associated_data=None)).decode()
+        encrypted_blob = aesgcm.encrypt(nonce=nonce, data=tx, associated_data=None)
+        encrypted_blob = hexlify(encrypted_blob).decode()
+
+        if debug:
+            logging.info("[Client] creating new blob")
+            logging.info("[Client] master key: {}".format(hexlify(tx_id[16:]).decode()))
+            logging.info("[Client] sk: {}".format(hexlify(sk).decode()))
+            logging.info("[Client] nonce: {}".format(hexlify(nonce).decode()))
+            logging.info("[Client] encrypted_blob: {}".format(encrypted_blob))
 
         return encrypted_blob
