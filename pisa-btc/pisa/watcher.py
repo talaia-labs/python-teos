@@ -3,8 +3,10 @@ from queue import Queue
 from threading import Thread
 from pisa.responder import Responder
 from pisa.zmq_subscriber import ZMQHandler
-from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
+from utils.authproxy import AuthServiceProxy, JSONRPCException
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
+
+EXPIRY_DELTA = 6
 
 
 class Watcher:
@@ -73,16 +75,44 @@ class Watcher:
 
             try:
                 block = bitcoin_cli.getblock(block_hash)
-                tx_ids = block.get('tx')
+                txids = block.get('tx')
 
                 if debug:
                     logging.info("[Watcher] new block received {}".format(block_hash))
-                    logging.info("[Watcher] list of transactions: {}".format(tx_ids))
+                    logging.info("[Watcher] list of transactions: {}".format(txids))
+
+                # Delete expired appointments
+                to_delete = {}
+                for locator in self.appointments:
+                    for appointment in self.appointments[locator]:
+                        if block["height"] > appointment.end_time + EXPIRY_DELTA:
+                            # Get the appointment index and add the appointment to the deletion list
+                            appointment_pos = self.appointments[locator].index(appointment)
+
+                            if locator in to_delete:
+                                to_delete[locator].append(appointment_pos)
+                            else:
+                                to_delete[locator] = [appointment_pos]
+
+                for locator, indexes in to_delete.items():
+                    if len(indexes) == len(self.appointments[locator]):
+                        if debug:
+                            logging.info("[Watcher] end time reached with no match! Deleting appointment {}"
+                                         .format(locator))
+
+                        del self.appointments[locator]
+                    else:
+                        for i in indexes:
+                            if debug:
+                                logging.info("[Watcher] end time reached with no match! Deleting appointment {}:{}"
+                                             .format(locator, i))
+
+                                del self.appointments[locator][i]
 
                 potential_matches = []
 
                 for locator in self.appointments.keys():
-                    potential_matches += [(locator, txid[32:]) for txid in tx_ids if txid.startswith(locator)]
+                    potential_matches += [(locator, txid[32:]) for txid in txids if txid.startswith(locator)]
 
                 if debug:
                     if len(potential_matches) > 0:
@@ -92,12 +122,12 @@ class Watcher:
 
                 matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
 
-                for locator, appointment_pos, dispute_txid, txid, rawtx in matches:
+                for locator, appointment_pos, dispute_txid, txid, raw_tx in matches:
                     if debug:
                         logging.info("[Watcher] notifying responder about {}:{} and deleting appointment".format(
                             locator, appointment_pos))
 
-                    responder.add_response(dispute_txid, txid, rawtx,
+                    responder.add_response(dispute_txid, txid, raw_tx,
                                            self.appointments[locator][appointment_pos].end_time, debug, logging)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
@@ -110,7 +140,7 @@ class Watcher:
 
             except JSONRPCException as e:
                 if debug:
-                    logging.info("[Watcher] JSONRPCException. Error code {}".format(e))
+                    logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
                 continue
 
         # Go back to sleep if there are no more appointments
@@ -134,7 +164,7 @@ class Watcher:
 
                     if debug:
                         logging.info("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos,
-                                                                                   dispute_txid))
+                                                                                  dispute_txid))
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
@@ -143,5 +173,3 @@ class Watcher:
                     continue
 
         return matches
-
-
