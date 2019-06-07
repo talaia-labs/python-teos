@@ -2,7 +2,7 @@ from queue import Queue
 from threading import Thread
 from pisa.zmq_subscriber import ZMQHandler
 from pisa.errors import *
-from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
+from utils.authproxy import AuthServiceProxy, JSONRPCException
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 CONFIRMATIONS_BEFORE_RETRY = 6
