@@ -3,10 +3,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-
-SUPPORTED_HASH_FUNCTIONS = ["SHA256"]
-SUPPORTED_CYPHERS = ["AES-GCM-128"]
-SALT = "lightningwatcher"
+from conf import SALT, SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 
 
 class Blob:
@@ -21,9 +18,9 @@ class Blob:
                             .format(self.hash_function, SUPPORTED_HASH_FUNCTIONS))
 
         # FIXME: We only support SHA256 for now
-        if self.cypher.upper() not in SUPPORTED_CYPHERS:
+        if self.cypher.upper() not in SUPPORTED_CIPHERS:
             raise Exception("Cypher not supported ({}). Supported cyphers: {}".format(self.hash_function,
-                                                                                      SUPPORTED_CYPHERS))
+                                                                                      SUPPORTED_CIPHERS))
 
     def encrypt(self, tx_id, debug, logging):
         # Transaction to be encrypted
