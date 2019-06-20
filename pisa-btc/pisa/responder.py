@@ -10,11 +10,10 @@ MIN_CONFIRMATIONS = 6
 
 
 class Job:
-    def __init__(self, dispute_txid, rawtx, appointment_end, retry_counter=0):
+    def __init__(self, dispute_txid, justice_rawtx, appointment_end, retry_counter=0):
         self.dispute_txid = dispute_txid
-        self.rawtx = rawtx
+        self.justice_rawtx = justice_rawtx
         self.appointment_end = appointment_end
-        self.in_block_height = None
         self.missed_confirmations = 0
         self.retry_counter = retry_counter
 
@@ -27,17 +26,19 @@ class Responder:
         self.asleep = True
         self.zmq_subscriber = None
 
-    def create_job(self, dispute_txid, txid, rawtx, appointment_end, debug, logging, conf_counter=0, retry=False):
+    def create_job(self, dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging, conf_counter=0,
+                   retry=False):
         # DISCUSS: Check what to do if the retry counter gets too big
         if retry:
-            self.jobs[txid].retry_counter += 1
+            self.jobs[justice_txid].retry_counter += 1
+            self.jobs[justice_txid].missed_confirmations = 0
         else:
-            self.confirmation_counter[txid] = conf_counter
-            self.jobs[txid] = Job(dispute_txid, rawtx, appointment_end)
+            self.confirmation_counter[justice_txid] = conf_counter
+            self.jobs[justice_txid] = Job(dispute_txid, justice_rawtx, appointment_end)
 
         if debug:
-            logging.info('[Responder] new job added (dispute txid = {}, txid = {}, appointment end = {})'.format(
-                dispute_txid, txid, appointment_end))
+            logging.info('[Responder] new job added (dispute txid = {}, justice txid = {}, appointment end = {})'.
+                         format(dispute_txid, justice_txid, appointment_end))
 
         if self.asleep:
             self.asleep = False
@@ -47,46 +48,48 @@ class Responder:
             zmq_thread.start()
             responder.start()
 
-    def add_response(self, dispute_txid, txid, rawtx, appointment_end, debug, logging, retry=False):
+    def add_response(self, dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging, retry=False):
         bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
                                                                BTC_RPC_PORT))
         try:
             if debug:
                 if self.asleep:
                     logging.info("[Responder] waking up!")
-                logging.info("[Responder] pushing transaction to the network (txid: {})".format(txid))
+                logging.info("[Responder] pushing transaction to the network (txid: {})".format(justice_txid))
 
-            bitcoin_cli.sendrawtransaction(rawtx)
+            bitcoin_cli.sendrawtransaction(justice_rawtx)
 
             # handle_responses can call add_response recursively if a broadcast transaction does not get confirmations
             # retry holds such information.
-            self.create_job(dispute_txid, txid, rawtx, appointment_end, debug, logging, conf_counter=0, retry=retry)
+            self.create_job(dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging, retry=retry)
 
         except JSONRPCException as e:
             # Since we're pushing a raw transaction to the network we can get two kind of rejections:
             # RPC_VERIFY_REJECTED and RPC_VERIFY_ALREADY_IN_CHAIN. The former implies that the transaction is rejected
             # due to network rules, whereas the later implies that the transaction is already in the blockchain.
-            if e.code == RPC_VERIFY_REJECTED:
+            if e.error.get('code') == RPC_VERIFY_REJECTED:
                 # DISCUSS: what to do in this case
                 pass
-            elif e.code == RPC_VERIFY_ALREADY_IN_CHAIN:
+            elif e.error.get('code') == RPC_VERIFY_ALREADY_IN_CHAIN:
                 try:
                     if debug:
-                        logging.info("[Responder] {} is already in the blockchain. Getting the confirmation count"
-                                     "and start monitoring the transaction".format(txid))
+                        logging.info("[Responder] {} is already in the blockchain. Getting the confirmation count and "
+                                     "start monitoring the transaction".format(justice_txid))
 
                     # If the transaction is already in the chain, we get the number of confirmations and watch the job
                     # until the end of the appointment
-                    tx_info = bitcoin_cli.gettransaction(txid)
+                    tx_info = bitcoin_cli.gettransaction(justice_txid)
                     confirmations = int(tx_info.get("confirmations"))
-                    self.create_job(dispute_txid, txid, rawtx, appointment_end, debug, logging, retry=retry,
-                                    conf_counter=confirmations)
+                    self.create_job(dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging,
+                                    retry=retry, conf_counter=confirmations)
+
                 except JSONRPCException as e:
                     # While it's quite unlikely, the transaction that was already in the blockchain could have been
                     # reorged while we were querying bitcoind to get the confirmation count. in such a case we just
                     # restart the job
-                    if e.code == RPC_INVALID_ADDRESS_OR_KEY:
-                        self.add_response(dispute_txid, txid, rawtx, appointment_end, debug, logging, retry=retry)
+                    if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
+                        self.add_response(dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging,
+                                          retry=retry)
                     elif debug:
                         # If something else happens (unlikely but possible) log it so we can treat it in future releases
                         logging.error("[Responder] JSONRPCException. Error code {}".format(e))
@@ -120,11 +123,10 @@ class Responder:
 
             jobs_to_delete = []
             if prev_block_hash == block.get('previousblockhash') or prev_block_hash == 0:
-                # Handling new jobs (aka jobs with not enough confirmations), when a job receives MIN_CONFIRMATIONS
-                # it will be passed to jobs and we will simply check for chain forks.
+                # Keep count of the confirmations each tx gets
                 for job_id, confirmations in self.confirmation_counter.items():
                     # If we see the transaction for the first time, or MIN_CONFIRMATIONS hasn't been reached
-                    if job_id in txs or (0 < confirmations < MIN_CONFIRMATIONS):
+                    if job_id in txs or (0 < confirmations):
                         self.confirmation_counter[job_id] += 1
 
                         if debug:
@@ -135,7 +137,7 @@ class Responder:
                         # DISCUSS: How many confirmations before retry
                         # DISCUSS: recursion vs setting confirmations to 0 and rebroadcast here
                         # DISCUSS: how many max retries and what to do if the cap is reached
-                        self.add_response(self.jobs[job_id].dispute_txid, job_id, self.jobs[job_id].tx,
+                        self.add_response(self.jobs[job_id].dispute_txid, job_id, self.jobs[job_id].justice_rawtx,
                                           self.jobs[job_id].appointment_end, debug, logging, retry=True)
                         if debug:
                             logging.warning("[Responder] txid = {} has missed {} confirmations. Rebroadcasting"
@@ -145,7 +147,7 @@ class Responder:
                         self.jobs[job_id].missed_confirmations += 1
 
                 for job_id, job in self.jobs.items():
-                    if job.appointment_end <= height:
+                    if job.appointment_end <= height and self.confirmation_counter[job_id] >= MIN_CONFIRMATIONS:
                         # The end of the appointment has been reached
                         jobs_to_delete.append(job_id)
 
@@ -191,7 +193,7 @@ class Responder:
                 try:
                     bitcoin_cli.gettransaction(job.dispute_txid)
                     # DISCUSS: Add job back, should we flag it as retried?
-                    self.add_response(job.dispute_txid, job_id, job.rawtx, job.appointment_end, debug, logging)
+                    self.add_response(job.dispute_txid, job_id, job.justice_rawtx, job.appointment_end, debug, logging)
                 except JSONRPCException as e:
                     # FIXME: It should be safe but check Exception code anyway
                     if debug:

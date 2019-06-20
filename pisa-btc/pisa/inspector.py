@@ -12,9 +12,6 @@ class Inspector:
         self.logging = logging
 
     def inspect(self, data):
-        message = None
-        rcode = 0
-
         locator = data.get('locator')
         start_time = data.get('start_time')
         end_time = data.get('end_time')
@@ -52,7 +49,7 @@ class Inspector:
             if self.debug:
                 self.logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
 
-        return rcode, message
+        return r
 
     def check_locator(self, locator):
         message = None
@@ -64,7 +61,7 @@ class Inspector:
         elif type(locator) != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong locator data type ({})".format(type(locator))
-        elif len(locator) != 32:
+        elif len(locator) != 64:
             rcode = errors.APPOINTMENT_WRONG_FIELD_SIZE
             message = "wrong locator size ({})".format(len(locator))
         elif re.search(r'^[0-9A-Fa-f]+$', locator) is None:
@@ -169,7 +166,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
         elif encrypted_blob == '':
-            # ToDo: We may want to define this to be at least as long as one block of the cypher we are using
+            # ToDo: We may want to define this to be at least as long as one block of the cipher we are using
             rcode = errors.APPOINTMENT_WRONG_FIELD
             message = "wrong encrypted_blob".format(t)
         if self.debug and message:
