@@ -1,5 +1,6 @@
 import logging
 from pisa.inspector import Inspector
+from pisa.appointment import Appointment
 from conf import TEST_LOG_FILE
 from pisa import errors
 from utils.authproxy import AuthServiceProxy, JSONRPCException
@@ -21,7 +22,7 @@ try:
 except JSONRPCException as e:
     logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
 
-locators = [None, 0, 'A' * 31, "A" * 31 + "_"]
+locators = [None, 0, 'A' * 31, "A" * 63 + "_"]
 start_times = [None, 0, '', 15.0, block_height - 10]
 end_times = [None, 0, '', 26.123, block_height - 11]
 dispute_deltas = [None, 0, '', 1.2, 30, -3]
@@ -64,7 +65,7 @@ for locator, ret in zip(locators, locators_rets):
     print(r)
 
 # Set locator to a 'valid' one
-appointment['locator'] = 'A' * 32
+appointment['locator'] = 'A' * 64
 
 print("\nStart time tests\n")
 for start_time, ret in zip(start_times, start_time_rets):
@@ -132,7 +133,7 @@ for hash_function, ret in zip(hash_functions, hash_function_rets):
 appointment['hash_function'] = SUPPORTED_HASH_FUNCTIONS[0]
 
 r = inspector.inspect(appointment)
-assert r[0] == 0
+assert type(r) == Appointment
 
 print("\nAll tests passed!")
 
