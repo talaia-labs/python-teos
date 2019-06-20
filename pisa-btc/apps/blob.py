@@ -5,9 +5,9 @@ from conf import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 
 
 class Blob:
-    def __init__(self, data, cypher, hash_function):
+    def __init__(self, data, cipher, hash_function):
         self.data = data
-        self.cypher = cypher
+        self.cipher = cipher
         self.hash_function = hash_function
 
         # FIXME: We only support SHA256 for now
@@ -15,9 +15,9 @@ class Blob:
             raise Exception("Hash function not supported ({}). Supported Hash functions: {}"
                             .format(self.hash_function, SUPPORTED_HASH_FUNCTIONS))
 
-        # FIXME: We only support SHA256 for now
-        if self.cypher.upper() not in SUPPORTED_CIPHERS:
-            raise Exception("Cypher not supported ({}). Supported cyphers: {}".format(self.hash_function,
+        # FIXME: We only support AES-GCM-128 for now
+        if self.cipher.upper() not in SUPPORTED_CIPHERS:
+            raise Exception("Cipher not supported ({}). Supported ciphers: {}".format(self.hash_function,
                                                                                       SUPPORTED_CIPHERS))
 
     def encrypt(self, tx_id, debug, logging):
