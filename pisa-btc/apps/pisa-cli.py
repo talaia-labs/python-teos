@@ -6,6 +6,8 @@ from getopt import getopt
 from sys import argv
 import logging
 from conf import CLIENT_LOG_FILE
+from hashlib import sha256
+from binascii import unhexlify
 
 from apps.blob import Blob
 from apps import PISA_API_SERVER, PISA_API_PORT
@@ -15,7 +17,7 @@ commands = ['add_appointment']
 
 
 def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, logging):
-    locator = tx_id[:32]
+    locator = sha256(unhexlify(tx_id)).hexdigest()
 
     cipher = "AES-GCM-128"
     hash_function = "SHA256"

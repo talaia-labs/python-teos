@@ -5,6 +5,7 @@ from conf import EXPIRY_DELTA
 from pisa.responder import Responder
 from pisa.zmq_subscriber import ZMQHandler
 from utils.authproxy import AuthServiceProxy, JSONRPCException
+from hashlib import sha256
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 
@@ -27,9 +28,9 @@ class Watcher:
         # max_appointments is reached.
 
         if len(self.appointments) < self.max_appointments:
-            # Appointments are identified by the locator: the most significant 16 bytes of the commitment txid.
-            # While 16-byte hash collisions are not likely, they are possible, so we will store appointments in lists
-            # even if we only have one (so the code logic is simplified from this point on).
+            # Appointments are identified by the locator: the sha256 of commitment txid (H(tx_id)).
+            # Two different nodes may ask for appointments using the same commitment txid, what will result in a
+            # collision in our appointments structure (and may be an attack surface), we use lists to avoid that.
             if not self.appointments.get(appointment.locator):
                 self.appointments[appointment.locator] = []
 
@@ -76,6 +77,8 @@ class Watcher:
                 block = bitcoin_cli.getblock(block_hash)
                 txids = block.get('tx')
 
+                potential_locators = {sha256(unhexlify(txid)).hexdigest(): txid for txid in txids}
+
                 if debug:
                     logging.info("[Watcher] new block received {}".format(block_hash))
                     logging.info("[Watcher] list of transactions: {}".format(txids))
@@ -108,10 +111,12 @@ class Watcher:
 
                                 del self.appointments[locator][i]
 
-                potential_matches = []
-
+                # Check is any of the tx_ids in the received block is an actual match
+                potential_matches = {}
                 for locator in self.appointments.keys():
-                    potential_matches += [(locator, txid[32:]) for txid in txids if txid.startswith(locator)]
+                    if locator in potential_locators:
+                        # This is locator:txid
+                        potential_matches[locator] = potential_locators[locator]
 
                 if debug:
                     if len(potential_matches) > 0:
@@ -121,12 +126,12 @@ class Watcher:
 
                 matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
 
-                for locator, appointment_pos, dispute_txid, txid, raw_tx in matches:
+                for locator, appointment_pos, dispute_txid, justice_txid, justice_rawtx in matches:
                     if debug:
-                        logging.info("[Watcher] notifying responder about {}:{} and deleting appointment".format(
-                            locator, appointment_pos))
+                        logging.info("[Watcher] notifying responder about {} and deleting appointment {}:{}".format(
+                            justice_txid, locator, appointment_pos))
 
-                    responder.add_response(dispute_txid, txid, raw_tx,
+                    responder.add_response(dispute_txid, justice_txid, justice_rawtx,
                                            self.appointments[locator][appointment_pos].end_time, debug, logging)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
@@ -152,18 +157,17 @@ class Watcher:
     def check_potential_matches(self, potential_matches, bitcoin_cli, debug, logging):
         matches = []
 
-        for locator, k in potential_matches:
+        for locator, dispute_txid in potential_matches.items():
             for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
-                    dispute_txid = locator + k
-                    raw_tx = appointment.encrypted_blob.decrypt(unhexlify(k), debug, logging)
-                    raw_tx = hexlify(raw_tx).decode()
-                    txid = bitcoin_cli.decoderawtransaction(raw_tx).get('txid')
-                    matches.append((locator, appointment_pos, dispute_txid, txid, raw_tx))
+                    justice_rawtx = appointment.encrypted_blob.decrypt(unhexlify(dispute_txid), debug, logging)
+                    justice_rawtx = hexlify(justice_rawtx).decode()
+                    justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
+                    matches.append((locator, appointment_pos, dispute_txid, justice_txid, justice_rawtx))
 
                     if debug:
                         logging.info("[Watcher] match found for {}:{}! {}".format(locator, appointment_pos,
-                                                                                  dispute_txid))
+                                                                                  justice_txid))
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
