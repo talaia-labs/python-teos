@@ -1,6 +1,7 @@
 from pisa import *
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
+from pisa.appointment import Appointment
 from flask import Flask, request, Response
 import json
 
@@ -19,9 +20,9 @@ def add_appointment():
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
-    appointment = inspector.inspect(request_data, debug)
+    appointment = inspector.inspect(request_data)
 
-    if appointment:
+    if type(appointment) == Appointment:
         appointment_added = watcher.add_appointment(appointment, debug, logging)
         rcode = HTTP_OK
 
@@ -32,7 +33,11 @@ def add_appointment():
             response = "appointment rejected"
             # FIXME: change the response code maybe?
 
+    elif type(appointment) == tuple:
+        rcode = HTTP_BAD_REQUEST
+        response = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
     else:
+
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
@@ -50,7 +55,7 @@ def start_api(d, l):
     debug = d
     logging = l
     watcher = Watcher()
-    inspector = Inspector()
+    inspector = Inspector(debug, logging)
 
     # Setting Flask log t ERROR only so it does not mess with out logging
     logging.getLogger('werkzeug').setLevel(logging.ERROR)

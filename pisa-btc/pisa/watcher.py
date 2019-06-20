@@ -1,12 +1,11 @@
 from binascii import hexlify, unhexlify
 from queue import Queue
 from threading import Thread
+from conf import EXPIRY_DELTA
 from pisa.responder import Responder
 from pisa.zmq_subscriber import ZMQHandler
 from utils.authproxy import AuthServiceProxy, JSONRPCException
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
-
-EXPIRY_DELTA = 6
 
 
 class Watcher:
