@@ -12,4 +12,9 @@ class Appointment:
         self.cipher = cipher
         self.hash_function = hash_function
 
+        # ToDO: We may want to add some additional things to the appointment, like
+        #   minimum fee
+        #   refund to be payed to the user in case of failing
+
+
 
