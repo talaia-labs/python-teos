@@ -26,7 +26,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, l
     # FIXME: tx_id should not be necessary (can be derived from tx SegWit-like). Passing it for now
     encrypted_blob = blob.encrypt(tx_id, debug, logging)
 
-    appointment = {"locator": locator, "start_block": start_block, "end_block": end_block,
+    appointment = {"locator": locator, "start_time": start_block, "end_time": end_block,
                    "dispute_delta": dispute_delta, "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function":
                    hash_function}
 
