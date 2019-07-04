@@ -76,7 +76,6 @@ class Responder:
                 # DISCUSS: what to do in this case
                 pass
             elif e.error.get('code') == RPC_VERIFY_ALREADY_IN_CHAIN:
-                # FIXME: This can be simplified with check_tx_in_chain
                 try:
                     if debug:
                         logging.info("[Responder] {} is already in the blockchain. Getting the confirmation count and "
