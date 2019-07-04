@@ -2,6 +2,7 @@ from queue import Queue
 from threading import Thread
 from pisa.zmq_subscriber import ZMQHandler
 from pisa.rpc_errors import *
+from pisa.tools import check_tx_in_chain
 from utils.authproxy import AuthServiceProxy, JSONRPCException
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
@@ -25,6 +26,10 @@ class Responder:
         self.block_queue = None
         self.asleep = True
         self.zmq_subscriber = None
+
+    def do_subscribe(self, block_queue, debug, logging):
+        self.zmq_subscriber = ZMQHandler(parent='Responder')
+        self.zmq_subscriber.handle(block_queue, debug, logging)
 
     def create_job(self, dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging, conf_counter=0,
                    retry=False):
@@ -71,6 +76,7 @@ class Responder:
                 # DISCUSS: what to do in this case
                 pass
             elif e.error.get('code') == RPC_VERIFY_ALREADY_IN_CHAIN:
+                # FIXME: This can be simplified with check_tx_in_chain
                 try:
                     if debug:
                         logging.info("[Responder] {} is already in the blockchain. Getting the confirmation count and "
@@ -78,7 +84,7 @@ class Responder:
 
                     # If the transaction is already in the chain, we get the number of confirmations and watch the job
                     # until the end of the appointment
-                    tx_info = bitcoin_cli.gettransaction(justice_txid)
+                    tx_info = bitcoin_cli.getrawtransaction(justice_txid, 1)
                     confirmations = int(tx_info.get("confirmations"))
                     self.create_job(dispute_txid, justice_txid, justice_rawtx, appointment_end, debug, logging,
                                     retry=retry, conf_counter=confirmations)
@@ -181,28 +187,33 @@ class Responder:
 
     def handle_reorgs(self, bitcoin_cli, debug, logging):
         for job_id, job in self.jobs.items():
-            try:
-                tx_info = bitcoin_cli.gettransaction(job_id)
-                job.confirmations = int(tx_info.get("confirmations"))
+            # First we check if the dispute transaction is still in the blockchain. If not, the justice can not be
+            # there either, so we'll need to call the reorg manager straight away
+            dispute_in_chain, _ = check_tx_in_chain(bitcoin_cli, job.dispute_txid, debug, logging, parent='Responder',
+                                                    tx_label='dispute')
 
-            except JSONRPCException as e:
-                # FIXME: It should be safe but check Exception code anyway
-                if debug:
-                    logging.warning("[Responder] justice transaction (txid = {}) not found!".format(job_id))
+            # If the dispute is there, we can check the justice tx
+            if dispute_in_chain:
+                justice_in_chain, justice_confirmations = check_tx_in_chain(bitcoin_cli, job_id, debug, logging,
+                                                                            parent='Responder', tx_label='dispute')
 
-                try:
-                    bitcoin_cli.gettransaction(job.dispute_txid)
-                    # DISCUSS: Add job back, should we flag it as retried?
-                    self.add_response(job.dispute_txid, job_id, job.justice_rawtx, job.appointment_end, debug, logging)
-                except JSONRPCException as e:
-                    # FIXME: It should be safe but check Exception code anyway
+                # If both transactions are there, we only need to update the justice tx confirmation count
+                if justice_in_chain:
                     if debug:
-                        logging.warning("[Responder] dispute transaction (txid = {}) not found either!"
-                                        .format(job.dispute_txid))
+                        logging.info("[Responder] updating confirmation count for {}: prev. {}, current {}".format(
+                            job_id, self.confirmation_counter[job_id], justice_confirmations))
+                    self.confirmation_counter[job_id] = justice_confirmations
+                    if debug:
+                        logging.info("[Responder] no more pending jobs, going back to sleep")
 
-                    # ToDO: Dispute transaction is not there either, call reorg manager
-                    pass
+                else:
+                    # Otherwise, we will add the job back (implying rebroadcast of the tx) and monitor it again
+                    # DISCUSS: Adding job back, should we flag it as retried?
+                    self.add_response(job.dispute_txid, job_id, job.justice_rawtx, job.appointment_end, debug, logging)
 
-    def do_subscribe(self, block_queue, debug, logging):
-        self.zmq_subscriber = ZMQHandler(parent='Responder')
-        self.zmq_subscriber.handle(block_queue, debug, logging)
+            else:
+                # FIXME: if the dispute is not on chain (either in mempool or not there al all), we need to call the
+                #        reorg manager
+                logging.warning("[Responder] dispute and justice transaction missing. Calling the reorg manager")
+                logging.error("[Responder] reorg manager not yet implemented")
+                pass
