@@ -21,3 +21,6 @@ if __name__ == '__main__':
 
     api_thread = Thread(target=start_api, args=[debug, logging])
     api_thread.start()
+
+    # ToDO: Run sanity checks to ensure that bitcoin rpc requests can be run, if the bitcoin.conf is not consistent with
+    #   conf.py the pisa daemon will fail upon performing the first rpc request.
