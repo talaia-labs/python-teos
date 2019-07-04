@@ -12,7 +12,7 @@ logs/
 .DS_Store
 .idea
 conf.py
-bitcoin.conf
+bitcoin.conf*
 *__pycache__
 .pending*
 pisa.log
