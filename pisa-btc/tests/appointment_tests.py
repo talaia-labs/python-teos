@@ -25,7 +25,7 @@ except JSONRPCException as e:
 locators = [None, 0, 'A' * 31, "A" * 63 + "_"]
 start_times = [None, 0, '', 15.0, block_height - 10]
 end_times = [None, 0, '', 26.123, block_height - 11]
-dispute_deltas = [None, 0, '', 1.2, 30, -3]
+dispute_deltas = [None, 0, '', 1.2, -3, 30]
 encrypted_blobs = [None, 0, '']
 ciphers = [None, 0, '', 'foo']
 hash_functions = [None, 0, '', 'foo']
@@ -43,7 +43,7 @@ end_time_rets = [errors.APPOINTMENT_EMPTY_FIELD, errors.APPOINTMENT_FIELD_TOO_SM
 
 dispute_delta_rets = [errors.APPOINTMENT_EMPTY_FIELD, errors.APPOINTMENT_FIELD_TOO_SMALL,
                       errors.APPOINTMENT_WRONG_FIELD_TYPE, errors.APPOINTMENT_WRONG_FIELD_TYPE,
-                      errors.APPOINTMENT_FIELD_TOO_BIG, errors.APPOINTMENT_FIELD_TOO_SMALL]
+                      errors.APPOINTMENT_FIELD_TOO_SMALL]
 
 encrypted_blob_rets = [errors.APPOINTMENT_EMPTY_FIELD, errors.APPOINTMENT_WRONG_FIELD_TYPE,
                        errors.APPOINTMENT_WRONG_FIELD]
