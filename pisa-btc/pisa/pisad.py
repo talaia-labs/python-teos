@@ -4,6 +4,9 @@ from getopt import getopt
 from conf import SERVER_LOG_FILE
 from threading import Thread
 from pisa.api import start_api
+from pisa.tools import can_connect_to_bitcoind, in_correct_network
+from utils.authproxy import AuthServiceProxy
+from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, BTC_NETWORK
 
 
 if __name__ == '__main__':
@@ -19,8 +22,15 @@ if __name__ == '__main__':
         logging.StreamHandler()
     ])
 
-    api_thread = Thread(target=start_api, args=[debug, logging])
-    api_thread.start()
+    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
+                                                           BTC_RPC_PORT))
 
-    # ToDO: Run sanity checks to ensure that bitcoin rpc requests can be run, if the bitcoin.conf is not consistent with
-    #   conf.py the pisa daemon will fail upon performing the first rpc request.
+    if can_connect_to_bitcoind(bitcoin_cli):
+        if in_correct_network(bitcoin_cli, BTC_NETWORK):
+            api_thread = Thread(target=start_api, args=[debug, logging])
+            api_thread.start()
+        else:
+            logging.error("[Pisad] bitcoind is running on a different network, check conf.py and bitcoin.conf. "
+                          "Shutting down")
+    else:
+        logging.error("[Pisad] can't connect to bitcoind. Shutting down")

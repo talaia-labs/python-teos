@@ -3,6 +3,7 @@ BTC_RPC_USER = None
 BTC_RPC_PASSWD = None
 BTC_RPC_HOST = None
 BTC_RPC_PORT = None
+BTC_NETWORK = None
 
 
 # ZMQ
@@ -22,4 +23,3 @@ CLIENT_LOG_FILE = 'pisa.log'
 # CRYPTO
 SUPPORTED_HASH_FUNCTIONS = ["SHA256"]
 SUPPORTED_CIPHERS = ["AES-GCM-128"]
-SALT = "lightningwatcher"
