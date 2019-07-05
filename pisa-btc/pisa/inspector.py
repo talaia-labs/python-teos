@@ -31,7 +31,7 @@ class Inspector:
             if rcode == 0:
                 rcode, message = self.check_end_time(end_time, start_time, block_height)
             if rcode == 0:
-                rcode, message = self.check_delta(dispute_delta, start_time, end_time)
+                rcode, message = self.check_delta(dispute_delta)
             if rcode == 0:
                 rcode, message = self.check_blob(encrypted_blob)
             if rcode == 0:
@@ -40,8 +40,7 @@ class Inspector:
                 rcode, message = self.check_hash_function(hash_function)
 
             if rcode == 0:
-                r = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob, cipher,
-                                          hash_function)
+                r = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function)
             else:
                 r = (rcode, message)
 
@@ -124,12 +123,11 @@ class Inspector:
 
         return rcode, message
 
-    def check_delta(self, dispute_delta, start_time, end_time):
+    def check_delta(self, dispute_delta):
         message = None
         rcode = 0
 
         t = type(dispute_delta)
-        delta = end_time - start_time
 
         if dispute_delta is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
@@ -137,15 +135,10 @@ class Inspector:
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong dispute_delta data type ({})".format(t)
-        elif end_time - start_time < dispute_delta:
-            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
-            message = "wrong dispute_delta provided ({} > {})".format(dispute_delta, delta)
-        elif end_time - start_time > dispute_delta:
-            rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
-            message = "wrong dispute_delta provided ({} < {})".format(dispute_delta, delta)
         elif dispute_delta < MIN_DISPUTE_DELTA:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
-            message = "dispute delta too small ({} < {})".format(dispute_delta, MIN_DISPUTE_DELTA)
+            message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
+                MIN_DISPUTE_DELTA, dispute_delta)
 
         if self.debug and message:
             self.logging.error("[Inspector] {}".format(message))
