@@ -1,5 +1,7 @@
 from queue import Queue
 from threading import Thread
+from hashlib import sha256
+from binascii import unhexlify
 from pisa.zmq_subscriber import ZMQHandler
 from pisa.rpc_errors import *
 from pisa.tools import check_tx_in_chain
@@ -13,10 +15,19 @@ MIN_CONFIRMATIONS = 6
 class Job:
     def __init__(self, dispute_txid, justice_rawtx, appointment_end, retry_counter=0):
         self.dispute_txid = dispute_txid
+        # FIXME: locator is here so we can give info about jobs for now. It can be either passed from watcher or info
+        #        can be directly got from DB
+        self.locator = sha256(unhexlify(dispute_txid)).hexdigest()
         self.justice_rawtx = justice_rawtx
         self.appointment_end = appointment_end
         self.missed_confirmations = 0
         self.retry_counter = retry_counter
+
+    def to_json(self):
+        job = {"locator": self.dispute_txid, "justice_rawtx": self.justice_rawtx,
+               "appointment_end": self.appointment_end}
+
+        return job
 
 
 class Responder:

@@ -2,7 +2,7 @@ from pisa import *
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
-from flask import Flask, request, Response
+from flask import Flask, request, Response, abort
 import json
 
 app = Flask(__name__)
@@ -47,6 +47,63 @@ def add_appointment():
                                                                                      remote_port))
 
     return Response(response, status=rcode, mimetype='text/plain')
+
+
+# FIXME: THE NEXT TWO API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
+@app.route('/get_appointment', methods=['GET'])
+def get_appointment():
+    locator = request.args.get('locator')
+    response = []
+
+    job_in_watcher = watcher.appointments.get(locator)
+
+    if job_in_watcher:
+        for job in job_in_watcher:
+            job_data = job.to_json()
+            job_data['status'] = "being watched"
+            response.append(job_data)
+
+    if watcher.responder:
+        responder_jobs = watcher.responder.jobs
+
+        for job_id, job in responder_jobs.items():
+            if job.locator == locator:
+                job_data = job.to_json()
+                job_data['status'] = "dispute responded"
+                job_data['confirmations'] = watcher.responder.confirmation_counter.get(job_id)
+                response.append(job_data)
+
+    if not response:
+        response.append({"locator": locator, "status": "not found"})
+
+    response = json.dumps(response)
+
+    return response
+
+
+@app.route('/get_all_appointments', methods=['GET'])
+def get_all_appointments():
+    watcher_appointments = []
+    responder_jobs = []
+
+    if request.remote_addr in ['localhost', '127.0.0.1']:
+        for app_id, appointment in watcher.appointments.items():
+            jobs_data = [job.to_json() for job in appointment]
+
+            watcher_appointments.append({app_id: jobs_data})
+
+        if watcher.responder:
+            for job_id, job in watcher.responder.jobs.items():
+                job_data = job.to_json()
+                job_data['confirmations'] = watcher.responder.confirmation_counter.get(job_id)
+                responder_jobs.append({job_id: job_data})
+
+        response = json.dumps({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
+
+    else:
+        abort(404)
+
+    return response
 
 
 def start_api(d, l):
