@@ -2,7 +2,7 @@ import requests
 import re
 import os
 import json
-from getopt import getopt
+from getopt import getopt, GetoptError
 from sys import argv
 import logging
 from conf import CLIENT_LOG_FILE
@@ -11,9 +11,6 @@ from binascii import unhexlify
 from apps.blob import Blob
 from requests import ConnectTimeout
 from apps import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT
-
-
-commands = ['add_appointment']
 
 
 def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, logging):
@@ -42,40 +39,69 @@ def check_txid_format(txid):
     return re.search(r'^[0-9A-Fa-f]+$', txid) is not None
 
 
-def show_usage():
-    print("usage: python pisa-cli.py argument [additional_arguments]."
+def show_usage(show_and_quit=False):
+    print("usage: python pisa-cli.py arguments [additional_arguments]."
           "\nArguments:"
-          "\nadd_appointment appointment: \tregisters a json formatted appointment "
-          "\nhelp: \t\tshows this message.")
+          "\n-a, --add_appointment appointment: \tregisters a json formatted appointment"
+          "\n-f, --file appointment_file: \tregisters an appointment from a an json formatted file"
+          "\n-s, --server: \tAPI server where to send the requests. Defaults to localhost (modifiable in __init__.py)"
+          "\n-p, --port: \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)"
+          "\n-d, --debug: \tshows debug information and stores it in pisa.log"
+          "\n-h --help: \tshows this message.")
+
+    if show_and_quit:
+        exit(-1)
 
 
 if __name__ == '__main__':
     debug = False
+    help_command = False
+    command = None
+    appointment_data = None
     pisa_api_server = DEFAULT_PISA_API_SERVER
     pisa_api_port = DEFAULT_PISA_API_PORT
-    command = None
+    commands = ['add_appointment']
 
-    opts, args = getopt(argv[1:], 'a:dh:p:', ['add_appointment, debug, host, port'])
-    for opt, arg in opts:
-        if opt in ['-a', '--add_appointment']:
-            if arg:
-                if not os.path.isfile(arg):
-                    raise Exception("Can't find file " + arg)
-                else:
+    try:
+        opts, args = getopt(argv[1:], 'a:-f:s:p:dh', ['add_appointment, file, server, port, debug, help'])
+
+        for opt, arg in opts:
+            if opt in ['-a', '--add_appointment']:
+                if arg:
                     command = 'add_appointment'
-                    json_file = arg
-            else:
-                raise Exception("Path to appointment_data.json missing.")
-        if opt in ['-d', '--debug']:
-            debug = True
+                    appointment_data = json.loads(arg)
+                else:
+                    print("No appointment provided.")
+                    show_usage(show_and_quit=True)
 
-        if opt in ['-h', 'host']:
-            if arg:
-                pisa_api_server = arg
+            elif opt in ['-f', '--file']:
+                if arg:
+                    if not os.path.isfile(arg):
+                        print("Can't find file " + arg)
+                        show_usage(show_and_quit=True)
+                    else:
+                        command = 'add_appointment'
+                        appointment_data = json.load(open(arg))
+                else:
+                    raise Exception("Path to appointment_data.json missing.")
+            if opt in ['-s', 'server']:
+                if arg:
+                    pisa_api_server = arg
 
-        if opt in ['-p', '--port']:
-            if arg:
-                pisa_api_port = int(arg)
+            if opt in ['-p', '--port']:
+                if arg:
+                    pisa_api_port = int(arg)
+
+            if opt in ['-d', '--debug']:
+                debug = True
+
+            if opt in ['-h', '--help']:
+                help_command = True
+
+    except GetoptError as e:
+        print(e)
+    except json.JSONDecodeError as e:
+        print('Non-JSON encoded appointment passed as parameter.')
 
     # Configure logging
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
@@ -83,9 +109,10 @@ if __name__ == '__main__':
         logging.StreamHandler()
     ])
 
-    if command in commands:
-        if command == 'add_appointment':
-            appointment_data = json.load(open(json_file))
+    if help_command:
+        show_usage()
+    elif command in commands:
+        if command == 'add_appointment' and appointment_data:
             valid_locator = check_txid_format(appointment_data.get('tx_id'))
 
             if valid_locator:
@@ -102,6 +129,8 @@ if __name__ == '__main__':
 
                     if debug:
                         logging.info("[Client] {} (code: {})".format(r.text, r.status_code))
+                    else:
+                        print("[Client] {} (code: {})".format(r.text, r.status_code))
 
                 except ConnectTimeout:
                     if debug:
@@ -111,5 +140,6 @@ if __name__ == '__main__':
                 raise ValueError("The provided locator is not valid.")
 
     else:
-        show_usage()
+        print("No valid appointment data provided.")
+        show_usage(show_and_quit=True)
 
