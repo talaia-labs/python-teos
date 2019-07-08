@@ -16,6 +16,7 @@ class Watcher:
         self.asleep = True
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
+        self.responder = Responder()
 
     def add_appointment(self, appointment, debug, logging):
         # DISCUSS: about validation of input data
@@ -40,8 +41,7 @@ class Watcher:
                 self.asleep = False
                 self.block_queue = Queue()
                 zmq_thread = Thread(target=self.do_subscribe, args=[self.block_queue, debug, logging])
-                responder = Responder()
-                watcher = Thread(target=self.do_watch, args=[responder, debug, logging])
+                watcher = Thread(target=self.do_watch, args=[debug, logging])
                 zmq_thread.start()
                 watcher.start()
 
@@ -66,7 +66,7 @@ class Watcher:
         self.zmq_subscriber = ZMQHandler(parent='Watcher')
         self.zmq_subscriber.handle(block_queue, debug, logging)
 
-    def do_watch(self, responder, debug, logging):
+    def do_watch(self, debug, logging):
         bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
                                                                BTC_RPC_PORT))
 
@@ -131,8 +131,8 @@ class Watcher:
                         logging.info("[Watcher] notifying responder about {} and deleting appointment {}:{}".format(
                             justice_txid, locator, appointment_pos))
 
-                    responder.add_response(dispute_txid, justice_txid, justice_rawtx,
-                                           self.appointments[locator][appointment_pos].end_time, debug, logging)
+                    self.responder.add_response(dispute_txid, justice_txid, justice_rawtx,
+                                                self.appointments[locator][appointment_pos].end_time, debug, logging)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
                     # DISCUSS: We may want to use locks before adding / removing appointment
