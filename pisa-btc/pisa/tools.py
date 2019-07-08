@@ -32,7 +32,7 @@ def can_connect_to_bitcoind(bitcoin_cli):
 
     try:
         bitcoin_cli.help()
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, JSONRPCException):
         can_connect = False
 
     return can_connect
