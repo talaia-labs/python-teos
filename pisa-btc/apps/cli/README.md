@@ -11,7 +11,7 @@
 - `-s, --server`:	API server where to send the requests. Defaults to localhost (modifiable in \_\_init\_\_.py)
 - `-p, --port` :	API port where to send the requests. Defaults to 9814 (modifiable in \_\_init\_\_.py)
 - `-d, --debug`: 	shows debug information and stores it in pisa.log
-- `-h --help`: 	shows this message.
+- `-h --help`: 	shows a list of commands or help for a specific command.
 
 #### Commands
 
@@ -47,15 +47,23 @@ The API will return a `text/plain` HTTP response code `200/OK` if the appointmen
 
 #### Usage
 
-	python pisa-cli add_appointment [command options] appointment/path_to_appointment_file
+	python pisa-cli add_appointment [command options] <appointment>/<path_to_appointment_file>
 	
-if -f, --file **is** specified, the the command expects a path to a json file instead of a json encoded
+if `-f, --file` **is** specified, the the command expects a path to a json file instead of a json encoded
 	string as parameter.
 	
-#### Options:
+#### Options
 - `-f, --file path_to_json_file`	 loads the appointment data from the specified json file instead of command line.
 
-An example of a json encoded appointment file can be found in `appointment_data.json`
+An example of a json encoded appointment file can be found in `example_appointment_data.json`
+
+#### Example
+
+Modify the provided `example_appointment_data.json` to make `start_time` and `end_time` match some future blocks.
+
+Run:
+
+`python pisa-cli.py -s 18.130.195.9 -p  9814 add_appointment -f example_appointment_data.json`
 
 
 ### get_appointment
@@ -96,7 +104,15 @@ This command is used to get information about an specific appointment from the P
 	
 #### Usage
 
-	python pisa-cli get_appointment appointment_locator
+	python pisa-cli get_appointment <appointment_locator>
+	
+#### Example
+
+Get the locator obtained [after adding an appointment](#example).
+
+Run:
+
+	python pisa-cli.py -s 18.130.195.9 -p 9814 get_appointment <appointment_locator>
 	
 ### help
 
