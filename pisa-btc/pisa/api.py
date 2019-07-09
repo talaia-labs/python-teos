@@ -2,7 +2,7 @@ from pisa import *
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
-from flask import Flask, request, Response, abort
+from flask import Flask, request, Response, abort, jsonify
 import json
 
 app = Flask(__name__)
@@ -28,7 +28,7 @@ def add_appointment():
 
         # FIXME: Response should be signed receipt (created and signed by the API)
         if appointment_added:
-            response = "appointment accepted"
+            response = "appointment accepted. locator: {}".format(appointment.locator)
         else:
             response = "appointment rejected"
             # FIXME: change the response code maybe?
@@ -60,7 +60,7 @@ def get_appointment():
     if job_in_watcher:
         for job in job_in_watcher:
             job_data = job.to_json()
-            job_data['status'] = "being watched"
+            job_data['status'] = "being_watched"
             response.append(job_data)
 
     if watcher.responder:
@@ -69,14 +69,14 @@ def get_appointment():
         for job_id, job in responder_jobs.items():
             if job.locator == locator:
                 job_data = job.to_json()
-                job_data['status'] = "dispute responded"
+                job_data['status'] = "dispute_responded"
                 job_data['confirmations'] = watcher.responder.confirmation_counter.get(job_id)
                 response.append(job_data)
 
     if not response:
         response.append({"locator": locator, "status": "not found"})
 
-    response = json.dumps(response)
+    response = jsonify(response)
 
     return response
 
@@ -86,7 +86,7 @@ def get_all_appointments():
     watcher_appointments = []
     responder_jobs = []
 
-    if request.remote_addr in ['localhost', '127.0.0.1']:
+    if request.remote_addr in request.host or request.remote_addr == '127.0.0.1':
         for app_id, appointment in watcher.appointments.items():
             jobs_data = [job.to_json() for job in appointment]
 
@@ -98,7 +98,7 @@ def get_all_appointments():
                 job_data['confirmations'] = watcher.responder.confirmation_counter.get(job_id)
                 responder_jobs.append({job_id: job_data})
 
-        response = json.dumps({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
+        response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
 
     else:
         abort(404)
