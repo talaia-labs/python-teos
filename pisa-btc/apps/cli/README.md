@@ -3,7 +3,7 @@
 `pisa-cli` is a command line interface to interact with the PISA server, written in Python3.
 
 ### Dependencies
-Refer to [DEPENCENCIES.md](DEPENCENCIES.md)
+Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
 
 ### Installation
 
