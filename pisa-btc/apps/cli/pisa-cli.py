@@ -6,12 +6,11 @@ import logging
 import requests
 from sys import argv
 from getopt import getopt, GetoptError
-from conf import CLIENT_LOG_FILE
 from hashlib import sha256
 from binascii import unhexlify
 from apps.cli.blob import Blob
 from requests import ConnectTimeout, ConnectionError
-from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT
+from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, CLIENT_LOG_FILE
 from apps.cli.help import help_add_appointment, help_get_appointment
 
 

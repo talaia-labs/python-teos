@@ -1,7 +1,7 @@
 from binascii import hexlify, unhexlify
 from hashlib import sha256
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from conf import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
+from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 
 
 class Blob:
