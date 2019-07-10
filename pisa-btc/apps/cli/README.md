@@ -1,8 +1,15 @@
 ## pisa-cli
 
-`pisa-cli` is a command line interface to interact with the PISA server. 
+`pisa-cli` is a command line interface to interact with the PISA server, written in Python3.
 
-#### Usage
+### Dependencies
+Refer to [DEPENCENCIES.md](DEPENCENCIES.md)
+
+### Installation
+
+Refer to [INSTALL.md](INSTALL.md)
+
+### Usage
 
 	python pisa-cli.py [global options] command [command options] [arguments]
 	
@@ -119,8 +126,8 @@ Run:
 Shows the list of commands or help about how to run a specific command.
 
 #### Usage
-	python pisa-cli help command
+	python pisa-cli help
 	
 or
 
-	python pisa-cli command -h
+	python pisa-cli help command

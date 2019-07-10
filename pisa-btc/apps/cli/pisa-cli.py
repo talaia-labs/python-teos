@@ -8,9 +8,9 @@ from sys import argv
 from getopt import getopt, GetoptError
 from hashlib import sha256
 from binascii import unhexlify
-from apps.cli.blob import Blob
 from requests import ConnectTimeout, ConnectionError
 from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, CLIENT_LOG_FILE
+from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
 
 
@@ -211,6 +211,8 @@ if __name__ == '__main__':
 
             else:
                 sys.exit("Unknown command. Use help to check the list of available commands.")
+        else:
+            sys.exit("No command provided. Use help to check the list of available commands.")
 
     except GetoptError as e:
         print(e)
