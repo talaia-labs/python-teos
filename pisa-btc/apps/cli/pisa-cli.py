@@ -148,7 +148,8 @@ def show_usage():
            '\n\thelp \t\t\tShows a list of commands or help for a specific command.'
 
            '\n\nGLOBAL OPTIONS:'
-           '\n\t-s, --server \tAPI server where to send the requests. Defaults to localhost (modifiable in __init__.py)'
+           '\n\t-s, --server \tAPI server where to send the requests. Defaults to 35.177.25.32 (modifiable in '
+           '__init__.py)'
            '\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)'
            '\n\t-d, --debug \tshows debug information and stores it in pisa.log'
            '\n\t-h --help \tshows this message.')
