@@ -93,7 +93,7 @@ def get_appointment(args):
             try:
                 r = requests.get(url=get_appointment_endpoint+parameters, timeout=5)
 
-                print(json.dumps(r.text))
+                print(json.dumps(r.json(), indent=4, sort_keys=True))
 
             except ConnectTimeout:
                 if debug:
