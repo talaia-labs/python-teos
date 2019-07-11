@@ -1,5 +1,6 @@
 from utils.authproxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
+from http.client import HTTPException
 
 
 def check_tx_in_chain(bitcoin_cli, tx_id, debug, logging, parent='', tx_label='transaction'):
@@ -32,7 +33,7 @@ def can_connect_to_bitcoind(bitcoin_cli):
 
     try:
         bitcoin_cli.help()
-    except (ConnectionRefusedError, JSONRPCException):
+    except (ConnectionRefusedError, JSONRPCException, HTTPException):
         can_connect = False
 
     return can_connect
