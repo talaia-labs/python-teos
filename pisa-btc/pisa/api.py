@@ -5,6 +5,12 @@ from pisa.appointment import Appointment
 from flask import Flask, request, Response, abort, jsonify
 import json
 
+
+# FIXME: HERE FOR TESTING (get_block_count). REMOVE WHEN REMOVING THE FUNCTION
+from utils.authproxy import AuthServiceProxy
+from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
+
+
 app = Flask(__name__)
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
@@ -49,7 +55,7 @@ def add_appointment():
     return Response(response, status=rcode, mimetype='text/plain')
 
 
-# FIXME: THE NEXT TWO API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
+# FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
 @app.route('/get_appointment', methods=['GET'])
 def get_appointment():
     locator = request.args.get('locator')
@@ -104,6 +110,14 @@ def get_all_appointments():
         abort(404)
 
     return response
+
+
+@app.route('/get_block_count', methods=['GET'])
+def get_block_count():
+    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
+                                                           BTC_RPC_PORT))
+
+    return jsonify({"block_count": bitcoin_cli.getblockcount()})
 
 
 def start_api(d, l):

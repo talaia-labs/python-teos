@@ -7,7 +7,7 @@ import requests
 from sys import argv
 from getopt import getopt, GetoptError
 from hashlib import sha256
-from binascii import unhexlify
+from binascii import hexlify, unhexlify
 from requests import ConnectTimeout, ConnectionError
 from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, CLIENT_LOG_FILE
 from apps.cli.blob import Blob
@@ -19,6 +19,20 @@ def show_message(message, debug, logging):
         logging.error('[Client] ' + message[0].lower() + message[1:])
     else:
         sys.exit(message)
+
+
+def generate_dummy_appointment():
+    # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
+    get_block_count_end_point = "http://{}:{}/get_block_count".format(pisa_api_server, pisa_api_port)
+    r = requests.get(url=get_block_count_end_point, timeout=5)
+
+    current_height = r.json().get("block_count")
+
+    dummy_appointment_data = {"tx": hexlify(os.urandom(192)).decode('utf-8'),
+                              "tx_id": hexlify(os.urandom(32)).decode('utf-8'), "start_time": current_height + 5,
+                              "end_time": current_height + 10, "dispute_delta": 20}
+
+    json.dump(dummy_appointment_data, open('dummy_appointment_data.json', 'w'))
 
 
 def add_appointment(args, debug, logging):
@@ -76,7 +90,6 @@ def add_appointment(args, debug, logging):
 
 
 def get_appointment(args, debug, logging):
-
     if args:
         arg_opt = args.pop(0)
 
@@ -90,7 +103,7 @@ def get_appointment(args, debug, logging):
             get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
             parameters = "?locator={}".format(locator)
             try:
-                r = requests.get(url=get_appointment_endpoint+parameters, timeout=5)
+                r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
 
                 print(json.dumps(r.json(), indent=4, sort_keys=True))
 
@@ -103,7 +116,7 @@ def get_appointment(args, debug, logging):
         else:
             show_message("The provided locator is not valid.", debug, logging)
     else:
-            show_message("The provided locator is not valid.", debug, logging)
+        show_message("The provided locator is not valid.", debug, logging)
 
 
 def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, logging):
@@ -120,7 +133,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, l
 
     appointment = {"locator": locator, "start_time": start_block, "end_time": end_block,
                    "dispute_delta": dispute_delta, "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function":
-                   hash_function}
+                       hash_function}
 
     return appointment
 
@@ -133,19 +146,19 @@ def check_txid_format(txid):
 
 
 def show_usage():
-    return('USAGE: '
-           '\n\tpython pisa-cli.py [global options] command [command options] [arguments]'
-           '\n\nCOMMANDS:'
-           '\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server.'
-           '\n\tget_appointment \tGets json formatted data about an appointment from the PISA server.'
-           '\n\thelp \t\t\tShows a list of commands or help for a specific command.'
+    return ('USAGE: '
+            '\n\tpython pisa-cli.py [global options] command [command options] [arguments]'
+            '\n\nCOMMANDS:'
+            '\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server.'
+            '\n\tget_appointment \tGets json formatted data about an appointment from the PISA server.'
+            '\n\thelp \t\t\tShows a list of commands or help for a specific command.'
 
-           '\n\nGLOBAL OPTIONS:'
-           '\n\t-s, --server \tAPI server where to send the requests. Defaults to 35.177.25.32 (modifiable in '
-           '__init__.py)'
-           '\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)'
-           '\n\t-d, --debug \tshows debug information and stores it in pisa.log'
-           '\n\t-h --help \tshows this message.')
+            '\n\nGLOBAL OPTIONS:'
+            '\n\t-s, --server \tAPI server where to send the requests. Defaults to btc.pisa.watch (modifiable in '
+            '__init__.py)'
+            '\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)'
+            '\n\t-d, --debug \tshows debug information and stores it in pisa.log'
+            '\n\t-h --help \tshows this message.')
 
 
 if __name__ == '__main__':
@@ -153,6 +166,7 @@ if __name__ == '__main__':
     pisa_api_server = DEFAULT_PISA_API_SERVER
     pisa_api_port = DEFAULT_PISA_API_PORT
     commands = ['add_appointment', 'get_appointment', 'help']
+    testing_commands = ['generate_dummy_appointment']
 
     try:
         opts, args = getopt(argv[1:], 's:p:dh', ['server', 'port', 'debug', 'help'])
@@ -204,6 +218,11 @@ if __name__ == '__main__':
                     else:
                         sys.exit(show_usage())
 
+            # FIXME: testing command, not for production
+            elif command in testing_commands:
+                if command == 'generate_dummy_appointment':
+                    generate_dummy_appointment()
+
             else:
                 show_message("Unknown command. Use help to check the list of available commands.", debug, logging)
         else:
@@ -213,5 +232,3 @@ if __name__ == '__main__':
         show_message(e, debug, logging)
     except json.JSONDecodeError as e:
         show_message('Non-JSON encoded appointment passed as parameter.', debug, logging)
-
-
