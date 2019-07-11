@@ -56,13 +56,11 @@ The API will return a `text/plain` HTTP response code `200/OK` if the appointmen
 
 	python pisa-cli add_appointment [command options] <appointment>/<path_to_appointment_file>
 	
-if `-f, --file` **is** specified, the the command expects a path to a json file instead of a json encoded
+if `-f, --file` **is** specified, then the command expects a path to a json file instead of a json encoded
 	string as parameter.
 	
 #### Options
 - `-f, --file path_to_json_file`	 loads the appointment data from the specified json file instead of command line.
-
-An example of a json encoded appointment file can be found in `example_appointment_data.json`
 
 #### Example
 
@@ -78,7 +76,7 @@ To send the appointment to the PISA server run:
 
 `python pisa-cli.py add_appointment -f dummy_appointment_data.json `
 
-**Notice that this appointment will never be fulfilled (it will eventually expire) since it does not , but will give you an easy wat to interact with the API.**
+**Notice that this appointment will never be fulfilled (it will eventually expire) since it does not corresopond to a valid transaction, but will give you an easy wat to interact with the API.**
 
 
 ### get_appointment
