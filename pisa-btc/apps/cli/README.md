@@ -15,7 +15,7 @@ Refer to [INSTALL.md](INSTALL.md)
 	
 #### Global options
 
-- `-s, --server`:	API server where to send the requests. Defaults to 35.177.25.32 (modifiable in \_\_init\_\_.py)
+- `-s, --server`:	API server where to send the requests. Defaults to btc.pisa.watch (modifiable in \_\_init\_\_.py)
 - `-p, --port` :	API port where to send the requests. Defaults to 9814 (modifiable in \_\_init\_\_.py)
 - `-d, --debug`: 	shows debug information and stores it in pisa.log
 - `-h --help`: 	shows a list of commands or help for a specific command.
@@ -66,11 +66,19 @@ An example of a json encoded appointment file can be found in `example_appointme
 
 #### Example
 
-Modify the provided `example_appointment_data.json` to make `start_time` and `end_time` match some future blocks.
+The easier way to generate an appointment is using the testing command `generate_dummy_appointment`.
 
 Run:
 
-`python pisa-cli.py add_appointment -f example_appointment_data.json`
+`python pisa-cli.py generate_dummy_appointment`
+
+That will create a json file that follows the appointment data structure filled with dummy data and store it as `dummy_appointment_data.json`.
+
+To send the appointment to the PISA server run:
+
+`python pisa-cli.py add_appointment -f dummy_appointment_data.json `
+
+**Notice that this appointment will never be fulfilled (it will eventually expire) since it does not , but will give you an easy wat to interact with the API.**
 
 
 ### get_appointment
