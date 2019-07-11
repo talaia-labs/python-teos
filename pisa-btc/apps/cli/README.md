@@ -131,7 +131,7 @@ or
     python pisa-cli.py add_appointment -f dummy_appointment_data.json
     ```
 
-    This returns a appointment locator that can be used to get updates about this appointment from the PISA.
+    This returns a appointment locator that can be used to get updates about this appointment from PISA.
 
 3. Test that PISA is still watching the appointment by replacing the appointment locator received into the following command:
 
