@@ -62,6 +62,10 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 #### Options
 - `-f, --file path_to_json_file`	 loads the appointment data from the specified json file instead of command line.
 
+### get_appointment	
+
+ This command is used to get information about an specific appointment from the PISA server.	
+
 **Appointment can be in three states**
 
 - `not_found`: meaning the locator is not recognised by the API. This could either mean the locator is wrong, or the appointment has already been fulfilled (the PISA server does not have any kind of data persistency for now).
