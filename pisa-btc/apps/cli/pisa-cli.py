@@ -21,8 +21,8 @@ def show_message(message, debug, logging):
         sys.exit(message)
 
 
+# FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
 def generate_dummy_appointment():
-    # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
     get_block_count_end_point = "http://{}:{}/get_block_count".format(pisa_api_server, pisa_api_port)
     r = requests.get(url=get_block_count_end_point, timeout=5)
 
@@ -32,7 +32,11 @@ def generate_dummy_appointment():
                               "tx_id": hexlify(os.urandom(32)).decode('utf-8'), "start_time": current_height + 5,
                               "end_time": current_height + 10, "dispute_delta": 20}
 
+    print('Generating dummy appointment data:''\n\n' + json.dumps(dummy_appointment_data, indent=4, sort_keys=True))
+
     json.dump(dummy_appointment_data, open('dummy_appointment_data.json', 'w'))
+
+    print('\nData stored in dummy_appointment_data.json')
 
 
 def add_appointment(args, debug, logging):
