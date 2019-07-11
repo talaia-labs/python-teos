@@ -15,7 +15,7 @@ Refer to [INSTALL.md](INSTALL.md)
 	
 #### Global options
 
-- `-s, --server`:	API server where to send the requests. Defaults to localhost (modifiable in \_\_init\_\_.py)
+- `-s, --server`:	API server where to send the requests. Defaults to 35.177.25.32 (modifiable in \_\_init\_\_.py)
 - `-p, --port` :	API port where to send the requests. Defaults to 9814 (modifiable in \_\_init\_\_.py)
 - `-d, --debug`: 	shows debug information and stores it in pisa.log
 - `-h --help`: 	shows a list of commands or help for a specific command.
@@ -70,7 +70,7 @@ Modify the provided `example_appointment_data.json` to make `start_time` and `en
 
 Run:
 
-`python pisa-cli.py -s 18.130.195.9 -p  9814 add_appointment -f example_appointment_data.json`
+`python pisa-cli.py add_appointment -f example_appointment_data.json`
 
 
 ### get_appointment
@@ -119,7 +119,7 @@ Get the locator obtained [after adding an appointment](#example).
 
 Run:
 
-	python pisa-cli.py -s 18.130.195.9 -p 9814 get_appointment <appointment_locator>
+	python pisa-cli.py get_appointment <appointment_locator>
 	
 ### help
 
@@ -131,3 +131,7 @@ Shows the list of commands or help about how to run a specific command.
 or
 
 	python pisa-cli help command
+
+### PISA API	
+
+If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [PISA-API.md](PISA-API.md)

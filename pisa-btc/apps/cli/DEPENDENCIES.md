@@ -66,7 +66,7 @@ and for `pip3`:
 	
 #### OSX
 
-`python3` can be installed using `Homebriew` as follows:
+`python3` can be installed using `Homebrew` as follows:
 	
 	brew install python3
 
