@@ -14,7 +14,15 @@ from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
 
 
-def add_appointment(args, debug):
+def show_message(message, debug, logging):
+    if debug:
+        logging.error('[Client] ' + message[0].lower() + message[1:])
+    else:
+        sys.exit(message)
+
+
+def add_appointment(args, debug, logging):
+    appointment_data = None
     use_help = "Use 'help add_appointment' for help of how to use the command."
 
     if args:
@@ -30,53 +38,44 @@ def add_appointment(args, debug):
                     if os.path.isfile(fin):
                         appointment_data = json.load(open(fin))
                     else:
-                        sys.exit("Can't find file " + fin)
+                        show_message("Can't find file " + fin, debug, logging)
                 else:
-                    sys.exit("No file provided as appointment. " + use_help)
+                    show_message("No file provided as appointment. " + use_help, debug, logging)
             else:
                 appointment_data = json.loads(arg_opt)
 
         except json.JSONDecodeError:
-            sys.exit("Non-JSON encoded data provided as appointment. " + use_help)
+            show_message("Non-JSON encoded data provided as appointment. " + use_help, debug, logging)
 
+        if appointment_data:
+            valid_locator = check_txid_format(appointment_data.get('tx_id'))
+
+            if valid_locator:
+                add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
+                appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
+                                                appointment_data.get('start_time'), appointment_data.get('end_time'),
+                                                appointment_data.get('dispute_delta'), debug, logging)
+
+                if debug:
+                    logging.info("[Client] sending appointment to PISA")
+
+                try:
+                    r = requests.post(url=add_appointment_endpoint, json=json.dumps(appointment), timeout=5)
+
+                    show_message("{} (code: {}).".format(r.text, r.status_code), debug, logging)
+
+                except ConnectTimeout:
+                    show_message("Can't connect to pisa API. Connection timeout.", debug, logging)
+
+                except ConnectionError:
+                    show_message("Can't connect to pisa API. Server cannot be reached.", debug, logging)
+            else:
+                show_message("The provided locator is not valid.", debug, logging)
     else:
-        sys.exit("No appointment data provided. " + use_help)
-
-    valid_locator = check_txid_format(appointment_data.get('tx_id'))
-
-    if valid_locator:
-        add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
-        appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
-                                        appointment_data.get('start_time'), appointment_data.get('end_time'),
-                                        appointment_data.get('dispute_delta'), debug, logging)
-
-        if debug:
-            logging.info("[Client] sending appointment to PISA")
-
-        try:
-            r = requests.post(url=add_appointment_endpoint, json=json.dumps(appointment), timeout=5)
-
-            if debug:
-                logging.info("[Client] {} (code: {})".format(r.text, r.status_code))
-            else:
-                print("{} (code: {}).".format(r.text, r.status_code))
-
-        except ConnectTimeout:
-            if debug:
-                logging.info("[Client] can't connect to pisa API. Connection timeout")
-            else:
-                sys.exit("Can't connect to pisa API. Connection timeout.")
-
-        except ConnectionError:
-            if debug:
-                logging.info("[Client] can't connect to pisa API. Server cannot be reached")
-            else:
-                sys.exit("Can't connect to pisa API. Server cannot be reached.")
-    else:
-        raise sys.exit("The provided locator is not valid.")
+        show_message("No appointment data provided. " + use_help, debug, logging)
 
 
-def get_appointment(args):
+def get_appointment(args, debug, logging):
 
     if args:
         arg_opt = args.pop(0)
@@ -96,21 +95,15 @@ def get_appointment(args):
                 print(json.dumps(r.json(), indent=4, sort_keys=True))
 
             except ConnectTimeout:
-                if debug:
-                    logging.info("[Client] can't connect to pisa API. Connection timeout")
-                else:
-                    sys.exit("Can't connect to pisa API. Connection timeout.")
+                show_message("Can't connect to pisa API. Connection timeout.", debug, logging)
 
             except ConnectionError:
-                if debug:
-                    logging.info("[Client] can't connect to pisa API. Server cannot be reached")
-                else:
-                    sys.exit("Can't connect to pisa API. Server cannot be reached.")
+                show_message("Can't connect to pisa API. Server cannot be reached.", debug, logging)
 
         else:
-            sys.exit("The provided locator is not valid.")
+            show_message("The provided locator is not valid.", debug, logging)
     else:
-        raise sys.exit("The provided locator is not valid.")
+            show_message("The provided locator is not valid.", debug, logging)
 
 
 def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, logging):
@@ -134,7 +127,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, l
 
 def check_txid_format(txid):
     if len(txid) != 64:
-        raise sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
+        sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
 
     return re.search(r'^[0-9A-Fa-f]+$', txid) is not None
 
@@ -161,12 +154,6 @@ if __name__ == '__main__':
     pisa_api_port = DEFAULT_PISA_API_PORT
     commands = ['add_appointment', 'get_appointment', 'help']
 
-    # Configure logging
-    logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
-        logging.FileHandler(CLIENT_LOG_FILE),
-        logging.StreamHandler()
-    ])
-
     try:
         opts, args = getopt(argv[1:], 's:p:dh', ['server', 'port', 'debug', 'help'])
 
@@ -182,6 +169,12 @@ if __name__ == '__main__':
             if opt in ['-d', '--debug']:
                 debug = True
 
+                # Configure logging
+                logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
+                    logging.FileHandler(CLIENT_LOG_FILE),
+                    logging.StreamHandler()
+                ])
+
             if opt in ['-h', '--help']:
                 sys.exit(show_usage())
 
@@ -190,10 +183,10 @@ if __name__ == '__main__':
 
             if command in commands:
                 if command == 'add_appointment':
-                    add_appointment(args, debug)
+                    add_appointment(args, debug, logging)
 
                 elif command == 'get_appointment':
-                    get_appointment(args)
+                    get_appointment(args, debug, logging)
 
                 elif command == 'help':
                     if args:
@@ -206,18 +199,19 @@ if __name__ == '__main__':
                             sys.exit(help_get_appointment())
 
                         else:
-                            sys.exit("Unknown command. Use help to check the list of available commands.")
+                            show_message("Unknown command. Use help to check the list of available commands.", debug,
+                                         logging)
                     else:
                         sys.exit(show_usage())
 
             else:
-                sys.exit("Unknown command. Use help to check the list of available commands.")
+                show_message("Unknown command. Use help to check the list of available commands.", debug, logging)
         else:
-            sys.exit("No command provided. Use help to check the list of available commands.")
+            show_message("No command provided. Use help to check the list of available commands.", debug, logging)
 
     except GetoptError as e:
-        print(e)
+        show_message(e, debug, logging)
     except json.JSONDecodeError as e:
-        print('Non-JSON encoded appointment passed as parameter.')
+        show_message('Non-JSON encoded appointment passed as parameter.', debug, logging)
 
 
