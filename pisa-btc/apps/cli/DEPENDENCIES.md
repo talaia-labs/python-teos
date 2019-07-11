@@ -62,6 +62,7 @@ And, if it happens to be installed, change the alias to `pip3`, or use `pip3` in
 and for `pip3`:
 
 	sudo apt-get install python3-pip
+	pip install --upgrade pip==9.0.3
 	
 #### OSX
 
@@ -76,3 +77,4 @@ and for `pip3`:
 `pisa-cli` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
 
 - `cryptography`
+- `requests`
