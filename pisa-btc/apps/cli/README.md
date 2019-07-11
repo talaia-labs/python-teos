@@ -1,15 +1,15 @@
-## pisa-cli
+# pisa-cli
 
 `pisa-cli` is a command line interface to interact with the PISA server, written in Python3.
 
-### Dependencies
+## Dependencies
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
 
-### Installation
+## Installation
 
 Refer to [INSTALL.md](INSTALL.md)
 
-### Usage
+## Usage
 
 	python pisa-cli.py [global options] command [command options] [arguments]
 	
@@ -94,7 +94,7 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 	"status": "dispute_responded"
 	"confirmations": c}]
 	
-### Usage
+#### Usage
 
 	python pisa-cli get_appointment <appointment_locator>
 	
@@ -111,7 +111,7 @@ or
 
 	python pisa-cli help command
 
-### Example
+## Example
 
 1. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not corresopond to a valid transaction. However it can be used to interact with the PISA API.
 
@@ -135,6 +135,6 @@ or
     python pisa-cli.py get_appointment <appointment_locator>
     ```
 
-### PISA API	
+## PISA API	
 
 If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [PISA-API.md](PISA-API.md)
