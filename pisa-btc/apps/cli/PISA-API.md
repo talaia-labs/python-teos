@@ -2,9 +2,9 @@
 
 ### Disclaimer: Everything in here is experimental and subject to change.
 
-The PISA REST API consists, currently, of two endpoints: `\` and `\check_appointment`
+The PISA REST API consists, currently, of two endpoints: `/` and `/check_appointment`
 
-`\` is the default endpoint, and is where the appointments should be sent to. `\` accepts `HTTP POST` requests only, with json request body, where data must match the following format:
+`/` is the default endpoint, and is where the appointments should be sent to. `/` accepts `HTTP POST` requests only, with json request body, where data must match the following format:
 
 	{"locator": l, "start_time": s, "end_time": e, 
 	"dispute_delta": d, "encrypted_blob": eb, "cipher":
@@ -46,7 +46,7 @@ The API will return a `text/plain` HTTP response code `200/OK` if the appointmen
 	
 # Check appointment
 	
-`\check_appointment` is a testing endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `\check_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the locator of an appointment. The query must match the following format:
+`/check_appointment` is a testing endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `/check_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the locator of an appointment. The query must match the following format:
 
 `http://pisa_server:pisa_port/check_appointment?locator=appointment_locator`
 

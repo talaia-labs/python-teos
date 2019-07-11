@@ -43,11 +43,11 @@ This command is used to register appointments to the PISA server. Appointments *
 
 `tx_id` **must** match the **commitment transaction id**, and will be used to encrypt the **justice transaction** and **generate the locator**. `type(tx_id) = hex encoded str`
 
-`s` is the time when the PISA server will start watching your transaction, and will normally match with whenever you will be offline. `s` is measured in block height, and must be **higher than the current block height** and not too close to it. `type(s) = int`
+`s` is the time when the PISA server will start watching your transaction, and will normally match to whenever you will be offline. `s` is measured in block height, and must be **higher than the current block height** and not too close to it. `type(s) = int`
 
 `e` is the time where the PISA server will stop watching your transaction, and will normally match which whenever you should be back online. `e` is also measured in block height, and must be **higher than** `s`. `type(e) = int`
 
-`d` is the time PISA would have to respond with the **justice transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the dispute_delta does not match the `OP_CSV `, PISA would try to respond with the justice transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be, at least, `20`. `type(d) = int`
+`d` is the time PISA would have to respond with the **justice transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the dispute_delta does not match the `OP_CSV `, PISA would try to respond with the justice transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be at least `20`. `type(d) = int`
 
 The API will return a `text/plain` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text. 
 
