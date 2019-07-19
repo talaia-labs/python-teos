@@ -11,6 +11,7 @@ logs/
 
 .DS_Store
 .idea
+venv/*
 conf.py
 bitcoin.conf*
 *__pycache__

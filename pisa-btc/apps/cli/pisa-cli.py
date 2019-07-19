@@ -146,6 +146,7 @@ def check_txid_format(txid):
     if len(txid) != 64:
         sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
 
+    # TODO: Check this regexp
     return re.search(r'^[0-9A-Fa-f]+$', txid) is not None
 
 

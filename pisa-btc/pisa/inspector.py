@@ -63,6 +63,7 @@ class Inspector:
         elif len(locator) != 64:
             rcode = errors.APPOINTMENT_WRONG_FIELD_SIZE
             message = "wrong locator size ({})".format(len(locator))
+            # TODO: Check this regexp
         elif re.search(r'^[0-9A-Fa-f]+$', locator) is None:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
@@ -161,7 +162,7 @@ class Inspector:
         elif encrypted_blob == '':
             # ToDo: We may want to define this to be at least as long as one block of the cipher we are using
             rcode = errors.APPOINTMENT_WRONG_FIELD
-            message = "wrong encrypted_blob".format(t)
+            message = "wrong encrypted_blob"
         if self.debug and message:
             self.logging.error("[Inspector] {}".format(message))
 
