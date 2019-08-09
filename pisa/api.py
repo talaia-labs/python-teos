@@ -7,8 +7,8 @@ import json
 
 
 # FIXME: HERE FOR TESTING (get_block_count). REMOVE WHEN REMOVING THE FUNCTION
-from utils.authproxy import AuthServiceProxy
-from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
+from pisa.utils.authproxy import AuthServiceProxy
+from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
@@ -61,13 +61,13 @@ def get_appointment():
     locator = request.args.get('locator')
     response = []
 
-    job_in_watcher = watcher.appointments.get(locator)
+    appointment_in_watcher = watcher.appointments.get(locator)
 
-    if job_in_watcher:
-        for job in job_in_watcher:
-            job_data = job.to_json()
-            job_data['status'] = "being_watched"
-            response.append(job_data)
+    if appointment_in_watcher:
+        for appointment in appointment_in_watcher:
+            appointment_data = appointment.to_json()
+            appointment_data['status'] = "being_watched"
+            response.append(appointment_data)
 
     if watcher.responder:
         responder_jobs = watcher.responder.jobs

@@ -10,11 +10,11 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 RUN python3 get-pip.py
 
 # Add pisa files
-ADD pisa-btc /root/pisa-btc
-WORKDIR /root/pisa-btc
+ADD pisa /root/pisa_btc
+WORKDIR /root/pisa_btc
 
 # Export pythonpath
-RUN echo export PYTHONPATH="$PYTHONPATH:/root/pisa-btc/" >> /root/.bashrc
+RUN echo export PYTHONPATH="$PYTHONPATH:/root/pisa_btc/" >> /root/.bashrc
 
 # Install dependencies
 RUN pip3 install -r requirements.txt

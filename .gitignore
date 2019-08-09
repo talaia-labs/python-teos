@@ -1,9 +1,12 @@
 .vscode/
+.idea/
 *.log
 .DS_Store
-/pisa-btc/venv/*
+venv/
 conf.py
 bitcoin.conf*
 *__pycache__
 .pending*
-pisa-btc/apps/cli/*.json
+apps/cli/*.json
+appointments/
+test.py

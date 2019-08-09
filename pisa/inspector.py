@@ -1,9 +1,9 @@
 import re
 from pisa.appointment import Appointment
 from pisa import errors
-from utils.authproxy import AuthServiceProxy, JSONRPCException
-from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, \
-    SUPPORTED_HASH_FUNCTIONS
+from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
+from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MIN_DISPUTE_DELTA, \
+    SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
 
 class Inspector:

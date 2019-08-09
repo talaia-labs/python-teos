@@ -16,6 +16,7 @@ MAX_APPOINTMENTS = 100
 EXPIRY_DELTA = 6
 MIN_DISPUTE_DELTA = 20
 SERVER_LOG_FILE = 'pisa.log'
+DB_PATH = 'appointments/'
 
 # PISA-CLI
 CLIENT_LOG_FILE = 'pisa.log'

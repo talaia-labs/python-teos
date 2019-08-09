@@ -1,4 +1,4 @@
-from utils.authproxy import JSONRPCException
+from pisa.utils.authproxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
 from http.client import HTTPException
 

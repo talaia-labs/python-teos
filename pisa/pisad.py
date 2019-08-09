@@ -1,12 +1,11 @@
 import logging
 from sys import argv
 from getopt import getopt
-from conf import SERVER_LOG_FILE
 from threading import Thread
 from pisa.api import start_api
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
-from utils.authproxy import AuthServiceProxy
-from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, BTC_NETWORK
+from pisa.utils.authproxy import AuthServiceProxy
+from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, BTC_NETWORK, SERVER_LOG_FILE
 
 
 if __name__ == '__main__':

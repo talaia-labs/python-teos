@@ -1,10 +1,10 @@
 import logging
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
-from conf import TEST_LOG_FILE
 from pisa import errors
-from utils.authproxy import AuthServiceProxy, JSONRPCException
-from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
+from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
+from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, SUPPORTED_HASH_FUNCTIONS, \
+    SUPPORTED_CIPHERS, TEST_LOG_FILE
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
     logging.FileHandler(TEST_LOG_FILE)

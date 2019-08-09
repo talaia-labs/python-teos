@@ -5,8 +5,8 @@ from binascii import unhexlify
 from pisa.zmq_subscriber import ZMQHandler
 from pisa.rpc_errors import *
 from pisa.tools import check_tx_in_chain
-from utils.authproxy import AuthServiceProxy, JSONRPCException
-from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
+from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
+from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6

@@ -1,6 +1,6 @@
 import zmq
 import binascii
-from conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
+from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
 # ToDo: #7-add-async-back-to-zmq
 class ZMQHandler:
