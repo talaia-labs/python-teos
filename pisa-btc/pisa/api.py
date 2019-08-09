@@ -10,7 +10,7 @@ import json
 from utils.authproxy import AuthServiceProxy
 from conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
-
+# ToDo: #5-add-async-to-api
 app = Flask(__name__)
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400

@@ -146,7 +146,7 @@ class Inspector:
 
         return rcode, message
 
-    # DISCUSS: ANYTHING TO CHECK HERE?
+    # ToDo: #5-define-checks-encrypted-blob
     def check_blob(self, encrypted_blob):
         message = None
         rcode = 0
@@ -160,7 +160,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
         elif encrypted_blob == '':
-            # ToDo: We may want to define this to be at least as long as one block of the cipher we are using
+            # ToDo: #5 We may want to define this to be at least as long as one block of the cipher we are using
             rcode = errors.APPOINTMENT_WRONG_FIELD
             message = "wrong encrypted_blob"
         if self.debug and message:

@@ -2,7 +2,7 @@ import zmq
 import binascii
 from conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
-
+# ToDo: #7-add-async-back-to-zmq
 class ZMQHandler:
     """ Adapted from https://github.com/bitcoin/bitcoin/blob/master/contrib/zmq/zmq_sub.py"""
     def __init__(self, parent):
