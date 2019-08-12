@@ -31,12 +31,13 @@ def add_appointment():
 
     if type(appointment) == Appointment:
         appointment_added = watcher.add_appointment(appointment, debug, logging)
-        rcode = HTTP_OK
 
         # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
+            rcode = HTTP_OK
             response = "appointment accepted. locator: {}".format(appointment.locator)
         else:
+            rcode = HTTP_SERVICE_UNAVAILABLE
             response = "appointment rejected"
 
     elif type(appointment) == tuple:
