@@ -48,6 +48,9 @@ class Inspector:
             if self.debug:
                 self.logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
 
+            # In case of an unknown exception, assign a special rcode and reason.
+            r = (errors.UNKNOWN_JSON_RPC_EXCEPTION, "Unexpected error occurred")
+
         return r
 
     def check_locator(self, locator):
