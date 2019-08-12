@@ -14,6 +14,7 @@ from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 app = Flask(__name__)
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
+HTTP_SERVICE_UNAVAILABLE = 503
 
 
 @app.route('/', methods=['POST'])
@@ -32,22 +33,21 @@ def add_appointment():
         appointment_added = watcher.add_appointment(appointment, debug, logging)
         rcode = HTTP_OK
 
-        # FIXME: Response should be signed receipt (created and signed by the API)
+        # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
             response = "appointment accepted. locator: {}".format(appointment.locator)
         else:
             response = "appointment rejected"
-            # FIXME: change the response code maybe?
 
     elif type(appointment) == tuple:
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
-    else:
 
+    else:
+        # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
-    # Send response back. Change multiprocessing.connection for an http based connection
     if debug:
         logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr,
                                                                                      remote_port))
@@ -56,10 +56,13 @@ def add_appointment():
 
 
 # FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
+# ToDo: #17-add-api-keys
 @app.route('/get_appointment', methods=['GET'])
 def get_appointment():
     locator = request.args.get('locator')
     response = []
+
+    # ToDo: #15-add-system-monitor
 
     appointment_in_watcher = watcher.appointments.get(locator)
 
@@ -91,6 +94,8 @@ def get_appointment():
 def get_all_appointments():
     watcher_appointments = []
     responder_jobs = []
+
+    # ToDo: #15-add-system-monitor
 
     if request.remote_addr in request.host or request.remote_addr == '127.0.0.1':
         for app_id, appointment in watcher.appointments.items():
@@ -125,6 +130,8 @@ def start_api(d, l):
     global debug, logging, watcher, inspector
     debug = d
     logging = l
+
+    # ToDo: #18-separate-api-from-watcher
     watcher = Watcher()
     inspector = Inspector(debug, logging)
 

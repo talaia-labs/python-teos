@@ -26,6 +26,7 @@ if __name__ == '__main__':
 
     if can_connect_to_bitcoind(bitcoin_cli):
         if in_correct_network(bitcoin_cli, BTC_NETWORK):
+            # ToDo: This may not have to be a thead. The main thread only creates this and terminates.
             api_thread = Thread(target=start_api, args=[debug, logging])
             api_thread.start()
         else:

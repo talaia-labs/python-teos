@@ -24,9 +24,6 @@ class Blob:
         # Transaction to be encrypted
         # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
         tx = unhexlify(self.data)
-
-        # FIXME: tx_id should not be necessary (can be derived from tx SegWit-like). Passing it for now
-        # Extend the key using HKDF
         tx_id = unhexlify(tx_id)
 
         # master_key = H(tx_id | tx_id)

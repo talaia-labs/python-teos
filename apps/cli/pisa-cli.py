@@ -131,8 +131,6 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta, debug, l
 
     # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
     blob = Blob(tx, cipher, hash_function)
-
-    # FIXME: tx_id should not be necessary (can be derived from tx SegWit-like). Passing it for now
     encrypted_blob = blob.encrypt(tx_id, debug, logging)
 
     appointment = {"locator": locator, "start_time": start_block, "end_time": end_block,
@@ -146,7 +144,7 @@ def check_txid_format(txid):
     if len(txid) != 64:
         sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
 
-    # TODO: Check this regexp
+    # TODO: #12-check-txid-regexp
     return re.search(r'^[0-9A-Fa-f]+$', txid) is not None
 
 
