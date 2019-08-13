@@ -18,8 +18,6 @@ class Watcher:
         self.responder = Responder()
 
     def add_appointment(self, appointment, debug, logging):
-        # DISCUSS: about validation of input data
-
         # Rationale:
         # The Watcher will analyze every received block looking for appointment matches. If there is no work
         # to do the watcher can go sleep (if appointments = {} then asleep = True) otherwise for every received block
@@ -76,13 +74,12 @@ class Watcher:
                 block = bitcoin_cli.getblock(block_hash)
                 txids = block.get('tx')
 
-                potential_locators = {sha256(unhexlify(txid)).hexdigest(): txid for txid in txids}
-
                 if debug:
                     logging.info("[Watcher] new block received {}".format(block_hash))
                     logging.info("[Watcher] list of transactions: {}".format(txids))
 
                 # Delete expired appointments
+                # ToDo: #9: also move this to a function
                 to_delete = {}
                 for locator in self.appointments:
                     for appointment in self.appointments[locator]:
@@ -102,16 +99,21 @@ class Watcher:
                                          .format(locator))
 
                         del self.appointments[locator]
+                        # ToDo: #9-add-data-persistency
                     else:
                         for i in indexes:
                             if debug:
                                 logging.info("[Watcher] end time reached with no match! Deleting appointment {}:{}"
                                              .format(locator, i))
 
-                                del self.appointments[locator][i]
+                            del self.appointments[locator][i]
+                            # ToDo: #9-add-data-persistency
+
+                potential_locators = {sha256(unhexlify(txid)).hexdigest(): txid for txid in txids}
 
                 # Check is any of the tx_ids in the received block is an actual match
                 potential_matches = {}
+                # ToDo: set intersection should be a more optimal solution
                 for locator in self.appointments.keys():
                     if locator in potential_locators:
                         # This is locator:txid
@@ -134,17 +136,17 @@ class Watcher:
                                                 self.appointments[locator][appointment_pos].end_time, debug, logging)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
-                    # DISCUSS: We may want to use locks before adding / removing appointment
                     if len(self.appointments[locator]) == 1:
+                        # ToDo: #9-add-data-persistency
                         del self.appointments[locator]
                     else:
                         # Otherwise we just delete the appointment that matches locator:appointment_pos
+                        # ToDo: #9-add-data-persistency
                         del self.appointments[locator][appointment_pos]
 
             except JSONRPCException as e:
                 if debug:
-                    logging.error("[Watcher] JSONRPCException. Error code {}".format(e))
-                continue
+                    logging.error("[Watcher] couldn't get block from bitcoind. Error code {}".format(e))
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
@@ -159,6 +161,7 @@ class Watcher:
         for locator, dispute_txid in potential_matches.items():
             for appointment_pos, appointment in enumerate(self.appointments.get(locator)):
                 try:
+                    # ToDo: #20-test-tx-decrypting-edge-cases
                     justice_rawtx = appointment.encrypted_blob.decrypt(unhexlify(dispute_txid), debug, logging)
                     justice_rawtx = hexlify(justice_rawtx).decode()
                     justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
@@ -172,6 +175,5 @@ class Watcher:
                     # for the POC
                     if debug:
                         logging.error("[Watcher] can't build transaction from decoded data. Error code {}".format(e))
-                    continue
 
         return matches
