@@ -1,8 +1,8 @@
 .vscode/
 .idea/
+.venv/
 *.log
 .DS_Store
-venv/
 conf.py
 bitcoin.conf*
 *__pycache__
