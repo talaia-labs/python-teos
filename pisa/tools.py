@@ -1,3 +1,4 @@
+import re
 from pisa.utils.authproxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
 from http.client import HTTPException
@@ -55,3 +56,7 @@ def in_correct_network(bitcoin_cli, network):
 
     return correct_network
 
+
+def check_txid_format(txid):
+    # TODO: #12-check-txid-regexp
+    return isinstance(txid, str) and re.search(r'^[0-9A-Fa-f]{64}$', txid) is not None

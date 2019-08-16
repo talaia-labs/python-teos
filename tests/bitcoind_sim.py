@@ -2,6 +2,8 @@ from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 from flask import Flask, request, Response, abort
 from tests.zmq_publisher import ZMQPublisher
 from threading import Thread
+from pisa.rpc_errors import *
+from pisa.tools import check_txid_format
 import binascii
 import json
 import os
@@ -41,70 +43,107 @@ def process_request():
                             simulator.
 
     getblockhash:           a block hash is only queried by pisad on bootstrapping to check the network bitcoind is
-                            running on. It always asks for the genesis block. Since this is ment to be for testing we
-                            will return the testnet3 genesis block hash.
+                            running on.
 
     help:                   help is only used as a sample command to test if bitcoind is running when bootstrapping
                             pisad. It will return a 200/OK with no data.
     """
 
-    global sent_transactions
+    global mempool
     request_data = request.get_json()
     method = request_data.get('method')
 
     response = {"id": 0, "result": 0, "error": None}
+    no_param_err = {"code": RPC_MISC_ERROR, "message": "JSON value is not a {} as expected"}
 
     if method == "decoderawtransaction":
         txid = get_param(request_data)
 
-        if txid:
-            response["result"] = {"txid": txid}
+        if isinstance(txid, str):
+            if check_txid_format(txid):
+                response["result"] = {"txid": txid}
+
+            else:
+                response["error"] = {"code": RPC_DESERIALIZATION_ERROR, "message": "TX decode failed"}
+
+        else:
+            response["error"] = no_param_err
+            response["error"]["message"] = response["error"]["message"].format("string")
 
     elif method == "sendrawtransaction":
+        # TODO: A way of rejecting transactions should be added to test edge cases.
         txid = get_param(request_data)
 
-        if txid:
-            sent_transactions.append(txid)
+        if isinstance(txid, str):
+            if check_txid_format(txid):
+                if txid not in mempool and txid not in list(mined_transactions.keys()):
+                    mempool.append(txid)
 
-        # FIXME: If the same transaction is sent twice it should return an error informing that the transaction is
-        #        already known
+                else:
+                    response["error"] = {"code": RPC_VERIFY_ALREADY_IN_CHAIN,
+                                         "message": "Transaction already in block chain"}
+
+            else:
+                response["error"] = {"code": RPC_DESERIALIZATION_ERROR, "message": "TX decode failed"}
+
+        else:
+            response["error"] = no_param_err
+            response["error"]["message"] = response["error"]["message"].format("string")
 
     elif method == "getrawtransaction":
         txid = get_param(request_data)
 
-        if txid:
+        if isinstance(txid, str):
             block = blocks.get(mined_transactions.get(txid))
 
             if block:
-                response["result"] = {"confirmations": block_count - block.get('height')}
+                response["result"] = {"confirmations": len(blockchain) - block.get('height')}
 
             else:
-                # FIXME: if the transaction cannot be found it should return an error. Check bitcoind
-                return abort(500)
+                response["error"] = {'code': RPC_INVALID_ADDRESS_OR_KEY,
+                                     'message': 'No such mempool or blockchain transaction. Use gettransaction for '
+                                                'wallet transactions.'}
+        else:
+            response["error"] = no_param_err
+            response["error"]["message"] = response["error"]["message"].format("string")
 
     elif method == "getblockcount":
-        response["result"] = block_count
+        response["result"] = len(blockchain)
 
     elif method == "getblock":
         blockid = get_param(request_data)
 
-        if blockid:
-            response["result"] = blocks.get(blockid)
+        if isinstance(blockid, str):
+            block = blocks.get(blockid)
+
+            if block:
+                response["result"] = block
+
+            else:
+                response["error"] = {"code": RPC_INVALID_ADDRESS_OR_KEY, "message": "Block not found"}
+
+        else:
+            response["error"] = no_param_err
+            response["error"]["message"] = response["error"]["message"].format("string")
 
     elif method == "getblockhash":
         height = get_param(request_data)
-        if height == 0:
-            # testnet3 genesis block hash
-            response["result"] = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
 
+        if isinstance(height, int):
+            if 0 <= height <= len(blockchain):
+                response["result"] = blockchain[height]
+
+            else:
+                response["error"] = {"code": RPC_INVALID_PARAMETER, "message": "Block height out of range"}
         else:
-            return abort(500, "Unsupported method")
+            response["error"] = no_param_err
+            response["error"]["message"] = response["error"]["message"].format("integer")
 
     elif method == "help":
         pass
 
     else:
-        return abort(500, "Unsupported method")
+        return abort(404, "Method not found")
 
     return Response(json.dumps(response), status=200, mimetype='application/json')
 
@@ -124,26 +163,26 @@ def load_data():
 
 
 def simulate_mining():
-    global sent_transactions, mined_transactions, blocks, block_count
+    global mempool, mined_transactions, blocks, blockchain
 
     while True:
         block_hash = binascii.hexlify(os.urandom(32)).decode('utf-8')
         coinbase_tx_hash = binascii.hexlify(os.urandom(32)).decode('utf-8')
         txs_to_mine = [coinbase_tx_hash]
 
-        if len(sent_transactions) != 0:
+        if len(mempool) != 0:
             # We'll mine up to 100 txs per block
-            txs_to_mine += sent_transactions[:99]
-            sent_transactions = sent_transactions[99:]
+            txs_to_mine += mempool[:99]
+            mempool = mempool[99:]
 
         # Keep track of the mined transaction (to respond to getrawtransaction)
         for tx in txs_to_mine:
             mined_transactions[tx] = block_hash
 
-        blocks[block_hash] = {"tx": txs_to_mine, "height": block_count}
+        blocks[block_hash] = {"tx": txs_to_mine, "height": len(blockchain)}
         mining_simulator.publish_data(binascii.unhexlify(block_hash))
+        blockchain.append(block_hash)
 
-        block_count += 1
         time.sleep(10)
 
 
@@ -151,10 +190,10 @@ if __name__ == '__main__':
     mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
                                     feed_port=FEED_PORT)
 
-    sent_transactions = []
+    mempool = []
     mined_transactions = {}
     blocks = {}
-    block_count = 0
+    blockchain = []
 
     mining_thread = Thread(target=simulate_mining)
     mining_thread.start()
