@@ -1,9 +1,10 @@
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 from flask import Flask, request, Response, abort
-from tests.zmq_publisher import ZMQPublisher
+from tests.simulator.zmq_publisher import ZMQPublisher
 from threading import Thread
 from pisa.rpc_errors import *
 from pisa.tools import check_txid_format
+import logging
 import binascii
 import json
 import os
@@ -38,9 +39,9 @@ def process_request():
     getblockcount:          the block count will be get from the mining simulator by querying how many blocks have been
                             emited so far.
 
-    getblock:               querying for a block will return a dictionary with a two fields: "tx" representing a list of
-                            transactions, and "height" representing the block height. Both will be got from the mining
-                            simulator.
+    getblock:               querying for a block will return a dictionary with a three fields: "tx" representing a list
+                            of transactions, "height" representing the block height and "hash" representing the block
+                            hash. Both will be got from the mining simulator.
 
     getblockhash:           a block hash is only queried by pisad on bootstrapping to check the network bitcoind is
                             running on.
@@ -117,6 +118,7 @@ def process_request():
             block = blocks.get(blockid)
 
             if block:
+                block["hash"] = blockid
                 response["result"] = block
 
             else:
@@ -164,6 +166,7 @@ def load_data():
 
 def simulate_mining():
     global mempool, mined_transactions, blocks, blockchain
+    prev_block_hash = None
 
     while True:
         block_hash = binascii.hexlify(os.urandom(32)).decode('utf-8')
@@ -179,9 +182,13 @@ def simulate_mining():
         for tx in txs_to_mine:
             mined_transactions[tx] = block_hash
 
-        blocks[block_hash] = {"tx": txs_to_mine, "height": len(blockchain)}
+        blocks[block_hash] = {"tx": txs_to_mine, "height": len(blockchain), "previousblockhash": prev_block_hash}
         mining_simulator.publish_data(binascii.unhexlify(block_hash))
         blockchain.append(block_hash)
+        prev_block_hash = block_hash
+
+        print("New block mined: {}".format(block_hash))
+        print("\tTransactions: {}".format(txs_to_mine))
 
         time.sleep(10)
 
@@ -197,5 +204,8 @@ if __name__ == '__main__':
 
     mining_thread = Thread(target=simulate_mining)
     mining_thread.start()
+
+    # Setting Flask log to ERROR only so it does not mess with out logging
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
     app.run(host=HOST, port=PORT)
