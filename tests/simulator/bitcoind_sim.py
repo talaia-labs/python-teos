@@ -77,7 +77,7 @@ def process_request():
 
         if isinstance(txid, str):
             if check_txid_format(txid):
-                if txid not in mempool and txid not in list(mined_transactions.keys()):
+                if txid not in list(mined_transactions.keys()):
                     mempool.append(txid)
 
                 else:
@@ -99,6 +99,9 @@ def process_request():
 
             if block:
                 response["result"] = {"confirmations": len(blockchain) - block.get('height')}
+
+            elif txid in mempool:
+                response["result"] = {"confirmations": 0}
 
             else:
                 response["error"] = {'code': RPC_INVALID_ADDRESS_OR_KEY,
