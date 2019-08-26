@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import time
+from copy import deepcopy
 from hashlib import sha256
 from binascii import hexlify, unhexlify
 from apps.cli.blob import Blob
@@ -13,7 +14,7 @@ PISA_API = "http://{}:{}".format(HOST, PORT)
 
 
 def generate_dummy_appointment(dispute_txid):
-    r = requests.get(url=PISA_API+'/get_block_count', timeout=5)
+    r = requests.get(url=PISA_API + '/get_block_count', timeout=5)
 
     current_height = r.json().get("block_count")
 
@@ -37,39 +38,84 @@ def generate_dummy_appointment(dispute_txid):
     return appointment
 
 
-dispute_txid = hexlify(os.urandom(32)).decode('utf-8')
-appointment = generate_dummy_appointment(dispute_txid)
+def test_add_appointment(appointment=None):
+    if not appointment:
+        dispute_txid = hexlify(os.urandom(32)).decode('utf-8')
+        appointment = generate_dummy_appointment(dispute_txid)
 
-print("Sending appointment (locator: {}) to PISA".format(appointment.get("locator")))
-r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
-print(r, r.reason, r.content)
+    print("Sending appointment (locator: {}) to PISA".format(appointment.get("locator")))
+    r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
 
-print("Requesting it back from PISA")
-r = requests.get(url=PISA_API+"/get_appointment?locator="+appointment["locator"])
-print(r, r.reason, r.content)
+    assert (r.status_code == 200 and r.reason == 'OK')
+    print(r.content.decode())
 
-time.sleep(2)
-print("Sending it again")
-appointment["end_time"] += 1
-r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
-print(r, r.reason, r.content)
+    print("Requesting it back from PISA")
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + appointment["locator"])
 
-print("Sleeping 10 sec")
-time.sleep(10)
-bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
+    assert (r.status_code == 200 and r.reason == 'OK')
 
-print("Getting all appointments")
-r = requests.get(url=PISA_API+"/get_all_appointments")
-print(r, r.reason, r.content)
+    received_appointments = json.loads(r.content)
 
-print("Triggering PISA with dispute tx")
-bitcoin_cli.sendrawtransaction(dispute_txid)
+    # Take the status out and leave the received appointments ready to compare
+    appointment_status = [appointment.pop("status") for appointment in received_appointments]
 
-time.sleep(10)
-print("Requesting it again")
-r = requests.get(url=PISA_API+"/get_appointment?locator="+appointment["locator"])
-print(r, r.reason, r.content)
+    # Check that the appointment is within the received appoints
+    assert (appointment in received_appointments)
 
-print("Getting all appointments")
-r = requests.get(url=PISA_API+"/get_all_appointments")
-print(r, r.reason, r.content)
+    # Check that all the appointments are being watched
+    assert (all([status == "being_watched" for status in appointment_status]))
+
+
+def test_same_locator_multiple_appointments():
+    dispute_txid = hexlify(os.urandom(32)).decode('utf-8')
+    appointment = generate_dummy_appointment(dispute_txid)
+
+    # Send it once
+    test_add_appointment(appointment)
+    time.sleep(0.5)
+
+    # Try again with the same data
+    print("Sending it again")
+    test_add_appointment(appointment)
+    time.sleep(0.5)
+
+    # Try again with the same data but increasing the end time
+    print("Sending once more")
+    dup_appointment = deepcopy(appointment)
+    dup_appointment["end_time"] += 1
+    test_add_appointment(dup_appointment)
+
+    print("Sleeping 5 sec")
+    time.sleep(5)
+
+    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
+
+    print("Triggering PISA with dispute tx")
+    bitcoin_cli.sendrawtransaction(dispute_txid)
+
+    print("Sleeping 10 sec (waiting for a new block)")
+    time.sleep(10)
+
+    print("Getting all appointments")
+    r = requests.get(url=PISA_API + "/get_all_appointments")
+
+    assert (r.status_code == 200 and r.reason == 'OK')
+
+    received_appointments = json.loads(r.content)
+
+    # Make sure there is not pending instance of the locator in the watcher
+    watcher_locators = [appointment["locator"] for appointment in received_appointments["watcher_appointments"]]
+    assert(appointment["locator"] not in watcher_locators)
+
+    # Make sure all the appointments went trough
+    target_jobs = [v for k, v in received_appointments["responder_jobs"].items() if v["locator"] ==
+                   appointment["locator"]]
+
+    assert (len(target_jobs) == 3)
+    
+
+if __name__ == '__main__':
+
+    test_same_locator_multiple_appointments()
+
+    print("All good!")
