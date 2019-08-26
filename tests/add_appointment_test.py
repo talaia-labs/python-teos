@@ -42,11 +42,34 @@ appointment = generate_dummy_appointment(dispute_txid)
 
 print("Sending appointment (locator: {}) to PISA".format(appointment.get("locator")))
 r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
-print(r, r.reason)
+print(r, r.reason, r.content)
+
+print("Requesting it back from PISA")
+r = requests.get(url=PISA_API+"/get_appointment?locator="+appointment["locator"])
+print(r, r.reason, r.content)
+
+time.sleep(2)
+print("Sending it again")
+appointment["end_time"] += 1
+r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
+print(r, r.reason, r.content)
 
 print("Sleeping 10 sec")
 time.sleep(10)
 bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
+print("Getting all appointments")
+r = requests.get(url=PISA_API+"/get_all_appointments")
+print(r, r.reason, r.content)
+
 print("Triggering PISA with dispute tx")
 bitcoin_cli.sendrawtransaction(dispute_txid)
+
+time.sleep(10)
+print("Requesting it again")
+r = requests.get(url=PISA_API+"/get_appointment?locator="+appointment["locator"])
+print(r, r.reason, r.content)
+
+print("Getting all appointments")
+r = requests.get(url=PISA_API+"/get_all_appointments")
+print(r, r.reason, r.content)

@@ -12,6 +12,7 @@ from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, 
 class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
+        self.locator_uuid_map = dict()
         self.block_queue = None
         self.asleep = True
         self.max_appointments = max_appointments
@@ -31,10 +32,15 @@ class Watcher:
             # Two different nodes may ask for appointments using the same commitment txid, what will result in a
             # collision in our appointments structure (and may be an attack surface). In order to avoid such collisions
             # we will identify every appointment with a uuid
-            if not self.appointments.get(appointment.locator):
-                self.appointments[appointment.locator] = {}
 
-            self.appointments[appointment.locator][uuid4().hex] = appointment
+            uuid = uuid4().hex
+            self.appointments[uuid] = appointment
+
+            if appointment.locator in self.locator_uuid_map:
+                self.locator_uuid_map[appointment.locator].append(uuid)
+
+            else:
+                self.locator_uuid_map[appointment.locator] = [uuid]
 
             if self.asleep:
                 self.asleep = False
@@ -85,12 +91,17 @@ class Watcher:
                 potential_locators = {sha256(unhexlify(txid)).hexdigest(): txid for txid in txids}
 
                 # Check is any of the tx_ids in the received block is an actual match
-                potential_matches = {}
+
                 # ToDo: set intersection should be a more optimal solution
-                for locator in self.appointments.keys():
-                    if locator in potential_locators:
-                        # This is locator:txid
-                        potential_matches[locator] = potential_locators[locator]
+                # Get the locators that are both in the map and in the potential locators dict.
+                intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
+                potential_matches = {locator: potential_locators[locator] for locator in intersection}
+
+                # potential_matches = {}
+                # for locator in self.locator_uuid_map.keys():
+                #     if locator in potential_locators:
+                #         # This is locator:txid
+                #         potential_matches[locator] = potential_locators[locator]
 
                 if debug:
                     if len(potential_matches) > 0:
@@ -105,17 +116,20 @@ class Watcher:
                         logging.info("[Watcher] notifying responder about {} and deleting appointment {} (uuid: {})"
                                      .format(justice_txid, locator, uuid))
 
-                    self.responder.add_response(dispute_txid, justice_txid, justice_rawtx,
-                                                self.appointments[locator][uuid].end_time, debug, logging)
+                    self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
+                                                self.appointments[uuid].end_time, debug, logging)
+
+                    # Delete the appointment
+                    self.appointments.pop(uuid)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
-                    if len(self.appointments[locator]) == 1:
+                    if len(self.locator_uuid_map[locator]) == 1:
                         # ToDo: #9-add-data-persistency
-                        del self.appointments[locator]
+                        self.locator_uuid_map.pop(locator)
                     else:
                         # Otherwise we just delete the appointment that matches locator:appointment_pos
                         # ToDo: #9-add-data-persistency
-                        del self.appointments[locator][uuid]
+                        self.locator_uuid_map[locator].remove(uuid)
 
             except JSONRPCException as e:
                 if debug:
@@ -129,41 +143,41 @@ class Watcher:
             logging.error("[Watcher] no more pending appointments, going back to sleep")
 
     def delete_expired_appointment(self, block, debug, logging):
-        to_delete = {}
+        # to_delete = []
+        #
+        # for uuid, appointment in self.appointments.items():
+        #     if block["height"] > appointment.end_time + EXPIRY_DELTA:
+        #         # Add the appointment to the deletion list
+        #         to_delete.append(uuid)
 
-        for locator, appointments in self.appointments.items():
-            for uuid, appointment in appointments:
-                if block["height"] > appointment.end_time + EXPIRY_DELTA:
-                    # Add the appointment to the deletion list
-                    if locator in to_delete:
-                        to_delete[locator].append(uuid)
-                    else:
-                        to_delete[locator] = [uuid]
+        to_delete = [uuid for uuid, appointment in self.appointments.items() if block["height"] > appointment.end_time
+                     + EXPIRY_DELTA]
 
-        for locator, uuids in to_delete.items():
-            if len(uuids) == len(self.appointments[locator]):
-                if debug:
-                    logging.info("[Watcher] end time reached with no match! Deleting appointment {}".format(locator))
+        for uuid in to_delete:
+            # ToDo: #9-add-data-persistency
+            locator = self.appointments[uuid].locator
 
-                del self.appointments[locator]
-                # ToDo: #9-add-data-persistency
+            self.appointments.pop(uuid)
+
+            if len(self.locator_uuid_map[locator]) == 1:
+                self.locator_uuid_map.pop(locator)
+
             else:
-                for uuid in uuids:
-                    if debug:
-                        logging.info("[Watcher] end time reached with no match! Deleting appointment {} (uuid: {})"
-                                     .format(locator, uuid))
+                self.locator_uuid_map[locator].remove(uuid)
 
-                    del self.appointments[locator][uuid]
-                    # ToDo: #9-add-data-persistency
+            if debug:
+                logging.info("[Watcher] end time reached with no match! Deleting appointment {} (uuid: {})"
+                             .format(locator, uuid))
 
     def check_potential_matches(self, potential_matches, bitcoin_cli, debug, logging):
         matches = []
 
         for locator, dispute_txid in potential_matches.items():
-            for uuid, appointment in self.appointments.get(locator):
+            for uuid in self.locator_uuid_map[locator]:
                 try:
                     # ToDo: #20-test-tx-decrypting-edge-cases
-                    justice_rawtx = appointment.encrypted_blob.decrypt(unhexlify(dispute_txid), debug, logging)
+                    justice_rawtx = self.appointments[uuid].encrypted_blob.decrypt(unhexlify(dispute_txid), debug,
+                                                                                   logging)
                     justice_rawtx = hexlify(justice_rawtx).decode()
                     justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
                     matches.append((locator, uuid, dispute_txid, justice_txid, justice_rawtx))
