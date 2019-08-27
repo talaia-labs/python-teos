@@ -65,22 +65,21 @@ def get_appointment():
 
     # ToDo: #15-add-system-monitor
 
-    appointment_in_watcher = watcher.appointments.get(locator)
+    appointment_in_watcher = watcher.locator_uuid_map.get(locator)
 
     if appointment_in_watcher:
-        for appointment in appointment_in_watcher:
-            appointment_data = appointment.to_json()
+        for uuid in appointment_in_watcher:
+            appointment_data = watcher.appointments[uuid].to_json()
             appointment_data['status'] = "being_watched"
             response.append(appointment_data)
 
     if watcher.responder:
         responder_jobs = watcher.responder.jobs
 
-        for job_id, job in responder_jobs.items():
+        for job in responder_jobs.values():
             if job.locator == locator:
                 job_data = job.to_json()
                 job_data['status'] = "dispute_responded"
-                job_data['confirmations'] = watcher.responder.confirmation_counter.get(job_id)
                 response.append(job_data)
 
     if not response:
@@ -93,22 +92,18 @@ def get_appointment():
 
 @app.route('/get_all_appointments', methods=['GET'])
 def get_all_appointments():
-    watcher_appointments = []
-    responder_jobs = []
+    watcher_appointments = {}
+    responder_jobs = {}
 
     # ToDo: #15-add-system-monitor
 
     if request.remote_addr in request.host or request.remote_addr == '127.0.0.1':
-        for app_id, appointment in watcher.appointments.items():
-            jobs_data = [job.to_json() for job in appointment]
-
-            watcher_appointments.append({app_id: jobs_data})
+        for uuid, appointment in watcher.appointments.items():
+            watcher_appointments[uuid] = appointment.to_json()
 
         if watcher.responder:
-            for job_id, job in watcher.responder.jobs.items():
-                job_data = job.to_json()
-                job_data['confirmations'] = watcher.responder.confirmation_counter.get(job_id)
-                responder_jobs.append({job_id: job_data})
+            for uuid, job in watcher.responder.jobs.items():
+                responder_jobs[uuid] = job.to_json()
 
         response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
 
