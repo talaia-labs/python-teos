@@ -91,17 +91,9 @@ class Watcher:
                 potential_locators = {sha256(unhexlify(txid)).hexdigest(): txid for txid in txids}
 
                 # Check is any of the tx_ids in the received block is an actual match
-
-                # ToDo: set intersection should be a more optimal solution
                 # Get the locators that are both in the map and in the potential locators dict.
                 intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
                 potential_matches = {locator: potential_locators[locator] for locator in intersection}
-
-                # potential_matches = {}
-                # for locator in self.locator_uuid_map.keys():
-                #     if locator in potential_locators:
-                #         # This is locator:txid
-                #         potential_matches[locator] = potential_locators[locator]
 
                 if debug:
                     if len(potential_matches) > 0:
@@ -143,13 +135,6 @@ class Watcher:
             logging.error("[Watcher] no more pending appointments, going back to sleep")
 
     def delete_expired_appointment(self, block, debug, logging):
-        # to_delete = []
-        #
-        # for uuid, appointment in self.appointments.items():
-        #     if block["height"] > appointment.end_time + EXPIRY_DELTA:
-        #         # Add the appointment to the deletion list
-        #         to_delete.append(uuid)
-
         to_delete = [uuid for uuid, appointment in self.appointments.items() if block["height"] > appointment.end_time
                      + EXPIRY_DELTA]
 
