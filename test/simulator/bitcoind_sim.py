@@ -55,6 +55,8 @@ def process_request():
     getblockhash:           a block hash is only queried by pisad on bootstrapping to check the network bitcoind is
                             running on.
 
+    getbestblockhash:       returns the hash of the block in the tip of the chain
+
     help:                   help is only used as a sample command to test if bitcoind is running when bootstrapping
                             pisad. It will return a 200/OK with no data.
     """
@@ -152,6 +154,9 @@ def process_request():
         else:
             response["error"] = no_param_err
             response["error"]["message"] = response["error"]["message"].format("integer")
+
+    elif method == "getbestblockhash":
+        response["result"] = blockchain[-1]
 
     elif method == "help":
         pass
