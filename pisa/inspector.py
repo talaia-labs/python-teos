@@ -1,16 +1,12 @@
 import re
-from pisa.appointment import Appointment
+import pisa.conf as conf
 from pisa import errors
-from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MIN_DISPUTE_DELTA, \
-    SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
+from pisa import logging, bitcoin_cli
+from pisa.appointment import Appointment
+from pisa.utils.auth_proxy import JSONRPCException
 
 
 class Inspector:
-    def __init__(self, debug=False, logging=None):
-        self.debug = debug
-        self.logging = logging
-
     def inspect(self, data):
         locator = data.get('locator')
         start_time = data.get('start_time')
@@ -20,8 +16,6 @@ class Inspector:
         cipher = data.get('cipher')
         hash_function = data.get('hash_function')
 
-        bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
-                                                               BTC_RPC_PORT))
         try:
             block_height = bitcoin_cli.getblockcount()
 
@@ -45,8 +39,7 @@ class Inspector:
                 r = (rcode, message)
 
         except JSONRPCException as e:
-            if self.debug:
-                self.logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
+            logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
 
             # In case of an unknown exception, assign a special rcode and reason.
             r = (errors.UNKNOWN_JSON_RPC_EXCEPTION, "Unexpected error occurred")
@@ -71,8 +64,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
@@ -95,8 +87,7 @@ class Inspector:
             else:
                 message = "start_time too close to current height"
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
@@ -122,8 +113,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = 'end_time is in the past'
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
@@ -139,13 +129,12 @@ class Inspector:
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong dispute_delta data type ({})".format(t)
-        elif dispute_delta < MIN_DISPUTE_DELTA:
+        elif dispute_delta < conf.MIN_DISPUTE_DELTA:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
-                MIN_DISPUTE_DELTA, dispute_delta)
+                conf.MIN_DISPUTE_DELTA, dispute_delta)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
@@ -166,8 +155,8 @@ class Inspector:
             # ToDo: #6 We may want to define this to be at least as long as one block of the cipher we are using
             rcode = errors.APPOINTMENT_WRONG_FIELD
             message = "wrong encrypted_blob"
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
@@ -183,12 +172,11 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong cipher data type ({})".format(t)
-        elif cipher not in SUPPORTED_CIPHERS:
+        elif cipher not in conf.SUPPORTED_CIPHERS:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
@@ -204,11 +192,10 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong hash_function data type ({})".format(t)
-        elif hash_function not in SUPPORTED_HASH_FUNCTIONS:
+        elif hash_function not in conf.SUPPORTED_HASH_FUNCTIONS:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        logging.error("[Inspector] {}".format(message))
 
         return rcode, message

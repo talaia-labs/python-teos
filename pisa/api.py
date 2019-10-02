@@ -1,14 +1,9 @@
-from pisa import *
+from pisa import HOST, PORT, logging, bitcoin_cli
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from flask import Flask, request, Response, abort, jsonify
 import json
-
-
-# FIXME: HERE FOR TESTING (get_block_count). REMOVE WHEN REMOVING THE FUNCTION
-from pisa.utils.authproxy import AuthServiceProxy
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
@@ -22,15 +17,14 @@ def add_appointment():
     remote_addr = request.environ.get('REMOTE_ADDR')
     remote_port = request.environ.get('REMOTE_PORT')
 
-    if debug:
-        logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
+    logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
     appointment = inspector.inspect(request_data)
 
     if type(appointment) == Appointment:
-        appointment_added = watcher.add_appointment(appointment, debug, logging)
+        appointment_added = watcher.add_appointment(appointment)
 
         # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
@@ -49,9 +43,7 @@ def add_appointment():
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
-    if debug:
-        logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr,
-                                                                                     remote_port))
+    logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr, remote_port))
 
     return Response(response, status=rcode, mimetype='text/plain')
 
@@ -115,21 +107,16 @@ def get_all_appointments():
 
 @app.route('/get_block_count', methods=['GET'])
 def get_block_count():
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
-                                                           BTC_RPC_PORT))
-
     return jsonify({"block_count": bitcoin_cli.getblockcount()})
 
 
-def start_api(d, l):
+def start_api():
     # FIXME: Pretty ugly but I haven't found a proper way to pass it to add_appointment
-    global debug, logging, watcher, inspector
-    debug = d
-    logging = l
+    global watcher, inspector
 
     # ToDo: #18-separate-api-from-watcher
     watcher = Watcher()
-    inspector = Inspector(debug, logging)
+    inspector = Inspector()
 
     # Setting Flask log t ERROR only so it does not mess with out logging
     logging.getLogger('werkzeug').setLevel(logging.ERROR)

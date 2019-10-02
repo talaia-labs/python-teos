@@ -19,7 +19,7 @@ class Appointment:
 
         return appointment
 
-        # ToDO: #3-improve-appointment-strcuture
+        # ToDO: #3-improve-appointment-structure
 
 
 
