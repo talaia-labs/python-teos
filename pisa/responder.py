@@ -2,9 +2,12 @@ from queue import Queue
 from threading import Thread
 from hashlib import sha256
 from binascii import unhexlify
-from pisa import logging, bitcoin_cli
+
 from pisa.rpc_errors import *
+from pisa.cleaner import Cleaner
+from pisa import logging, bitcoin_cli
 from pisa.tools import check_tx_in_chain
+from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 from pisa.utils.auth_proxy import JSONRPCException
 
@@ -90,12 +93,16 @@ class Responder:
         self.zmq_subscriber.handle(block_queue)
 
     def handle_responses(self):
+        # ToDo: #9-add-data-persistence
+        #       change prev_block_hash to the last known tip when bootstrapping
         prev_block_hash = 0
+
         while len(self.jobs) > 0:
             # We get notified for every new received block
             block_hash = self.block_queue.get()
+            block = BlockProcessor.getblock(block_hash)
 
-            try:
+            if block is not None:
                 block = bitcoin_cli.getblock(block_hash)
                 txs = block.get('tx')
                 height = block.get('height')
@@ -104,12 +111,13 @@ class Responder:
                 logging.info("[Responder] prev. block hash {}".format(block.get('previousblockhash')))
                 logging.info("[Responder] list of transactions: {}".format(txs))
 
-            except JSONRPCException as e:
-                logging.error("[Responder] couldn't get block from bitcoind. Error code {}".format(e))
-
+            else:
                 continue
 
             completed_jobs = []
+            jobs_to_rebroadcast = []
+            # ToDo: #9-add-data-persistence
+            #       change prev_block_hash condition
             if prev_block_hash == block.get('previousblockhash') or prev_block_hash == 0:
                 # Keep count of the confirmations each tx gets
                 for justice_txid, jobs in self.tx_job_map.items():
@@ -121,15 +129,8 @@ class Responder:
                                 uuid, justice_txid))
 
                         elif self.jobs[uuid].missed_confirmations >= CONFIRMATIONS_BEFORE_RETRY:
-                            # If a transactions has missed too many confirmations for a while we'll try to rebroadcast
-                            # ToDO: #22-discuss-confirmations-before-retry
-                            # ToDo: #23-define-behaviour-approaching-end
-                            self.add_response(uuid, self.jobs[uuid].dispute_txid, justice_txid,
-                                              self.jobs[uuid].justice_rawtx, self.jobs[uuid].appointment_end,
-                                              retry=True)
-
-                            logging.warning("[Responder] txid = {} has missed {} confirmations. Rebroadcasting"
-                                            .format(justice_txid, CONFIRMATIONS_BEFORE_RETRY))
+                            # If a transactions has missed too many confirmations we add it to the rebroadcast list
+                            jobs_to_rebroadcast.append(uuid)
 
                         else:
                             # Otherwise we increase the number of missed confirmations
@@ -140,7 +141,10 @@ class Responder:
                             # The end of the appointment has been reached
                             completed_jobs.append(uuid)
 
-                self.remove_completed_jobs(completed_jobs, height)
+                self.jobs, self.tx_job_map = Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map, completed_jobs,
+                                                                           height)
+
+                self.rebroadcast(jobs_to_rebroadcast)
 
             else:
                 logging.warning("[Responder] reorg found! local prev. block id = {}, remote prev. block id = {}"
@@ -155,6 +159,17 @@ class Responder:
         self.zmq_subscriber.terminate = True
 
         logging.info("[Responder] no more pending jobs, going back to sleep")
+
+    def rebroadcast(self, jobs_to_rebroadcast):
+        # ToDO: #22-discuss-confirmations-before-retry
+        # ToDo: #23-define-behaviour-approaching-end
+
+        for uuid in jobs_to_rebroadcast:
+            self.add_response(uuid, self.jobs[uuid].dispute_txid, self.jobs[uuid].justice_txid,
+                              self.jobs[uuid].justice_rawtx, self.jobs[uuid].appointment_end, retry=True)
+
+            logging.warning("[Responder] txid = {} has missed {} confirmations. Rebroadcasting"
+                            .format(self.jobs[uuid].justice_txid, CONFIRMATIONS_BEFORE_RETRY))
 
     def handle_send_failures(self, e, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, retry):
         # Since we're pushing a raw transaction to the network we can get two kind of rejections:
@@ -193,24 +208,6 @@ class Responder:
         else:
             # If something else happens (unlikely but possible) log it so we can treat it in future releases
             logging.error("[Responder] JSONRPCException. Error {}".format(e))
-
-    def remove_completed_jobs(self, completed_jobs, height):
-        for uuid in completed_jobs:
-            logging.info("[Responder] job completed (uuid = {}, justice_txid = {}). Appointment ended at "
-                         "block {} after {} confirmations".format(uuid, self.jobs[uuid].justice_txid, height,
-                                                                  self.jobs[uuid].confirmations))
-
-            # ToDo: #9-add-data-persistency
-            justice_txid = self.jobs[uuid].justice_txid
-            self.jobs.pop(uuid)
-
-            if len(self.tx_job_map[justice_txid]) == 1:
-                self.tx_job_map.pop(justice_txid)
-
-                logging.info("[Responder] no more jobs for justice_txid {}".format(justice_txid))
-
-            else:
-                self.tx_job_map[justice_txid].remove(uuid)
 
     def handle_reorgs(self):
         for uuid, job in self.jobs.items():
