@@ -21,5 +21,3 @@ class Appointment:
 
         # ToDO: #3-improve-appointment-structure
 
-
-

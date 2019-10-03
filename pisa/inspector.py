@@ -1,6 +1,7 @@
 import re
-import pisa.conf as conf
+
 from pisa import errors
+import pisa.conf as conf
 from pisa import logging, bitcoin_cli
 from pisa.appointment import Appointment
 from pisa.utils.auth_proxy import JSONRPCException

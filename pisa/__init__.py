@@ -1,6 +1,8 @@
+import logging
+
 from pisa.utils.auth_proxy import AuthServiceProxy
 import pisa.conf as conf
-import logging
+
 
 HOST = 'localhost'
 PORT = 9814

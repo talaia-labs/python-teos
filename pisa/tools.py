@@ -1,9 +1,10 @@
 import re
+from http.client import HTTPException
+
 import pisa.conf as conf
 from pisa import logging, bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
-from http.client import HTTPException
 
 
 def check_tx_in_chain(tx_id, parent='', tx_label='transaction'):
