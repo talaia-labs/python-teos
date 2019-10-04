@@ -7,7 +7,7 @@ from hashlib import sha256
 from binascii import hexlify, unhexlify
 from apps.cli.blob import Blob
 from pisa import HOST, PORT
-from pisa.utils.authproxy import AuthServiceProxy
+from pisa.utils.auth_proxy import AuthServiceProxy
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 PISA_API = "http://{}:{}".format(HOST, PORT)

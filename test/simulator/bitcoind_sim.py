@@ -1,6 +1,6 @@
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 from flask import Flask, request, Response, abort
-from tests.simulator.zmq_publisher import ZMQPublisher
+from test.simulator.zmq_publisher import ZMQPublisher
 from threading import Thread
 from pisa.rpc_errors import *
 from pisa.tools import check_txid_format
