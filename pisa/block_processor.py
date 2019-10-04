@@ -7,7 +7,7 @@ from pisa.utils.auth_proxy import JSONRPCException
 
 class BlockProcessor:
     @staticmethod
-    def getblock(block_hash):
+    def get_block(block_hash):
         block = None
 
         try:
@@ -17,6 +17,18 @@ class BlockProcessor:
             logging.error("[BlockProcessor] couldn't get block from bitcoind. Error code {}".format(e))
 
         return block
+
+    @staticmethod
+    def get_best_block_hash():
+        block_hash = None
+
+        try:
+            block_hash = bitcoin_cli.getbestblockhash()
+
+        except JSONRPCException as e:
+            logging.error("[BlockProcessor] couldn't get block hash. Error code {}".format(e))
+
+        return block_hash
 
     @staticmethod
     def get_potential_matches(txids, locator_uuid_map):
@@ -54,4 +66,25 @@ class BlockProcessor:
                     logging.error("[BlockProcessor] can't build transaction from decoded data. Error code {}".format(e))
 
         return matches
+
+    @staticmethod
+    def check_confirmations(txs, unconfirmed_txs, tx_job_map, missed_confirmations):
+
+        for tx in txs:
+            if tx in tx_job_map and tx in unconfirmed_txs:
+                unconfirmed_txs.remove(tx)
+
+                logging.info("[Responder] confirmation received for tx {}".format(tx))
+
+            elif tx in unconfirmed_txs:
+                if tx in missed_confirmations:
+                    missed_confirmations[tx] += 1
+
+                else:
+                    missed_confirmations[tx] = 1
+
+                logging.info("[Responder] tx {} missed a confirmation (total missed: {})"
+                             .format(tx, missed_confirmations[tx]))
+
+        return unconfirmed_txs, missed_confirmations
 
