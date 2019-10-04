@@ -120,8 +120,7 @@ class Responder:
                         txs, self.unconfirmed_txs, self.tx_job_map, self.missed_confirmations)
 
                     txs_to_rebroadcast = self.get_txs_to_rebroadcast(txs)
-                    self.jobs, self.tx_job_map = Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map,
-                                                                               self.get_completed_jobs(height), height)
+                    Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map, self.get_completed_jobs(height), height)
 
                     self.rebroadcast(txs_to_rebroadcast)
 
@@ -157,9 +156,10 @@ class Responder:
                 tx = Carrier.get_transaction(job.dispute_txid)
 
                 # FIXME: Should be improved with the librarian
-                if tx is not None and tx.get('confirmations') > MIN_CONFIRMATIONS:
+                confirmations = tx.get('confirmations')
+                if tx is not None and confirmations > MIN_CONFIRMATIONS:
                     # The end of the appointment has been reached
-                    completed_jobs.append(uuid)
+                    completed_jobs.append((uuid, confirmations))
 
         return completed_jobs
 

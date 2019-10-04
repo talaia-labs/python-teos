@@ -3,10 +3,11 @@ from queue import Queue
 from threading import Thread
 
 from pisa import logging
+from pisa.cleaner import Cleaner
+from pisa.conf import EXPIRY_DELTA
 from pisa.responder import Responder
 from pisa.conf import MAX_APPOINTMENTS
 from pisa.block_processor import BlockProcessor
-from pisa.cleaner import Cleaner
 from pisa.utils.zmq_subscriber import ZMQHandler
 
 
@@ -78,15 +79,17 @@ class Watcher:
             block_hash = self.block_queue.get()
             logging.info("[Watcher] new block received {}".format(block_hash))
 
-            block = BlockProcessor.getblock(block_hash)
+            block = BlockProcessor.get_block(block_hash)
 
             if block is not None:
                 txids = block.get('tx')
 
                 logging.info("[Watcher] list of transactions: {}".format(txids))
 
-                self.appointments, self.locator_uuid_map = Cleaner.delete_expired_appointment(
-                    block, self.appointments, self.locator_uuid_map)
+                expired_appointments = [uuid for uuid, appointment in self.appointments.items()
+                                        if block["height"] > appointment.end_time + EXPIRY_DELTA]
+
+                Cleaner.delete_expired_appointment(expired_appointments, self.appointments, self.locator_uuid_map)
 
                 potential_matches = BlockProcessor.get_potential_matches(txids, self.locator_uuid_map)
                 matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)

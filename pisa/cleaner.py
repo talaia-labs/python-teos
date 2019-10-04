@@ -1,14 +1,13 @@
-import pisa.conf as conf
 from pisa import logging
+
+# Dictionaries in Python are "passed-by-reference", so no return is needed for the Cleaner"
+# https://docs.python.org/3/faq/programming.html#how-do-i-write-a-function-with-output-parameters-call-by-reference
 
 
 class Cleaner:
     @staticmethod
-    def delete_expired_appointment(block, appointments, locator_uuid_map):
-        to_delete = [uuid for uuid, appointment in appointments.items()
-                     if block["height"] > appointment.end_time + conf.EXPIRY_DELTA]
-
-        for uuid in to_delete:
+    def delete_expired_appointment(expired_appointments, appointments, locator_uuid_map):
+        for uuid in expired_appointments:
             locator = appointments[uuid].locator
 
             appointments.pop(uuid)
@@ -22,13 +21,11 @@ class Cleaner:
             logging.info("[Cleaner] end time reached with no match! Deleting appointment {} (uuid: {})".format(locator,
                                                                                                                uuid))
 
-        return appointments, locator_uuid_map
-
     @staticmethod
     def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height):
-        for uuid in completed_jobs:
+        for uuid, confirmations in completed_jobs:
             logging.info("[Cleaner] job completed (uuid = {}). Appointment ended at block {} after {} confirmations"
-                         .format(uuid, jobs[uuid].justice_txid, height, jobs[uuid].confirmations))
+                         .format(uuid, height, confirmations))
 
             # ToDo: #9-add-data-persistence
             justice_txid = jobs[uuid].justice_txid
@@ -41,5 +38,3 @@ class Cleaner:
 
             else:
                 tx_job_map[justice_txid].remove(uuid)
-
-        return jobs, tx_job_map
