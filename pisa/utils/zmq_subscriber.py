@@ -1,5 +1,6 @@
 import zmq
 import binascii
+
 from pisa import logging
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 

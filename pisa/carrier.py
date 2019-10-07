@@ -1,7 +1,7 @@
+from pisa.rpc_errors import *
+from pisa import logging, bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION
-from pisa import logging, bitcoin_cli
-from pisa.rpc_errors import *
 
 
 class Carrier:

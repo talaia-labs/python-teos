@@ -2,12 +2,14 @@ from hashlib import sha256
 from binascii import unhexlify, hexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from pisa import logging
+
 
 class EncryptedBlob:
     def __init__(self, data):
         self.data = data
 
-    def decrypt(self, key, debug, logging):
+    def decrypt(self, key):
         # master_key = H(tx_id | tx_id)
         master_key = sha256(key + key).digest()
 
@@ -15,12 +17,11 @@ class EncryptedBlob:
         sk = master_key[:16]
         nonce = master_key[16:]
 
-        if debug:
-            logging.info("[Watcher] creating new blob")
-            logging.info("[Watcher] master key: {}".format(hexlify(master_key).decode()))
-            logging.info("[Watcher] sk: {}".format(hexlify(sk).decode()))
-            logging.info("[Watcher] nonce: {}".format(hexlify(nonce).decode()))
-            logging.info("[Watcher] encrypted_blob: {}".format(self.data))
+        logging.info("[Watcher] creating new blob")
+        logging.info("[Watcher] master key: {}".format(hexlify(master_key).decode()))
+        logging.info("[Watcher] sk: {}".format(hexlify(sk).decode()))
+        logging.info("[Watcher] nonce: {}".format(hexlify(nonce).decode()))
+        logging.info("[Watcher] encrypted_blob: {}".format(self.data))
 
         # Decrypt
         aesgcm = AESGCM(sk)

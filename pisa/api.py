@@ -1,11 +1,10 @@
 import json
 from flask import Flask, request, Response, abort, jsonify
 
-from pisa import HOST, PORT, logging, bitcoin_cli
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
-
+from pisa import HOST, PORT, logging, bitcoin_cli
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
