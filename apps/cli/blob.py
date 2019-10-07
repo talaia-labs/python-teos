@@ -1,6 +1,7 @@
-from binascii import hexlify, unhexlify
 from hashlib import sha256
+from binascii import hexlify, unhexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 
 

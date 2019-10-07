@@ -1,7 +1,6 @@
 import random
 from os import urandom
 from uuid import uuid4
-from binascii import hexlify
 
 from pisa import logging
 from pisa.responder import Job

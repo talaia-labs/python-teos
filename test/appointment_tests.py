@@ -1,20 +1,11 @@
-import logging
+import pisa.conf as conf
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
-from pisa import errors
-from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, SUPPORTED_HASH_FUNCTIONS, \
-    SUPPORTED_CIPHERS, TEST_LOG_FILE
-
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
-    logging.FileHandler(TEST_LOG_FILE)
-])
+from pisa import errors, logging, bitcoin_cli
+from pisa.utils.auth_proxy import JSONRPCException
 
 appointment = {"locator": None, "start_time": None, "end_time": None, "dispute_delta": None,
                "encrypted_blob": None, "cipher": None, "hash_function": None}
-
-bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
-                                                       BTC_RPC_PORT))
 
 try:
     block_height = bitcoin_cli.getblockcount()
@@ -54,7 +45,7 @@ cipher_rets = [errors.APPOINTMENT_EMPTY_FIELD, errors.APPOINTMENT_WRONG_FIELD_TY
 hash_function_rets = [errors.APPOINTMENT_EMPTY_FIELD, errors.APPOINTMENT_WRONG_FIELD_TYPE,
                       errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED, errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED]
 
-inspector = Inspector(debug=True, logging=logging)
+inspector = Inspector()
 
 print("Locator tests\n")
 for locator, ret in zip(locators, locators_rets):
@@ -119,7 +110,7 @@ for cipher, ret in zip(ciphers, cipher_rets):
     print(r)
 
 # Setting the cipher to the only supported one for now
-appointment['cipher'] = SUPPORTED_CIPHERS[0]
+appointment['cipher'] = conf.SUPPORTED_CIPHERS[0]
 
 print("\nHash function tests\n")
 for hash_function, ret in zip(hash_functions, hash_function_rets):
@@ -130,7 +121,7 @@ for hash_function, ret in zip(hash_functions, hash_function_rets):
     print(r)
 
 # Setting the cipher to the only supported one for now
-appointment['hash_function'] = SUPPORTED_HASH_FUNCTIONS[0]
+appointment['hash_function'] = conf.SUPPORTED_HASH_FUNCTIONS[0]
 
 r = inspector.inspect(appointment)
 assert type(r) == Appointment

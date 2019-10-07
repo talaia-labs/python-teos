@@ -1,6 +1,5 @@
 import os
-import binascii
-from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
+from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 from pisa.tools import check_txid_format
 

@@ -1,12 +1,13 @@
 import os
 import json
-import requests
 import time
+import requests
 from copy import deepcopy
 from hashlib import sha256
-from binascii import hexlify, unhexlify
-from apps.cli.blob import Blob
+from binascii import unhexlify
+
 from pisa import HOST, PORT
+from apps.cli.blob import Blob
 from pisa.utils.auth_proxy import AuthServiceProxy
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 

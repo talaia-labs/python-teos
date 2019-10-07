@@ -5,13 +5,14 @@ import json
 import logging
 import requests
 from sys import argv
-from getopt import getopt, GetoptError
 from hashlib import sha256
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
+from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
-from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, CLIENT_LOG_FILE
+
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
+from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, CLIENT_LOG_FILE
 
 
 def show_message(message, debug, logging):
