@@ -2,6 +2,7 @@ from hashlib import sha256
 from binascii import hexlify, unhexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from apps.cli import logging
 from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 
 
@@ -21,7 +22,7 @@ class Blob:
             raise Exception("Cipher not supported ({}). Supported ciphers: {}".format(self.hash_function,
                                                                                       SUPPORTED_CIPHERS))
 
-    def encrypt(self, tx_id, debug, logging):
+    def encrypt(self, tx_id):
         # Transaction to be encrypted
         # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
         tx = unhexlify(self.data)
@@ -39,11 +40,10 @@ class Blob:
         encrypted_blob = aesgcm.encrypt(nonce=nonce, data=tx, associated_data=None)
         encrypted_blob = hexlify(encrypted_blob).decode()
 
-        if debug:
-            logging.info("[Client] creating new blob")
-            logging.info("[Client] master key: {}".format(hexlify(master_key).decode()))
-            logging.info("[Client] sk: {}".format(hexlify(sk).decode()))
-            logging.info("[Client] nonce: {}".format(hexlify(nonce).decode()))
-            logging.info("[Client] encrypted_blob: {}".format(encrypted_blob))
+        logging.info("[Client] creating new blob")
+        logging.info("[Client] master key: {}".format(hexlify(master_key).decode()))
+        logging.info("[Client] sk: {}".format(hexlify(sk).decode()))
+        logging.info("[Client] nonce: {}".format(hexlify(nonce).decode()))
+        logging.info("[Client] encrypted_blob: {}".format(encrypted_blob))
 
         return encrypted_blob
