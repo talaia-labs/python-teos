@@ -47,7 +47,8 @@ class Inspector:
 
         return r
 
-    def check_locator(self, locator):
+    @staticmethod
+    def check_locator(locator):
         message = None
         rcode = 0
 
@@ -65,11 +66,13 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
-    def check_start_time(self, start_time, block_height):
+    @staticmethod
+    def check_start_time(start_time, block_height):
         message = None
         rcode = 0
 
@@ -88,11 +91,13 @@ class Inspector:
             else:
                 message = "start_time too close to current height"
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
-    def check_end_time(self, end_time, start_time, block_height):
+    @staticmethod
+    def check_end_time(end_time, start_time, block_height):
         message = None
         rcode = 0
 
@@ -114,11 +119,13 @@ class Inspector:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = 'end_time is in the past'
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
-    def check_delta(self, dispute_delta):
+    @staticmethod
+    def check_delta(dispute_delta):
         message = None
         rcode = 0
 
@@ -135,12 +142,14 @@ class Inspector:
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
                 conf.MIN_DISPUTE_DELTA, dispute_delta)
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
     # ToDo: #6-define-checks-encrypted-blob
-    def check_blob(self, encrypted_blob):
+    @staticmethod
+    def check_blob(encrypted_blob):
         message = None
         rcode = 0
 
@@ -157,11 +166,13 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD
             message = "wrong encrypted_blob"
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
-    def check_cipher(self, cipher):
+    @staticmethod
+    def check_cipher(cipher):
         message = None
         rcode = 0
 
@@ -177,11 +188,13 @@ class Inspector:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
 
-    def check_hash_function(self, hash_function):
+    @staticmethod
+    def check_hash_function(hash_function):
         message = None
         rcode = 0
 
@@ -197,6 +210,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 
-        logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logging.error("[Inspector] {}".format(message))
 
         return rcode, message
