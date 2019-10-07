@@ -1,3 +1,4 @@
+import re
 from hashlib import sha256
 from binascii import hexlify, unhexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -8,6 +9,9 @@ from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 
 class Blob:
     def __init__(self, data, cipher, hash_function):
+        if type(data) is not str or re.search(r'^[0-9A-Fa-f]+$', data) is None:
+            raise ValueError("Non-Hex character found in txid.")
+
         self.data = data
         self.cipher = cipher
         self.hash_function = hash_function
@@ -23,6 +27,12 @@ class Blob:
                                                                                        SUPPORTED_CIPHERS))
 
     def encrypt(self, tx_id):
+        if len(tx_id) != 64:
+            raise ValueError("txid does not matches the expected size (32-byte / 64 hex chars).")
+
+        elif re.search(r'^[0-9A-Fa-f]+$', tx_id) is None:
+            raise ValueError("Non-Hex character found in txid.")
+
         # Transaction to be encrypted
         # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
         tx = unhexlify(self.data)
