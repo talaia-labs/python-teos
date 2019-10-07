@@ -2,9 +2,14 @@ import re
 
 from pisa import errors
 import pisa.conf as conf
-from pisa import logging, bitcoin_cli
+from pisa import logging
 from pisa.appointment import Appointment
-from pisa.utils.auth_proxy import JSONRPCException
+from pisa.block_processor import BlockProcessor
+
+# FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
+#        long field that, even if not accepted by PISA, would be stored in the logs. This is a possible DoS surface
+#        since pisa would store any kind of message (no matter the length). Solution: truncate the length of the fields
+#        stored + blacklist if multiple wrong requests are received.
 
 
 class Inspector:
@@ -17,10 +22,11 @@ class Inspector:
         cipher = data.get('cipher')
         hash_function = data.get('hash_function')
 
-        try:
-            block_height = bitcoin_cli.getblockcount()
+        block_height = BlockProcessor.get_block_count()
 
+        if block_height is not None:
             rcode, message = self.check_locator(locator)
+
             if rcode == 0:
                 rcode, message = self.check_start_time(start_time, block_height)
             if rcode == 0:
@@ -39,9 +45,7 @@ class Inspector:
             else:
                 r = (rcode, message)
 
-        except JSONRPCException as e:
-            logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
-
+        else:
             # In case of an unknown exception, assign a special rcode and reason.
             r = (errors.UNKNOWN_JSON_RPC_EXCEPTION, "Unexpected error occurred")
 
@@ -76,6 +80,9 @@ class Inspector:
         message = None
         rcode = 0
 
+        # TODO: What's too close to the current height is not properly defined. Right now any appointment that is in the
+        #       future will be accepted (even if it's only one block away).
+
         t = type(start_time)
 
         if start_time is None:
@@ -89,7 +96,7 @@ class Inspector:
             if start_time < block_height:
                 message = "start_time is in the past"
             else:
-                message = "start_time too close to current height"
+                message = "start_time is too close to current height"
 
         if message is not None:
             logging.error("[Inspector] {}".format(message))
@@ -100,6 +107,9 @@ class Inspector:
     def check_end_time(end_time, start_time, block_height):
         message = None
         rcode = 0
+
+        # TODO: What's too close to the current height is not properly defined. Right now any appointment that ends in
+        #       the future will be accepted (even if it's only one block away).
 
         t = type(end_time)
 
@@ -115,9 +125,12 @@ class Inspector:
                 message = "end_time is smaller than start_time"
             else:
                 message = "end_time is equal to start_time"
-        elif block_height > end_time:
+        elif block_height >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
-            message = 'end_time is in the past'
+            if block_height > end_time:
+                message = 'end_time is in the past'
+            else:
+                message = 'end_time is too close to current height'
 
         if message is not None:
             logging.error("[Inspector] {}".format(message))
@@ -161,10 +174,9 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
-        elif encrypted_blob == '':
-            # ToDo: #6 We may want to define this to be at least as long as one block of the cipher we are using
-            rcode = errors.APPOINTMENT_WRONG_FIELD
-            message = "wrong encrypted_blob"
+        elif re.search(r'^[0-9A-Fa-f]+$', encrypted_blob) is None:
+            rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
+            message = "wrong encrypted_blob format ({})".format(encrypted_blob)
 
         if message is not None:
             logging.error("[Inspector] {}".format(message))
@@ -184,7 +196,7 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong cipher data type ({})".format(t)
-        elif cipher not in conf.SUPPORTED_CIPHERS:
+        elif cipher.upper() not in conf.SUPPORTED_CIPHERS:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
@@ -206,7 +218,7 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong hash_function data type ({})".format(t)
-        elif hash_function not in conf.SUPPORTED_HASH_FUNCTIONS:
+        elif hash_function.upper() not in conf.SUPPORTED_HASH_FUNCTIONS:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 

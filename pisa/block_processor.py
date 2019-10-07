@@ -31,6 +31,18 @@ class BlockProcessor:
         return block_hash
 
     @staticmethod
+    def get_block_count():
+        block_count = None
+
+        try:
+            block_count = bitcoin_cli.getblockcount()
+
+        except JSONRPCException as e:
+            logging.error("[BlockProcessor] couldn't get block block count. Error code {}".format(e))
+
+        return block_count
+
+    @staticmethod
     def get_potential_matches(txids, locator_uuid_map):
         potential_locators = {sha256(binascii.unhexlify(txid)).hexdigest(): txid for txid in txids}
 
