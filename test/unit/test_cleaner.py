@@ -20,7 +20,7 @@ def set_up_appointments(total_appointments):
 
     for _ in range(total_appointments):
         uuid = uuid4().hex
-        locator = hexlify(urandom(64))
+        locator = urandom(32).hex()
 
         appointments[uuid] = Appointment(locator, None, None, None, None, None, None)
         locator_uuid_map[locator] = [uuid]
@@ -41,7 +41,7 @@ def set_up_jobs(total_jobs):
 
     for _ in range(total_jobs):
         uuid = uuid4().hex
-        txid = hexlify(urandom(64))
+        txid = urandom(32).hex()
 
         # Assign both justice_txid and dispute_txid the same id (it shouldn't matter)
         jobs[uuid] = Job(txid, txid, None, None, None)

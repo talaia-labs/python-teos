@@ -18,8 +18,7 @@ def generate_dummy_appointment(dispute_txid):
 
     current_height = r.json().get("block_count")
 
-    dummy_appointment_data = {"tx": hexlify(os.urandom(32)).decode('utf-8'),
-                              "tx_id": dispute_txid, "start_time": current_height + 5,
+    dummy_appointment_data = {"tx": os.urandom(32).hex(), "tx_id": dispute_txid, "start_time": current_height + 5,
                               "end_time": current_height + 10, "dispute_delta": 20}
 
     cipher = "AES-GCM-128"
@@ -40,7 +39,7 @@ def generate_dummy_appointment(dispute_txid):
 
 def test_add_appointment(appointment=None):
     if not appointment:
-        dispute_txid = hexlify(os.urandom(32)).decode('utf-8')
+        dispute_txid = os.urandom(32).hex()
         appointment = generate_dummy_appointment(dispute_txid)
 
     print("Sending appointment (locator: {}) to PISA".format(appointment.get("locator")))
@@ -67,7 +66,7 @@ def test_add_appointment(appointment=None):
 
 
 def test_same_locator_multiple_appointments():
-    dispute_txid = hexlify(os.urandom(32)).decode('utf-8')
+    dispute_txid = os.urandom(32).hex()
     appointment = generate_dummy_appointment(dispute_txid)
 
     # Send it once

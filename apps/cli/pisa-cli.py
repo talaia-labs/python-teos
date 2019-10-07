@@ -28,9 +28,8 @@ def generate_dummy_appointment():
 
     current_height = r.json().get("block_count")
 
-    dummy_appointment_data = {"tx": hexlify(os.urandom(192)).decode('utf-8'),
-                              "tx_id": hexlify(os.urandom(32)).decode('utf-8'), "start_time": current_height + 5,
-                              "end_time": current_height + 10, "dispute_delta": 20}
+    dummy_appointment_data = {"tx": os.urandom(192).hex(), "tx_id": os.urandom(32).hex(),
+                              "start_time": current_height + 5, "end_time": current_height + 10, "dispute_delta": 20}
 
     print('Generating dummy appointment data:''\n\n' + json.dumps(dummy_appointment_data, indent=4, sort_keys=True))
 

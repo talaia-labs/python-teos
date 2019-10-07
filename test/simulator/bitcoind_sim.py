@@ -172,8 +172,8 @@ def simulate_mining():
     prev_block_hash = None
 
     while True:
-        block_hash = binascii.hexlify(os.urandom(32)).decode('utf-8')
-        coinbase_tx_hash = binascii.hexlify(os.urandom(32)).decode('utf-8')
+        block_hash = os.urandom(32).hex()
+        coinbase_tx_hash = os.urandom(32).hex()
         txs_to_mine = [coinbase_tx_hash]
 
         if len(mempool) != 0:

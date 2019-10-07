@@ -32,7 +32,7 @@ assert(len(block.get('tx')) != 0)
 assert(isinstance(block.get('height'), int))
 
 # Some fails
-values += ["a"*64, binascii.hexlify(os.urandom(32)).decode()]
+values += ["a"*64, os.urandom(32).hex()]
 print("\ngetblock fails ({}):".format(len(values)))
 
 for v in values:
@@ -50,14 +50,14 @@ assert(isinstance(tx.get('txid'), str))
 assert(check_txid_format(tx.get('txid')))
 
 # Therefore should also work for a random formatted 32-byte hex in our simulation
-random_tx = binascii.hexlify(os.urandom(32)).decode()
+random_tx = os.urandom(32).hex()
 tx = bitcoin_cli.decoderawtransaction(random_tx)
 assert(isinstance(tx, dict))
 assert(isinstance(tx.get('txid'), str))
 assert(check_txid_format(tx.get('txid')))
 
 # But it should fail for not proper formatted one
-values = [1, None, '', "a"*63, "b"*65, [], binascii.hexlify(os.urandom(31)).hex()]
+values = [1, None, '', "a"*63, "b"*65, [], os.urandom(31).hex()]
 print("\ndecoderawtransaction fails ({}):".format(len(values)))
 
 for v in values:
@@ -68,7 +68,7 @@ for v in values:
         print('\t{}'.format(e))
 
 # sendrawtransaction should only allow txids that the simulator has not mined yet
-bitcoin_cli.sendrawtransaction(binascii.hexlify(os.urandom(32)).decode())
+bitcoin_cli.sendrawtransaction(os.urandom(32).hex())
 
 # Any data not matching the txid format or that matches with an already mined transaction should fail
 values += [coinbase_tx]
