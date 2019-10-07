@@ -5,6 +5,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pisa import logging
 
 
+# FIXME: EncryptedBlob is assuming AESGCM. A cipher field should be part of the object and the decryption should be
+#        performed depending on the cipher.
 class EncryptedBlob:
     def __init__(self, data):
         self.data = data
