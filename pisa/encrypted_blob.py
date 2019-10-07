@@ -11,6 +11,7 @@ class EncryptedBlob:
 
     def decrypt(self, key):
         # master_key = H(tx_id | tx_id)
+        key = unhexlify(key)
         master_key = sha256(key + key).digest()
 
         # The 16 MSB of the master key will serve as the AES GCM 128 secret key. The 16 LSB will serve as the IV.
@@ -27,5 +28,6 @@ class EncryptedBlob:
         aesgcm = AESGCM(sk)
         data = unhexlify(self.data.encode())
         raw_tx = aesgcm.decrypt(nonce=nonce, data=data, associated_data=None)
+        hex_raw_tx = hexlify(raw_tx).decode('utf8')
 
-        return raw_tx
+        return hex_raw_tx

@@ -64,8 +64,7 @@ class BlockProcessor:
             for uuid in locator_uuid_map[locator]:
                 try:
                     # ToDo: #20-test-tx-decrypting-edge-cases
-                    justice_rawtx = appointments[uuid].encrypted_blob.decrypt(binascii.unhexlify(dispute_txid))
-                    justice_rawtx = binascii.hexlify(justice_rawtx).decode()
+                    justice_rawtx = appointments[uuid].encrypted_blob.decrypt(dispute_txid)
                     justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
                     matches.append((locator, uuid, dispute_txid, justice_txid, justice_rawtx))
 
