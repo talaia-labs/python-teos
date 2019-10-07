@@ -14,13 +14,13 @@ class Blob:
 
         # FIXME: We only support SHA256 for now
         if self.hash_function.upper() not in SUPPORTED_HASH_FUNCTIONS:
-            raise Exception("Hash function not supported ({}). Supported Hash functions: {}"
-                            .format(self.hash_function, SUPPORTED_HASH_FUNCTIONS))
+            raise ValueError("Hash function not supported ({}). Supported Hash functions: {}"
+                             .format(self.hash_function, SUPPORTED_HASH_FUNCTIONS))
 
         # FIXME: We only support AES-GCM-128 for now
         if self.cipher.upper() not in SUPPORTED_CIPHERS:
-            raise Exception("Cipher not supported ({}). Supported ciphers: {}".format(self.hash_function,
-                                                                                      SUPPORTED_CIPHERS))
+            raise ValueError("Cipher not supported ({}). Supported ciphers: {}".format(self.hash_function,
+                                                                                       SUPPORTED_CIPHERS))
 
     def encrypt(self, tx_id):
         # Transaction to be encrypted
