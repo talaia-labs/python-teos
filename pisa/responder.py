@@ -80,7 +80,8 @@ class Responder:
             if confirmations == 0:
                 self.unconfirmed_txs.append(justice_txid)
 
-        logging.info(M("[Responder] new job added.", dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end))
+        logging.info(M("[Responder] new job added.",
+                     dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end))
 
         if self.asleep:
             self.asleep = False
@@ -108,7 +109,8 @@ class Responder:
                 txs = block.get('tx')
                 height = block.get('height')
 
-                logging.info(M("[Responder] new block received", block_hash=block_hash, prev_block_hash=block.get('previousblockhash'), txs=txs))
+                logging.info(M("[Responder] new block received",
+                             block_hash=block_hash, prev_block_hash=block.get('previousblockhash'), txs=txs))
 
                 # ToDo: #9-add-data-persistence
                 #       change prev_block_hash condition
@@ -123,7 +125,8 @@ class Responder:
 
                 else:
                     logging.warning(M("[Responder] reorg found!",
-                                      local_prev_block_hash=prev_block_hash, remote_prev_block_hash=block.get('previousblockhash')))
+                                      local_prev_block_hash=prev_block_hash,
+                                      remote_prev_block_hash=block.get('previousblockhash')))
 
                     self.handle_reorgs()
 
@@ -170,7 +173,8 @@ class Responder:
                                   self.jobs[uuid].justice_rawtx, self.jobs[uuid].appointment_end, retry=True)
 
                 logging.warning(M("[Responder] Transaction has missed many confirmations. Rebroadcasting.",
-                                  justice_txid=self.jobs[uuid].justice_txid, confirmations_missed=CONFIRMATIONS_BEFORE_RETRY))
+                                  justice_txid=self.jobs[uuid].justice_txid,
+                                  confirmations_missed=CONFIRMATIONS_BEFORE_RETRY))
 
     # FIXME: Legacy code, must be checked and updated/fixed
     def handle_reorgs(self):
@@ -187,7 +191,9 @@ class Responder:
                 # If both transactions are there, we only need to update the justice tx confirmation count
                 if justice_in_chain:
                     logging.info(M("[Responder] updating confirmation count for transaction.",
-                                   justice_txid=job.justice_txid, prev_count=job.confirmations, curr_count=justice_confirmations))
+                                   justice_txid=job.justice_txid,
+                                   prev_count=job.confirmations,
+                                   curr_count=justice_confirmations))
 
                     job.confirmations = justice_confirmations
 

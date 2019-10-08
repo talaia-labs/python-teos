@@ -75,7 +75,8 @@ class BlockProcessor:
                     justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
                     matches.append((locator, uuid, dispute_txid, justice_txid, justice_rawtx))
 
-                    logging.info(M("[BlockProcessor] match found for locator.", locator=locator, uuid=uuid, justice_txid=justice_txid))
+                    logging.info(M("[BlockProcessor] match found for locator.",
+                                   locator=locator, uuid=uuid, justice_txid=justice_txid))
 
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
@@ -101,7 +102,8 @@ class BlockProcessor:
                 else:
                     missed_confirmations[tx] = 1
 
-                logging.info(M("[Responder] transaction missed a confirmation", tx=tx, missed_confirmations=missed_confirmations[tx]))
+                logging.info(M("[Responder] transaction missed a confirmation",
+                               tx=tx, missed_confirmations=missed_confirmations[tx]))
 
         return unconfirmed_txs, missed_confirmations
 

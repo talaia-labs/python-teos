@@ -47,7 +47,8 @@ def add_appointment():
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
-    logging.info(M('[API] sending response and disconnecting', from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response))
+    logging.info(M('[API] sending response and disconnecting',
+                   from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response))
 
     return Response(response, status=rcode, mimetype='text/plain')
 

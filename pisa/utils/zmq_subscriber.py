@@ -29,4 +29,5 @@ class ZMQHandler:
                     block_hash = binascii.hexlify(body).decode('UTF-8')
                     block_queue.put(block_hash)
 
-                    logging.info(M("[ZMQHandler-{}] new block received via ZMQ".format(self.parent), block_hash=block_hash))
+                    logging.info(M("[ZMQHandler-{}] new block received via ZMQ".format(self.parent),
+                                   block_hash=block_hash))

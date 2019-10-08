@@ -32,7 +32,8 @@ class Carrier:
                 receipt = self.Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
             elif errno == RPC_VERIFY_ALREADY_IN_CHAIN:
-                logging.info(M("[Carrier] Transaction is already in the blockchain. Getting confirmation count", txid=txid))
+                logging.info(M("[Carrier] Transaction is already in the blockchain. Getting confirmation count",
+                               txid=txid))
 
                 # If the transaction is already in the chain, we get the number of confirmations and watch the job
                 # until the end of the appointment

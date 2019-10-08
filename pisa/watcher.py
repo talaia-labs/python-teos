@@ -61,7 +61,8 @@ class Watcher:
         else:
             appointment_added = False
 
-            logging.info(M("[Watcher] maximum appointments reached, appointment rejected.", locator=appointment.locator))
+            logging.info(M("[Watcher] maximum appointments reached, appointment rejected.",
+                           locator=appointment.locator))
 
         return appointment_added
 

@@ -23,11 +23,10 @@ class EncryptedBlob:
         nonce = master_key[16:]
 
         logging.info(M("[Watcher] creating new blob.",
-            master_key=hexlify(master_key).decode(),
-            sk=hexlify(sk).decode(),
-            nonce=hexlify(sk).decode(),
-            encrypted_blob=self.data
-        ))
+                       master_key=hexlify(master_key).decode(),
+                       sk=hexlify(sk).decode(),
+                       nonce=hexlify(sk).decode(),
+                       encrypted_blob=self.data))
 
         # Decrypt
         aesgcm = AESGCM(sk)
