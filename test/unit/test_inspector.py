@@ -1,10 +1,14 @@
+import time
+import pytest
 from os import urandom
+from threading import Thread
 
 from pisa import logging
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
+from test.simulator.bitcoind_sim import run_simulator
 from pisa.conf import MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
 inspector = Inspector()
@@ -13,6 +17,18 @@ APPOINTMENT_OK = (0, None)
 NO_HEX_STINGS = ["R" * 64, urandom(31).hex() + "PP", "$"*64, " "*64]
 WRONG_TYPES = [[], '', urandom(32).hex(), 3.2, 2.0, (), object, {}, " "*32, object()]
 WRONG_TYPES_NO_STR = [[], urandom(32), 3.2, 2.0, (), object, {}, object()]
+
+logging.getLogger().disabled = True
+
+
+@pytest.fixture(autouse=True)
+def run_bitcoind():
+    bitcoind_thread = Thread(target=run_simulator)
+    bitcoind_thread.daemon = True
+    bitcoind_thread.start()
+
+    # It takes a little bit of time to start the simulator (otherwise the requests are sent too early and they fail)
+    time.sleep(0.1)
 
 
 def test_check_locator():
@@ -187,8 +203,6 @@ def test_check_hash_function():
 
 
 def test_inspect():
-    # Running this required bitcoind to be running (or mocked) since the block height is queried by inspect.
-
     # At this point every single check function has been already tested, let's test inspect with an invalid and a valid
     # appointments.
 
@@ -217,14 +231,3 @@ def test_inspect():
            appointment.encrypted_blob.data == encrypted_blob and appointment.cipher == cipher and
            appointment.hash_function == hash_function)
 
-
-logging.getLogger().disabled = True
-
-test_check_locator()
-test_check_start_time()
-test_check_end_time()
-test_check_delta()
-test_check_blob()
-test_check_cipher()
-test_check_hash_function()
-test_inspect()
