@@ -18,7 +18,22 @@ class StructuredMessage(object):
     def __str__(self):
         return json.dumps({**self.kwargs, "message": self.message, "time": self.time})
 
-M = StructuredMessage   # to improve readability
+
+class Logger(object):
+    def __init__(self, actor=None):
+        self.actor = actor
+
+    def _add_prefix(self, msg):
+        return msg if self.actor is None else "[{}] {}".format(self.actor, msg)
+
+    def info(msg, **kwargs):
+        logging.info(StructuredMessage(self._add_prefix(msg), **kwargs))
+
+    def debug(msg, **kwargs):
+        logging.debug(StructuredMessage(self._add_prefix(msg), **kwargs))
+
+    def error(msg, **kwargs):
+        logging.error(StructuredMessage(self._add_prefix(msg), **kwargs))
 
 # Configure logging
 logging.basicConfig(format='%(message)s', level=logging.INFO, handlers=[

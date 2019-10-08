@@ -3,7 +3,7 @@ from threading import Thread
 from hashlib import sha256
 from binascii import unhexlify
 
-from pisa import logging, M
+from pisa import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.tools import check_tx_in_chain
@@ -12,6 +12,8 @@ from pisa.utils.zmq_subscriber import ZMQHandler
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
+
+logger = Logger("Responder")
 
 
 class Job:
@@ -45,7 +47,7 @@ class Responder:
 
     def add_response(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, retry=False):
         if self.asleep:
-            logging.info(M("[Responder] waking up!"))
+            logger.info("waking up!")
 
         carrier = Carrier()
         receipt = carrier.send_transaction(justice_rawtx, justice_txid)
@@ -80,8 +82,8 @@ class Responder:
             if confirmations == 0:
                 self.unconfirmed_txs.append(justice_txid)
 
-        logging.info(M("[Responder] new job added.",
-                     dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end))
+        logger.info("new job added.",
+                    dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end)
 
         if self.asleep:
             self.asleep = False
@@ -109,8 +111,8 @@ class Responder:
                 txs = block.get('tx')
                 height = block.get('height')
 
-                logging.info(M("[Responder] new block received",
-                             block_hash=block_hash, prev_block_hash=block.get('previousblockhash'), txs=txs))
+                logger.info("new block received",
+                            block_hash=block_hash, prev_block_hash=block.get('previousblockhash'), txs=txs)
 
                 # ToDo: #9-add-data-persistence
                 #       change prev_block_hash condition
@@ -124,9 +126,9 @@ class Responder:
                     self.rebroadcast(txs_to_rebroadcast)
 
                 else:
-                    logging.warning(M("[Responder] reorg found!",
-                                      local_prev_block_hash=prev_block_hash,
-                                      remote_prev_block_hash=block.get('previousblockhash')))
+                    logger.warning("reorg found!",
+                                   local_prev_block_hash=prev_block_hash,
+                                   remote_prev_block_hash=block.get('previousblockhash'))
 
                     self.handle_reorgs()
 
@@ -136,7 +138,7 @@ class Responder:
         self.asleep = True
         self.zmq_subscriber.terminate = True
 
-        logging.info(M("[Responder] no more pending jobs, going back to sleep"))
+        logger.info("no more pending jobs, going back to sleep")
 
     def get_txs_to_rebroadcast(self, txs):
         txs_to_rebroadcast = []
@@ -172,9 +174,9 @@ class Responder:
                 self.add_response(uuid, self.jobs[uuid].dispute_txid, self.jobs[uuid].justice_txid,
                                   self.jobs[uuid].justice_rawtx, self.jobs[uuid].appointment_end, retry=True)
 
-                logging.warning(M("[Responder] Transaction has missed many confirmations. Rebroadcasting.",
-                                  justice_txid=self.jobs[uuid].justice_txid,
-                                  confirmations_missed=CONFIRMATIONS_BEFORE_RETRY))
+                logger.warning("Transaction has missed many confirmations. Rebroadcasting.",
+                               justice_txid=self.jobs[uuid].justice_txid,
+                               confirmations_missed=CONFIRMATIONS_BEFORE_RETRY)
 
     # FIXME: Legacy code, must be checked and updated/fixed
     def handle_reorgs(self):
@@ -190,10 +192,10 @@ class Responder:
 
                 # If both transactions are there, we only need to update the justice tx confirmation count
                 if justice_in_chain:
-                    logging.info(M("[Responder] updating confirmation count for transaction.",
-                                   justice_txid=job.justice_txid,
-                                   prev_count=job.confirmations,
-                                   curr_count=justice_confirmations))
+                    logger.info("updating confirmation count for transaction.",
+                                justice_txid=job.justice_txid,
+                                prev_count=job.confirmations,
+                                curr_count=justice_confirmations)
 
                     job.confirmations = justice_confirmations
 
@@ -208,5 +210,5 @@ class Responder:
                 # ToDo: #24-properly-handle-reorgs
                 # FIXME: if the dispute is not on chain (either in mempool or not there at all), we need to call the
                 #        reorg manager
-                logging.warning(M("[Responder] dispute and justice transaction missing. Calling the reorg manager"))
-                logging.error(M("[Responder] reorg manager not yet implemented"))
+                logger.warning("dispute and justice transaction missing. Calling the reorg manager")
+                logger.error("reorg manager not yet implemented")

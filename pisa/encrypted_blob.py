@@ -1,7 +1,9 @@
 from hashlib import sha256
 from binascii import unhexlify, hexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from pisa import logging, M
+from pisa import Logger
+
+logger = Logger("Watcher")
 
 
 # FIXME: EncryptedBlob is assuming AES-128-GCM. A cipher field should be part of the object and the decryption should be
@@ -22,11 +24,11 @@ class EncryptedBlob:
         sk = master_key[:16]
         nonce = master_key[16:]
 
-        logging.info(M("[Watcher] creating new blob.",
-                       master_key=hexlify(master_key).decode(),
-                       sk=hexlify(sk).decode(),
-                       nonce=hexlify(sk).decode(),
-                       encrypted_blob=self.data))
+        logger.info("[Watcher] creating new blob.",
+                    master_key=hexlify(master_key).decode(),
+                    sk=hexlify(sk).decode(),
+                    nonce=hexlify(sk).decode(),
+                    encrypted_blob=self.data)
 
         # Decrypt
         aesgcm = AESGCM(sk)

@@ -2,7 +2,7 @@ from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
-from pisa import logging, M
+from pisa import Logger
 from pisa.cleaner import Cleaner
 from pisa.conf import EXPIRY_DELTA
 from pisa.responder import Responder
@@ -10,6 +10,7 @@ from pisa.conf import MAX_APPOINTMENTS
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 
+logging = Logger("Watcher")
 
 class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
@@ -52,17 +53,16 @@ class Watcher:
                 zmq_thread.start()
                 watcher.start()
 
-                logging.info(M("[Watcher] waking up!"))
+                logger.info("waking up!")
 
             appointment_added = True
 
-            logging.info(M("[Watcher] new appointment accepted.", locator=appointment.locator))
+            logger.info("new appointment accepted.", locator=appointment.locator)
 
         else:
             appointment_added = False
 
-            logging.info(M("[Watcher] maximum appointments reached, appointment rejected.",
-                           locator=appointment.locator))
+            logger.info("maximum appointments reached, appointment rejected.", locator=appointment.locator)
 
         return appointment_added
 
@@ -73,14 +73,14 @@ class Watcher:
     def do_watch(self):
         while len(self.appointments) > 0:
             block_hash = self.block_queue.get()
-            logging.info(M("[Watcher] new block received", block_hash=block_hash))
+            logger.info("new block received", block_hash=block_hash)
 
             block = BlockProcessor.get_block(block_hash)
 
             if block is not None:
                 txids = block.get('tx')
 
-                logging.info(M("[Watcher] list of transactions.", txids=txids))
+                logger.info("list of transactions.", txids=txids)
 
                 expired_appointments = [uuid for uuid, appointment in self.appointments.items()
                                         if block["height"] > appointment.end_time + EXPIRY_DELTA]
@@ -91,8 +91,8 @@ class Watcher:
                 matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
 
                 for locator, uuid, dispute_txid, justice_txid, justice_rawtx in matches:
-                    logging.info(M("[Watcher] notifying responder and deleting appointment.",
-                                   justice_txid=justice_txid, locator=locator, uuid=uuid))
+                    logger.info("notifying responder and deleting appointment.",
+                                justice_txid=justice_txid, locator=locator, uuid=uuid)
 
                     self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
                                                 self.appointments[uuid].end_time)
@@ -113,4 +113,4 @@ class Watcher:
         self.asleep = True
         self.zmq_subscriber.terminate = True
 
-        logging.error(M("[Watcher] no more pending appointments, going back to sleep"))
+        logger.error("no more pending appointments, going back to sleep")

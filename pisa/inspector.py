@@ -2,9 +2,11 @@ import re
 
 from pisa import errors
 import pisa.conf as conf
-from pisa import logging, bitcoin_cli, M
+from pisa import bitcoin_cli, Logger
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
+
+logger = Logger("Inspector")
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by PISA, would be stored in the logs. This is a possible DoS surface
@@ -70,7 +72,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
 
@@ -97,7 +99,7 @@ class Inspector:
             else:
                 message = "start_time is too close to current height"
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
 
@@ -130,7 +132,7 @@ class Inspector:
             else:
                 message = 'end_time is too close to current height'
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
 
@@ -152,7 +154,7 @@ class Inspector:
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
                 conf.MIN_DISPUTE_DELTA, dispute_delta)
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
 
@@ -174,7 +176,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong encrypted_blob format ({})".format(encrypted_blob)
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
 
@@ -195,7 +197,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
 
@@ -216,6 +218,6 @@ class Inspector:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 
-        logging.error(M("[Inspector] {}".format(message)))
+        logger.error(message)
 
         return rcode, message
