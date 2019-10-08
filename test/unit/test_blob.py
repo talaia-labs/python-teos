@@ -4,6 +4,8 @@ from pisa import logging
 from apps.cli.blob import Blob
 from pisa.conf import SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
+logging.getLogger().disabled = True
+
 
 def test_init_blob():
     data = urandom(64).hex()
@@ -86,9 +88,4 @@ def test_encrypt():
 
     assert(encrypted_blob == encrypted_blob2 and id(encrypted_blob) != id(encrypted_blob2))
 
-
-logging.getLogger().disabled = True
-
-test_init_blob()
-test_encrypt()
 

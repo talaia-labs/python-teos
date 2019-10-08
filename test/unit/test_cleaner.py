@@ -12,6 +12,8 @@ ITEMS = 10
 MAX_ITEMS = 100
 ITERATIONS = 1000
 
+logging.getLogger().disabled = True
+
 
 def set_up_appointments(total_appointments):
     appointments = dict()
@@ -57,30 +59,23 @@ def set_up_jobs(total_jobs):
 
 
 def test_delete_expired_appointment():
-    appointments, locator_uuid_map = set_up_appointments(MAX_ITEMS)
-    expired_appointments = random.sample(list(appointments.keys()), k=ITEMS)
+    for _ in range(ITERATIONS):
+        appointments, locator_uuid_map = set_up_appointments(MAX_ITEMS)
+        expired_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-    Cleaner.delete_expired_appointment(expired_appointments, appointments, locator_uuid_map)
+        Cleaner.delete_expired_appointment(expired_appointments, appointments, locator_uuid_map)
 
-    assert not set(expired_appointments).issubset(appointments.keys())
+        assert not set(expired_appointments).issubset(appointments.keys())
 
 
 def test_delete_completed_jobs():
-    jobs, tx_job_map = set_up_jobs(MAX_ITEMS)
-    selected_jobs = random.sample(list(jobs.keys()), k=ITEMS)
+    for _ in range(ITERATIONS):
+        jobs, tx_job_map = set_up_jobs(MAX_ITEMS)
+        selected_jobs = random.sample(list(jobs.keys()), k=ITEMS)
 
-    completed_jobs = [(job, 6) for job in selected_jobs]
+        completed_jobs = [(job, 6) for job in selected_jobs]
 
-    Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, 0)
+        Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, 0)
 
-    assert not set(completed_jobs).issubset(jobs.keys())
-
-
-logging.getLogger().disabled = True
-
-for _ in range(ITERATIONS):
-    test_delete_expired_appointment()
-
-for _ in range(ITERATIONS):
-    test_delete_completed_jobs()
+        assert not set(completed_jobs).issubset(jobs.keys())
 

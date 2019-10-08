@@ -4,6 +4,8 @@ from cryptography.exceptions import InvalidTag
 from pisa import logging
 from pisa.encrypted_blob import EncryptedBlob
 
+logging.getLogger().disabled = True
+
 
 def test_init_encrypted_blob():
     # No much to test here, basically that the object is properly created
@@ -34,8 +36,4 @@ def test_decrypt():
     assert(encrypted_blob.decrypt(key) == data)
 
 
-logging.getLogger().disabled = True
-
-test_init_encrypted_blob()
-test_decrypt()
 
