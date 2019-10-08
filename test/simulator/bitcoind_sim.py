@@ -15,6 +15,15 @@ app = Flask(__name__)
 HOST = 'localhost'
 PORT = '18443'
 
+mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
+                                feed_port=FEED_PORT)
+
+mempool = []
+mined_transactions = {}
+blocks = {}
+blockchain = []
+TIME_BETWEEN_BLOCKS = 10
+
 
 @app.route('/', methods=['POST'])
 def process_request():
@@ -193,18 +202,10 @@ def simulate_mining():
         print("New block mined: {}".format(block_hash))
         print("\tTransactions: {}".format(txs_to_mine))
 
-        time.sleep(10)
+        time.sleep(TIME_BETWEEN_BLOCKS)
 
 
-if __name__ == '__main__':
-    mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
-                                    feed_port=FEED_PORT)
-
-    mempool = []
-    mined_transactions = {}
-    blocks = {}
-    blockchain = []
-
+def run_simulator():
     mining_thread = Thread(target=simulate_mining)
     mining_thread.start()
 

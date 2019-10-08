@@ -3,8 +3,10 @@ from flask import Flask, request, Response, abort, jsonify
 
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
+from pisa import HOST, PORT, logging
 from pisa.appointment import Appointment
-from pisa import HOST, PORT, logging, bitcoin_cli
+from pisa.block_processor import BlockProcessor
+
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
@@ -108,7 +110,7 @@ def get_all_appointments():
 
 @app.route('/get_block_count', methods=['GET'])
 def get_block_count():
-    return jsonify({"block_count": bitcoin_cli.getblockcount()})
+    return jsonify({"block_count": BlockProcessor.get_block_count()})
 
 
 def start_api():
