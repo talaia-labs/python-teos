@@ -1,7 +1,7 @@
 from sys import argv
 from getopt import getopt
 
-from pisa import logging
+from pisa import logging, M
 from pisa.api import start_api
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
@@ -19,8 +19,8 @@ if __name__ == '__main__':
             start_api()
 
         else:
-            logging.error("[Pisad] bitcoind is running on a different network, check conf.py and bitcoin.conf. "
-                          "Shutting down")
+            logging.error(M("[Pisad] bitcoind is running on a different network, check conf.py and bitcoin.conf. "
+                          "Shutting down"))
 
     else:
-        logging.error("[Pisad] can't connect to bitcoind. Shutting down")
+        logging.error(M("[Pisad] can't connect to bitcoind. Shutting down"))

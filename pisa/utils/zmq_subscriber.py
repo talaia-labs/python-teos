@@ -1,7 +1,6 @@
 import zmq
 import binascii
-
-from pisa import logging
+from pisa import logging, M
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
 
@@ -30,4 +29,4 @@ class ZMQHandler:
                     block_hash = binascii.hexlify(body).decode('UTF-8')
                     block_queue.put(block_hash)
 
-                    logging.info("[ZMQHandler-{}] new block received via ZMQ".format(self.parent, block_hash))
+                    logging.info(M("[ZMQHandler-{}] new block received via ZMQ".format(self.parent), block_hash=block_hash))

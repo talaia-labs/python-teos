@@ -2,7 +2,7 @@ import re
 
 from pisa import errors
 import pisa.conf as conf
-from pisa import logging
+from pisa import logging, bitcoin_cli, M
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
@@ -70,8 +70,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message
 
@@ -98,8 +97,7 @@ class Inspector:
             else:
                 message = "start_time is too close to current height"
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message
 
@@ -132,8 +130,7 @@ class Inspector:
             else:
                 message = 'end_time is too close to current height'
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message
 
@@ -155,8 +152,7 @@ class Inspector:
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
                 conf.MIN_DISPUTE_DELTA, dispute_delta)
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message
 
@@ -178,8 +174,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong encrypted_blob format ({})".format(encrypted_blob)
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message
 
@@ -200,8 +195,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message
 
@@ -222,7 +216,6 @@ class Inspector:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 
-        if message is not None:
-            logging.error("[Inspector] {}".format(message))
+        logging.error(M("[Inspector] {}".format(message)))
 
         return rcode, message

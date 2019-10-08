@@ -1,5 +1,5 @@
 from pisa.rpc_errors import *
-from pisa import logging, bitcoin_cli
+from pisa import logging, bitcoin_cli, M
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION
 
@@ -13,7 +13,7 @@ class Carrier:
 
     def send_transaction(self, rawtx, txid):
         try:
-            logging.info("[Carrier] pushing transaction to the network (txid: {})".format(rawtx))
+            logging.info(M("[Carrier] pushing transaction to the network", txid=txid, rawtx=rawtx))
             bitcoin_cli.sendrawtransaction(rawtx)
 
             receipt = self.Receipt(delivered=True)
@@ -32,7 +32,7 @@ class Carrier:
                 receipt = self.Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
             elif errno == RPC_VERIFY_ALREADY_IN_CHAIN:
-                logging.info("[Carrier] {} is already in the blockchain. Getting confirmation count".format(txid))
+                logging.info(M("[Carrier] Transaction is already in the blockchain. Getting confirmation count", txid=txid))
 
                 # If the transaction is already in the chain, we get the number of confirmations and watch the job
                 # until the end of the appointment
@@ -43,13 +43,13 @@ class Carrier:
                     receipt = self.Receipt(delivered=True, confirmations=confirmations)
 
                 else:
-                    # There's a really unlike edge case where a transaction can be reorged between receiving the
+                    # There's a really unlikely edge case where a transaction can be reorged between receiving the
                     # notification and querying the data. In such a case we just resend
                     self.send_transaction(rawtx, txid)
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logging.error("[Responder] JSONRPCException. Error {}".format(e))
+                logging.error(M("[Responder] JSONRPCException.", error_code=e))
                 receipt = self.Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         return receipt
@@ -66,12 +66,12 @@ class Carrier:
             # reorged while we were querying bitcoind to get the confirmation count. In such a case we just
             # restart the job
             if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
-                logging.info("[Carrier] transaction {} got reorged before obtaining information".format(txid))
+                logging.info(M("[Carrier] transaction got reorged before obtaining information", txid=txid))
 
             # TODO: Check RPC methods to see possible returns and avoid general else
             # else:
             #     # If something else happens (unlikely but possible) log it so we can treat it in future releases
-            #     logging.error("[Responder] JSONRPCException. Error {}".format(e))
+            #     logging.error(M("[Responder] JSONRPCException.", error_code=e)
 
         return tx_info
 
