@@ -20,8 +20,6 @@ class StructuredMessage(object):
 
 M = StructuredMessage   # to improve readability
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-
 # Configure logging
 logging.basicConfig(format='%(message)s', level=logging.INFO, handlers=[
     logging.FileHandler(conf.SERVER_LOG_FILE),
