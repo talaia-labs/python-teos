@@ -8,40 +8,43 @@ from pisa.utils.auth_proxy import JSONRPCException
 class BlockProcessor:
     @staticmethod
     def get_block(block_hash):
-        block = None
 
         try:
             block = bitcoin_cli.getblock(block_hash)
 
         except JSONRPCException as e:
+            block = None
             logging.error("[BlockProcessor] couldn't get block from bitcoind. Error code {}".format(e))
 
         return block
 
     @staticmethod
     def get_best_block_hash():
-        block_hash = None
 
         try:
             block_hash = bitcoin_cli.getbestblockhash()
 
         except JSONRPCException as e:
+            block_hash = None
             logging.error("[BlockProcessor] couldn't get block hash. Error code {}".format(e))
 
         return block_hash
 
     @staticmethod
     def get_block_count():
-        block_count = None
 
         try:
             block_count = bitcoin_cli.getblockcount()
 
         except JSONRPCException as e:
+            block_count = None
             logging.error("[BlockProcessor] couldn't get block block count. Error code {}".format(e))
 
         return block_count
 
+    # FIXME: The following two functions does not seem to belong here. They come from the Watcher, and need to be
+    #        separated since they will be reused by the TimeTraveller.
+    # DISCUSS: 36-who-should-check-appointment-trigger
     @staticmethod
     def get_potential_matches(txids, locator_uuid_map):
         potential_locators = {sha256(binascii.unhexlify(txid)).hexdigest(): txid for txid in txids}
@@ -80,6 +83,7 @@ class BlockProcessor:
 
         return matches
 
+    # DISCUSS: This method comes from the Responder and seems like it could go back there.
     @staticmethod
     def check_confirmations(txs, unconfirmed_txs, tx_job_map, missed_confirmations):
 
