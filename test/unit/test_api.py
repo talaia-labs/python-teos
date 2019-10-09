@@ -62,9 +62,6 @@ def run_bitcoind():
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
 
-    # # It takes a little bit of time to start the simulator (otherwise the requests are sent too early and they fail)
-    # time.sleep(0.1)
-
 
 @pytest.fixture
 def new_appointment(dispute_txid=None):
