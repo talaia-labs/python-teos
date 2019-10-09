@@ -11,10 +11,6 @@ from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 
 
-# WIP: MOVED BLOCKCHAIN RELATED TASKS TO BLOCK PROCESSOR IN AN AIM TO MAKE THE CODE MORE MODULAR. THIS SHOULD HELP
-#      WITH CODE REUSE WHEN MERGING THE DATA PERSISTENCE PART.
-
-
 class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()

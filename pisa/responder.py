@@ -164,7 +164,7 @@ class Responder:
         return completed_jobs
 
     def rebroadcast(self, jobs_to_rebroadcast):
-        # ToDO: #22-discuss-confirmations-before-retry
+        # DISCUSS: #22-discuss-confirmations-before-retry
         # ToDo: #23-define-behaviour-approaching-end
 
         for tx in jobs_to_rebroadcast:

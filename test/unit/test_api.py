@@ -124,7 +124,7 @@ def test_request_appointment(new_appointment):
 
 def test_add_appointment_multiple_times(new_appointment, n=MULTIPLE_APPOINTMENTS):
     # Multiple appointments with the same locator should be valid
-    # TODO: #34-store-identical-appointments
+    # DISCUSS: #34-store-identical-appointments
     for _ in range(n):
         r = add_appointment(new_appointment)
         assert (r.status_code == 200)
