@@ -183,11 +183,11 @@ class Responder:
         for uuid, job in self.jobs.items():
             # First we check if the dispute transaction is still in the blockchain. If not, the justice can not be
             # there either, so we'll need to call the reorg manager straight away
-            dispute_in_chain, _ = check_tx_in_chain(job.dispute_txid, parent='Responder', tx_label='dispute tx')
+            dispute_in_chain, _ = check_tx_in_chain(job.dispute_txid, logger=logger, tx_label='dispute tx')
 
             # If the dispute is there, we can check the justice tx
             if dispute_in_chain:
-                justice_in_chain, justice_confirmations = check_tx_in_chain(job.justice_txid, parent='Responder',
+                justice_in_chain, justice_confirmations = check_tx_in_chain(job.justice_txid, logger=logger,
                                                                             tx_label='justice tx')
 
                 # If both transactions are there, we only need to update the justice tx confirmation count

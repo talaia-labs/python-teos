@@ -20,8 +20,7 @@ if __name__ == '__main__':
             start_api()
 
         else:
-            logger.error("[Pisad] bitcoind is running on a different network, check conf.py and bitcoin.conf. "
-                         "Shutting down")
+            logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
-        logging.error("[Pisad] can't connect to bitcoind. Shutting down")
+        logging.error("can't connect to bitcoind. Shutting down")
