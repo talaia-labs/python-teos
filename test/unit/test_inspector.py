@@ -21,7 +21,7 @@ WRONG_TYPES_NO_STR = [[], urandom(32), 3.2, 2.0, (), object, {}, object()]
 logging.getLogger().disabled = True
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope='session')
 def run_bitcoind():
     bitcoind_thread = Thread(target=run_simulator)
     bitcoind_thread.daemon = True
