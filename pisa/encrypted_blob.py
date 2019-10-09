@@ -5,11 +5,14 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pisa import logging
 
 
-# FIXME: EncryptedBlob is assuming AESGCM. A cipher field should be part of the object and the decryption should be
+# FIXME: EncryptedBlob is assuming AES-128-GCM. A cipher field should be part of the object and the decryption should be
 #        performed depending on the cipher.
 class EncryptedBlob:
     def __init__(self, data):
         self.data = data
+
+    def __eq__(self, other):
+        return isinstance(other, EncryptedBlob) and self.data == other.data
 
     def decrypt(self, key):
         # master_key = H(tx_id | tx_id)
