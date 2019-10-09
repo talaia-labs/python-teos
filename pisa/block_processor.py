@@ -1,7 +1,8 @@
 import binascii
 from hashlib import sha256
 
-from pisa import bitcoin_cli, Logger
+from pisa import bitcoin_cli
+from pisa.logger import Logger
 from pisa.utils.auth_proxy import JSONRPCException
 
 logger = Logger("BlockProcessor")

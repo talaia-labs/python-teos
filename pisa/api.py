@@ -1,7 +1,8 @@
 import json
 from flask import Flask, request, Response, abort, jsonify
 
-from pisa import HOST, PORT, logging, bitcoin_cli, Logger
+from pisa import HOST, PORT, logging, bitcoin_cli
+from pisa.logger import Logger
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa import HOST, PORT, logging

@@ -1,5 +1,6 @@
 from pisa.rpc_errors import *
-from pisa import bitcoin_cli, Logger
+from pisa import bitcoin_cli
+from pisa.logger import Logger
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION
 

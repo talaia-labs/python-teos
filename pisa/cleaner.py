@@ -1,4 +1,4 @@
-from pisa import Logger
+from pisa.logger import Logger
 
 logger = Logger("Cleaner")
 

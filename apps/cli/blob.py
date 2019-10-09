@@ -5,6 +5,9 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from apps.cli import logging
 from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
+from pisa.logger import Logger
+
+logger = Logger("Client")
 
 
 class Blob:
@@ -50,10 +53,10 @@ class Blob:
         encrypted_blob = aesgcm.encrypt(nonce=nonce, data=tx, associated_data=None)
         encrypted_blob = hexlify(encrypted_blob).decode()
 
-        logging.info("[Client] creating new blob")
-        logging.info("[Client] master key: {}".format(hexlify(master_key).decode()))
-        logging.info("[Client] sk: {}".format(hexlify(sk).decode()))
-        logging.info("[Client] nonce: {}".format(hexlify(nonce).decode()))
-        logging.info("[Client] encrypted_blob: {}".format(encrypted_blob))
+        logger.info("creating new blob",
+                    master_key=hexlify(master_key).decode(),
+                    sk=hexlify(sk).decode(),
+                    nonce=hexlify(nonce).decode(),
+                    encrypted_blob=encrypted_blob)
 
         return encrypted_blob

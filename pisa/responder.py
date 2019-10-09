@@ -3,7 +3,7 @@ from threading import Thread
 from hashlib import sha256
 from binascii import unhexlify
 
-from pisa import Logger
+from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.tools import check_tx_in_chain

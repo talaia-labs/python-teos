@@ -2,7 +2,8 @@ import re
 from http.client import HTTPException
 
 import pisa.conf as conf
-from pisa import bitcoin_cli, Logger
+from pisa import bitcoin_cli
+from pisa.logger import Logger
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
 

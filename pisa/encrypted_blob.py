@@ -1,7 +1,7 @@
 from hashlib import sha256
 from binascii import unhexlify, hexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from pisa import Logger
+from pisa.logger import Logger
 
 logger = Logger("Watcher")
 

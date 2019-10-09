@@ -2,7 +2,7 @@ from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
-from pisa import Logger
+from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.conf import EXPIRY_DELTA
 from pisa.responder import Responder
