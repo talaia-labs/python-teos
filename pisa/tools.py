@@ -17,14 +17,14 @@ def check_tx_in_chain(tx_id, logger=Logger(), tx_label='transaction'):
         if tx_info.get("confirmations"):
             confirmations = int(tx_info.get("confirmations"))
             tx_in_chain = True
-            logger.error("{} found in the blockchain (txid: {}) ".format(tx_label), txid=tx_id)
+            logger.error("{} found in the blockchain".format(tx_label), txid=tx_id)
 
         else:
-            logger.error("{} found in mempool (txid: {}) ".format(tx_label), txid=tx_id)
+            logger.error("{} found in mempool".format(tx_label), txid=tx_id)
 
     except JSONRPCException as e:
         if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
-            logger.error("{} not found in mempool nor blockchain (txid: {}) ".format(tx_label), txid=tx_id)
+            logger.error("{} not found in mempool nor blockchain".format(tx_label), txid=tx_id)
 
         else:
             # ToDO: Unhandled errors, check this properly

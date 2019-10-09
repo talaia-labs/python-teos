@@ -23,4 +23,4 @@ if __name__ == '__main__':
             logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
-        logging.error("can't connect to bitcoind. Shutting down")
+        logger.error("can't connect to bitcoind. Shutting down")

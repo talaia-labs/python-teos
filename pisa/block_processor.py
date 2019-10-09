@@ -63,8 +63,6 @@ class BlockProcessor:
 
         return potential_matches
 
-        return potential_matches
-
     @staticmethod
     def get_matches(potential_matches, locator_uuid_map, appointments):
         matches = []

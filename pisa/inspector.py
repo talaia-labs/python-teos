@@ -72,7 +72,8 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
@@ -99,7 +100,8 @@ class Inspector:
             else:
                 message = "start_time is too close to current height"
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
@@ -132,7 +134,8 @@ class Inspector:
             else:
                 message = 'end_time is too close to current height'
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
@@ -154,7 +157,8 @@ class Inspector:
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
                 conf.MIN_DISPUTE_DELTA, dispute_delta)
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
@@ -176,7 +180,8 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong encrypted_blob format ({})".format(encrypted_blob)
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
@@ -197,7 +202,8 @@ class Inspector:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
@@ -218,6 +224,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 
-        logger.error(message)
+        if message is not None:
+            logger.error(message)
 
         return rcode, message

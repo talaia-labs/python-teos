@@ -10,7 +10,7 @@ from pisa.conf import MAX_APPOINTMENTS
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 
-logging = Logger("Watcher")
+logger = Logger("Watcher")
 
 class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
