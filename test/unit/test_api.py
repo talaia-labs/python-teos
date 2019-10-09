@@ -16,7 +16,10 @@ from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, 
 
 logging.getLogger().disabled = True
 PISA_API = "http://{}:{}".format(HOST, PORT)
-MULTIPLE_APPOINTMENTS = 50
+MULTIPLE_APPOINTMENTS = 10
+
+appointments = []
+locator_dispute_txid_map = {}
 
 
 def generate_dummy_appointment(dispute_txid):
@@ -43,7 +46,7 @@ def generate_dummy_appointment(dispute_txid):
     return appointment
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope='session')
 def run_api():
     api_thread = Thread(target=start_api)
     api_thread.daemon = True
@@ -53,14 +56,14 @@ def run_api():
     time.sleep(0.1)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope='session')
 def run_bitcoind():
     bitcoind_thread = Thread(target=run_simulator)
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
 
-    # It takes a little bit of time to start the simulator (otherwise the requests are sent too early and they fail)
-    time.sleep(0.1)
+    # # It takes a little bit of time to start the simulator (otherwise the requests are sent too early and they fail)
+    # time.sleep(0.1)
 
 
 @pytest.fixture
@@ -75,12 +78,16 @@ def create_appointment(dispute_txid=None):
         dispute_txid = os.urandom(32).hex()
 
     appointment = generate_dummy_appointment(dispute_txid)
+    locator_dispute_txid_map[appointment["locator"]] = dispute_txid
 
     return appointment
 
 
 def add_appointment(appointment):
     r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
+
+    if r.status_code == 200:
+        appointments.append(appointment)
 
     return r
 
@@ -135,7 +142,7 @@ def test_request_multiple_appointments_same_locator(new_appointment, n=MULTIPLE_
 
 
 def test_add_too_many_appointment(new_appointment):
-    for _ in range(MAX_APPOINTMENTS):
+    for _ in range(MAX_APPOINTMENTS-len(appointments)):
         r = add_appointment(new_appointment)
         assert (r.status_code == 200)
 
@@ -143,13 +150,7 @@ def test_add_too_many_appointment(new_appointment):
     assert (r.status_code == 503)
 
 
-def test_get_all_appointments_watcher(n=MULTIPLE_APPOINTMENTS):
-    appointments = [create_appointment() for _ in range(n)]
-
-    for appointment in appointments:
-        r = add_appointment(appointment)
-        assert (r.status_code == 200 and r.reason == 'OK')
-
+def test_get_all_appointments_watcher():
     r = requests.get(url=PISA_API + "/get_all_appointments")
     assert (r.status_code == 200 and r.reason == 'OK')
 
@@ -163,20 +164,14 @@ def test_get_all_appointments_watcher(n=MULTIPLE_APPOINTMENTS):
     assert(len(received_appointments["responder_jobs"]) == 0)
 
 
-def test_get_all_appointments_responder(n=MAX_APPOINTMENTS):
-    # Create appointments send them to PISA
-    dispute_txids = [os.urandom(32).hex() for _ in range(n)]
-    appointments = [create_appointment(dispute_txid) for dispute_txid in dispute_txids]
-
-    for appointment in appointments:
-        r = add_appointment(appointment)
-        assert (r.status_code == 200 and r.reason == 'OK')
-
+def test_get_all_appointments_responder():
     # Trigger all disputes
     bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
-    for dispute_txid in dispute_txids:
-        bitcoin_cli.sendrawtransaction(dispute_txid)
+    locators = [appointment["locator"] for appointment in appointments]
+    for locator, dispute_txid in locator_dispute_txid_map.items():
+        if locator in locators:
+            bitcoin_cli.sendrawtransaction(dispute_txid)
 
     # Wait a bit for them to get confirmed
     time.sleep(TIME_BETWEEN_BLOCKS)
