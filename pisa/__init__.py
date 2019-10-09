@@ -26,14 +26,14 @@ class Logger(object):
     def _add_prefix(self, msg):
         return msg if self.actor is None else "[{}] {}".format(self.actor, msg)
 
-    def info(msg, **kwargs):
-        logging.info(StructuredMessage(self._add_prefix(msg), **kwargs))
+    def info(self, msg, **kwargs):
+        logging.info(StructuredMessage(self._add_prefix(msg), actor=self.actor, **kwargs))
 
-    def debug(msg, **kwargs):
-        logging.debug(StructuredMessage(self._add_prefix(msg), **kwargs))
+    def debug(self, msg, **kwargs):
+        logging.debug(StructuredMessage(self._add_prefix(msg), actor=self.actor, **kwargs))
 
-    def error(msg, **kwargs):
-        logging.error(StructuredMessage(self._add_prefix(msg), **kwargs))
+    def error(self, msg, **kwargs):
+        logging.error(StructuredMessage(self._add_prefix(msg), actor=self.actor, **kwargs))
 
 # Configure logging
 logging.basicConfig(format='%(message)s', level=logging.INFO, handlers=[
