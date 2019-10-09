@@ -19,6 +19,7 @@ def run_bitcoind():
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
 
+    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
     sleep(0.1)
 
 
