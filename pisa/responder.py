@@ -126,9 +126,9 @@ class Responder:
                     self.rebroadcast(txs_to_rebroadcast)
 
                 else:
-                    logger.warn("Reorg found",
-                                local_prev_block_hash=prev_block_hash,
-                                remote_prev_block_hash=block.get('previousblockhash'))
+                    logger.warning("Reorg found",
+                                   local_prev_block_hash=prev_block_hash,
+                                   remote_prev_block_hash=block.get('previousblockhash'))
 
                     self.handle_reorgs()
 
@@ -174,9 +174,9 @@ class Responder:
                 self.add_response(uuid, self.jobs[uuid].dispute_txid, self.jobs[uuid].justice_txid,
                                   self.jobs[uuid].justice_rawtx, self.jobs[uuid].appointment_end, retry=True)
 
-                logger.warn("Transaction has missed many confirmations. Rebroadcasting.",
-                            justice_txid=self.jobs[uuid].justice_txid,
-                            confirmations_missed=CONFIRMATIONS_BEFORE_RETRY)
+                logger.warning("Transaction has missed many confirmations. Rebroadcasting.",
+                               justice_txid=self.jobs[uuid].justice_txid,
+                               confirmations_missed=CONFIRMATIONS_BEFORE_RETRY)
 
     # FIXME: Legacy code, must be checked and updated/fixed
     def handle_reorgs(self):
@@ -210,5 +210,5 @@ class Responder:
                 # ToDo: #24-properly-handle-reorgs
                 # FIXME: if the dispute is not on chain (either in mempool or not there at all), we need to call the
                 #        reorg manager
-                logger.warn("Dispute and justice transaction missing. Calling the reorg manager")
+                logger.warning("Dispute and justice transaction missing. Calling the reorg manager")
                 logger.error("Reorg manager not yet implemented")
