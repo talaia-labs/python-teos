@@ -20,12 +20,12 @@ class Cleaner:
             else:
                 locator_uuid_map[locator].remove(uuid)
 
-            logger.info("end time reached with no match! Deleting appointment.", locator=locator, uuid=uuid)
+            logger.info("End time reached with no match. Deleting appointment.", locator=locator, uuid=uuid)
 
     @staticmethod
     def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height):
         for uuid, confirmations in completed_jobs:
-            logger.info("job completed. Appointment ended after reaching enough confirmations.",
+            logger.info("Job completed. Appointment ended after reaching enough confirmations.",
                         uuid=uuid, height=height, confirmations=confirmations)
 
             # ToDo: #9-add-data-persistence
@@ -35,7 +35,7 @@ class Cleaner:
             if len(tx_job_map[justice_txid]) == 1:
                 tx_job_map.pop(justice_txid)
 
-                logger.info("no more jobs for justice transaction.", justice_txid=justice_txid)
+                logger.info("No more jobs for justice transaction.", justice_txid=justice_txid)
 
             else:
                 tx_job_map[justice_txid].remove(uuid)

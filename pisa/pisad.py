@@ -1,7 +1,6 @@
 from sys import argv
 from getopt import getopt
 
-from pisa import logging
 from pisa.logger import Logger
 from pisa.api import start_api
 from pisa.tools import can_connect_to_bitcoind, in_correct_network

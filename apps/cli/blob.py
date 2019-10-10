@@ -3,7 +3,6 @@ from hashlib import sha256
 from binascii import hexlify, unhexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from apps.cli import logging
 from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
 from pisa.logger import Logger
 
@@ -53,7 +52,7 @@ class Blob:
         encrypted_blob = aesgcm.encrypt(nonce=nonce, data=tx, associated_data=None)
         encrypted_blob = hexlify(encrypted_blob).decode()
 
-        logger.info("creating new blob",
+        logger.info("Creating new blob",
                     master_key=hexlify(master_key).decode(),
                     sk=hexlify(sk).decode(),
                     nonce=hexlify(nonce).decode(),

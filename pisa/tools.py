@@ -8,7 +8,8 @@ from pisa.utils.auth_proxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
 
 
-def check_tx_in_chain(tx_id, logger=Logger(), tx_label='transaction'):
+# TODO: currently only used in the Responder; might move there or in the BlockProcessor
+def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
     tx_in_chain = False
     confirmations = 0
 

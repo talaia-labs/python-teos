@@ -24,7 +24,7 @@ class EncryptedBlob:
         sk = master_key[:16]
         nonce = master_key[16:]
 
-        logger.info("[Watcher] creating new blob.",
+        logger.info("Creating new blob.",
                     master_key=hexlify(master_key).decode(),
                     sk=hexlify(sk).decode(),
                     nonce=hexlify(sk).decode(),

@@ -16,7 +16,7 @@ class Carrier:
 
     def send_transaction(self, rawtx, txid):
         try:
-            logger.info("pushing transaction to the network", txid=txid, rawtx=rawtx)
+            logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
             bitcoin_cli.sendrawtransaction(rawtx)
 
             receipt = self.Receipt(delivered=True)
@@ -69,7 +69,7 @@ class Carrier:
             # reorged while we were querying bitcoind to get the confirmation count. In such a case we just
             # restart the job
             if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
-                logger.info("transaction got reorged before obtaining information", txid=txid)
+                logger.info("Transaction got reorged before obtaining information", txid=txid)
 
             # TODO: Check RPC methods to see possible returns and avoid general else
             # else:

@@ -24,7 +24,7 @@ def add_appointment():
     remote_addr = request.environ.get('REMOTE_ADDR')
     remote_port = request.environ.get('REMOTE_PORT')
 
-    logger.info('connection accepted', from_addr_port='{}:{}'.format(remote_addr, remote_port))
+    logger.info('Connection accepted', from_addr_port='{}:{}'.format(remote_addr, remote_port))
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
@@ -50,7 +50,7 @@ def add_appointment():
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
-    logger.info('sending response and disconnecting',
+    logger.info('Sending response and disconnecting',
                 from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response)
 
     return Response(response, status=rcode, mimetype='text/plain')

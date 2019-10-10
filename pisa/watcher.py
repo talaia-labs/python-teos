@@ -53,16 +53,16 @@ class Watcher:
                 zmq_thread.start()
                 watcher.start()
 
-                logger.info("waking up!")
+                logger.info("Waking up")
 
             appointment_added = True
 
-            logger.info("new appointment accepted.", locator=appointment.locator)
+            logger.info("New appointment accepted.", locator=appointment.locator)
 
         else:
             appointment_added = False
 
-            logger.info("maximum appointments reached, appointment rejected.", locator=appointment.locator)
+            logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
 
         return appointment_added
 
@@ -73,14 +73,14 @@ class Watcher:
     def do_watch(self):
         while len(self.appointments) > 0:
             block_hash = self.block_queue.get()
-            logger.info("new block received", block_hash=block_hash)
+            logger.info("New block received", block_hash=block_hash)
 
             block = BlockProcessor.get_block(block_hash)
 
             if block is not None:
                 txids = block.get('tx')
 
-                logger.info("list of transactions.", txids=txids)
+                logger.info("List of transactions.", txids=txids)
 
                 expired_appointments = [uuid for uuid, appointment in self.appointments.items()
                                         if block["height"] > appointment.end_time + EXPIRY_DELTA]
@@ -91,7 +91,7 @@ class Watcher:
                 matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
 
                 for locator, uuid, dispute_txid, justice_txid, justice_rawtx in matches:
-                    logger.info("notifying responder and deleting appointment.",
+                    logger.info("Notifying responder and deleting appointment.",
                                 justice_txid=justice_txid, locator=locator, uuid=uuid)
 
                     self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
@@ -113,4 +113,4 @@ class Watcher:
         self.asleep = True
         self.zmq_subscriber.terminate = True
 
-        logger.error("no more pending appointments, going back to sleep")
+        logger.error("No more pending appointments, going back to sleep")
