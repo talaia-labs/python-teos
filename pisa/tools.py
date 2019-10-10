@@ -30,7 +30,7 @@ def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
 
         else:
             # ToDO: Unhandled errors, check this properly
-            logger.error("JSONRPCException.", error_code=e)
+            logger.error("JSONRPCException.", method='tools.check_tx_in_chain', error_code=e)
 
     return tx_in_chain, confirmations
 

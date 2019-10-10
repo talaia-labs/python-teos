@@ -24,22 +24,14 @@ class Carrier:
 
         except JSONRPCException as e:
             errno = e.error.get('code')
-            # Since we're pushing a raw transaction to the network we can get two kind of rejections:
-            # RPC_VERIFY_REJECTED and RPC_VERIFY_ALREADY_IN_CHAIN. The former implies that the transaction is rejected
-            # due to network rules, whereas the later implies that the transaction is already in the blockchain.
+            # Since we're pushing a raw transaction to the network we can face several rejections
             if errno == RPC_VERIFY_REJECTED:
-                # DISCUSS: what to do in this case
-                # DISCUSS: invalid transactions (properly formatted but invalid, like unsigned) fit here too.
-                # DISCUSS: check errors -9 and -10
+                # DISCUSS: 37-transaction-rejection
                 # TODO: UNKNOWN_JSON_RPC_EXCEPTION is not the proper exception here. This is long due.
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
             elif errno == RPC_VERIFY_ERROR:
-                # DISCUSS: The only reason for it seems to bea non-existing or spent input.
-                #          https://github.com/bitcoin/bitcoin/blob/master/src/rpc/rawtransaction.cpp#L660
-                #          However RPC_TRANSACTION_ERROR aliases RPC_VERIFY_ERROR and it's the default return for
-                #          RPCErrorFromTransactionError
-                #          https://github.com/bitcoin/bitcoin/blob/master/src/rpc/util.cpp#L276
+                # DISCUSS: 37-transaction-rejection
                 # TODO: UNKNOWN_JSON_RPC_EXCEPTION is not the proper exception here. This is long due.
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
@@ -63,12 +55,12 @@ class Carrier:
                 # Adding this here just for completeness. We should never end up here. The Carrier only sends txs
                 # handed by the Responder, who receives them from the Watcher, who checks that the tx can be properly
                 # deserialized
-                logger.info("[Carrier] tx {} cannot be deserialized".format(txid))
+                logger.info("Transaction cannot be deserialized".format(txid))
                 receipt = Receipt(delivered=False, reason=RPC_DESERIALIZATION_ERROR)
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", error_code=e)
+                logger.error("JSONRPCException.", method='Carrier.send_transaction', error_code=e)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         return receipt
@@ -86,9 +78,8 @@ class Carrier:
             if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
                 logger.info("Transaction got reorged before obtaining information", txid=txid)
 
-            # TODO: Check RPC methods to see possible returns and avoid general else
-            # else:
-            #     # If something else happens (unlikely but possible) log it so we can treat it in future releases
-            #     logger.error("JSONRPCException.", error_code=e)
+            else:
+                # If something else happens (unlikely but possible) log it so we can treat it in future releases
+                logger.error("JSONRPCException.", method='Carrier.get_transaction', error_code=e)
 
         return tx_info
