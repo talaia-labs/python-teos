@@ -63,13 +63,13 @@ class Carrier:
                 # Adding this here just for completeness. We should never end up here. The Carrier only sends txs
                 # handed by the Responder, who receives them from the Watcher, who checks that the tx can be properly
                 # deserialized
-                logging.info("[Carrier] tx {} cannot be deserialized".format(txid))
+                logger.info("[Carrier] tx {} cannot be deserialized".format(txid))
                 receipt = Receipt(delivered=False, reason=RPC_DESERIALIZATION_ERROR)
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
                 logger.error("JSONRPCException.", error_code=e)
-                receipt = self.Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
+                receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         return receipt
 
