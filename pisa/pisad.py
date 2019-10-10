@@ -1,5 +1,6 @@
-from sys import argv
+from sys import argv, exit
 from getopt import getopt
+from signal import signal, SIGINT
 
 from pisa.logger import Logger
 from pisa.api import start_api
@@ -7,7 +8,17 @@ from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
 logger = Logger("Daemon")
 
+
+def handle_sigint(signal_received, frame):
+    print("Shutting down PISA...")
+    # TODO: add code to close the db, free any resources, etc.
+
+    exit(0)
+
+
 if __name__ == '__main__':
+    signal(SIGINT, handle_sigint)
+
     debug = False
     opts, _ = getopt(argv[1:], 'd', ['debug'])
     for opt, arg in opts:
