@@ -87,5 +87,3 @@ def test_encrypt():
     encrypted_blob2 = blob.encrypt(key)
 
     assert(encrypted_blob == encrypted_blob2 and id(encrypted_blob) != id(encrypted_blob2))
-
-

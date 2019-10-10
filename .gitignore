@@ -10,3 +10,5 @@ bitcoin.conf*
 apps/cli/*.json
 appointments/
 test.py
+*.pyc
+.cache

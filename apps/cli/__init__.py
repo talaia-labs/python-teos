@@ -12,7 +12,7 @@ SUPPORTED_HASH_FUNCTIONS = ["SHA256"]
 SUPPORTED_CIPHERS = ["AES-GCM-128"]
 
 # Configure logging
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO, handlers=[
+logging.basicConfig(format='%(message)s', level=logging.INFO, handlers=[
     logging.FileHandler(CLIENT_LOG_FILE),
     logging.StreamHandler()
 ])

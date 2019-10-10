@@ -2,9 +2,12 @@ import re
 
 from pisa import errors
 import pisa.conf as conf
-from pisa import logging
+from pisa import bitcoin_cli
+from pisa.logger import Logger
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
+
+logger = Logger("Inspector")
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by PISA, would be stored in the logs. This is a possible DoS surface
@@ -71,7 +74,7 @@ class Inspector:
             message = "wrong locator format ({})".format(locator)
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message
 
@@ -99,7 +102,7 @@ class Inspector:
                 message = "start_time is too close to current height"
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message
 
@@ -133,7 +136,7 @@ class Inspector:
                 message = 'end_time is too close to current height'
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message
 
@@ -156,7 +159,7 @@ class Inspector:
                 conf.MIN_DISPUTE_DELTA, dispute_delta)
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message
 
@@ -179,7 +182,7 @@ class Inspector:
             message = "wrong encrypted_blob format ({})".format(encrypted_blob)
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message
 
@@ -201,7 +204,7 @@ class Inspector:
             message = "cipher not supported: {}".format(cipher)
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message
 
@@ -223,6 +226,6 @@ class Inspector:
             message = "hash_function not supported {}".format(hash_function)
 
         if message is not None:
-            logging.error("[Inspector] {}".format(message))
+            logger.error(message)
 
         return rcode, message

@@ -73,4 +73,3 @@ def test_potential_matches_random_data(locator_uuid_map):
 
     # None of the txids should match
     assert len(potential_matches) == 0
-

@@ -34,6 +34,3 @@ def test_decrypt():
     encrypted_blob = EncryptedBlob(encrypted_data)
 
     assert(encrypted_blob.decrypt(key) == data)
-
-
-

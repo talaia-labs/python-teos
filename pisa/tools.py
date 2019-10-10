@@ -2,12 +2,14 @@ import re
 from http.client import HTTPException
 
 import pisa.conf as conf
-from pisa import logging, bitcoin_cli
+from pisa import bitcoin_cli
+from pisa.logger import Logger
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
 
 
-def check_tx_in_chain(tx_id, parent='', tx_label='transaction'):
+# TODO: currently only used in the Responder; might move there or in the BlockProcessor
+def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
     tx_in_chain = False
     confirmations = 0
 
@@ -17,18 +19,18 @@ def check_tx_in_chain(tx_id, parent='', tx_label='transaction'):
         if tx_info.get("confirmations"):
             confirmations = int(tx_info.get("confirmations"))
             tx_in_chain = True
-            logging.error("[{}] {} found in the blockchain (txid: {}) ".format(parent, tx_label, tx_id))
+            logger.error("{} found in the blockchain".format(tx_label), txid=tx_id)
 
         else:
-            logging.error("[{}] {} found in mempool (txid: {}) ".format(parent, tx_label, tx_id))
+            logger.error("{} found in mempool".format(tx_label), txid=tx_id)
 
     except JSONRPCException as e:
         if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
-            logging.error("[{}] {} not found in mempool nor blockchain (txid: {}) ".format(parent, tx_label, tx_id))
+            logger.error("{} not found in mempool nor blockchain".format(tx_label), txid=tx_id)
 
         else:
             # ToDO: Unhandled errors, check this properly
-            logging.error("[{}] JSONRPCException. Error code {}".format(parent, e))
+            logger.error("JSONRPCException.", error_code=e)
 
     return tx_in_chain, confirmations
 

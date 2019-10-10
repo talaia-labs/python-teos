@@ -230,4 +230,3 @@ def test_inspect():
            and appointment.end_time == end_time and appointment.dispute_delta == dispute_delta and
            appointment.encrypted_blob.data == encrypted_blob and appointment.cipher == cipher and
            appointment.hash_function == hash_function)
-

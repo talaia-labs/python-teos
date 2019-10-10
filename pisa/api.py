@@ -1,9 +1,10 @@
 import json
 from flask import Flask, request, Response, abort, jsonify
 
+from pisa import HOST, PORT, logging
+from pisa.logger import Logger
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
-from pisa import HOST, PORT, logging
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
@@ -14,13 +15,15 @@ HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
 HTTP_SERVICE_UNAVAILABLE = 503
 
+logger = Logger("API")
+
 
 @app.route('/', methods=['POST'])
 def add_appointment():
     remote_addr = request.environ.get('REMOTE_ADDR')
     remote_port = request.environ.get('REMOTE_PORT')
 
-    logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
+    logger.info('Connection accepted', from_addr_port='{}:{}'.format(remote_addr, remote_port))
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
@@ -46,7 +49,8 @@ def add_appointment():
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
-    logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr, remote_port))
+    logger.info('Sending response and disconnecting',
+                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response)
 
     return Response(response, status=rcode, mimetype='text/plain')
 

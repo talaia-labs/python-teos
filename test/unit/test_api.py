@@ -183,8 +183,3 @@ def test_get_all_appointments_responder():
 
     assert (set(responder_jobs) == set(local_locators))
     assert (len(received_appointments["watcher_appointments"]) == 0)
-
-
-
-
-
