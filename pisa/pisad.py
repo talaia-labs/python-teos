@@ -5,7 +5,7 @@ from pisa.logger import Logger
 from pisa.api import start_api
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
-logger = Logger("Pisad")
+logger = Logger("Daemon")
 
 if __name__ == '__main__':
     debug = False
@@ -23,4 +23,4 @@ if __name__ == '__main__':
             logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
-        logger.error("can't connect to bitcoind. Shutting down")
+        logger.error("Can't connect to bitcoind. Shutting down")

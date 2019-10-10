@@ -12,6 +12,7 @@ from pisa.utils.zmq_subscriber import ZMQHandler
 
 logger = Logger("Watcher")
 
+
 class Watcher:
     def __init__(self, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()

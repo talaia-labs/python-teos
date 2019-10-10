@@ -78,4 +78,3 @@ def test_delete_completed_jobs():
         Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, 0)
 
         assert not set(completed_jobs).issubset(jobs.keys())
-

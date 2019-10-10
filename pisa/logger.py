@@ -28,3 +28,6 @@ class Logger(object):
 
     def error(self, msg, **kwargs):
         logging.error(StructuredMessage(self._add_prefix(msg), actor=self.actor, **kwargs))
+
+    def warn(self, msg, **kwargs):
+        logging.warn(StructuredMessage(self._add_prefix(msg), actor=self.actor, **kwargs))
