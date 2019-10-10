@@ -1,3 +1,5 @@
+import json
+
 from pisa.encrypted_blob import EncryptedBlob
 
 
@@ -22,3 +24,5 @@ class Appointment:
 
         # ToDO: #3-improve-appointment-structure
 
+    def serialize(self):
+        return json.dumps(self.to_json())

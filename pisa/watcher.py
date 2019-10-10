@@ -1,12 +1,12 @@
 from uuid import uuid4
 from queue import Queue
 from threading import Thread
+import ecdsa
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
-from pisa.conf import EXPIRY_DELTA
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, SIGNING_KEY_DER
 from pisa.responder import Responder
-from pisa.conf import MAX_APPOINTMENTS
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 
@@ -22,6 +22,7 @@ class Watcher:
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
         self.responder = Responder()
+        self.sk = ecdsa.SigningKey.from_der(SIGNING_KEY_DER)
 
     def add_appointment(self, appointment):
         # Rationale:
@@ -30,6 +31,8 @@ class Watcher:
         # the watcher will get the list of transactions and compare it with the list of appointments.
         # If the watcher is awake, every new appointment will just be added to the appointment list until
         # max_appointments is reached.
+
+        signature = None
 
         if len(self.appointments) < self.max_appointments:
             # Appointments are identified by the locator: the sha256 of commitment txid (H(tx_id)).
@@ -60,12 +63,14 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
+            signature = self.sk.sign(appointment.serialize().encode('utf8'))
+
         else:
             appointment_added = False
 
             logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
 
-        return appointment_added
+        return (appointment_added, signature)
 
     def do_subscribe(self):
         self.zmq_subscriber = ZMQHandler(parent="Watcher")

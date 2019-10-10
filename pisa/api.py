@@ -30,12 +30,12 @@ def add_appointment():
     appointment = inspector.inspect(request_data)
 
     if type(appointment) == Appointment:
-        appointment_added = watcher.add_appointment(appointment)
+        appointment_added, signature = watcher.add_appointment(appointment)
 
         # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
             rcode = HTTP_OK
-            response = "appointment accepted. locator: {}".format(appointment.locator)
+            response = "appointment accepted. locator: {}. signature: {}".format(appointment.locator, signature)
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
             response = "appointment rejected"
