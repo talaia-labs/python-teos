@@ -22,7 +22,7 @@ class Watcher:
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
         self.responder = Responder()
-        self.sk = ecdsa.SigningKey.from_der(SIGNING_KEY_DER)
+        self.signing_key = ecdsa.SigningKey.from_der(SIGNING_KEY_DER) if SIGNING_KEY_DER is not None else None
 
     def add_appointment(self, appointment):
         # Rationale:
@@ -63,7 +63,8 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
-            signature = self.sk.sign(appointment.serialize().encode('utf8'))
+            if (self.signing_key is not None):
+                signature = self.signing_key.sign(appointment.serialize().encode('utf8'))
 
         else:
             appointment_added = False
