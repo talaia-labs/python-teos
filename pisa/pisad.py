@@ -1,5 +1,5 @@
-from sys import argv, exit
 from getopt import getopt
+from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from pisa.logger import Logger
@@ -23,8 +23,7 @@ if __name__ == '__main__':
     signal(SIGTERM, handle_signals)
     signal(SIGQUIT, handle_signals)
 
-    debug = False
-    opts, _ = getopt(argv[1:], 'd', ['debug'])
+    opts, _ = getopt(argv[1:], '', [''])
     for opt, arg in opts:
         # FIXME: Leaving this here for future option/arguments
         pass
