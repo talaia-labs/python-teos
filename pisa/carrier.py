@@ -32,8 +32,8 @@ class Carrier:
 
             elif errno == RPC_VERIFY_ERROR:
                 # DISCUSS: 37-transaction-rejection
-                # TODO: UNKNOWN_JSON_RPC_EXCEPTION is not the proper exception here. This is long due.
-                receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
+                receipt = Receipt(delivered=False, reason=RPC_VERIFY_ERROR)
+                logger.error("Transaction couldn't be broadcast", error=e.error)
 
             elif errno == RPC_VERIFY_ALREADY_IN_CHAIN:
                 logger.info("Transaction is already in the blockchain. Getting confirmation count", txid=txid)
@@ -60,7 +60,7 @@ class Carrier:
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", method='Carrier.send_transaction', error_code=e)
+                logger.error("JSONRPCException.", method='Carrier.send_transaction', error=e.error)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         return receipt
@@ -80,6 +80,6 @@ class Carrier:
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", method='Carrier.get_transaction', error_code=e)
+                logger.error("JSONRPCException.", method='Carrier.get_transaction', error=e.error)
 
         return tx_info

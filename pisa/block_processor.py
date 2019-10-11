@@ -17,7 +17,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block = None
-            logger.error("Couldn't get block from bitcoind.", error_code=e)
+            logger.error("Couldn't get block from bitcoind.", error=e.error)
 
         return block
 
@@ -29,7 +29,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block_hash = None
-            logger.error("Couldn't get block hash.", error_code=e)
+            logger.error("Couldn't get block hash.", error=e.error)
 
         return block_hash
 
@@ -41,7 +41,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block_count = None
-            logger.error("Couldn't get block count", error_code=e)
+            logger.error("Couldn't get block count", error=e.error)
 
         return block_count
 
@@ -81,7 +81,7 @@ class BlockProcessor:
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
-                    logger.error("Can't build transaction from decoded data.", error_code=e)
+                    logger.error("Can't build transaction from decoded data.", error=e.error)
 
         return matches
 
