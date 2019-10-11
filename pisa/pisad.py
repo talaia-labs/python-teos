@@ -10,13 +10,15 @@ logger = Logger("Daemon")
 
 
 def handle_signals(signal_received, frame):
-    print("Shutting down PISA...")
+    logger.info("Shutting down PISA")
     # TODO: add code to close the db, free any resources, etc.
 
     exit(0)
 
 
 if __name__ == '__main__':
+    logger.info("Starting PISA")
+
     signal(SIGINT, handle_signals)
     signal(SIGTERM, handle_signals)
     signal(SIGQUIT, handle_signals)
