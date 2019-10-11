@@ -1,11 +1,11 @@
 from uuid import uuid4
 from queue import Queue
 from threading import Thread
-import ecdsa
+from ecdsa import SigningKey
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, SIGNING_KEY_DER
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, SIGNING_KEY_FILE
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
@@ -22,7 +22,11 @@ class Watcher:
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
         self.responder = Responder()
-        self.signing_key = ecdsa.SigningKey.from_der(SIGNING_KEY_DER) if SIGNING_KEY_DER is not None else None
+        if SIGNING_KEY_FILE is not None:
+            self.signing_key = SigningKey.from_pem(open(SIGNING_KEY_FILE).read())
+        else:
+            self.signing_key = None
+            logger.warning("No signing key provided. Appointments will not be signed.")
 
     def add_appointment(self, appointment):
         # Rationale:
