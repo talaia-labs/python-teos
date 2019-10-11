@@ -29,7 +29,7 @@ class Job:
         #        can be directly got from DB
         self.locator = sha256(unhexlify(dispute_txid)).hexdigest()
 
-    def to_json(self):
+    def to_dict(self):
         job = {"locator": self.locator, "justice_rawtx": self.justice_rawtx, "appointment_end": self.appointment_end}
 
         return job

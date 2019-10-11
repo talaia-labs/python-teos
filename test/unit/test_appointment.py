@@ -1,4 +1,5 @@
 from os import urandom
+import json
 from pytest import fixture
 
 from pisa.appointment import Appointment
@@ -35,13 +36,25 @@ def test_init_appointment(appointment_data):
             and dispute_delta == appointment.dispute_delta and hash_function == appointment.hash_function)
 
 
+def test_to_dict(appointment_data):
+    locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function = appointment_data
+    appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
+
+    dict_appointment = appointment.to_dict()
+
+    assert (locator == dict_appointment.get("locator") and start_time == dict_appointment.get("start_time")
+            and end_time == dict_appointment.get("end_time") and dispute_delta == dict_appointment.get("dispute_delta")
+            and cipher == dict_appointment.get("cipher") and hash_function == dict_appointment.get("hash_function")
+            and encrypted_blob_data == dict_appointment.get("encrypted_blob"))
+
+
 def test_to_json(appointment_data):
     locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function = appointment_data
     appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
 
-    json_appointment = appointment.to_json()
+    dict_appointment = json.loads(appointment.to_json())
 
-    assert (locator == json_appointment.get("locator") and start_time == json_appointment.get("start_time")
-            and end_time == json_appointment.get("end_time") and dispute_delta == json_appointment.get("dispute_delta")
-            and cipher == json_appointment.get("cipher") and hash_function == json_appointment.get("hash_function")
-            and encrypted_blob_data == json_appointment.get("encrypted_blob"))
+    assert (locator == dict_appointment.get("locator") and start_time == dict_appointment.get("start_time")
+            and end_time == dict_appointment.get("end_time") and dispute_delta == dict_appointment.get("dispute_delta")
+            and cipher == dict_appointment.get("cipher") and hash_function == dict_appointment.get("hash_function")
+            and encrypted_blob_data == dict_appointment.get("encrypted_blob"))

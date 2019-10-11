@@ -64,7 +64,7 @@ class Watcher:
             logger.info("New appointment accepted.", locator=appointment.locator)
 
             if (self.signing_key is not None):
-                signature = self.signing_key.sign(appointment.serialize().encode('utf8'))
+                signature = self.signing_key.sign(appointment.to_json().encode('utf8'))
 
         else:
             appointment_added = False

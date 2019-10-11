@@ -68,7 +68,7 @@ def get_appointment():
 
     if appointment_in_watcher:
         for uuid in appointment_in_watcher:
-            appointment_data = watcher.appointments[uuid].to_json()
+            appointment_data = watcher.appointments[uuid].to_dict()
             appointment_data['status'] = "being_watched"
             response.append(appointment_data)
 
@@ -77,7 +77,7 @@ def get_appointment():
 
         for job in responder_jobs.values():
             if job.locator == locator:
-                job_data = job.to_json()
+                job_data = job.to_dict()
                 job_data['status'] = "dispute_responded"
                 response.append(job_data)
 
@@ -98,11 +98,11 @@ def get_all_appointments():
 
     if request.remote_addr in request.host or request.remote_addr == '127.0.0.1':
         for uuid, appointment in watcher.appointments.items():
-            watcher_appointments[uuid] = appointment.to_json()
+            watcher_appointments[uuid] = appointment.to_dict()
 
         if watcher.responder:
             for uuid, job in watcher.responder.jobs.items():
-                responder_jobs[uuid] = job.to_json()
+                responder_jobs[uuid] = job.to_dict()
 
         response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
 
