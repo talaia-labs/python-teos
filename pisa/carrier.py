@@ -6,6 +6,8 @@ from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION
 
 logger = Logger("Carrier")
 
+# FIXME: This class is not fully covered by unit tests
+
 
 class Receipt:
     def __init__(self, delivered, confirmations=0, reason=None):
