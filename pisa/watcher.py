@@ -67,7 +67,7 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
-            if (self.signing_key is not None):
+            if self.signing_key is not None:
                 signature = self.signing_key.sign(appointment.to_json().encode('utf8'))
 
         else:
@@ -75,7 +75,7 @@ class Watcher:
 
             logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
 
-        return (appointment_added, signature)
+        return appointment_added, signature
 
     def do_subscribe(self):
         self.zmq_subscriber = ZMQHandler(parent="Watcher")
