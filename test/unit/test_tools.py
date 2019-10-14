@@ -1,25 +1,9 @@
-import pytest
-from time import sleep
-from multiprocessing import Process
-
-
-from pisa import logging
+from pisa import logging, bitcoin_cli
 from pisa.tools import check_txid_format
-from test.simulator.bitcoind_sim import run_simulator
+from test.unit.conftest import bitcoind_process
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
 logging.getLogger().disabled = True
-
-
-@pytest.fixture(autouse=True, scope='session')
-def run_bitcoind():
-    bitcoind_process = Process(target=run_simulator)
-    bitcoind_process.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    sleep(0.1)
-
-    return bitcoind_process
 
 
 def test_in_correct_network():
@@ -33,9 +17,9 @@ def test_can_connect_to_bitcoind():
     assert can_connect_to_bitcoind() is True
 
 
-def test_can_connect_to_bitcoind_bitcoin_not_running(run_bitcoind):
+def test_can_connect_to_bitcoind_bitcoin_not_running():
     # Kill the simulator thread and test the check fails
-    run_bitcoind.kill()
+    bitcoind_process.kill()
     assert can_connect_to_bitcoind() is False
 
 

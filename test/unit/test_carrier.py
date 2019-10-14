@@ -1,11 +1,10 @@
 import pytest
 from os import urandom
 from time import sleep
-from threading import Thread
 
 from pisa.carrier import Carrier
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
-from test.simulator.bitcoind_sim import run_simulator, TIME_BETWEEN_BLOCKS
+from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 
 # FIXME: This test do not fully cover the carrier since the simulator does not support every single error bitcoind may
 #        return for RPC_VERIFY_REJECTED and RPC_VERIFY_ERROR. Further development of the simulator / mocks or simulation
@@ -15,17 +14,7 @@ from test.simulator.bitcoind_sim import run_simulator, TIME_BETWEEN_BLOCKS
 sent_txs = []
 
 
-@pytest.fixture(autouse=True, scope='session')
-def run_bitcoind():
-    bitcoind_thread = Thread(target=run_simulator)
-    bitcoind_thread.daemon = True
-    bitcoind_thread.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    sleep(0.1)
-
-
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='module')
 def carrier():
     return Carrier()
 
@@ -45,7 +34,7 @@ def test_send_double_spending_transaction(carrier):
     sent_txs.append(tx)
 
     # Wait for a block to be mined
-    sleep(TIME_BETWEEN_BLOCKS)
+    sleep(2*TIME_BETWEEN_BLOCKS)
 
     # Try to send it again
     receipt2 = carrier.send_transaction(tx, tx)
@@ -53,7 +42,7 @@ def test_send_double_spending_transaction(carrier):
     # The carrier should report delivered True for both, but in the second case the transaction was already delivered
     # (either by himself or someone else)
     assert(receipt.delivered is True)
-    assert (receipt2.delivered is True and receipt2.confirmations == 1
+    assert (receipt2.delivered is True and receipt2.confirmations >= 1
             and receipt2.reason == RPC_VERIFY_ALREADY_IN_CHAIN)
 
 

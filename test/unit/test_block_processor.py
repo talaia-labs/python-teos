@@ -1,34 +1,21 @@
 import pytest
-from time import sleep
 from os import urandom
 from uuid import uuid4
 from hashlib import sha256
-from threading import Thread
 from binascii import unhexlify
 
 from pisa.block_processor import BlockProcessor
-from test.simulator.bitcoind_sim import run_simulator
 
 APPOINTMENT_COUNT = 100
 TEST_SET_SIZE = 200
 
 
-@pytest.fixture(autouse=True, scope='session')
-def run_bitcoind():
-    bitcoind_thread = Thread(target=run_simulator)
-    bitcoind_thread.daemon = True
-    bitcoind_thread.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    sleep(0.1)
-
-
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='module')
 def txids():
     return [urandom(32).hex() for _ in range(APPOINTMENT_COUNT)]
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='module')
 def locator_uuid_map(txids):
     return {sha256(unhexlify(txid)).hexdigest(): uuid4().hex for txid in txids}
 

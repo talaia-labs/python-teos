@@ -1,14 +1,10 @@
-import time
-import pytest
 from os import urandom
-from threading import Thread
 
 from pisa import logging
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
-from test.simulator.bitcoind_sim import run_simulator
 from pisa.conf import MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
 inspector = Inspector()
@@ -19,16 +15,6 @@ WRONG_TYPES = [[], '', urandom(32).hex(), 3.2, 2.0, (), object, {}, " "*32, obje
 WRONG_TYPES_NO_STR = [[], urandom(32), 3.2, 2.0, (), object, {}, object()]
 
 logging.getLogger().disabled = True
-
-
-@pytest.fixture(autouse=True, scope='session')
-def run_bitcoind():
-    bitcoind_thread = Thread(target=run_simulator)
-    bitcoind_thread.daemon = True
-    bitcoind_thread.start()
-
-    # It takes a little bit of time to start the simulator (otherwise the requests are sent too early and they fail)
-    time.sleep(0.1)
 
 
 def test_check_locator():

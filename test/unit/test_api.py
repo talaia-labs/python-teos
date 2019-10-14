@@ -4,14 +4,12 @@ import pytest
 import time
 import requests
 from hashlib import sha256
-from threading import Thread
 from binascii import unhexlify
 
 from apps.cli.blob import Blob
-from pisa.api import start_api
 from pisa import HOST, PORT, logging
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.simulator.bitcoind_sim import run_simulator, TIME_BETWEEN_BLOCKS
+from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 logging.getLogger().disabled = True
@@ -44,23 +42,6 @@ def generate_dummy_appointment(dispute_txid):
                    "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function": hash_function}
 
     return appointment
-
-
-@pytest.fixture(autouse=True, scope='session')
-def run_api():
-    api_thread = Thread(target=start_api)
-    api_thread.daemon = True
-    api_thread.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    time.sleep(0.1)
-
-
-@pytest.fixture(autouse=True, scope='session')
-def run_bitcoind():
-    bitcoind_thread = Thread(target=run_simulator)
-    bitcoind_thread.daemon = True
-    bitcoind_thread.start()
 
 
 @pytest.fixture
