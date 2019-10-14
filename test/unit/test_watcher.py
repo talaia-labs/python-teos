@@ -7,14 +7,14 @@ from hashlib import sha256
 from threading import Thread
 from queue import Queue, Empty
 
-from pisa import bitcoin_cli
 from pisa.watcher import Watcher
-from pisa.conf import EXPIRY_DELTA
 from pisa.responder import Responder
 from pisa.conf import MAX_APPOINTMENTS
 from pisa.appointment import Appointment
 from pisa.tools import check_txid_format
+from pisa.utils.auth_proxy import AuthServiceProxy
 from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
+from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 logging.getLogger().disabled = True
 APPOINTMENTS = 5
@@ -26,8 +26,11 @@ def watcher():
 
 
 def create_appointment(locator=None):
+    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
+
     if locator is None:
         locator = urandom(32).hex()
+
     start_time = bitcoin_cli.getblockcount() + 1
     end_time = start_time + 1
     dispute_delta = 20
@@ -107,6 +110,8 @@ def test_do_subscribe(watcher):
 
 
 def test_do_watch(watcher):
+    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
+
     # We will wipe all the previous data and add 5 appointments
     watcher.appointments, watcher.locator_uuid_map, txids = create_appointments(APPOINTMENTS)
 
