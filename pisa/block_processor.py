@@ -74,14 +74,16 @@ class BlockProcessor:
                     # ToDo: #20-test-tx-decrypting-edge-cases
                     justice_rawtx = appointments[uuid].encrypted_blob.decrypt(dispute_txid)
                     justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
-                    matches.append((locator, uuid, dispute_txid, justice_txid, justice_rawtx))
-
                     logger.info("Match found for locator.", locator=locator, uuid=uuid, justice_txid=justice_txid)
 
                 except JSONRPCException as e:
                     # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
                     # for the POC
+                    justice_txid = None
+                    justice_rawtx = None
                     logger.error("Can't build transaction from decoded data.", error=e.error)
+
+                matches.append((locator, uuid, dispute_txid, justice_txid, justice_rawtx))
 
         return matches
 

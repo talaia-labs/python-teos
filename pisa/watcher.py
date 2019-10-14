@@ -49,7 +49,7 @@ class Watcher:
             if self.asleep:
                 self.asleep = False
                 self.block_queue = Queue()
-                zmq_thread = Thread(target=self.do_subscribe, args=[self.block_queue])
+                zmq_thread = Thread(target=self.do_subscribe)
                 watcher = Thread(target=self.do_watch)
                 zmq_thread.start()
                 watcher.start()
@@ -67,9 +67,9 @@ class Watcher:
 
         return appointment_added
 
-    def do_subscribe(self, block_queue):
+    def do_subscribe(self):
         self.zmq_subscriber = ZMQHandler(parent="Watcher")
-        self.zmq_subscriber.handle(block_queue)
+        self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
         while len(self.appointments) > 0:
@@ -92,11 +92,13 @@ class Watcher:
                 matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
 
                 for locator, uuid, dispute_txid, justice_txid, justice_rawtx in matches:
-                    logger.info("Notifying responder and deleting appointment.",
-                                justice_txid=justice_txid, locator=locator, uuid=uuid)
+                    # Errors decrypting the Blob will result in a None justice_txid
+                    if justice_txid is not None:
+                        logger.info("Notifying responder and deleting appointment.", justice_txid=justice_txid,
+                                    locator=locator, uuid=uuid)
 
-                    self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
-                                                self.appointments[uuid].end_time)
+                        self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
+                                                    self.appointments[uuid].end_time)
 
                     # Delete the appointment
                     self.appointments.pop(uuid)

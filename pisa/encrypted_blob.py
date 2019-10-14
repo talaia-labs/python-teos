@@ -1,6 +1,8 @@
 from hashlib import sha256
 from binascii import unhexlify, hexlify
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from pisa.logger import Logger
 
 logger = Logger("Watcher")
@@ -33,7 +35,12 @@ class EncryptedBlob:
         # Decrypt
         aesgcm = AESGCM(sk)
         data = unhexlify(self.data.encode())
-        raw_tx = aesgcm.decrypt(nonce=nonce, data=data, associated_data=None)
-        hex_raw_tx = hexlify(raw_tx).decode('utf8')
+
+        try:
+            raw_tx = aesgcm.decrypt(nonce=nonce, data=data, associated_data=None)
+            hex_raw_tx = hexlify(raw_tx).decode('utf8')
+
+        except InvalidTag:
+            hex_raw_tx = None
 
         return hex_raw_tx

@@ -19,13 +19,10 @@ def test_decrypt():
     encrypted_data = urandom(64).hex()
     encrypted_blob = EncryptedBlob(encrypted_data)
 
-    # Trying to decrypt random data (in AES_GCM-128) should result in an InvalidTag exception
-    try:
-        encrypted_blob.decrypt(key)
-        assert False, "Able to decrypt random data with random key"
-
-    except InvalidTag:
-        assert True
+    # Trying to decrypt random data (in AES_GCM-128) should result in an InvalidTag exception. Our decrypt function
+    # returns None
+    hex_tx = encrypted_blob.decrypt(key)
+    assert hex_tx is None
 
     # Valid data should run with no InvalidTag and verify
     data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
