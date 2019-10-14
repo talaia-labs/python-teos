@@ -68,7 +68,7 @@ class Responder:
         # ToDo: #23-define-behaviour-approaching-end
         if retry:
             self.jobs[uuid].retry_counter += 1
-            self.jobs[uuid].missed_confirmations = 0
+            self.missed_confirmations[justice_txid] = 0
 
         else:
             self.jobs[uuid] = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
@@ -144,7 +144,7 @@ class Responder:
         txs_to_rebroadcast = []
 
         for tx in txs:
-            if self.missed_confirmations[tx] >= CONFIRMATIONS_BEFORE_RETRY:
+            if tx in self.missed_confirmations and self.missed_confirmations[tx] >= CONFIRMATIONS_BEFORE_RETRY:
                 # If a transactions has missed too many confirmations we add it to the rebroadcast list
                 txs_to_rebroadcast.append(tx)
 
@@ -153,7 +153,7 @@ class Responder:
     def get_completed_jobs(self, height):
         completed_jobs = []
 
-        for uuid, job in self.jobs:
+        for uuid, job in self.jobs.items():
             if job.appointment_end <= height:
                 tx = Carrier.get_transaction(job.dispute_txid)
 
