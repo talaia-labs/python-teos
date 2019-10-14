@@ -70,7 +70,7 @@ def add_appointment(appointment):
     return r
 
 
-def test_add_appointment(new_appointment):
+def test_add_appointment(run_api, run_bitcoind, new_appointment):
     # Properly formatted appointment
     r = add_appointment(new_appointment)
     assert (r.status_code == 200)

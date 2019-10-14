@@ -188,7 +188,7 @@ def test_check_hash_function():
     assert (Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_EMPTY_FIELD)
 
 
-def test_inspect():
+def test_inspect(run_bitcoind):
     # At this point every single check function has been already tested, let's test inspect with an invalid and a valid
     # appointments.
 

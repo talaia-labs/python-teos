@@ -1,10 +1,13 @@
 import pytest
+import logging
 from os import urandom
 from time import sleep
 
 from pisa.carrier import Carrier
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
+
+logging.getLogger().disabled = True
 
 # FIXME: This test do not fully cover the carrier since the simulator does not support every single error bitcoind may
 #        return for RPC_VERIFY_REJECTED and RPC_VERIFY_ERROR. Further development of the simulator / mocks or simulation
@@ -19,7 +22,7 @@ def carrier():
     return Carrier()
 
 
-def test_send_transaction(carrier):
+def test_send_transaction(run_bitcoind, carrier):
     # We are mocking bitcoind and in our simulator txid == tx
     tx = urandom(32).hex()
     receipt = carrier.send_transaction(tx, tx)

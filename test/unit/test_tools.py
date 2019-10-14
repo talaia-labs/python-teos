@@ -6,7 +6,7 @@ from pisa.tools import can_connect_to_bitcoind, in_correct_network
 logging.getLogger().disabled = True
 
 
-def test_in_correct_network():
+def test_in_correct_network(run_bitcoind):
     # The simulator runs as if it was regtest, so every other network should fail
     assert in_correct_network('mainnet') is False
     assert in_correct_network('testnet') is False

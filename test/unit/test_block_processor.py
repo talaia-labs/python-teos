@@ -1,10 +1,13 @@
 import pytest
+import logging
 from os import urandom
 from uuid import uuid4
 from hashlib import sha256
 from binascii import unhexlify
 
 from pisa.block_processor import BlockProcessor
+
+logging.getLogger().disabled = True
 
 APPOINTMENT_COUNT = 100
 TEST_SET_SIZE = 200
@@ -25,7 +28,7 @@ def best_block_hash():
     return BlockProcessor.get_best_block_hash()
 
 
-def test_get_best_block_hash(best_block_hash):
+def test_get_best_block_hash(run_bitcoind, best_block_hash):
     # As long as bitcoind is running (or mocked in this case) we should always a block hash
     assert best_block_hash is not None and isinstance(best_block_hash, str)
 
