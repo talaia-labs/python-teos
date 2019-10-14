@@ -59,7 +59,7 @@ def test_init_blob():
 
     try:
         Blob(data, cipher, hash_function)
-        assert(False, "Able to create blob with wrong data")
+        assert False, "Able to create blob with wrong data"
 
     except ValueError:
         assert True
@@ -78,7 +78,7 @@ def test_encrypt():
 
     try:
         blob.encrypt(invalid_key)
-        assert (False, "Able to create encrypt with invalid key")
+        assert False, "Able to create encrypt with invalid key"
 
     except ValueError:
         assert True
