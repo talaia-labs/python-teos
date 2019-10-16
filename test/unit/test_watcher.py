@@ -18,6 +18,8 @@ from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, 
 
 logging.getLogger().disabled = True
 APPOINTMENTS = 5
+START_TIME_OFFSET = 1
+END_TIME_OFFSET = 1
 
 
 @pytest.fixture(scope="module")
@@ -125,7 +127,7 @@ def test_do_watch(watcher):
 
     # After leaving some time for the block to be mined and processed, the number of appointments should have reduced
     # by two
-    sleep(TIME_BETWEEN_BLOCKS*2)
+    sleep(TIME_BETWEEN_BLOCKS*(START_TIME_OFFSET+END_TIME_OFFSET + 1))
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
     # The rest of appointments will timeout after the end (2) + EXPIRY_DELTA
