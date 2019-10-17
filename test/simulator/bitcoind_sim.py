@@ -1,29 +1,36 @@
-import re
 import os
 import time
 import json
 import logging
 import binascii
-from threading import Thread
+from threading import Thread, Event
 from flask import Flask, request, Response, abort
 
 from pisa.rpc_errors import *
-from test2.simulator.utils import sha256d
-from pisa.tools import check_txid_format
-from test2.simulator.transaction import TX
-from test2.simulator.zmq_publisher import ZMQPublisher
+from test.simulator.utils import sha256d
+from test.simulator.transaction import TX
+from test.simulator.zmq_publisher import ZMQPublisher
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
 app = Flask(__name__)
 HOST = 'localhost'
 PORT = '18443'
 
-TIME_BETWEEN_BLOCKS = 5
-
-mempool = []
-mined_transactions = {}
-blocks = {}
 blockchain = []
+blocks = {}
+mined_transactions = {}
+mempool = []
+
+mine_new_block = Event()
+
+        
+@app.route('/generate', methods=['POST'])
+def generate():
+    global mine_new_block
+
+    mine_new_block.set()
+
+    return Response(status=200, mimetype='application/json')
 
 
 @app.route('/', methods=['POST'])
@@ -72,9 +79,11 @@ def process_request():
     if method == "decoderawtransaction":
         rawtx = get_param(request_data)
 
-        if isinstance(rawtx, str):
+        if isinstance(rawtx, str) and len(rawtx) % 2 is 0:
+            txid = sha256d(rawtx)
+
             if TX.deserialize(rawtx) is not None:
-                response["result"] = {"txid": rawtx}
+                response["result"] = {"txid": txid}
 
             else:
                 response["error"] = {"code": RPC_DESERIALIZATION_ERROR, "message": "TX decode failed"}
@@ -87,10 +96,13 @@ def process_request():
         # TODO: A way of rejecting transactions should be added to test edge cases.
         rawtx = get_param(request_data)
 
-        if isinstance(rawtx, str):
+        if isinstance(rawtx, str) and len(rawtx) % 2 is 0:
+            txid = sha256d(rawtx)
+
             if TX.deserialize(rawtx) is not None:
-                if rawtx not in list(mined_transactions.keys()):
+                if txid not in list(mined_transactions.keys()):
                     mempool.append(rawtx)
+                    response["result"] = {"txid": txid}
 
                 else:
                     response["error"] = {"code": RPC_VERIFY_ALREADY_IN_CHAIN,
@@ -107,10 +119,10 @@ def process_request():
         txid = get_param(request_data)
 
         if isinstance(txid, str):
-            block = blocks.get(mined_transactions.get(txid))
-
-            if block:
-                response["result"] = {"confirmations": len(blockchain) - block.get('height')}
+            if txid in mined_transactions:
+                block = blocks.get(mined_transactions[txid]["block"])
+                rawtx = mined_transactions[txid].get('tx')
+                response["result"] = {"hex": rawtx, "confirmations": len(blockchain) - block.get('height')}
 
             elif txid in mempool:
                 response["result"] = {"confirmations": 0}
@@ -122,8 +134,6 @@ def process_request():
         else:
             response["error"] = no_param_err
             response["error"]["message"] = response["error"]["message"].format("string")
-
-        print(response)
 
     elif method == "getblockcount":
         response["result"] = len(blockchain)
@@ -185,43 +195,19 @@ def load_data():
     pass
 
 
-def create_dummy_transaction(prev_tx_id=None, prev_out_index=None):
-    tx = TX()
-
-    if prev_tx_id is None:
-        prev_tx_id = os.urandom(32).hex()
-
-    if prev_out_index is None:
-        prev_out_index = 0
-
-    tx.version = 1
-    tx.inputs = 1
-    tx.outputs = 1
-    tx.prev_tx_id = [prev_tx_id]
-    tx.prev_out_index = [prev_out_index]
-    tx.nLockTime = 0
-    tx.scriptSig = ['47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860'
-                    'a4acdd12909d831cc56cbbac4622082221a8768d1d0901']
-    tx.scriptSig_len = [77]
-    tx.nSequence = [4294967295]
-    tx.value = [5000000000]
-    tx.scriptPubKey = ['4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c'
-                       '1b7303b8a0626f1baded5c72a704f7e6cd84cac']
-    tx.scriptPubKey_len = [67]
-
-    return tx.serialize()
-
-
-def simulate_mining():
-    global mempool, mined_transactions, blocks, blockchain
+def simulate_mining(mode, time_between_blocks):
+    global mempool, mined_transactions, blocks, blockchain, mine_new_block
     prev_block_hash = None
 
     mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
                                     feed_port=FEED_PORT)
 
-    while True:
+    # Set the mining event to initialize the blockchain with a block
+    mine_new_block.set()
+
+    while mine_new_block.wait():
         block_hash = os.urandom(32).hex()
-        coinbase_tx = create_dummy_transaction()
+        coinbase_tx = TX.create_dummy_transaction()
         coinbase_tx_hash = sha256d(coinbase_tx)
 
         txs_to_mine = dict({coinbase_tx_hash: coinbase_tx})
@@ -248,11 +234,18 @@ def simulate_mining():
         print("New block mined: {}".format(block_hash))
         print("\tTransactions: {}".format(list(txs_to_mine.keys())))
 
-        time.sleep(TIME_BETWEEN_BLOCKS)
+        if mode == 'time':
+            time.sleep(time_between_blocks)
 
+        else:
+            mine_new_block.clear()
+            
 
-def run_simulator():
-    mining_thread = Thread(target=simulate_mining)
+def run_simulator(mode='time', time_between_blocks=5):
+    if mode not in ["time", 'event']:
+        raise ValueError("Node must be time or event")
+
+    mining_thread = Thread(target=simulate_mining, args=[mode, time_between_blocks])
     mining_thread.start()
 
     # Setting Flask log to ERROR only so it does not mess with out logging
