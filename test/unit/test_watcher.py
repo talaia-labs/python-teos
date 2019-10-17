@@ -75,7 +75,7 @@ def test_add_appointment(run_bitcoind, watcher):
 
     # We should be able to add appointments up to the limit
     for _ in range(10):
-        added_appointment = watcher.add_appointment(create_appointment())
+        added_appointment, sig = watcher.add_appointment(create_appointment())
 
         assert added_appointment is True
 
@@ -85,11 +85,11 @@ def test_add_too_many_appointments(watcher):
     watcher.appointments = dict()
 
     for _ in range(MAX_APPOINTMENTS):
-        added_appointment = watcher.add_appointment(create_appointment())
+        added_appointment, sig = watcher.add_appointment(create_appointment())
 
         assert added_appointment is True
 
-    added_appointment = watcher.add_appointment(create_appointment())
+    added_appointment, sig = watcher.add_appointment(create_appointment())
 
     assert added_appointment is False
 

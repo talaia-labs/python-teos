@@ -1,5 +1,4 @@
 zmq
 flask
 cryptography
-ecdsa
 requests

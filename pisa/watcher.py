@@ -1,7 +1,11 @@
 from uuid import uuid4
 from queue import Queue
 from threading import Thread
-from ecdsa import SigningKey
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
@@ -26,7 +30,9 @@ class Watcher:
         if SIGNING_KEY_FILE is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
         else:
-            self.signing_key = SigningKey.from_pem(open(SIGNING_KEY_FILE).read())
+            with open(SIGNING_KEY_FILE, "r") as key_file:
+                pubkey_pem = key_file.read().encode("utf-8")
+                self.signing_key = load_pem_private_key(pubkey_pem, password=None, backend=default_backend())
 
     def add_appointment(self, appointment):
         # Rationale:
@@ -67,9 +73,10 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
-            if self.signing_key is not None:
-                signature = self.signing_key.sign(appointment.to_json().encode('utf8'))
-
+            signature = self.signing_key.sign(
+                appointment.to_json().encode("utf-8"),
+                ec.ECDSA(hashes.SHA256())
+            )
         else:
             appointment_added = False
 
