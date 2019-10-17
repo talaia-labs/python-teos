@@ -102,7 +102,7 @@ def get_all_appointments():
 
         if watcher.responder:
             for uuid, job in watcher.responder.jobs.items():
-                responder_jobs[uuid] = job.to_json()
+                responder_jobs[uuid] = job.to_dict()
 
         response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
 
