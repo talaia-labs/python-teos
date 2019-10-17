@@ -1,4 +1,4 @@
-from pisa import logging, bitcoin_cli
+from pisa import logging
 from pisa.tools import check_txid_format
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 

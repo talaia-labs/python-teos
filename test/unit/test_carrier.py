@@ -1,11 +1,13 @@
 import pytest
 import logging
 from os import urandom
-from time import sleep
+
 
 from pisa.carrier import Carrier
+from test.simulator.utils import sha256d
+from test.simulator.transaction import TX
+from test.unit.conftest import generate_block
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
-from test2.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 
 logging.getLogger().disabled = True
 
@@ -24,23 +26,28 @@ def carrier():
 
 def test_send_transaction(run_bitcoind, carrier):
     # We are mocking bitcoind and in our simulator txid == tx
-    tx = urandom(32).hex()
-    receipt = carrier.send_transaction(tx, tx)
+    tx = TX.create_dummy_transaction()
+    txid = sha256d(tx)
+
+    receipt = carrier.send_transaction(tx, txid)
 
     assert(receipt.delivered is True)
 
 
 def test_send_double_spending_transaction(carrier):
     # We can test what happens if the same transaction is sent twice
-    tx = urandom(32).hex()
-    receipt = carrier.send_transaction(tx, tx)
-    sent_txs.append(tx)
+    tx = TX.create_dummy_transaction()
+    txid = sha256d(tx)
+
+    receipt = carrier.send_transaction(tx, txid)
+    sent_txs.append(txid)
 
     # Wait for a block to be mined
-    sleep(2*TIME_BETWEEN_BLOCKS)
+    for _ in range(2):
+        generate_block()
 
     # Try to send it again
-    receipt2 = carrier.send_transaction(tx, tx)
+    receipt2 = carrier.send_transaction(tx, txid)
 
     # The carrier should report delivered True for both, but in the second case the transaction was already delivered
     # (either by himself or someone else)
@@ -51,8 +58,9 @@ def test_send_double_spending_transaction(carrier):
 
 def test_send_transaction_invalid_format(carrier):
     # Test sending a transaction that does not fits the format
-    tx = urandom(31).hex()
-    receipt = carrier.send_transaction(tx, tx)
+    tx = TX.create_dummy_transaction()
+    txid = sha256d(tx)
+    receipt = carrier.send_transaction(txid, txid)
 
     assert (receipt.delivered is False and receipt.reason == RPC_DESERIALIZATION_ERROR)
 
