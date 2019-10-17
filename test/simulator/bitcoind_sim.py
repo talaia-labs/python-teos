@@ -1,21 +1,24 @@
-from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
-from flask import Flask, request, Response, abort
-from test.simulator.zmq_publisher import ZMQPublisher
-from threading import Thread
-from pisa.rpc_errors import *
-from pisa.tools import check_txid_format
-import logging
-import binascii
-import json
+import re
 import os
 import time
+import json
+import logging
+import binascii
+from threading import Thread
+from flask import Flask, request, Response, abort
 
+from pisa.rpc_errors import *
+from test2.simulator.utils import sha256d
+from pisa.tools import check_txid_format
+from test2.simulator.transaction import TX
+from test2.simulator.zmq_publisher import ZMQPublisher
+from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
 app = Flask(__name__)
 HOST = 'localhost'
 PORT = '18443'
 
-TIME_BETWEEN_BLOCKS = 10
+TIME_BETWEEN_BLOCKS = 5
 
 mempool = []
 mined_transactions = {}
@@ -67,11 +70,11 @@ def process_request():
     no_param_err = {"code": RPC_MISC_ERROR, "message": "JSON value is not a {} as expected"}
 
     if method == "decoderawtransaction":
-        txid = get_param(request_data)
+        rawtx = get_param(request_data)
 
-        if isinstance(txid, str):
-            if check_txid_format(txid):
-                response["result"] = {"txid": txid}
+        if isinstance(rawtx, str):
+            if TX.deserialize(rawtx) is not None:
+                response["result"] = {"txid": rawtx}
 
             else:
                 response["error"] = {"code": RPC_DESERIALIZATION_ERROR, "message": "TX decode failed"}
@@ -82,12 +85,12 @@ def process_request():
 
     elif method == "sendrawtransaction":
         # TODO: A way of rejecting transactions should be added to test edge cases.
-        txid = get_param(request_data)
+        rawtx = get_param(request_data)
 
-        if isinstance(txid, str):
-            if check_txid_format(txid):
-                if txid not in list(mined_transactions.keys()):
-                    mempool.append(txid)
+        if isinstance(rawtx, str):
+            if TX.deserialize(rawtx) is not None:
+                if rawtx not in list(mined_transactions.keys()):
+                    mempool.append(rawtx)
 
                 else:
                     response["error"] = {"code": RPC_VERIFY_ALREADY_IN_CHAIN,
@@ -119,6 +122,8 @@ def process_request():
         else:
             response["error"] = no_param_err
             response["error"]["message"] = response["error"]["message"].format("string")
+
+        print(response)
 
     elif method == "getblockcount":
         response["result"] = len(blockchain)
@@ -169,6 +174,7 @@ def get_param(request_data):
     param = None
 
     params = request_data.get("params")
+
     if isinstance(params, list) and len(params) > 0:
         param = params[0]
 
@@ -177,6 +183,33 @@ def get_param(request_data):
 
 def load_data():
     pass
+
+
+def create_dummy_transaction(prev_tx_id=None, prev_out_index=None):
+    tx = TX()
+
+    if prev_tx_id is None:
+        prev_tx_id = os.urandom(32).hex()
+
+    if prev_out_index is None:
+        prev_out_index = 0
+
+    tx.version = 1
+    tx.inputs = 1
+    tx.outputs = 1
+    tx.prev_tx_id = [prev_tx_id]
+    tx.prev_out_index = [prev_out_index]
+    tx.nLockTime = 0
+    tx.scriptSig = ['47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860'
+                    'a4acdd12909d831cc56cbbac4622082221a8768d1d0901']
+    tx.scriptSig_len = [77]
+    tx.nSequence = [4294967295]
+    tx.value = [5000000000]
+    tx.scriptPubKey = ['4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c'
+                       '1b7303b8a0626f1baded5c72a704f7e6cd84cac']
+    tx.scriptPubKey_len = [67]
+
+    return tx.serialize()
 
 
 def simulate_mining():
@@ -188,25 +221,32 @@ def simulate_mining():
 
     while True:
         block_hash = os.urandom(32).hex()
-        coinbase_tx_hash = os.urandom(32).hex()
-        txs_to_mine = [coinbase_tx_hash]
+        coinbase_tx = create_dummy_transaction()
+        coinbase_tx_hash = sha256d(coinbase_tx)
+
+        txs_to_mine = dict({coinbase_tx_hash: coinbase_tx})
 
         if len(mempool) != 0:
             # We'll mine up to 100 txs per block
-            txs_to_mine += mempool[:99]
+            for rawtx in mempool[:99]:
+                txid = sha256d(rawtx)
+                txs_to_mine[txid] = rawtx
+
             mempool = mempool[99:]
 
         # Keep track of the mined transaction (to respond to getrawtransaction)
-        for tx in txs_to_mine:
-            mined_transactions[tx] = block_hash
+        for txid, tx in txs_to_mine.items():
+            mined_transactions[txid] = {"tx": tx, "block": block_hash}
 
-        blocks[block_hash] = {"tx": txs_to_mine, "height": len(blockchain), "previousblockhash": prev_block_hash}
+        blocks[block_hash] = {"tx": list(txs_to_mine.keys()), "height": len(blockchain),
+                              "previousblockhash": prev_block_hash}
+
         mining_simulator.publish_data(binascii.unhexlify(block_hash))
         blockchain.append(block_hash)
         prev_block_hash = block_hash
 
         print("New block mined: {}".format(block_hash))
-        print("\tTransactions: {}".format(txs_to_mine))
+        print("\tTransactions: {}".format(list(txs_to_mine.keys())))
 
         time.sleep(TIME_BETWEEN_BLOCKS)
 

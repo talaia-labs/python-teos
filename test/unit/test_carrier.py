@@ -5,7 +5,7 @@ from time import sleep
 
 from pisa.carrier import Carrier
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
-from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
+from test2.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 
 logging.getLogger().disabled = True
 

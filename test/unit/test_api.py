@@ -9,7 +9,7 @@ from binascii import unhexlify
 from apps.cli.blob import Blob
 from pisa import HOST, PORT, logging
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
+from test2.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS, create_dummy_transaction
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 logging.getLogger().disabled = True
@@ -25,7 +25,7 @@ def generate_dummy_appointment(dispute_txid):
 
     current_height = r.json().get("block_count")
 
-    dummy_appointment_data = {"tx": os.urandom(32).hex(), "tx_id": dispute_txid, "start_time": current_height + 5,
+    dummy_appointment_data = {"tx": create_dummy_transaction(), "tx_id": dispute_txid, "start_time": current_height + 5,
                               "end_time": current_height + 30, "dispute_delta": 20}
 
     cipher = "AES-GCM-128"

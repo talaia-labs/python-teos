@@ -2,7 +2,6 @@ import re
 
 from pisa import errors
 import pisa.conf as conf
-from pisa import bitcoin_cli
 from pisa.logger import Logger
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor

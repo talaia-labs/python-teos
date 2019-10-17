@@ -13,7 +13,7 @@ from pisa.conf import MAX_APPOINTMENTS
 from pisa.appointment import Appointment
 from pisa.tools import check_txid_format
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
+from test2.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 logging.getLogger().disabled = True

@@ -3,7 +3,7 @@ from time import sleep
 from threading import Thread
 
 from pisa.api import start_api
-from test.simulator.bitcoind_sim import run_simulator
+from test2.simulator.bitcoind_sim import run_simulator
 
 
 @pytest.fixture(scope='session')
