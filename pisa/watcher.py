@@ -22,11 +22,11 @@ class Watcher:
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
         self.responder = Responder()
-        if SIGNING_KEY_FILE is not None:
-            self.signing_key = SigningKey.from_pem(open(SIGNING_KEY_FILE).read())
+
+        if SIGNING_KEY_FILE is None:
+            raise ValueError("No signing key provided. Please fix your pisa.conf")
         else:
-            self.signing_key = None
-            logger.warning("No signing key provided. Appointments will not be signed.")
+            self.signing_key = SigningKey.from_pem(open(SIGNING_KEY_FILE).read())
 
     def add_appointment(self, appointment):
         # Rationale:
