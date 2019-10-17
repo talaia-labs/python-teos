@@ -42,3 +42,4 @@ if __name__ == '__main__':
             logger.error("Can't connect to bitcoind. Shutting down")
     except Exception e:
         logger.error("There was an error while starting the daemon. Shutting down", error_args=e.args)
+        exit(1)
