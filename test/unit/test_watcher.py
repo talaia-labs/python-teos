@@ -6,6 +6,12 @@ from threading import Thread
 from binascii import unhexlify
 from queue import Queue, Empty
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
 from apps.cli.blob import Blob
 from pisa.watcher import Watcher
 from pisa.responder import Responder
@@ -16,13 +22,19 @@ from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from test.unit.conftest import generate_block
 from pisa.utils.auth_proxy import AuthServiceProxy
-from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
+from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, SIGNING_KEY_FILE
 
 logging.getLogger().disabled = True
 
 APPOINTMENTS = 5
 START_TIME_OFFSET = 1
 END_TIME_OFFSET = 1
+
+with open(SIGNING_KEY_FILE, "r") as key_file:
+    pubkey_pem = key_file.read().encode("utf-8")
+    # TODO: should use the public key file instead, but it is not currently exported in the configuration
+    signing_key = load_pem_private_key(pubkey_pem, password=None, backend=default_backend())
+    public_key = signing_key.public_key()
 
 
 @pytest.fixture(scope="module")
@@ -91,6 +103,13 @@ def test_add_appointment(run_bitcoind, watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
+
+        # verify the signature
+        try:
+            data = appointment.to_json().encode("utf-8")
+            public_key.verify(sig, data, ec.ECDSA(hashes.SHA256()))
+        except InvalidSignature:
+            assert False, "The appointment's signature is not correct"
 
 
 def test_add_too_many_appointments(watcher):

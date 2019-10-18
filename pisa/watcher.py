@@ -73,6 +73,7 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
+            print(appointment.to_json().encode("utf-8"))
             signature = self.signing_key.sign(
                 appointment.to_json().encode("utf-8"),
                 ec.ECDSA(hashes.SHA256())
