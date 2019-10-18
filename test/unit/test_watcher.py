@@ -106,7 +106,7 @@ def test_add_appointment(run_bitcoind, watcher):
 
         # verify the signature
         try:
-            data = appointment.to_json().encode("utf-8")
+            data = appointment.to_json().encode('utf-8')
             public_key.verify(sig, data, ec.ECDSA(hashes.SHA256()))
         except InvalidSignature:
             assert False, "The appointment's signature is not correct"

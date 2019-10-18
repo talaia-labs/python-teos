@@ -95,8 +95,8 @@ def add_appointment(args):
                             logger.error("The response does not contain the signature of the appointment.")
                         else:
                             # verify that the returned signature is valid
-                            signature = response_json['signature']
-                            pisa_public_key.verify(signature.encode("utf-8"), data, ec.ECDSA(hashes.SHA256()))
+                            sig_bytes = unhexlify(response_json['signature'].encode('utf-8'))
+                            pisa_public_key.verify(sig_bytes, appointment_data, ec.ECDSA(hashes.SHA256()))
                     else:
                         if 'error' not in response_json:
                             logger.error("The server returned status code {}, but no error description."
