@@ -104,7 +104,7 @@ def test_add_too_many_appointments(watcher):
         assert added_appointment is True
 
     appointment, dispute_tx = generate_dummy_appointment()
-    added_appointment = watcher.add_appointment(appointment)
+    added_appointment, sig = watcher.add_appointment(appointment)
 
     assert added_appointment is False
 
