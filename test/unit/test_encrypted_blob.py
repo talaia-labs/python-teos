@@ -1,5 +1,4 @@
 from os import urandom
-from cryptography.exceptions import InvalidTag
 
 from pisa import logging
 from pisa.encrypted_blob import EncryptedBlob

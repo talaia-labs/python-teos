@@ -1,23 +1,28 @@
 import pytest
 import logging
-from os import urandom
-from time import sleep
 from uuid import uuid4
 from hashlib import sha256
 from threading import Thread
+from binascii import unhexlify
 from queue import Queue, Empty
 
+from apps.cli.blob import Blob
 from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.conf import MAX_APPOINTMENTS
 from pisa.appointment import Appointment
 from pisa.tools import check_txid_format
+from test.simulator.utils import sha256d
+from test.simulator.transaction import TX
+from test.unit.conftest import generate_block
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 logging.getLogger().disabled = True
+
 APPOINTMENTS = 5
+START_TIME_OFFSET = 1
+END_TIME_OFFSET = 1
 
 
 @pytest.fixture(scope="module")
@@ -25,37 +30,44 @@ def watcher():
     return Watcher()
 
 
-def create_appointment(locator=None):
+def generate_dummy_appointment():
     bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
-    if locator is None:
-        locator = urandom(32).hex()
+    dispute_tx = TX.create_dummy_transaction()
+    dispute_txid = sha256d(dispute_tx)
+    justice_tx = TX.create_dummy_transaction(dispute_txid)
 
     start_time = bitcoin_cli.getblockcount() + 1
     end_time = start_time + 1
     dispute_delta = 20
-    encrypted_blob_data = urandom(100).hex()
+
     cipher = "AES-GCM-128"
     hash_function = "SHA256"
 
-    return Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
+    locator = sha256(unhexlify(dispute_txid)).hexdigest()
+    blob = Blob(justice_tx, cipher, hash_function)
+
+    encrypted_blob = blob.encrypt(dispute_txid)
+
+    appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function)
+
+    return appointment, dispute_tx
 
 
 def create_appointments(n):
     locator_uuid_map = dict()
     appointments = dict()
-    txids = []
+    dispute_txs = []
 
     for i in range(n):
-        txid = urandom(32)
+        appointment, dispute_tx = generate_dummy_appointment()
         uuid = uuid4().hex
-        locator = sha256(txid).hexdigest()
 
-        appointments[uuid] = create_appointment(locator)
-        locator_uuid_map[locator] = [uuid]
-        txids.append(txid.hex())
+        appointments[uuid] = appointment
+        locator_uuid_map[appointment.locator] = [uuid]
+        dispute_txs.append(dispute_tx)
 
-    return appointments, locator_uuid_map, txids
+    return appointments, locator_uuid_map, dispute_txs
 
 
 def test_init(watcher):
@@ -69,13 +81,14 @@ def test_init(watcher):
 
 
 def test_add_appointment(run_bitcoind, watcher):
-    # The watcher automatically fire do_watch and do_subscribe on adding an appointment if it is asleep (initial state).
+    # The watcher automatically fires do_watch and do_subscribe on adding an appointment if it is asleep (initial state)
     # Avoid this by setting the state to awake.
     watcher.asleep = False
 
     # We should be able to add appointments up to the limit
     for _ in range(10):
-        added_appointment, sig = watcher.add_appointment(create_appointment())
+        appointment, dispute_tx = generate_dummy_appointment()
+        added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
 
@@ -85,11 +98,13 @@ def test_add_too_many_appointments(watcher):
     watcher.appointments = dict()
 
     for _ in range(MAX_APPOINTMENTS):
-        added_appointment, sig = watcher.add_appointment(create_appointment())
+        appointment, dispute_tx = generate_dummy_appointment()
+        added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
 
-    added_appointment, sig = watcher.add_appointment(create_appointment())
+    appointment, dispute_tx = generate_dummy_appointment()
+    added_appointment = watcher.add_appointment(appointment)
 
     assert added_appointment is False
 
@@ -102,7 +117,8 @@ def test_do_subscribe(watcher):
     zmq_thread.start()
 
     try:
-        block_hash = watcher.block_queue.get(timeout=MAX_APPOINTMENTS)
+        generate_block()
+        block_hash = watcher.block_queue.get()
         assert check_txid_format(block_hash)
 
     except Empty:
@@ -113,25 +129,28 @@ def test_do_watch(watcher):
     bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
     # We will wipe all the previous data and add 5 appointments
-    watcher.appointments, watcher.locator_uuid_map, txids = create_appointments(APPOINTMENTS)
+    watcher.appointments, watcher.locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
 
     watch_thread = Thread(target=watcher.do_watch)
     watch_thread.daemon = True
     watch_thread.start()
 
     # Broadcast the first two
-    for txid in txids[:2]:
-        bitcoin_cli.sendrawtransaction(txid)
+    for dispute_tx in dispute_txs[:2]:
+        r = bitcoin_cli.sendrawtransaction(dispute_tx)
 
     # After leaving some time for the block to be mined and processed, the number of appointments should have reduced
     # by two
-    sleep(TIME_BETWEEN_BLOCKS*2)
+    for _ in range(START_TIME_OFFSET + END_TIME_OFFSET):
+        generate_block()
+
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
     # The rest of appointments will timeout after the end (2) + EXPIRY_DELTA
     # Wait for an additional block to be safe
 
-    sleep((EXPIRY_DELTA + 2 + 1) * TIME_BETWEEN_BLOCKS)
+    for _ in range(EXPIRY_DELTA + START_TIME_OFFSET + END_TIME_OFFSET):
+        generate_block()
 
     assert len(watcher.appointments) == 0
     assert watcher.asleep is True

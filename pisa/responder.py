@@ -1,6 +1,7 @@
+import json
 from queue import Queue
-from threading import Thread
 from hashlib import sha256
+from threading import Thread
 from binascii import unhexlify
 
 from pisa.logger import Logger
@@ -34,6 +35,9 @@ class Job:
 
         return job
 
+    def to_json(self):
+        return json.dumps(self.to_dict())
+
 
 class Responder:
     def __init__(self):
@@ -61,6 +65,8 @@ class Responder:
         else:
             # TODO: Add the missing reasons (e.g. RPC_VERIFY_REJECTED)
             pass
+
+        return receipt
 
     def create_job(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations=0,
                    retry=False):
@@ -155,7 +161,7 @@ class Responder:
 
         for uuid, job in self.jobs.items():
             if job.appointment_end <= height:
-                tx = Carrier.get_transaction(job.dispute_txid)
+                tx = Carrier.get_transaction(job.justice_txid)
 
                 # FIXME: Should be improved with the librarian
                 confirmations = tx.get('confirmations')

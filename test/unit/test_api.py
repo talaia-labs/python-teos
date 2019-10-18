@@ -1,37 +1,42 @@
-import os
 import json
 import pytest
-import time
 import requests
 from hashlib import sha256
 from binascii import unhexlify
 
 from apps.cli.blob import Blob
 from pisa import HOST, PORT, logging
+from test.simulator.utils import sha256d
+from test.simulator.transaction import TX
+from test.unit.conftest import generate_block
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.simulator.bitcoind_sim import TIME_BETWEEN_BLOCKS
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 logging.getLogger().disabled = True
+
 PISA_API = "http://{}:{}".format(HOST, PORT)
 MULTIPLE_APPOINTMENTS = 10
 
 appointments = []
-locator_dispute_txid_map = {}
+locator_dispute_tx_map = {}
 
 
-def generate_dummy_appointment(dispute_txid):
+def generate_dummy_appointment():
     r = requests.get(url=PISA_API + '/get_block_count', timeout=5)
 
     current_height = r.json().get("block_count")
 
-    dummy_appointment_data = {"tx": os.urandom(32).hex(), "tx_id": dispute_txid, "start_time": current_height + 5,
+    dispute_tx = TX.create_dummy_transaction()
+    dispute_txid = sha256d(dispute_tx)
+    justice_tx = TX.create_dummy_transaction(dispute_txid)
+
+    dummy_appointment_data = {"tx": justice_tx, "tx_id": dispute_txid, "start_time": current_height + 5,
                               "end_time": current_height + 30, "dispute_delta": 20}
 
     cipher = "AES-GCM-128"
     hash_function = "SHA256"
 
-    locator = sha256(unhexlify(dummy_appointment_data.get("tx_id"))).hexdigest()
+    locator = sha256(unhexlify(dispute_txid)).hexdigest()
     blob = Blob(dummy_appointment_data.get("tx"), cipher, hash_function)
 
     encrypted_blob = blob.encrypt((dummy_appointment_data.get("tx_id")))
@@ -41,22 +46,13 @@ def generate_dummy_appointment(dispute_txid):
                    "dispute_delta": dummy_appointment_data.get("dispute_delta"),
                    "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function": hash_function}
 
-    return appointment
+    return appointment, dispute_tx
 
 
 @pytest.fixture
-def new_appointment(dispute_txid=None):
-    appointment = create_appointment(dispute_txid)
-
-    return appointment
-
-
-def create_appointment(dispute_txid=None):
-    if dispute_txid is None:
-        dispute_txid = os.urandom(32).hex()
-
-    appointment = generate_dummy_appointment(dispute_txid)
-    locator_dispute_txid_map[appointment["locator"]] = dispute_txid
+def new_appointment():
+    appointment, dispute_tx = generate_dummy_appointment()
+    locator_dispute_tx_map[appointment["locator"]] = dispute_tx
 
     return appointment
 
@@ -147,12 +143,12 @@ def test_get_all_appointments_responder():
     bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
     locators = [appointment["locator"] for appointment in appointments]
-    for locator, dispute_txid in locator_dispute_txid_map.items():
+    for locator, dispute_tx in locator_dispute_tx_map.items():
         if locator in locators:
-            bitcoin_cli.sendrawtransaction(dispute_txid)
+            bitcoin_cli.sendrawtransaction(dispute_tx)
 
     # Wait a bit for them to get confirmed
-    time.sleep(TIME_BETWEEN_BLOCKS)
+    generate_block()
 
     # Get all appointments
     r = requests.get(url=PISA_API + "/get_all_appointments")

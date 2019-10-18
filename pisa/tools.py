@@ -1,10 +1,15 @@
 import re
 from http.client import HTTPException
 
-from pisa import bitcoin_cli
+import pisa.conf as conf
 from pisa.logger import Logger
-from pisa.utils.auth_proxy import JSONRPCException
 from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
+from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
+
+
+def bitcoin_cli():
+    return AuthServiceProxy("http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST,
+                                                    conf.BTC_RPC_PORT))
 
 
 # TODO: currently only used in the Responder; might move there or in the BlockProcessor
@@ -13,7 +18,7 @@ def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
     confirmations = 0
 
     try:
-        tx_info = bitcoin_cli.getrawtransaction(tx_id, 1)
+        tx_info = bitcoin_cli().getrawtransaction(tx_id, 1)
 
         if tx_info.get("confirmations"):
             confirmations = int(tx_info.get("confirmations"))
@@ -38,7 +43,7 @@ def can_connect_to_bitcoind():
     can_connect = True
 
     try:
-        bitcoin_cli.help()
+        bitcoin_cli().help()
     except (ConnectionRefusedError, JSONRPCException, HTTPException):
         can_connect = False
 
@@ -50,7 +55,7 @@ def in_correct_network(network):
     testnet3_genesis_block_hash = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
     correct_network = False
 
-    genesis_block_hash = bitcoin_cli.getblockhash(0)
+    genesis_block_hash = bitcoin_cli().getblockhash(0)
 
     if network == 'mainnet' and genesis_block_hash == mainnet_genesis_block_hash:
         correct_network = True
@@ -65,3 +70,4 @@ def in_correct_network(network):
 def check_txid_format(txid):
     # TODO: #12-check-txid-regexp
     return isinstance(txid, str) and re.search(r'^[0-9A-Fa-f]{64}$', txid) is not None
+
