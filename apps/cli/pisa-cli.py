@@ -16,6 +16,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
 
 from pisa.logger import Logger
+from pisa.appointment import Appointment
+
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
 from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PUBLIC_KEY_FILE
@@ -84,7 +86,9 @@ def add_appointment(args):
                 logger.info("Sending appointment to PISA")
 
                 try:
-                    r = requests.post(url=add_appointment_endpoint, json=json.dumps(appointment), timeout=5)
+                    r = requests.post(url=add_appointment_endpoint, json=appointment.to_json(), timeout=5)
+
+                    print(r.text)
 
                     logger.info("{} (code: {}).".format(r.json(), r.status_code))
 
@@ -96,7 +100,8 @@ def add_appointment(args):
                         else:
                             # verify that the returned signature is valid
                             sig_bytes = unhexlify(response_json['signature'].encode('utf-8'))
-                            pisa_public_key.verify(sig_bytes, appointment_data, ec.ECDSA(hashes.SHA256()))
+                            data = appointment.to_json().encode("utf-8")
+                            pisa_public_key.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
                     else:
                         if 'error' not in response_json:
                             logger.error("The server returned status code {}, but no error description."
@@ -164,11 +169,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
     blob = Blob(tx, cipher, hash_function)
     encrypted_blob = blob.encrypt(tx_id)
 
-    appointment = {"locator": locator, "start_time": start_block, "end_time": end_block,
-                   "dispute_delta": dispute_delta, "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function":
-                       hash_function}
-
-    return appointment
+    return Appointment(locator, start_block, end_block, dispute_delta, encrypted_blob, cipher, hash_function)
 
 
 def check_txid_format(txid):
@@ -258,4 +259,3 @@ if __name__ == '__main__':
 
     except json.JSONDecodeError as e:
         logger.error("Non-JSON encoded appointment passed as parameter.")
-
