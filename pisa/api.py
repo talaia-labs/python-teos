@@ -1,5 +1,6 @@
 import json
 from flask import Flask, request, Response, abort, jsonify
+from binascii import hexlify
 
 from pisa import HOST, PORT, logging
 from pisa.logger import Logger
@@ -29,30 +30,39 @@ def add_appointment():
     request_data = json.loads(request.get_json())
     appointment = inspector.inspect(request_data)
 
+    error = None
+    response = None
+
     if type(appointment) == Appointment:
         appointment_added, signature = watcher.add_appointment(appointment)
 
         # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
             rcode = HTTP_OK
-            response = "appointment accepted. locator: {}. signature: {}".format(appointment.locator, signature)
+            response = {
+                "locator": appointment.locator,
+                "signature": hexlify(signature).decode('utf-8')
+            }
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
-            response = "appointment rejected"
+            error = "appointment rejected"
 
     elif type(appointment) == tuple:
         rcode = HTTP_BAD_REQUEST
-        response = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
+        error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
 
     else:
         # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
         rcode = HTTP_BAD_REQUEST
-        response = "appointment rejected. Request does not match the standard"
+        error = "appointment rejected. Request does not match the standard"
 
     logger.info('Sending response and disconnecting',
-                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response)
+                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response, error=error)
 
-    return Response(response, status=rcode, mimetype='text/plain')
+    if error is None:
+        return jsonify(response), rcode
+    else:
+        return jsonify({"error": error}), rcode
 
 
 # FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
