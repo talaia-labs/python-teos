@@ -88,20 +88,20 @@ class Responder:
             if confirmations == 0:
                 self.unconfirmed_txs.append(justice_txid)
 
-        logger.info("New job added.",
-                    dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end)
+        logger.info("New job added.", dispute_txid=dispute_txid, justice_txid=justice_txid,
+                    appointment_end=appointment_end)
 
         if self.asleep:
             self.asleep = False
             self.block_queue = Queue()
-            zmq_thread = Thread(target=self.do_subscribe, args=[self.block_queue])
+            zmq_thread = Thread(target=self.do_subscribe)
             responder = Thread(target=self.do_watch)
             zmq_thread.start()
             responder.start()
 
-    def do_subscribe(self, block_queue):
+    def do_subscribe(self):
         self.zmq_subscriber = ZMQHandler(parent='Responder')
-        self.zmq_subscriber.handle(block_queue)
+        self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
         # ToDo: #9-add-data-persistence
