@@ -25,4 +25,4 @@ class Appointment:
         # ToDO: #3-improve-appointment-structure
 
     def to_json(self):
-        return json.dumps(self.to_dict())
+        return json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':'))
