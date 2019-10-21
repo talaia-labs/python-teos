@@ -17,6 +17,7 @@ class Receipt:
 
 
 class Carrier:
+    # NOTCOVERED
     def send_transaction(self, rawtx, txid):
         try:
             logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
@@ -49,6 +50,8 @@ class Carrier:
                     receipt = Receipt(delivered=True, confirmations=confirmations, reason=RPC_VERIFY_ALREADY_IN_CHAIN)
 
                 else:
+                    # WIP: It would be better to return and let the caller call again if necessary
+
                     # There's a really unlikely edge case where a transaction can be reorged between receiving the
                     # notification and querying the data. In such a case we just resend
                     self.send_transaction(rawtx, txid)

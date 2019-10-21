@@ -7,12 +7,14 @@ from pisa.rpc_errors import RPC_INVALID_ADDRESS_OR_KEY
 from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 
 
+# NOTCOVERED
 def bitcoin_cli():
     return AuthServiceProxy("http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST,
                                                     conf.BTC_RPC_PORT))
 
 
 # TODO: currently only used in the Responder; might move there or in the BlockProcessor
+# NOTCOVERED
 def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
     tx_in_chain = False
     confirmations = 0
@@ -39,6 +41,7 @@ def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
     return tx_in_chain, confirmations
 
 
+# NOTCOVERED
 def can_connect_to_bitcoind():
     can_connect = True
 
