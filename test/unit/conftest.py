@@ -32,3 +32,8 @@ def generate_block():
     sleep(0.5)
 
 
+def generate_blocks(n):
+    for _ in range(n):
+        generate_block()
+
+

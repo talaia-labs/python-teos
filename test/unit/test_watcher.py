@@ -14,8 +14,8 @@ from pisa.appointment import Appointment
 from pisa.tools import check_txid_format
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
-from test.unit.conftest import generate_block
 from pisa.utils.auth_proxy import AuthServiceProxy
+from test.unit.conftest import generate_block, generate_blocks
 from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 logging.getLogger().disabled = True
@@ -137,20 +137,17 @@ def test_do_watch(watcher):
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
-        r = bitcoin_cli.sendrawtransaction(dispute_tx)
+        bitcoin_cli.sendrawtransaction(dispute_tx)
 
     # After leaving some time for the block to be mined and processed, the number of appointments should have reduced
     # by two
-    for _ in range(START_TIME_OFFSET + END_TIME_OFFSET):
-        generate_block()
+    generate_blocks(START_TIME_OFFSET + END_TIME_OFFSET)
 
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
     # The rest of appointments will timeout after the end (2) + EXPIRY_DELTA
     # Wait for an additional block to be safe
-
-    for _ in range(EXPIRY_DELTA + START_TIME_OFFSET + END_TIME_OFFSET):
-        generate_block()
+    generate_blocks(EXPIRY_DELTA + START_TIME_OFFSET + END_TIME_OFFSET)
 
     assert len(watcher.appointments) == 0
     assert watcher.asleep is True
