@@ -1,6 +1,6 @@
 from pisa import logging
 from pisa.tools import check_txid_format
-from pisa.tools import can_connect_to_bitcoind, in_correct_network
+from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli
 
 logging.getLogger().disabled = True
 
@@ -20,6 +20,15 @@ def test_can_connect_to_bitcoind():
 #     # Kill the simulator thread and test the check fails
 #     bitcoind_process.kill()
 #     assert can_connect_to_bitcoind() is False
+
+
+def test_bitcoin_cli():
+    try:
+        bitcoin_cli().help()
+        assert True
+
+    except Exception:
+        assert False
 
 
 def test_check_txid_format():

@@ -121,6 +121,7 @@ class Responder:
                     Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map, completed_jobs, height)
                     self.rebroadcast(txs_to_rebroadcast)
 
+                # NOTCOVERED
                 else:
                     logger.warning("Reorg found", local_prev_block_hash=prev_block_hash,
                                    remote_prev_block_hash=block.get('previousblockhash'))

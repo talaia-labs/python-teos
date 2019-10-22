@@ -1,6 +1,7 @@
 [run]
 omit =
     pisa/pisad.py
+    pisa/logger.py
     pisa/sample_conf.py
     pisa/time_traveler.py
     pisa/utils/auth_proxy.py

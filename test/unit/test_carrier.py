@@ -25,7 +25,6 @@ def carrier():
 
 
 def test_send_transaction(run_bitcoind, carrier):
-    # We are mocking bitcoind and in our simulator txid == tx
     tx = TX.create_dummy_transaction()
     txid = sha256d(tx)
 
