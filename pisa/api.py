@@ -1,3 +1,4 @@
+import os
 import json
 from flask import Flask, request, Response, abort, jsonify
 from binascii import hexlify
@@ -12,6 +13,7 @@ from pisa.block_processor import BlockProcessor
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
+
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
 HTTP_SERVICE_UNAVAILABLE = 503
@@ -135,7 +137,8 @@ def start_api():
     watcher = Watcher()
     inspector = Inspector()
 
-    # Setting Flask log t ERROR only so it does not mess with out logging
+    # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    os.environ['WERKZEUG_RUN_MAIN'] = 'true'
 
     app.run(host=HOST, port=PORT)
