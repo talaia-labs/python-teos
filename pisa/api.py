@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, request, Response, abort, jsonify
+from flask import Flask, request, abort, jsonify
 from binascii import hexlify
 
 from pisa import HOST, PORT, logging
