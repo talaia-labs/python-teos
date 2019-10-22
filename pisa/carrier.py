@@ -2,7 +2,7 @@ from pisa.rpc_errors import *
 from pisa.logger import Logger
 from pisa.tools import bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
-from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION
+from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
 
 logger = Logger("Carrier")
 
@@ -50,11 +50,10 @@ class Carrier:
                     receipt = Receipt(delivered=True, confirmations=confirmations, reason=RPC_VERIFY_ALREADY_IN_CHAIN)
 
                 else:
-                    # WIP: It would be better to return and let the caller call again if necessary
-
                     # There's a really unlikely edge case where a transaction can be reorged between receiving the
-                    # notification and querying the data. In such a case we just resend
-                    self.send_transaction(rawtx, txid)
+                    # notification and querying the data. Notice that this implies the tx being also kicked off the
+                    # mempool, which again is really unlikely.
+                    receipt = Receipt(delivered=False, reason=RPC_TX_REORGED_AFTER_BROADCAST)
 
             elif errno == RPC_DESERIALIZATION_ERROR:
                 # Adding this here just for completeness. We should never end up here. The Carrier only sends txs
