@@ -102,11 +102,12 @@ def add_appointment(args):
                 appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
                                                 appointment_data.get('start_time'), appointment_data.get('end_time'),
                                                 appointment_data.get('dispute_delta'))
+                appointment_json = json.dumps(sort_keys=True, separators=(',', ':'))
 
                 logger.info("Sending appointment to PISA")
 
                 try:
-                    r = requests.post(url=add_appointment_endpoint, json=appointment.to_json(), timeout=5)
+                    r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
 
                     logger.info("{} (code: {}).".format(r.json(), r.status_code))
 
