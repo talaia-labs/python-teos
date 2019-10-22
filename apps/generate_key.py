@@ -7,10 +7,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 
 # Simple tool to generate an ECDSA private key using the secp256k1 curve and save private and public keys
-# as signing_key_priv.pem and signing_key_pub.pem
+# as 'pisa_sk.pem' 'and pisa_pk.pem', respectively.
 
-FILE_NAME_PRIV = 'signing_key_priv.pem'
-FILE_NAME_PUB = 'signing_key_pub.pem'
+FILE_NAME_PRIV = 'pisa_sk.pem'
+FILE_NAME_PUB = 'pisa_pk.pem'
 
 
 def save_sk(sk, filename):

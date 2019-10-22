@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, SIGNING_KEY_FILE
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
@@ -27,10 +27,10 @@ class Watcher:
         self.zmq_subscriber = None
         self.responder = Responder()
 
-        if SIGNING_KEY_FILE is None:
+        if PISA_SECRET_KEY is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
         else:
-            with open(SIGNING_KEY_FILE, "r") as key_file:
+            with open(PISA_SECRET_KEY, "r") as key_file:
                 privkey_pem = key_file.read().encode("utf-8")
                 self.signing_key = load_pem_private_key(privkey_pem, password=None, backend=default_backend())
 

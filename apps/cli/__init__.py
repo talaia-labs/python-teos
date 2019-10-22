@@ -11,7 +11,7 @@ CLIENT_LOG_FILE = 'pisa.log'
 SUPPORTED_HASH_FUNCTIONS = ["SHA256"]
 SUPPORTED_CIPHERS = ["AES-GCM-128"]
 
-PUBLIC_KEY_FILE = "signing_key_pub.pem"
+PISA_PUBLIC_KEY = "pisa_pk.pem"
 
 # Configure logging
 logging.basicConfig(format='%(message)s', level=logging.INFO, handlers=[

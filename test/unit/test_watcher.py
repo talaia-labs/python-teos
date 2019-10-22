@@ -22,7 +22,7 @@ from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from test.unit.conftest import generate_block
 from pisa.utils.auth_proxy import AuthServiceProxy
-from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, SIGNING_KEY_FILE
+from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, PISA_SECRET_KEY
 
 logging.getLogger().disabled = True
 
@@ -30,7 +30,7 @@ APPOINTMENTS = 5
 START_TIME_OFFSET = 1
 END_TIME_OFFSET = 1
 
-with open(SIGNING_KEY_FILE, "r") as key_file:
+with open(PISA_SECRET_KEY, "r") as key_file:
     pubkey_pem = key_file.read().encode("utf-8")
     # TODO: should use the public key file instead, but it is not currently exported in the configuration
     signing_key = load_pem_private_key(pubkey_pem, password=None, backend=default_backend())

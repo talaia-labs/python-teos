@@ -20,13 +20,13 @@ from pisa.appointment import Appointment
 
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PUBLIC_KEY_FILE
+from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY
 
 HTTP_OK = 200
 
 logger = Logger("Client")
 
-with open(PUBLIC_KEY_FILE, "r") as key_file:
+with open(PISA_PUBLIC_KEY, "r") as key_file:
     pubkey_pem = key_file.read().encode("utf-8")
     pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
 
@@ -87,8 +87,6 @@ def add_appointment(args):
 
                 try:
                     r = requests.post(url=add_appointment_endpoint, json=appointment.to_json(), timeout=5)
-
-                    print(r.text)
 
                     logger.info("{} (code: {}).".format(r.json(), r.status_code))
 
