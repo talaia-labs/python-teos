@@ -1,6 +1,6 @@
 # Porting some functionality from https://github.com/sr-gi/bitcoin_tools with some modifications <3
 from hashlib import sha256
-from binascii import unhexlify
+from binascii import unhexlify, hexlify
 
 
 def change_endianness(x):
@@ -15,9 +15,9 @@ def change_endianness(x):
     if (len(x) % 2) == 1:
         x += "0"
 
-    y = bytes(x, 'utf-8')
+    y = unhexlify(x)
     z = y[::-1]
-    return z.decode('utf-8')
+    return hexlify(z).decode('utf-8')
 
 
 def parse_varint(tx):
