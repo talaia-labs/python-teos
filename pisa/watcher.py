@@ -31,8 +31,8 @@ class Watcher:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
         else:
             with open(PISA_SECRET_KEY, "r") as key_file:
-                privkey_pem = key_file.read().encode("utf-8")
-                self.signing_key = load_pem_private_key(privkey_pem, password=None, backend=default_backend())
+                secret_key_pem = key_file.read().encode("utf-8")
+                self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
 
     def add_appointment(self, appointment):
         # Rationale:
@@ -73,7 +73,6 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
-            print(appointment.to_json().encode("utf-8"))
             signature = self.signing_key.sign(
                 appointment.to_json().encode("utf-8"),
                 ec.ECDSA(hashes.SHA256())

@@ -38,7 +38,6 @@ def add_appointment():
     if type(appointment) == Appointment:
         appointment_added, signature = watcher.add_appointment(appointment)
 
-        # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
             rcode = HTTP_OK
             response = {

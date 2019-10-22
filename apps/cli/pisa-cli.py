@@ -118,7 +118,7 @@ def add_appointment(args):
                             logger.error("The response does not contain the signature of the appointment.")
                         else:
                             # verify that the returned signature is valid
-                            if is_appointment_signature_valid(appointment, response_json['signature']) == False:
+                            if not is_appointment_signature_valid(appointment, response_json['signature']):
                                 logger.error("The returned appointment's signature is invalid.")
                     else:
                         if 'error' not in response_json:
