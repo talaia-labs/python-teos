@@ -9,8 +9,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 # Simple tool to generate an ECDSA private key using the secp256k1 curve and save private and public keys
 # as 'pisa_sk.pem' 'and pisa_pk.pem', respectively.
 
-FILE_NAME_PRIV = 'pisa_sk.pem'
-FILE_NAME_PUB = 'pisa_pk.pem'
+SK_FILE_NAME = 'pisa_sk.pem'
+PK_FILE_NAME = 'pisa_pk.pem'
 
 
 def save_sk(sk, filename):
@@ -33,8 +33,8 @@ def save_pk(pk, filename):
 
 
 if __name__ == '__main__':
-    if os.path.exists(FILE_NAME_PRIV):
-        print("A key with name \"{}\" already exists. Aborting.".format(FILE_NAME_PRIV))
+    if os.path.exists(SK_FILE_NAME):
+        print("A key with name \"{}\" already exists. Aborting.".format(SK_FILE_NAME))
         exit(1)
 
     sk = ec.generate_private_key(
@@ -42,6 +42,6 @@ if __name__ == '__main__':
     )
     pk = sk.public_key()
 
-    save_sk(sk, FILE_NAME_PRIV)
-    save_pk(pk, FILE_NAME_PUB)
-    print("Saved private key \"{}\" and public key \"{}\".".format(FILE_NAME_PRIV, FILE_NAME_PUB))
+    save_sk(sk, SK_FILE_NAME)
+    save_pk(pk, PK_FILE_NAME)
+    print("Saved private key \"{}\" and public key \"{}\".".format(SK_FILE_NAME, PK_FILE_NAME))
