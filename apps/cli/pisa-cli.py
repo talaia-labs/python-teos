@@ -126,7 +126,7 @@ def add_appointment(args):
                         else:
                             error = r.json()['error']
                             logger.error("The server returned status code {}, and the following error: {}."
-                                         .format(r.status_code))
+                                         .format(r.status_code), error)
 
                 except json.JSONDecodeError:
                     logger.error("The response was not valid JSON.")
