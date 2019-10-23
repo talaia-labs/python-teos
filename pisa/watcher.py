@@ -1,12 +1,16 @@
-from binascii import hexlify, unhexlify
+from uuid import uuid4
 from queue import Queue
 from threading import Thread
+
+from pisa.logger import Logger
+from pisa.cleaner import Cleaner
+from pisa.conf import EXPIRY_DELTA
 from pisa.responder import Responder
-from pisa.zmq_subscriber import ZMQHandler
-from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
-from hashlib import sha256
-from uuid import uuid4
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS, EXPIRY_DELTA
+from pisa.conf import MAX_APPOINTMENTS
+from pisa.block_processor import BlockProcessor
+from pisa.utils.zmq_subscriber import ZMQHandler
+
+logger = Logger("Watcher")
 
 
 class Watcher:
@@ -19,7 +23,7 @@ class Watcher:
         self.zmq_subscriber = None
         self.responder = Responder()
 
-    def add_appointment(self, appointment, debug, logging):
+    def add_appointment(self, appointment):
         # Rationale:
         # The Watcher will analyze every received block looking for appointment matches. If there is no work
         # to do the watcher can go sleep (if appointments = {} then asleep = True) otherwise for every received block
@@ -45,135 +49,71 @@ class Watcher:
             if self.asleep:
                 self.asleep = False
                 self.block_queue = Queue()
-                zmq_thread = Thread(target=self.do_subscribe, args=[self.block_queue, debug, logging])
-                watcher = Thread(target=self.do_watch, args=[debug, logging])
+                zmq_thread = Thread(target=self.do_subscribe)
+                watcher = Thread(target=self.do_watch)
                 zmq_thread.start()
                 watcher.start()
 
-                if debug:
-                    logging.info("[Watcher] waking up!")
+                logger.info("Waking up")
 
             appointment_added = True
 
-            if debug:
-                logging.info('[Watcher] new appointment accepted (locator = {})'.format(appointment.locator))
+            logger.info("New appointment accepted.", locator=appointment.locator)
 
         else:
             appointment_added = False
 
-            if debug:
-                logging.info('[Watcher] maximum appointments reached, appointment rejected (locator = {})'
-                             .format(appointment.locator))
+            logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
 
         return appointment_added
 
-    def do_subscribe(self, block_queue, debug, logging):
-        self.zmq_subscriber = ZMQHandler(parent='Watcher')
-        self.zmq_subscriber.handle(block_queue, debug, logging)
+    def do_subscribe(self):
+        self.zmq_subscriber = ZMQHandler(parent="Watcher")
+        self.zmq_subscriber.handle(self.block_queue)
 
-    def do_watch(self, debug, logging):
-        bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
-                                                               BTC_RPC_PORT))
-
+    def do_watch(self):
         while len(self.appointments) > 0:
             block_hash = self.block_queue.get()
+            logger.info("New block received", block_hash=block_hash)
 
-            try:
-                block = bitcoin_cli.getblock(block_hash)
+            block = BlockProcessor.get_block(block_hash)
+
+            if block is not None:
                 txids = block.get('tx')
 
-                if debug:
-                    logging.info("[Watcher] new block received {}".format(block_hash))
-                    logging.info("[Watcher] list of transactions: {}".format(txids))
+                logger.info("List of transactions.", txids=txids)
 
-                self.delete_expired_appointment(block, debug, logging)
+                expired_appointments = [uuid for uuid, appointment in self.appointments.items()
+                                        if block["height"] > appointment.end_time + EXPIRY_DELTA]
 
-                potential_locators = {sha256(unhexlify(txid)).hexdigest(): txid for txid in txids}
+                Cleaner.delete_expired_appointment(expired_appointments, self.appointments, self.locator_uuid_map)
 
-                # Check is any of the tx_ids in the received block is an actual match
-                # Get the locators that are both in the map and in the potential locators dict.
-                intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
-                potential_matches = {locator: potential_locators[locator] for locator in intersection}
-
-                if debug:
-                    if len(potential_matches) > 0:
-                        logging.info("[Watcher] list of potential matches: {}".format(potential_matches))
-                    else:
-                        logging.info("[Watcher] no potential matches found")
-
-                matches = self.check_potential_matches(potential_matches, bitcoin_cli, debug, logging)
+                potential_matches = BlockProcessor.get_potential_matches(txids, self.locator_uuid_map)
+                matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
 
                 for locator, uuid, dispute_txid, justice_txid, justice_rawtx in matches:
-                    if debug:
-                        logging.info("[Watcher] notifying responder about {} and deleting appointment {} (uuid: {})"
-                                     .format(justice_txid, locator, uuid))
+                    # Errors decrypting the Blob will result in a None justice_txid
+                    if justice_txid is not None:
+                        logger.info("Notifying responder and deleting appointment.", justice_txid=justice_txid,
+                                    locator=locator, uuid=uuid)
 
-                    self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
-                                                self.appointments[uuid].end_time, debug, logging)
+                        self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
+                                                    self.appointments[uuid].end_time)
 
                     # Delete the appointment
                     self.appointments.pop(uuid)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
                     if len(self.locator_uuid_map[locator]) == 1:
-                        # ToDo: #9-add-data-persistency
+                        # ToDo: #9-add-data-persistence
                         self.locator_uuid_map.pop(locator)
                     else:
                         # Otherwise we just delete the appointment that matches locator:appointment_pos
-                        # ToDo: #9-add-data-persistency
+                        # ToDo: #9-add-data-persistence
                         self.locator_uuid_map[locator].remove(uuid)
-
-            except JSONRPCException as e:
-                if debug:
-                    logging.error("[Watcher] couldn't get block from bitcoind. Error code {}".format(e))
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
         self.zmq_subscriber.terminate = True
 
-        if debug:
-            logging.error("[Watcher] no more pending appointments, going back to sleep")
-
-    def delete_expired_appointment(self, block, debug, logging):
-        to_delete = [uuid for uuid, appointment in self.appointments.items() if block["height"] > appointment.end_time
-                     + EXPIRY_DELTA]
-
-        for uuid in to_delete:
-            # ToDo: #9-add-data-persistency
-            locator = self.appointments[uuid].locator
-
-            self.appointments.pop(uuid)
-
-            if len(self.locator_uuid_map[locator]) == 1:
-                self.locator_uuid_map.pop(locator)
-
-            else:
-                self.locator_uuid_map[locator].remove(uuid)
-
-            if debug:
-                logging.info("[Watcher] end time reached with no match! Deleting appointment {} (uuid: {})"
-                             .format(locator, uuid))
-
-    def check_potential_matches(self, potential_matches, bitcoin_cli, debug, logging):
-        matches = []
-
-        for locator, dispute_txid in potential_matches.items():
-            for uuid in self.locator_uuid_map[locator]:
-                try:
-                    # ToDo: #20-test-tx-decrypting-edge-cases
-                    justice_rawtx = self.appointments[uuid].encrypted_blob.decrypt(unhexlify(dispute_txid), debug,
-                                                                                   logging)
-                    justice_rawtx = hexlify(justice_rawtx).decode()
-                    justice_txid = bitcoin_cli.decoderawtransaction(justice_rawtx).get('txid')
-                    matches.append((locator, uuid, dispute_txid, justice_txid, justice_rawtx))
-
-                    if debug:
-                        logging.info("[Watcher] match found for locator {} (uuid: {}): {}".format(locator, uuid,
-                                                                                                  justice_txid))
-                except JSONRPCException as e:
-                    # Tx decode failed returns error code -22, maybe we should be more strict here. Leaving it simple
-                    # for the POC
-                    if debug:
-                        logging.error("[Watcher] can't build transaction from decoded data. Error code {}".format(e))
-
-        return matches
+        logger.error("No more pending appointments, going back to sleep")

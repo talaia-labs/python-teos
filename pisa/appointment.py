@@ -3,6 +3,7 @@ from pisa.encrypted_blob import EncryptedBlob
 
 # Basic appointment structure
 class Appointment:
+    # DISCUSS: 35-appointment-checks
     def __init__(self, locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function):
         self.locator = locator
         self.start_time = start_time    # ToDo: #4-standardize-appointment-fields
@@ -19,7 +20,5 @@ class Appointment:
 
         return appointment
 
-        # ToDO: #3-improve-appointment-strcuture
-
-
+        # ToDO: #3-improve-appointment-structure
 

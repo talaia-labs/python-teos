@@ -1,6 +1,8 @@
 import zmq
 import binascii
+from pisa.logger import Logger
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
+
 
 # ToDo: #7-add-async-back-to-zmq
 class ZMQHandler:
@@ -11,10 +13,11 @@ class ZMQHandler:
         self.zmqSubSocket.setsockopt(zmq.RCVHWM, 0)
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
         self.zmqSubSocket.connect("%s://%s:%s" % (FEED_PROTOCOL, FEED_ADDR, FEED_PORT))
-        self.parent = parent
+        self.logger = Logger("ZMQHandler-{}".format(parent))
+
         self.terminate = False
 
-    def handle(self, block_queue, debug, logging):
+    def handle(self, block_queue):
         while not self.terminate:
             msg = self.zmqSubSocket.recv_multipart()
 
@@ -27,5 +30,4 @@ class ZMQHandler:
                     block_hash = binascii.hexlify(body).decode('UTF-8')
                     block_queue.put(block_hash)
 
-                    if debug:
-                        logging.info("[ZMQHandler-{}] new block received via ZMQ".format(self.parent, block_hash))
+                    self.logger.info("New block received via ZMQ", block_hash=block_hash)

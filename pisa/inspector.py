@@ -1,16 +1,20 @@
 import re
-from pisa.appointment import Appointment
+
 from pisa import errors
-from pisa.utils.authproxy import AuthServiceProxy, JSONRPCException
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MIN_DISPUTE_DELTA, \
-    SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
+import pisa.conf as conf
+from pisa.logger import Logger
+from pisa.appointment import Appointment
+from pisa.block_processor import BlockProcessor
+
+logger = Logger("Inspector")
+
+# FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
+#        long field that, even if not accepted by PISA, would be stored in the logs. This is a possible DoS surface
+#        since pisa would store any kind of message (no matter the length). Solution: truncate the length of the fields
+#        stored + blacklist if multiple wrong requests are received.
 
 
 class Inspector:
-    def __init__(self, debug=False, logging=None):
-        self.debug = debug
-        self.logging = logging
-
     def inspect(self, data):
         locator = data.get('locator')
         start_time = data.get('start_time')
@@ -20,12 +24,11 @@ class Inspector:
         cipher = data.get('cipher')
         hash_function = data.get('hash_function')
 
-        bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
-                                                               BTC_RPC_PORT))
-        try:
-            block_height = bitcoin_cli.getblockcount()
+        block_height = BlockProcessor.get_block_count()
 
+        if block_height is not None:
             rcode, message = self.check_locator(locator)
+
             if rcode == 0:
                 rcode, message = self.check_start_time(start_time, block_height)
             if rcode == 0:
@@ -44,16 +47,14 @@ class Inspector:
             else:
                 r = (rcode, message)
 
-        except JSONRPCException as e:
-            if self.debug:
-                self.logging.error("[Inspector] JSONRPCException. Error code {}".format(e))
-
+        else:
             # In case of an unknown exception, assign a special rcode and reason.
             r = (errors.UNKNOWN_JSON_RPC_EXCEPTION, "Unexpected error occurred")
 
         return r
 
-    def check_locator(self, locator):
+    @staticmethod
+    def check_locator(locator):
         message = None
         rcode = 0
 
@@ -71,14 +72,18 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
-    def check_start_time(self, start_time, block_height):
+    @staticmethod
+    def check_start_time(start_time, block_height):
         message = None
         rcode = 0
+
+        # TODO: What's too close to the current height is not properly defined. Right now any appointment that is in the
+        #       future will be accepted (even if it's only one block away).
 
         t = type(start_time)
 
@@ -93,16 +98,20 @@ class Inspector:
             if start_time < block_height:
                 message = "start_time is in the past"
             else:
-                message = "start_time too close to current height"
+                message = "start_time is too close to current height"
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
-    def check_end_time(self, end_time, start_time, block_height):
+    @staticmethod
+    def check_end_time(end_time, start_time, block_height):
         message = None
         rcode = 0
+
+        # TODO: What's too close to the current height is not properly defined. Right now any appointment that ends in
+        #       the future will be accepted (even if it's only one block away).
 
         t = type(end_time)
 
@@ -118,16 +127,20 @@ class Inspector:
                 message = "end_time is smaller than start_time"
             else:
                 message = "end_time is equal to start_time"
-        elif block_height > end_time:
+        elif block_height >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
-            message = 'end_time is in the past'
+            if block_height > end_time:
+                message = 'end_time is in the past'
+            else:
+                message = 'end_time is too close to current height'
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
-    def check_delta(self, dispute_delta):
+    @staticmethod
+    def check_delta(dispute_delta):
         message = None
         rcode = 0
 
@@ -139,18 +152,19 @@ class Inspector:
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong dispute_delta data type ({})".format(t)
-        elif dispute_delta < MIN_DISPUTE_DELTA:
+        elif dispute_delta < conf.MIN_DISPUTE_DELTA:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
-                MIN_DISPUTE_DELTA, dispute_delta)
+                conf.MIN_DISPUTE_DELTA, dispute_delta)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
     # ToDo: #6-define-checks-encrypted-blob
-    def check_blob(self, encrypted_blob):
+    @staticmethod
+    def check_blob(encrypted_blob):
         message = None
         rcode = 0
 
@@ -162,16 +176,17 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
-        elif encrypted_blob == '':
-            # ToDo: #6 We may want to define this to be at least as long as one block of the cipher we are using
-            rcode = errors.APPOINTMENT_WRONG_FIELD
-            message = "wrong encrypted_blob"
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        elif re.search(r'^[0-9A-Fa-f]+$', encrypted_blob) is None:
+            rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
+            message = "wrong encrypted_blob format ({})".format(encrypted_blob)
+
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
-    def check_cipher(self, cipher):
+    @staticmethod
+    def check_cipher(cipher):
         message = None
         rcode = 0
 
@@ -183,16 +198,17 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong cipher data type ({})".format(t)
-        elif cipher not in SUPPORTED_CIPHERS:
+        elif cipher.upper() not in conf.SUPPORTED_CIPHERS:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logger.error(message)
 
         return rcode, message
 
-    def check_hash_function(self, hash_function):
+    @staticmethod
+    def check_hash_function(hash_function):
         message = None
         rcode = 0
 
@@ -204,11 +220,11 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong hash_function data type ({})".format(t)
-        elif hash_function not in SUPPORTED_HASH_FUNCTIONS:
+        elif hash_function.upper() not in conf.SUPPORTED_HASH_FUNCTIONS:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)
 
-        if self.debug and message:
-            self.logging.error("[Inspector] {}".format(message))
+        if message is not None:
+            logger.error(message)
 
         return rcode, message

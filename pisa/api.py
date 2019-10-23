@@ -1,20 +1,23 @@
-from pisa import *
+import os
+import json
+from flask import Flask, request, Response, abort, jsonify
+
+from pisa import HOST, PORT, logging
+from pisa.logger import Logger
 from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
-from flask import Flask, request, Response, abort, jsonify
-import json
+from pisa.block_processor import BlockProcessor
 
-
-# FIXME: HERE FOR TESTING (get_block_count). REMOVE WHEN REMOVING THE FUNCTION
-from pisa.utils.authproxy import AuthServiceProxy
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
+
 HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
 HTTP_SERVICE_UNAVAILABLE = 503
+
+logger = Logger("API")
 
 
 @app.route('/', methods=['POST'])
@@ -22,15 +25,14 @@ def add_appointment():
     remote_addr = request.environ.get('REMOTE_ADDR')
     remote_port = request.environ.get('REMOTE_PORT')
 
-    if debug:
-        logging.info('[API] connection accepted from {}:{}'.format(remote_addr, remote_port))
+    logger.info('Connection accepted', from_addr_port='{}:{}'.format(remote_addr, remote_port))
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
     appointment = inspector.inspect(request_data)
 
     if type(appointment) == Appointment:
-        appointment_added = watcher.add_appointment(appointment, debug, logging)
+        appointment_added = watcher.add_appointment(appointment)
 
         # ToDo: #13-create-server-side-signature-receipt
         if appointment_added:
@@ -49,9 +51,8 @@ def add_appointment():
         rcode = HTTP_BAD_REQUEST
         response = "appointment rejected. Request does not match the standard"
 
-    if debug:
-        logging.info('[API] sending response and disconnecting: {} --> {}:{}'.format(response, remote_addr,
-                                                                                     remote_port))
+    logger.info('Sending response and disconnecting',
+                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response)
 
     return Response(response, status=rcode, mimetype='text/plain')
 
@@ -83,7 +84,7 @@ def get_appointment():
                 response.append(job_data)
 
     if not response:
-        response.append({"locator": locator, "status": "not found"})
+        response.append({"locator": locator, "status": "not_found"})
 
     response = jsonify(response)
 
@@ -103,7 +104,7 @@ def get_all_appointments():
 
         if watcher.responder:
             for uuid, job in watcher.responder.jobs.items():
-                responder_jobs[uuid] = job.to_json()
+                responder_jobs[uuid] = job.to_dict()
 
         response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
 
@@ -115,23 +116,19 @@ def get_all_appointments():
 
 @app.route('/get_block_count', methods=['GET'])
 def get_block_count():
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST,
-                                                           BTC_RPC_PORT))
-
-    return jsonify({"block_count": bitcoin_cli.getblockcount()})
+    return jsonify({"block_count": BlockProcessor.get_block_count()})
 
 
-def start_api(d, l):
+def start_api():
     # FIXME: Pretty ugly but I haven't found a proper way to pass it to add_appointment
-    global debug, logging, watcher, inspector
-    debug = d
-    logging = l
+    global watcher, inspector
 
     # ToDo: #18-separate-api-from-watcher
     watcher = Watcher()
-    inspector = Inspector(debug, logging)
+    inspector = Inspector()
 
-    # Setting Flask log t ERROR only so it does not mess with out logging
+    # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    os.environ['WERKZEUG_RUN_MAIN'] = 'true'
 
     app.run(host=HOST, port=PORT)

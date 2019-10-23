@@ -1,30 +1,46 @@
-from binascii import unhexlify, hexlify
 from hashlib import sha256
+from binascii import unhexlify, hexlify
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from pisa.logger import Logger
 
+logger = Logger("Watcher")
+
+
+# FIXME: EncryptedBlob is assuming AES-128-GCM. A cipher field should be part of the object and the decryption should be
+#        performed depending on the cipher.
 class EncryptedBlob:
     def __init__(self, data):
         self.data = data
 
-    def decrypt(self, key, debug, logging):
+    def __eq__(self, other):
+        return isinstance(other, EncryptedBlob) and self.data == other.data
+
+    def decrypt(self, key):
         # master_key = H(tx_id | tx_id)
+        key = unhexlify(key)
         master_key = sha256(key + key).digest()
 
         # The 16 MSB of the master key will serve as the AES GCM 128 secret key. The 16 LSB will serve as the IV.
         sk = master_key[:16]
         nonce = master_key[16:]
 
-        if debug:
-            logging.info("[Watcher] creating new blob")
-            logging.info("[Watcher] master key: {}".format(hexlify(master_key).decode()))
-            logging.info("[Watcher] sk: {}".format(hexlify(sk).decode()))
-            logging.info("[Watcher] nonce: {}".format(hexlify(nonce).decode()))
-            logging.info("[Watcher] encrypted_blob: {}".format(self.data))
+        logger.info("Creating new blob.",
+                    master_key=hexlify(master_key).decode(),
+                    sk=hexlify(sk).decode(),
+                    nonce=hexlify(sk).decode(),
+                    encrypted_blob=self.data)
 
         # Decrypt
         aesgcm = AESGCM(sk)
         data = unhexlify(self.data.encode())
-        raw_tx = aesgcm.decrypt(nonce=nonce, data=data, associated_data=None)
 
-        return raw_tx
+        try:
+            raw_tx = aesgcm.decrypt(nonce=nonce, data=data, associated_data=None)
+            hex_raw_tx = hexlify(raw_tx).decode('utf8')
+
+        except InvalidTag:
+            hex_raw_tx = None
+
+        return hex_raw_tx
