@@ -40,10 +40,7 @@ def add_appointment():
 
         if appointment_added:
             rcode = HTTP_OK
-            response = {
-                "locator": appointment.locator,
-                "signature": hexlify(signature).decode('utf-8')
-            }
+            response = {"locator": appointment.locator, "signature": hexlify(signature).decode('utf-8')}
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
             error = "appointment rejected"

@@ -13,7 +13,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
 from pisa.logger import Logger
 from pisa.appointment import Appointment
@@ -56,11 +56,11 @@ def is_appointment_signature_valid(appointment, signature):
             with open(PISA_PUBLIC_KEY, "r") as key_file:
                 pubkey_pem = key_file.read().encode("utf-8")
                 pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
-        except cryptography.exceptions.UnsupportedAlgorithm:
+        except UnsupportedAlgorithm:
             raise ValueError("Could not unserialize the public key (unsupported algorithm).")
     try:
-        sig_bytes = unhexlify(response_json['signature'].encode('utf-8'))
-        data = appointment.to_json().encode("utf-8")
+        sig_bytes = unhexlify(signature.encode('utf-8'))
+        data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
         pisa_public_key.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
     except InvalidSignature:
         return False
@@ -102,7 +102,7 @@ def add_appointment(args):
                 appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
                                                 appointment_data.get('start_time'), appointment_data.get('end_time'),
                                                 appointment_data.get('dispute_delta'))
-                appointment_json = json.dumps(sort_keys=True, separators=(',', ':'))
+                appointment_json = json.dumps(appointment, sort_keys=True, separators=(',', ':'))
 
                 logger.info("Sending appointment to PISA")
 
@@ -127,7 +127,7 @@ def add_appointment(args):
                         else:
                             error = r.json()['error']
                             logger.error("The server returned status code {}, and the following error: {}."
-                                         .format(r.status_code), error)
+                                         .format(r.status_code, error))
 
                 except json.JSONDecodeError:
                     logger.error("The response was not valid JSON.")
@@ -139,8 +139,8 @@ def add_appointment(args):
                     logger.error("Can't connect to pisa API. Server cannot be reached.")
                 except FileNotFoundError:
                     logger.error("Pisa's public key file not found. Please check your settings.")
-                except IOError e:
-                    logger.error("I/O error({0}): {1}".format(e.errno, e.strerror))
+                except IOError as e:
+                    logger.error("I/O error({}): {}".format(e.errno, e.strerror))
             else:
                 logger.error("The provided locator is not valid.")
     else:
@@ -188,15 +188,11 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
     blob = Blob(tx, cipher, hash_function)
     encrypted_blob = blob.encrypt(tx_id)
 
-    return {
-        'locator': locator,
-        'start_block': start_block,
-        'end_block': end_block,
-        'dispute_delta': dispute_delta,
-        'encrypted_blob': encrypted_blob,
-        'cipher': cipher,
-        'hash_function': hash_function
-    }
+    appointment = {
+        'locator': locator, 'start_block': start_block, 'end_block': end_block, 'dispute_delta': dispute_delta,
+        'encrypted_blob': encrypted_blob, 'cipher': cipher, 'hash_function': hash_function }
+
+    return appointment
 
 
 def check_txid_format(txid):
