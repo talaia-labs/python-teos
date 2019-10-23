@@ -1,20 +1,20 @@
-from os import urandom
 import json
 from pytest import fixture
 
 from pisa.appointment import Appointment
 from pisa.encrypted_blob import EncryptedBlob
+from test.unit.conftest import get_random_value_hex
 
 
 # Not much to test here, adding it for completeness
 
 @fixture
 def appointment_data():
-    locator = urandom(32).hex()
+    locator = get_random_value_hex(32)
     start_time = 100
     end_time = 120
     dispute_delta = 20
-    encrypted_blob_data = urandom(100).hex()
+    encrypted_blob_data = get_random_value_hex(100)
     cipher = "AES-GCM-128"
     hash_function = "SHA256"
 

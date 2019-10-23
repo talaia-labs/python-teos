@@ -1,33 +1,34 @@
-from os import urandom
+from binascii import unhexlify
 
 from pisa import logging
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
+from test.unit.conftest import get_random_value_hex
 from pisa.conf import MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
 inspector = Inspector()
 APPOINTMENT_OK = (0, None)
 
-NO_HEX_STINGS = ["R" * 64, urandom(31).hex() + "PP", "$"*64, " "*64]
-WRONG_TYPES = [[], '', urandom(32).hex(), 3.2, 2.0, (), object, {}, " "*32, object()]
-WRONG_TYPES_NO_STR = [[], urandom(32), 3.2, 2.0, (), object, {}, object()]
+NO_HEX_STRINGS = ["R" * 64, get_random_value_hex(31) + "PP", "$"*64, " "*64]
+WRONG_TYPES = [[], '', get_random_value_hex(32), 3.2, 2.0, (), object, {}, " "*32, object()]
+WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(32)), 3.2, 2.0, (), object, {}, object()]
 
 logging.getLogger().disabled = True
 
 
 def test_check_locator():
     # Right appointment type, size and format
-    locator = urandom(32).hex()
+    locator = get_random_value_hex(32)
     assert(Inspector.check_locator(locator) == APPOINTMENT_OK)
 
     # Wrong size (too big)
-    locator = urandom(33).hex()
+    locator = get_random_value_hex(33)
     assert(Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_SIZE)
 
     # Wrong size (too small)
-    locator = urandom(31).hex()
+    locator = get_random_value_hex(31)
     assert(Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_SIZE)
 
     # Empty
@@ -41,7 +42,7 @@ def test_check_locator():
         assert (Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_TYPE)
 
     # Wrong format (no hex)
-    locators = NO_HEX_STINGS
+    locators = NO_HEX_STRINGS
     for locator in locators:
         assert (Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_FORMAT)
 
@@ -122,7 +123,7 @@ def test_check_delta():
 
 def test_check_blob():
     # Right format and length
-    encrypted_blob = urandom(120).hex()
+    encrypted_blob = get_random_value_hex(120)
     assert(Inspector.check_blob(encrypted_blob) == APPOINTMENT_OK)
 
     # # Wrong content
@@ -139,7 +140,7 @@ def test_check_blob():
     assert (Inspector.check_blob(encrypted_blob)[0] == APPOINTMENT_EMPTY_FIELD)
 
     # Wrong format (no hex)
-    encrypted_blobs = NO_HEX_STINGS
+    encrypted_blobs = NO_HEX_STRINGS
     for encrypted_blob in encrypted_blobs:
         assert (Inspector.check_blob(encrypted_blob)[0] == APPOINTMENT_WRONG_FIELD_FORMAT)
 
@@ -157,7 +158,7 @@ def test_check_cipher():
         assert(Inspector.check_cipher(cipher)[0] == APPOINTMENT_WRONG_FIELD_TYPE)
 
     # Wrong value
-    ciphers = NO_HEX_STINGS
+    ciphers = NO_HEX_STRINGS
     for cipher in ciphers:
         assert(Inspector.check_cipher(cipher)[0] == APPOINTMENT_CIPHER_NOT_SUPPORTED)
 
@@ -179,7 +180,7 @@ def test_check_hash_function():
         assert (Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_WRONG_FIELD_TYPE)
 
     # Wrong value
-    hash_functions = NO_HEX_STINGS
+    hash_functions = NO_HEX_STRINGS
     for hash_function in hash_functions:
         assert (Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED)
 
@@ -198,11 +199,11 @@ def test_inspect(run_bitcoind):
     assert (type(appointment) == tuple and appointment[0] != 0)
 
     # Valid appointment
-    locator = urandom(32).hex()
+    locator = get_random_value_hex(32)
     start_time = BlockProcessor.get_block_count() + 5
     end_time = start_time + 20
     dispute_delta = MIN_DISPUTE_DELTA
-    encrypted_blob = urandom(64).hex()
+    encrypted_blob = get_random_value_hex(64)
     cipher = SUPPORTED_CIPHERS[0]
     hash_function = SUPPORTED_HASH_FUNCTIONS[0]
 

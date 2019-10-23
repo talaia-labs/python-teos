@@ -6,6 +6,7 @@ from pisa import logging
 from pisa.responder import Job
 from pisa.cleaner import Cleaner
 from pisa.appointment import Appointment
+from test.unit.conftest import get_random_value_hex
 
 CONFIRMATIONS = 6
 ITEMS = 10
@@ -21,7 +22,7 @@ def set_up_appointments(total_appointments):
 
     for _ in range(total_appointments):
         uuid = uuid4().hex
-        locator = urandom(32).hex()
+        locator = get_random_value_hex(32)
 
         appointments[uuid] = Appointment(locator, None, None, None, None, None, None)
         locator_uuid_map[locator] = [uuid]
@@ -42,7 +43,7 @@ def set_up_jobs(total_jobs):
 
     for _ in range(total_jobs):
         uuid = uuid4().hex
-        txid = urandom(32).hex()
+        txid = get_random_value_hex(32)
 
         # Assign both justice_txid and dispute_txid the same id (it shouldn't matter)
         jobs[uuid] = Job(txid, txid, None, None)
