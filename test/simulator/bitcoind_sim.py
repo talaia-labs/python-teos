@@ -23,6 +23,10 @@ mempool = []
 
 mine_new_block = Event()
 
+TIME_BETWEEN_BLOCKS = 5
+GENESIS_PARENT = '0000000000000000000000000000000000000000000000000000000000000000'
+prev_block_hash = GENESIS_PARENT
+
         
 @app.route('/generate', methods=['POST'])
 def generate():
@@ -31,6 +35,39 @@ def generate():
     mine_new_block.set()
 
     return Response(status=200, mimetype='application/json')
+
+
+@app.route('/fork', methods=['POST'])
+def create_fork():
+    """
+    create_fork processes chain fork requests. It will create a fork with the following parameters:
+    parent: the block hash from where the chain will be forked
+    length: the length of the fork to be created (number of blocks to be mined on top of parent)
+    stay: whether to stay in the forked chain after length blocks has been mined or to come back to the previous chain.
+          Stay is optional and will default to False.
+    """
+
+    global prev_block_hash
+
+    request_data = request.get_json()
+    response = {"result": 0, "error": None}
+
+    parent = request_data.get("parent")
+
+    # FIXME: We only accept forks one by one for now
+
+    if parent not in blocks:
+        response["error"] = {"code": -1, "message": "Wrong parent block to fork from"}
+
+    else:
+        prev_block_hash = parent
+        print("Forking chain from {}".format(parent))
+
+        # FIXME: the blockchain is defined as a list (since forks in the sim where not possible til recently). Therefore
+        #        block heights and blockchain length is currently incorrect. It does the trick to test forks, but should
+        #        be fixed for better testing.
+
+    return Response(json.dumps(response), status=200, mimetype='application/json')
 
 
 @app.route('/', methods=['POST'])
@@ -144,8 +181,13 @@ def process_request():
         if isinstance(blockid, str):
             block = blocks.get(blockid)
 
-            if block:
+            if block is not None:
                 block["hash"] = blockid
+
+                # FIXME: the confirmation counter depends on the chain the transaction is in (in case of forks). For
+                #        now there will be only one, but multiple forks would come up handy to test edge cases
+                block["confirmations"] = len(blockchain) - block["height"] + 1
+
                 response["result"] = block
 
             else:
@@ -197,7 +239,7 @@ def load_data():
 
 def simulate_mining(mode, time_between_blocks):
     global mempool, mined_transactions, blocks, blockchain, mine_new_block
-    prev_block_hash = None
+    prev_block_hash = GENESIS_PARENT
 
     mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
                                     feed_port=FEED_PORT)
@@ -224,8 +266,9 @@ def simulate_mining(mode, time_between_blocks):
         for txid, tx in txs_to_mine.items():
             mined_transactions[txid] = {"tx": tx, "block": block_hash}
 
-        blocks[block_hash] = {"tx": list(txs_to_mine.keys()), "height": len(blockchain),
-                              "previousblockhash": prev_block_hash}
+        # FIXME: chain_work is being defined as a incremental counter for now. Multiple chains should be possible.
+        blocks[block_hash] = {"tx": list(txs_to_mine.keys()), "height": len(blockchain), "previousblockhash": prev_block_hash,
+                              "chainwork": '{:x}'.format(len(blockchain))}
 
         mining_simulator.publish_data(binascii.unhexlify(block_hash))
         blockchain.append(block_hash)
@@ -241,14 +284,15 @@ def simulate_mining(mode, time_between_blocks):
             mine_new_block.clear()
             
 
-def run_simulator(mode='time', time_between_blocks=5):
+def run_simulator(mode='time', time_between_blocks=TIME_BETWEEN_BLOCKS):
     if mode not in ["time", 'event']:
         raise ValueError("Node must be time or event")
 
     mining_thread = Thread(target=simulate_mining, args=[mode, time_between_blocks])
     mining_thread.start()
 
-    # Setting Flask log to ERROR only so it does not mess with out logging
+    # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
+    os.environ['WERKZEUG_RUN_MAIN'] = 'true'
 
     app.run(host=HOST, port=PORT)
