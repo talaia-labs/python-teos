@@ -1,6 +1,5 @@
 import json
 import pytest
-from os import urandom
 from uuid import uuid4
 from threading import Thread
 from queue import Queue, Empty
@@ -9,8 +8,9 @@ from pisa.tools import check_txid_format
 from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
 from test.simulator.bitcoind_sim import TX
-from test.unit.conftest import generate_block, generate_blocks
 from pisa.utils.auth_proxy import AuthServiceProxy
+from test.unit.conftest import get_random_value_hex
+from test.unit.conftest import generate_block, generate_blocks
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 
@@ -40,7 +40,7 @@ def create_dummy_job_data(random_txid=False, justice_rawtx=None):
         justice_txid = sha256d(justice_rawtx)
 
     if random_txid is True:
-        justice_txid = urandom(32).hex()
+        justice_txid = get_random_value_hex(32)
 
     appointment_end = bitcoin_cli.getblockcount() + 2
 
@@ -214,10 +214,10 @@ def test_do_watch(responder):
 
 def test_get_txs_to_rebroadcast(responder):
     # Let's create a few fake txids and assign at least 6 missing confirmations to each
-    txs_missing_too_many_conf = {urandom(32).hex(): 6+i for i in range(10)}
+    txs_missing_too_many_conf = {get_random_value_hex(32): 6+i for i in range(10)}
 
     # Let's create some other transaction that has missed some confirmations but not that many
-    txs_missing_some_conf = {urandom(32).hex(): 3 for _ in range(10)}
+    txs_missing_some_conf = {get_random_value_hex(32): 3 for _ in range(10)}
 
     # All the txs in the first dict should be flagged as to_rebroadcast
     responder.missed_confirmations = txs_missing_too_many_conf

@@ -1,4 +1,5 @@
 import pytest
+import random
 import requests
 from time import sleep
 from threading import Thread
@@ -25,6 +26,17 @@ def run_api():
 
     # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
     sleep(0.1)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def prng_seed():
+    random.seed(0)
+
+
+def get_random_value_hex(nbytes):
+    pseudo_random_value = random.getrandbits(8*nbytes)
+    prv_hex = '{:x}'.format(pseudo_random_value)
+    return prv_hex.zfill(2*nbytes)
 
 
 def generate_block():

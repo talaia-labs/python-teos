@@ -1,21 +1,20 @@
-from os import urandom
-
 from pisa import logging
 from pisa.encrypted_blob import EncryptedBlob
+from test.unit.conftest import get_random_value_hex
 
 logging.getLogger().disabled = True
 
 
 def test_init_encrypted_blob():
     # No much to test here, basically that the object is properly created
-    data = urandom(64).hex()
+    data = get_random_value_hex(64)
     assert (EncryptedBlob(data).data == data)
 
 
 def test_decrypt():
     # TODO: The decryption tests are assuming the cipher is AES-GCM-128, since EncryptedBlob assumes the same. Fix this.
-    key = urandom(32).hex()
-    encrypted_data = urandom(64).hex()
+    key = get_random_value_hex(32)
+    encrypted_data = get_random_value_hex(64)
     encrypted_blob = EncryptedBlob(encrypted_data)
 
     # Trying to decrypt random data (in AES_GCM-128) should result in an InvalidTag exception. Our decrypt function

@@ -29,13 +29,13 @@ if __name__ == '__main__':
         # FIXME: Leaving this here for future option/arguments
         pass
 
-    if can_connect_to_bitcoind():
-        if in_correct_network(BTC_NETWORK):
-            # Fire the api
-            start_api()
+    if not can_connect_to_bitcoind():
+        logger.error("Can't connect to bitcoind. Shutting down")
 
-        else:
-            logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
+    elif not in_correct_network(BTC_NETWORK):
+        logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
-        logger.error("Can't connect to bitcoind. Shutting down")
+        # Fire the api
+        start_api()
+

@@ -1,7 +1,6 @@
 import json
 import pytest
 import requests
-from os import urandom
 from hashlib import sha256
 from binascii import unhexlify
 
@@ -9,8 +8,8 @@ from apps.cli.blob import Blob
 from pisa import HOST, PORT, logging
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
-from test.unit.conftest import generate_block
 from pisa.utils.auth_proxy import AuthServiceProxy
+from test.unit.conftest import generate_block, get_random_value_hex
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 logging.getLogger().disabled = True
@@ -101,7 +100,7 @@ def test_request_appointment(new_appointment):
 
 
 def test_request_random_appointment():
-    r = requests.get(url=PISA_API + "/get_appointment?locator=" + urandom(32).hex())
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + get_random_value_hex(32))
     assert (r.status_code == 200)
 
     received_appointments = json.loads(r.content)

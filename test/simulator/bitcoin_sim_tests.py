@@ -1,15 +1,17 @@
 import re
-import os
 import pytest
 from time import sleep
 from threading import Thread
 
 from test.simulator.transaction import TX
+from test.unit.conftest import get_random_value_hex
 from test.simulator.bitcoind_sim import run_simulator
 from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
-MIXED_VALUES = values = [-1, 500, '', '111', [], 1.1, None, '', "a" * 31, "b" * 33, os.urandom(32).hex()]
+MIXED_VALUES = values = [-1, 500, '', '111', [], 1.1, None, '', "a" * 31, "b" * 33, get_random_value_hex(32)]
+
+bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
 
 @pytest.fixture(scope='module')
@@ -30,9 +32,6 @@ def genesis_block_hash(run_bitcoind):
 def check_hash_format(txid):
     # TODO: #12-check-txid-regexp
     return isinstance(txid, str) and re.search(r'^[0-9A-Fa-f]{64}$', txid) is not None
-
-
-bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
 
 
 def test_help(run_bitcoind):

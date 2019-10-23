@@ -1,11 +1,11 @@
 import pytest
 import logging
-from os import urandom
 from uuid import uuid4
 from hashlib import sha256
 from binascii import unhexlify
 
 from pisa.block_processor import BlockProcessor
+from test.unit.conftest import get_random_value_hex
 
 logging.getLogger().disabled = True
 
@@ -15,7 +15,7 @@ TEST_SET_SIZE = 200
 
 @pytest.fixture(scope='module')
 def txids():
-    return [urandom(32).hex() for _ in range(APPOINTMENT_COUNT)]
+    return [get_random_value_hex(32) for _ in range(APPOINTMENT_COUNT)]
 
 
 @pytest.fixture(scope='module')
@@ -44,7 +44,7 @@ def test_get_block(best_block_hash):
 
 
 def test_get_random_block():
-    block = BlockProcessor.get_block(urandom(32).hex())
+    block = BlockProcessor.get_block(get_random_value_hex(32))
 
     assert block is None
 
@@ -62,7 +62,7 @@ def test_potential_matches(txids, locator_uuid_map):
 
 
 def test_potential_matches_random(locator_uuid_map):
-    txids = [urandom(32).hex() for _ in range(len(locator_uuid_map))]
+    txids = [get_random_value_hex(32) for _ in range(len(locator_uuid_map))]
 
     potential_matches = BlockProcessor.get_potential_matches(txids, locator_uuid_map)
 
@@ -72,7 +72,7 @@ def test_potential_matches_random(locator_uuid_map):
 
 def test_potential_matches_random_data(locator_uuid_map):
     # The likelihood of finding a potential match with random data should be negligible
-    txids = [urandom(32).hex() for _ in range(TEST_SET_SIZE)]
+    txids = [get_random_value_hex(32) for _ in range(TEST_SET_SIZE)]
 
     potential_matches = BlockProcessor.get_potential_matches(txids, locator_uuid_map)
 

@@ -1,14 +1,15 @@
-from os import urandom
+from binascii import unhexlify
 
 from pisa import logging
 from apps.cli.blob import Blob
+from test.unit.conftest import get_random_value_hex
 from pisa.conf import SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
 logging.getLogger().disabled = True
 
 
 def test_init_blob():
-    data = urandom(64).hex()
+    data = get_random_value_hex(64)
 
     # Fixed (valid) hash function, try different valid ciphers
     hash_function = SUPPORTED_HASH_FUNCTIONS[0]
@@ -29,7 +30,7 @@ def test_init_blob():
             assert(blob.data == data and blob.cipher == cipher and blob.hash_function == case)
 
     # Invalid data
-    data = urandom(64)
+    data = unhexlify(get_random_value_hex(64))
     cipher = SUPPORTED_CIPHERS[0]
     hash_function = SUPPORTED_HASH_FUNCTIONS[0]
 
@@ -41,7 +42,7 @@ def test_init_blob():
         assert True
 
     # Invalid cipher
-    data = urandom(64).hex()
+    data = get_random_value_hex(64)
     cipher = "A" * 10
     hash_function = SUPPORTED_HASH_FUNCTIONS[0]
 
@@ -53,7 +54,7 @@ def test_init_blob():
         assert True
 
     # Invalid hash function
-    data = urandom(64).hex()
+    data = get_random_value_hex(64)
     cipher = SUPPORTED_CIPHERS[0]
     hash_function = "A" * 10
 
@@ -67,14 +68,14 @@ def test_init_blob():
 
 def test_encrypt():
     # Valid data, valid key
-    data = urandom(64).hex()
+    data = get_random_value_hex(64)
     blob = Blob(data, SUPPORTED_CIPHERS[0], SUPPORTED_HASH_FUNCTIONS[0])
-    key = urandom(32).hex()
+    key = get_random_value_hex(32)
 
     encrypted_blob = blob.encrypt(key)
 
     # Invalid key (note that encrypt cannot be called with invalid data since that's checked when the Blob is created)
-    invalid_key = urandom(32)
+    invalid_key = unhexlify(get_random_value_hex(32))
 
     try:
         blob.encrypt(invalid_key)

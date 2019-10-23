@@ -1,12 +1,11 @@
 import pytest
 import logging
-from os import urandom
-
 
 from pisa.carrier import Carrier
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from test.unit.conftest import generate_blocks
+from test.unit.conftest import get_random_value_hex
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
 logging.getLogger().disabled = True
@@ -72,7 +71,7 @@ def test_get_transaction():
 
 
 def test_get_non_existing_transaction():
-    tx_info = Carrier.get_transaction(urandom(32).hex())
+    tx_info = Carrier.get_transaction(get_random_value_hex(32))
 
     assert tx_info is None
 
