@@ -2,9 +2,12 @@ from getopt import getopt
 from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+from pisa.conf import DB_PATH
 from pisa.logger import Logger
 from pisa.api import start_api
+from pisa.watcher import Watcher
 from pisa.conf import BTC_NETWORK
+from pisa.db_manager import DBManager
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
 logger = Logger("Daemon")
@@ -37,8 +40,23 @@ if __name__ == '__main__':
 
     else:
         try:
-            # Fire the api
-            start_api()
+            db_manager = DBManager(DB_PATH)
+
+            watcher_appointments = db_manager.load_watcher_appointments()
+            responder_jobs = db_manager.load_responder_jobs()
+
+            if len(watcher_appointments) == 0 and len(responder_jobs) == 0:
+                logger.info("Fresh bootstrap")
+
+            else:
+                logger.info("Bootstrapping from backed up data")
+
+            watcher = Watcher(db_manager)
+
+            # Create an instance of the Watcher and fire the API
+            start_api(watcher)
+
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
+

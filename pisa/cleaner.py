@@ -8,7 +8,7 @@ logger = Logger("Cleaner")
 
 class Cleaner:
     @staticmethod
-    def delete_expired_appointment(expired_appointments, appointments, locator_uuid_map):
+    def delete_expired_appointment(expired_appointments, appointments, locator_uuid_map, db_manager):
         for uuid in expired_appointments:
             locator = appointments[uuid].locator
 
@@ -22,8 +22,11 @@ class Cleaner:
 
             logger.info("End time reached with no match. Deleting appointment.", locator=locator, uuid=uuid)
 
+            # Delete appointment from the db
+            db_manager.delete_watcher_appointment(uuid)
+
     @staticmethod
-    def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height):
+    def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager):
         for uuid, confirmations in completed_jobs:
             logger.info("Job completed. Appointment ended after reaching enough confirmations.",
                         uuid=uuid, height=height, confirmations=confirmations)
@@ -39,3 +42,7 @@ class Cleaner:
 
             else:
                 tx_job_map[justice_txid].remove(uuid)
+
+            # Delete appointment from the db (both watchers's and responder's)
+            db_manager.ddelete_watcher_appointment(uuid)
+            db_manager.delete_responder_job(uuid)

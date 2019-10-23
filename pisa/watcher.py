@@ -18,14 +18,18 @@ logger = Logger("Watcher")
 
 
 class Watcher:
-    def __init__(self, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, responder=None, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.block_queue = None
         self.asleep = True
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
-        self.responder = Responder()
+
+        if not isinstance(responder, Responder):
+            self.responder = Responder(db_manager)
+
+        self.db_manager = db_manager
 
         if PISA_SECRET_KEY is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
@@ -71,6 +75,8 @@ class Watcher:
 
                 logger.info("Waking up")
 
+            self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+
             appointment_added = True
 
             logger.info("New appointment accepted.", locator=appointment.locator)
@@ -103,7 +109,8 @@ class Watcher:
                 expired_appointments = [uuid for uuid, appointment in self.appointments.items()
                                         if block["height"] > appointment.end_time + EXPIRY_DELTA]
 
-                Cleaner.delete_expired_appointment(expired_appointments, self.appointments, self.locator_uuid_map)
+                Cleaner.delete_expired_appointment(expired_appointments, self.appointments, self.locator_uuid_map,
+                                                   self.db_manager)
 
                 potential_matches = BlockProcessor.get_potential_matches(txids, self.locator_uuid_map)
                 matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
@@ -118,16 +125,23 @@ class Watcher:
                                                     self.appointments[uuid].end_time)
 
                     # Delete the appointment
-                    self.appointments.pop(uuid)
+                    appointment = self.appointments.pop(uuid)
 
                     # If there was only one appointment that matches the locator we can delete the whole list
                     if len(self.locator_uuid_map[locator]) == 1:
-                        # ToDo: #9-add-data-persistence
                         self.locator_uuid_map.pop(locator)
                     else:
                         # Otherwise we just delete the appointment that matches locator:appointment_pos
-                        # ToDo: #9-add-data-persistence
                         self.locator_uuid_map[locator].remove(uuid)
+
+                    # DISCUSS: instead of deleting the appointment, we will mark it as triggered and delete it from both
+                    #          the watcher's and responder's db after fulfilled
+                    # Update appointment in the db
+                    appointment["triggered"] = True
+                    self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+
+                    # Register the last processed block for the watcher
+                    self.db_manager.store_last_block_watcher(block_hash)
 
         # Go back to sleep if there are no more appointments
         self.asleep = True

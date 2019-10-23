@@ -38,7 +38,7 @@ class Job:
 
 
 class Responder:
-    def __init__(self):
+    def __init__(self, db_manager):
         self.jobs = dict()
         self.tx_job_map = dict()
         self.unconfirmed_txs = []
@@ -46,6 +46,7 @@ class Responder:
         self.block_queue = None
         self.asleep = True
         self.zmq_subscriber = None
+        self.db_manager = db_manager
 
     def add_response(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, retry=False):
         if self.asleep:
@@ -67,7 +68,8 @@ class Responder:
         return receipt
 
     def create_job(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations=0):
-        self.jobs[uuid] = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+        job = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+        self.jobs[uuid] = job
 
         if justice_txid in self.tx_job_map:
             self.tx_job_map[justice_txid].append(uuid)
@@ -77,6 +79,8 @@ class Responder:
 
         if confirmations == 0:
             self.unconfirmed_txs.append(justice_txid)
+
+        self.db_manager.store_responder_job(uuid.encode, job.to_json())
 
         logger.info("New job added.", dispute_txid=dispute_txid, justice_txid=justice_txid,
                     appointment_end=appointment_end)
@@ -128,6 +132,9 @@ class Responder:
 
                     # ToDo: #24-properly-handle-reorgs
                     self.handle_reorgs()
+
+                # Register the last processed block for the responder
+                self.db_manager.store_last_block_responder(block_hash)
 
                 prev_block_hash = block.get('hash')
 

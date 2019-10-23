@@ -20,6 +20,8 @@ HTTP_SERVICE_UNAVAILABLE = 503
 
 logger = Logger("API")
 
+watcher = None
+
 
 @app.route('/', methods=['POST'])
 def add_appointment():
@@ -30,6 +32,7 @@ def add_appointment():
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
+    inspector = Inspector()
     appointment = inspector.inspect(request_data)
 
     error = None
@@ -125,13 +128,12 @@ def get_block_count():
     return jsonify({"block_count": BlockProcessor.get_block_count()})
 
 
-def start_api():
+def start_api(w):
     # FIXME: Pretty ugly but I haven't found a proper way to pass it to add_appointment
-    global watcher, inspector
+    global watcher
 
     # ToDo: #18-separate-api-from-watcher
-    watcher = Watcher()
-    inspector = Inspector()
+    watcher = w
 
     # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
