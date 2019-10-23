@@ -6,7 +6,7 @@ from os import urandom
 from pisa.carrier import Carrier
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
-from test.unit.conftest import generate_block
+from test.unit.conftest import generate_blocks
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
 logging.getLogger().disabled = True
@@ -25,7 +25,6 @@ def carrier():
 
 
 def test_send_transaction(run_bitcoind, carrier):
-    # We are mocking bitcoind and in our simulator txid == tx
     tx = TX.create_dummy_transaction()
     txid = sha256d(tx)
 
@@ -43,8 +42,7 @@ def test_send_double_spending_transaction(carrier):
     sent_txs.append(txid)
 
     # Wait for a block to be mined
-    for _ in range(2):
-        generate_block()
+    generate_blocks(2)
 
     # Try to send it again
     receipt2 = carrier.send_transaction(tx, txid)

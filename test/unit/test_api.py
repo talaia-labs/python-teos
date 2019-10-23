@@ -1,6 +1,7 @@
 import json
 import pytest
 import requests
+from os import urandom
 from hashlib import sha256
 from binascii import unhexlify
 
@@ -97,6 +98,16 @@ def test_request_appointment(new_appointment):
 
     # Check that all the appointments are being watched
     assert (all([status == "being_watched" for status in appointment_status]))
+
+
+def test_request_random_appointment():
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + urandom(32).hex())
+    assert (r.status_code == 200)
+
+    received_appointments = json.loads(r.content)
+    appointment_status = [appointment.pop("status") for appointment in received_appointments]
+
+    assert (all([status == "not_found" for status in appointment_status]))
 
 
 def test_add_appointment_multiple_times(new_appointment, n=MULTIPLE_APPOINTMENTS):

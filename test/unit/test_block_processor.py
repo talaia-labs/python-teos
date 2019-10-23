@@ -43,6 +43,12 @@ def test_get_block(best_block_hash):
     assert block.get('hash') == best_block_hash and 'height' in block and 'previousblockhash' in block and 'tx' in block
 
 
+def test_get_random_block():
+    block = BlockProcessor.get_block(urandom(32).hex())
+
+    assert block is None
+
+
 def test_get_block_count():
     block_count = BlockProcessor.get_block_count()
     assert isinstance(block_count, int) and block_count >= 0
@@ -53,6 +59,15 @@ def test_potential_matches(txids, locator_uuid_map):
 
     # All the txids must match
     assert locator_uuid_map.keys() == potential_matches.keys()
+
+
+def test_potential_matches_random(locator_uuid_map):
+    txids = [urandom(32).hex() for _ in range(len(locator_uuid_map))]
+
+    potential_matches = BlockProcessor.get_potential_matches(txids, locator_uuid_map)
+
+    # None of the ids should match
+    assert len(potential_matches) == 0
 
 
 def test_potential_matches_random_data(locator_uuid_map):

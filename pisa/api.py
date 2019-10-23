@@ -93,7 +93,7 @@ def get_appointment():
                 response.append(job_data)
 
     if not response:
-        response.append({"locator": locator, "status": "not found"})
+        response.append({"locator": locator, "status": "not_found"})
 
     response = jsonify(response)
 

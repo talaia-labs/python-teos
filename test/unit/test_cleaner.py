@@ -45,14 +45,14 @@ def set_up_jobs(total_jobs):
         txid = urandom(32).hex()
 
         # Assign both justice_txid and dispute_txid the same id (it shouldn't matter)
-        jobs[uuid] = Job(txid, txid, None, None, None)
+        jobs[uuid] = Job(txid, txid, None, None)
         tx_job_map[txid] = [uuid]
 
         # Each justice_txid can have more than one uuid assigned to it. Do a coin toss to add multiple ones
         while random.randint(0, 1):
             uuid = uuid4().hex
 
-            jobs[uuid] = Job(txid, txid, None, None, None)
+            jobs[uuid] = Job(txid, txid, None, None)
             tx_job_map[txid].append(uuid)
 
     return jobs, tx_job_map

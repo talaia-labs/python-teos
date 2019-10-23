@@ -65,6 +65,7 @@ class BlockProcessor:
         return potential_matches
 
     @staticmethod
+    # NOTCOVERED
     def get_matches(potential_matches, locator_uuid_map, appointments):
         matches = []
 
@@ -89,6 +90,7 @@ class BlockProcessor:
 
     # DISCUSS: This method comes from the Responder and seems like it could go back there.
     @staticmethod
+    # NOTCOVERED
     def check_confirmations(txs, unconfirmed_txs, tx_job_map, missed_confirmations):
 
         for tx in txs:
