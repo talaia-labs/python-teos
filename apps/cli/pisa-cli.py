@@ -190,7 +190,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
 
     appointment = {
         'locator': locator, 'start_block': start_block, 'end_block': end_block, 'dispute_delta': dispute_delta,
-        'encrypted_blob': encrypted_blob, 'cipher': cipher, 'hash_function': hash_function }
+        'encrypted_blob': encrypted_blob, 'cipher': cipher, 'hash_function': hash_function}
 
     return appointment
 
