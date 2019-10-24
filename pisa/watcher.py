@@ -34,6 +34,10 @@ class Watcher:
                 secret_key_pem = key_file.read().encode("utf-8")
                 self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
 
+    def sign_appointment(self, appointment):
+        data = appointment.to_json().encode("utf-8")
+        return self.signing_key.sign(data, ec.ECDSA(hashes.SHA256()))
+
     def add_appointment(self, appointment):
         # Rationale:
         # The Watcher will analyze every received block looking for appointment matches. If there is no work
@@ -73,10 +77,7 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
-            signature = self.signing_key.sign(
-                appointment.to_json().encode("utf-8"),
-                ec.ECDSA(hashes.SHA256())
-            )
+            signature = self.sign_appointment(appointment)
         else:
             appointment_added = False
 
