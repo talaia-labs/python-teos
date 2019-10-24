@@ -118,7 +118,6 @@ def test_add_appointment(run_bitcoind, watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-
         verify_signature(appointment, sig, public_key)
 
 
@@ -137,6 +136,7 @@ def test_add_too_many_appointments(watcher):
     added_appointment, sig = watcher.add_appointment(appointment)
 
     assert added_appointment is False
+    assert sig is None
 
 
 def test_do_subscribe(watcher):
