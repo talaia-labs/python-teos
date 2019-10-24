@@ -122,7 +122,7 @@ class Responder:
                     txs_to_rebroadcast = self.get_txs_to_rebroadcast(txs)
                     completed_jobs = self.get_completed_jobs(height)
 
-                    Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map, completed_jobs, height)
+                    Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map, completed_jobs, height, self.db_manager)
                     self.rebroadcast(txs_to_rebroadcast)
 
                 # NOTCOVERED

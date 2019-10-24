@@ -20,7 +20,7 @@ class DBManager:
     def load_appointments_db(self, prefix):
         data = {}
 
-        for k, v in self.db.iterator(prefix=prefix):
+        for k, v in self.db.iterator(prefix=prefix.encode('utf-8')):
             # Get uuid and appointment_data from the db
             uuid = k[1:].decode('utf-8')
             data[uuid] = json.loads(v)
