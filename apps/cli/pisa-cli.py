@@ -50,6 +50,8 @@ def generate_dummy_appointment():
 # Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
 # Will raise ValueError if it the public key file was present but it failed to be unserialized.
 def is_appointment_signature_valid(appointment, signature):
+    global pisa_public_key
+
     # Load the key the first time this is used
     if pisa_public_key is None:
         try:
@@ -178,7 +180,7 @@ def get_appointment(args):
         logger.error("The provided locator is not valid.")
 
 
-def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
+def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
     locator = sha256(unhexlify(tx_id)).hexdigest()
 
     cipher = "AES-GCM-128"
@@ -189,7 +191,7 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
     encrypted_blob = blob.encrypt(tx_id)
 
     appointment = {
-        'locator': locator, 'start_block': start_block, 'end_block': end_block, 'dispute_delta': dispute_delta,
+        'locator': locator, 'start_time': start_time, 'end_time': end_time, 'dispute_delta': dispute_delta,
         'encrypted_blob': encrypted_blob, 'cipher': cipher, 'hash_function': hash_function}
 
     return appointment
