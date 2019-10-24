@@ -4,7 +4,7 @@ import plyvel
 from pisa.logger import Logger
 from pisa.conf import WATCHER_PREFIX, RESPONDER_PREFIX, WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY
 
-logger = Logger("Daemon")
+logger = Logger("DBManager")
 
 
 class DBManager:
