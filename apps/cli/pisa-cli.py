@@ -9,22 +9,20 @@ from binascii import unhexlify
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
-from pisa.logger import Logger
-from pisa.appointment import Appointment
-
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
+from apps.cli import logger
 from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY
 
-HTTP_OK = 200
 
-logger = Logger("Client")
+HTTP_OK = 200
 
 pisa_public_key = None
 
