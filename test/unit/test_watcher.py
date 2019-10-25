@@ -82,13 +82,14 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
-def verify_signature(appointment, signature, pk):
+def is_signature_valid(appointment, signature, pk):
     # verify the signature
     try:
         data = appointment.to_json().encode('utf-8')
         pk.verify(signature, data, ec.ECDSA(hashes.SHA256()))
     except InvalidSignature:
-        assert False, "The appointment's signature is not correct"
+        return False
+    return True
 
 
 def test_init(watcher):
@@ -104,7 +105,7 @@ def test_init(watcher):
 def test_sign_appointment(watcher):
     appointment, _ = generate_dummy_appointment()
     signature = watcher.sign_appointment(appointment)
-    verify_signature(appointment, signature, public_key)
+    assert is_signature_valid(appointment, signature, public_key)
 
 
 def test_add_appointment(run_bitcoind, watcher):
@@ -118,7 +119,7 @@ def test_add_appointment(run_bitcoind, watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        verify_signature(appointment, sig, public_key)
+        assert is_signature_valid(appointment, sig, public_key)
 
 
 def test_add_too_many_appointments(watcher):
@@ -130,7 +131,7 @@ def test_add_too_many_appointments(watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        verify_signature(appointment, sig, public_key)
+        assert is_signature_valid(appointment, sig, public_key)
 
     appointment, dispute_tx = generate_dummy_appointment()
     added_appointment, sig = watcher.add_appointment(appointment)
