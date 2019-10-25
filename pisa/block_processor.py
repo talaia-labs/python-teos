@@ -45,6 +45,21 @@ class BlockProcessor:
 
         return block_count
 
+    def get_distance_to_tip(self, target_block_hash):
+        distance = None
+
+        chain_tip = self.get_best_block_hash()
+        chain_tip_height = self.get_block(chain_tip).get("height")
+
+        target_block = self.get_block(target_block_hash).get("height")
+
+        if target_block is not None:
+            target_block_height = target_block.get("height")
+
+            distance = chain_tip_height - target_block_height
+
+        return distance
+
     # FIXME: The following two functions does not seem to belong here. They come from the Watcher, and need to be
     #        separated since they will be reused by the TimeTraveller.
     # DISCUSS: 36-who-should-check-appointment-trigger
