@@ -44,15 +44,18 @@ def sign_appointment(sk, appointment):
 def test_is_appointment_signature_valid():
     # Verify that an appointment signed by Pisa is valid
     signature = sign_appointment(pisa_sk, dummy_appointment)
-    assert pisa_cli.is_appointment_signature_valid(dummy_appointment, signature)
+    assert pisa_cli.is_appointment_signature_valid(dummy_appointment, signature, pisa_pk)
 
     # Test that a signature from a different key is indeed invalid
     other_signature = sign_appointment(other_sk, dummy_appointment)
-    assert not pisa_cli.is_appointment_signature_valid(dummy_appointment, other_signature)
+    assert not pisa_cli.is_appointment_signature_valid(dummy_appointment, other_signature, pisa_pk)
 
 
 @responses.activate
 def test_add_appointment():
+    # Simulate a request to add_appointment for dummy_appointment, make sure that the right endpoint is requested
+    # and the return value is True
+
     response = {
         'locator': dummy_appointment['locator'],
         'signature': sign_appointment(pisa_sk, dummy_appointment)
@@ -61,7 +64,26 @@ def test_add_appointment():
     request_url = 'http://{}/'.format(pisa_endpoint)
     responses.add(responses.POST, request_url, json=response, status=200)
 
-    pisa_cli.add_appointment([json.dumps(dummy_appointment_request)])
+    result = pisa_cli.add_appointment([json.dumps(dummy_appointment_request)])
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == request_url
+
+    assert result
+
+
+@responses.activate
+def test_add_appointment_with_invalid_signature():
+    # Simulate a request to add_appointment for dummy_appointment, but sign with a different key,
+    # make sure that the right endpoint is requested, but the return value is False
+    response = {
+        'locator': dummy_appointment['locator'],
+        'signature': sign_appointment(other_sk, dummy_appointment)  # signing with a different key
+    }
+
+    request_url = 'http://{}/'.format(pisa_endpoint)
+    responses.add(responses.POST, request_url, json=response, status=200)
+
+    result = pisa_cli.add_appointment([json.dumps(dummy_appointment_request)])
+
+    assert not result

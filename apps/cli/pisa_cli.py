@@ -44,19 +44,22 @@ def generate_dummy_appointment():
     print('\nData stored in dummy_appointment_data.json')
 
 
-# Loads Pisa's public key from disk and verifies that the appointment signature is a valid signature from Pisa,
-# returning True or False accordingly.
+# Loads and returns Pisa's public key from disk.
 # Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
 # Will raise ValueError if it the public key file was present but it failed to be deserialized.
-def is_appointment_signature_valid(appointment, signature) -> bool:
-    # Load the key from disk
+def load_pisa_public_key():
     try:
         with open(PISA_PUBLIC_KEY, "r") as key_file:
             pubkey_pem = key_file.read().encode("utf-8")
             pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
+            return pisa_public_key
     except UnsupportedAlgorithm:
         raise ValueError("Could not deserialize the public key (unsupported algorithm).")
 
+
+# Verifies that the appointment signature is a valid signature with public key `pk`,
+# returning True or False accordingly.
+def is_appointment_signature_valid(appointment, signature, pk):
     try:
         sig_bytes = unhexlify(signature.encode('utf-8'))
         data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
@@ -130,15 +133,15 @@ def add_appointment(args):
 
                 except json.JSONDecodeError:
                     logger.error("The response was not valid JSON.")
-                    return
+                    return False
 
                 except ConnectTimeout:
                     logger.error("Can't connect to pisa API. Connection timeout.")
-                    return
+                    return False
 
                 except ConnectionError:
                     logger.error("Can't connect to pisa API. Server cannot be reached.")
-                    return
+                    return False
 
                 if r.status_code == HTTP_OK:
                     if 'signature' not in response_json:
@@ -147,22 +150,24 @@ def add_appointment(args):
                         signature = response_json['signature']
                         # verify that the returned signature is valid
                         try:
-                            is_sig_valid = is_appointment_signature_valid(appointment, signature)
+                            pk = load_pisa_public_key()
+                            is_sig_valid = is_appointment_signature_valid(appointment, signature, pk)
                         except ValueError:
                             logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
-                            return
+                            return False
                         except FileNotFoundError:
                             logger.error("Pisa's public key file not found. Please check your settings.")
-                            return
+                            return False
                         except IOError as e:
                             logger.error("I/O error({}): {}".format(e.errno, e.strerror))
-                            return
+                            return False
 
                         if is_sig_valid:
                             logger.info("Appointment accepted and signed by Pisa.")
                             # all good, store appointment and signature
                             try:
                                 save_signed_appointment(appointment, signature)
+                                return True
                             except OSError as e:
                                 logger.error("There was an error while saving the appointment: {}".format(e))
                         else:
@@ -182,6 +187,8 @@ def add_appointment(args):
     else:
         logger.error("No appointment data provided. " + use_help)
 
+    return False  # return False for any path that returned an error message
+
 
 def get_appointment(args):
     if args:
@@ -200,7 +207,7 @@ def get_appointment(args):
                 r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
 
                 print(json.dumps(r.json(), indent=4, sort_keys=True))
-
+                return True
             except ConnectTimeout:
                 logger.error("Can't connect to pisa API. Connection timeout.")
 
@@ -212,6 +219,8 @@ def get_appointment(args):
 
     else:
         logger.error("The provided locator is not valid.")
+
+    return False  # return False for any path that returned an error message
 
 
 def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
