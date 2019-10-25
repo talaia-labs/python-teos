@@ -13,8 +13,11 @@ For example, for user alice running a UNIX system and having `apps` in her home 
 You should also include the command in your `.bash_rc` to avoid having to run it every time you open a new terminal. You can do it by running:
 
 	echo 'export PYTHONPATH=$PYTHONPATH:<absolute_path_to_apps>' >> ~/.bash_rc
+
+
+Create the tower configuration file called `conf.py` in `/pisa_btc/pisa` directory. `Sample_conf.py` shows what values can be set in the file, including suggested default values. 
 	
-Once the `PYTHONPATH` is set, you should be able to run `pisa-cli` straightaway. Try it by running:
+Once that's all set, you should be able to run `pisa-cli` straightaway. Try it by running:
 
 	cd <absolute_path_to_apps>/apps/cli
 	python pisa-cli.py -h
