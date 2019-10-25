@@ -28,6 +28,19 @@ class Job:
         #        can be directly got from DB
         self.locator = sha256(unhexlify(dispute_txid)).hexdigest()
 
+    @classmethod
+    def from_dict(cls, jobs_data):
+        dispute_txid = jobs_data.get("dispute_txid")
+        justice_txid = jobs_data.get("justice_txid")
+        justice_rawtx = jobs_data.get("justice_rawtx")
+        appointment_end = jobs_data.get("appointment_end")
+
+        if all([dispute_txid, justice_txid, justice_rawtx, appointment_end]) is not None:
+            job = cls(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+
+        else:
+            raise ValueError("Wrong job data, some fields are missing")
+
     def to_dict(self):
         job = {"locator": self.locator, "justice_rawtx": self.justice_rawtx, "appointment_end": self.appointment_end}
 
@@ -48,7 +61,20 @@ class Responder:
         self.zmq_subscriber = None
         self.db_manager = db_manager
 
-    def add_response(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, retry=False):
+    @staticmethod
+    def on_sync(block_hash):
+        block_processor = BlockProcessor()
+        distance_from_tip = block_processor.get_distance_to_tip(block_hash)
+
+        if distance_from_tip is not None and distance_from_tip > 1:
+            synchronized = False
+
+        else:
+            synchronized = True
+
+        return synchronized
+
+    def add_response(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, block_hash, retry=False):
         if self.asleep:
             logger.info("Waking up")
 
@@ -63,6 +89,8 @@ class Responder:
 
         else:
             # TODO: Add the missing reasons (e.g. RPC_VERIFY_REJECTED)
+            # TODO: Use self.on_sync(block_hash) to check whether or not we failed because we are out of sync
+            logger.warning("Job failed.", uuid=uuid, on_sync=self.on_sync(block_hash))
             pass
 
         return receipt
