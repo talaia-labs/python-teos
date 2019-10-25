@@ -2,7 +2,7 @@ import logging
 from .logger import Logger
 
 # PISA-SERVER
-DEFAULT_PISA_API_SERVER = 'btc.pisa.watch'
+DEFAULT_PISA_API_SERVER = 'localhost'
 DEFAULT_PISA_API_PORT = 9814
 
 # PISA-CLI

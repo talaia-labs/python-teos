@@ -46,8 +46,6 @@ class Watcher:
         # If the watcher is awake, every new appointment will just be added to the appointment list until
         # max_appointments is reached.
 
-        signature = None
-
         if len(self.appointments) < self.max_appointments:
             # Appointments are identified by the locator: the sha256 of commitment txid (H(tx_id)).
             # Two different nodes may ask for appointments using the same commitment txid, what will result in a
@@ -80,6 +78,7 @@ class Watcher:
             signature = self.sign_appointment(appointment)
         else:
             appointment_added = False
+            signature = None
 
             logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
 

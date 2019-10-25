@@ -67,12 +67,13 @@ def is_appointment_signature_valid(appointment, signature):
     return True
 
 
+# Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
 def save_signed_appointment(appointment, signature):
     # Create the appointments directory if it doesn't already exist
     try:
         os.makedirs(APPOINTMENTS_FOLDER_NAME)
     except FileExistsError:
-        # directory already exists
+        # directory already exists, this is fine
         pass
 
     timestamp = int(time.time()*1000)
@@ -127,41 +128,56 @@ def add_appointment(args):
                     r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
 
                     response_json = r.json()
-                    print(response_json)
-
-                    if r.status_code == HTTP_OK:
-                        if 'signature' not in response_json:
-                            logger.error("The response does not contain the signature of the appointment.")
-                        else:
-                            signature = response_json['signature']
-                            # verify that the returned signature is valid
-                            if is_appointment_signature_valid(appointment, signature):
-                                logger.info("Appointment accepted and signed by Pisa.")
-                                # TODO: store on disk
-                                save_signed_appointment(appointment, signature)
-                            else:
-                                logger.error("The returned appointment's signature is invalid.")
-                    else:
-                        if 'error' not in response_json:
-                            logger.error("The server returned status code {}, but no error description."
-                                         .format(r.status_code))
-                        else:
-                            error = r.json()['error']
-                            logger.error("The server returned status code {}, and the following error: {}."
-                                         .format(r.status_code, error))
 
                 except json.JSONDecodeError:
                     logger.error("The response was not valid JSON.")
+                    return
 
                 except ConnectTimeout:
                     logger.error("Can't connect to pisa API. Connection timeout.")
+                    return
 
                 except ConnectionError:
                     logger.error("Can't connect to pisa API. Server cannot be reached.")
-                except FileNotFoundError:
-                    logger.error("Pisa's public key file not found. Please check your settings.")
-                except IOError as e:
-                    logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+                    return
+
+                if r.status_code == HTTP_OK:
+                    if 'signature' not in response_json:
+                        logger.error("The response does not contain the signature of the appointment.")
+                    else:
+                        signature = response_json['signature']
+                        # verify that the returned signature is valid
+                        try:
+                            is_sig_valid = is_appointment_signature_valid(appointment, signature)
+                        except ValueError:
+                            logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+                            return
+                        except FileNotFoundError:
+                            logger.error("Pisa's public key file not found. Please check your settings.")
+                            return
+                        except IOError as e:
+                            logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+                            return
+
+                        if is_sig_valid:
+                            logger.info("Appointment accepted and signed by Pisa.")
+                            # all good, store appointment and signature
+                            try:
+                                save_signed_appointment(appointment, signature)
+                            except OSError as e:
+                                logger.error("There was an error while saving the appointment: {}".format(e))
+                        else:
+                            logger.error("The returned appointment's signature is invalid.")
+
+                else:
+                    if 'error' not in response_json:
+                        logger.error("The server returned status code {}, but no error description."
+                                     .format(r.status_code))
+                    else:
+                        error = r.json()['error']
+                        logger.error("The server returned status code {}, and the following error: {}."
+                                     .format(r.status_code, error))
+
             else:
                 logger.error("The provided locator is not valid.")
     else:
