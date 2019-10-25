@@ -122,7 +122,7 @@ class Watcher:
                                     locator=locator, uuid=uuid)
 
                         self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
-                                                    self.appointments[uuid].end_time)
+                                                    self.appointments[uuid].end_time, block_hash)
 
                     # Delete the appointment
                     appointment = self.appointments.pop(uuid)
