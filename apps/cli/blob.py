@@ -4,9 +4,7 @@ from binascii import hexlify, unhexlify
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from apps.cli import SUPPORTED_HASH_FUNCTIONS, SUPPORTED_CIPHERS
-from pisa.logger import Logger
-
-logger = Logger("Client")
+from apps.cli import logger
 
 
 class Blob:

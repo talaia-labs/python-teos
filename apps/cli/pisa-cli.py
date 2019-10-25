@@ -18,8 +18,8 @@ from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli import logger
 from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY
+from apps.cli import logger
 
 
 HTTP_OK = 200
