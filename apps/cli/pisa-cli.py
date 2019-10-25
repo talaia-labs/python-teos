@@ -24,8 +24,6 @@ from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC
 
 HTTP_OK = 200
 
-pisa_public_key = None
-
 
 # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
 def generate_dummy_appointment():
@@ -44,20 +42,19 @@ def generate_dummy_appointment():
     print('\nData stored in dummy_appointment_data.json')
 
 
-# Verifies that the appointment signature is a valid signature from Pisa, returning True or False accordingly.
+# Loads Pisa's public key from disk and verifies that the appointment signature is a valid signature from Pisa,
+# returning True or False accordingly.
 # Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
 # Will raise ValueError if it the public key file was present but it failed to be unserialized.
 def is_appointment_signature_valid(appointment, signature):
-    global pisa_public_key
+    # Load the key from disk
+    try:
+        with open(PISA_PUBLIC_KEY, "r") as key_file:
+            pubkey_pem = key_file.read().encode("utf-8")
+            pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
+    except UnsupportedAlgorithm:
+        raise ValueError("Could not unserialize the public key (unsupported algorithm).")
 
-    # Load the key the first time this is used
-    if pisa_public_key is None:
-        try:
-            with open(PISA_PUBLIC_KEY, "r") as key_file:
-                pubkey_pem = key_file.read().encode("utf-8")
-                pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
-        except UnsupportedAlgorithm:
-            raise ValueError("Could not unserialize the public key (unsupported algorithm).")
     try:
         sig_bytes = unhexlify(signature.encode('utf-8'))
         data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
