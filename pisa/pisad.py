@@ -6,7 +6,9 @@ from pisa.conf import DB_PATH
 from pisa.logger import Logger
 from pisa.api import start_api
 from pisa.watcher import Watcher
+from pisa.builder import Builder
 from pisa.conf import BTC_NETWORK
+from pisa.responder import Responder
 from pisa.db_manager import DBManager
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
@@ -42,16 +44,21 @@ if __name__ == '__main__':
         try:
             db_manager = DBManager(DB_PATH)
 
-            watcher_appointments = db_manager.load_watcher_appointments()
-            responder_jobs = db_manager.load_responder_jobs()
+            watcher_appointments_data = db_manager.load_watcher_appointments()
+            responder_jobs_data = db_manager.load_responder_jobs()
 
-            if len(watcher_appointments) == 0 and len(responder_jobs) == 0:
+            watcher = Watcher(db_manager)
+
+            if len(watcher_appointments_data) == 0 and len(responder_jobs_data) == 0:
                 logger.info("Fresh bootstrap")
 
             else:
                 logger.info("Bootstrapping from backed up data")
+                responder = Responder(db_manager)
+                responder.jobs, responder.tx_job_map = Builder.build_jobs(responder_jobs_data)
 
-            watcher = Watcher(db_manager)
+                watcher.responder = responder
+                watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(watcher_appointments_data)
 
             # Create an instance of the Watcher and fire the API
             start_api(watcher)
