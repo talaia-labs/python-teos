@@ -1,5 +1,5 @@
 import logging
-from logger import Logger
+from .logger import Logger
 
 # PISA-SERVER
 DEFAULT_PISA_API_SERVER = 'btc.pisa.watch'
@@ -7,6 +7,7 @@ DEFAULT_PISA_API_PORT = 9814
 
 # PISA-CLI
 CLIENT_LOG_FILE = 'pisa-cli.log'
+APPOINTMENTS_FOLDER_NAME = 'appointments'
 
 # CRYPTO
 SUPPORTED_HASH_FUNCTIONS = ["SHA256"]

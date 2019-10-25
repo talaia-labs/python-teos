@@ -3,11 +3,13 @@ import os
 import sys
 import json
 import requests
+import time
 from sys import argv
 from hashlib import sha256
 from binascii import unhexlify
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
+from uuid import uuid4
 
 
 from cryptography.hazmat.backends import default_backend
@@ -18,7 +20,7 @@ from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY
+from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY, APPOINTMENTS_FOLDER_NAME
 from apps.cli import logger
 
 
@@ -45,7 +47,7 @@ def generate_dummy_appointment():
 # Loads Pisa's public key from disk and verifies that the appointment signature is a valid signature from Pisa,
 # returning True or False accordingly.
 # Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
-# Will raise ValueError if it the public key file was present but it failed to be unserialized.
+# Will raise ValueError if it the public key file was present but it failed to be deserialized.
 def is_appointment_signature_valid(appointment, signature):
     # Load the key from disk
     try:
@@ -53,7 +55,7 @@ def is_appointment_signature_valid(appointment, signature):
             pubkey_pem = key_file.read().encode("utf-8")
             pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
     except UnsupportedAlgorithm:
-        raise ValueError("Could not unserialize the public key (unsupported algorithm).")
+        raise ValueError("Could not deserialize the public key (unsupported algorithm).")
 
     try:
         sig_bytes = unhexlify(signature.encode('utf-8'))
@@ -63,6 +65,24 @@ def is_appointment_signature_valid(appointment, signature):
         return False
 
     return True
+
+
+def save_signed_appointment(appointment, signature):
+    # Create the appointments directory if it doesn't already exist
+    try:
+        os.makedirs(APPOINTMENTS_FOLDER_NAME)
+    except FileExistsError:
+        # directory already exists
+        pass
+
+    timestamp = int(time.time()*1000)
+    locator = appointment['locator']
+    uuid = uuid4()  # prevent filename collisions
+    filename = "{}/appointment-{}-{}-{}.json".format(APPOINTMENTS_FOLDER_NAME, timestamp, locator, uuid)
+    data = {"appointment": appointment, "signature": signature}
+
+    with open(filename, "w") as f:
+        json.dump(data, f)
 
 
 def add_appointment(args):
@@ -106,16 +126,20 @@ def add_appointment(args):
                 try:
                     r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
 
-                    logger.info("{} (code: {}).".format(r.json(), r.status_code))
-
                     response_json = r.json()
+                    print(response_json)
 
                     if r.status_code == HTTP_OK:
                         if 'signature' not in response_json:
                             logger.error("The response does not contain the signature of the appointment.")
                         else:
+                            signature = response_json['signature']
                             # verify that the returned signature is valid
-                            if not is_appointment_signature_valid(appointment, response_json['signature']):
+                            if is_appointment_signature_valid(appointment, signature):
+                                logger.info("Appointment accepted and signed by Pisa.")
+                                # TODO: store on disk
+                                save_signed_appointment(appointment, signature)
+                            else:
                                 logger.error("The returned appointment's signature is invalid.")
                     else:
                         if 'error' not in response_json:
