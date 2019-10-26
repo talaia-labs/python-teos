@@ -137,7 +137,7 @@ class Watcher:
                     # DISCUSS: instead of deleting the appointment, we will mark it as triggered and delete it from both
                     #          the watcher's and responder's db after fulfilled
                     # Update appointment in the db
-                    appointment["triggered"] = True
+                    appointment.triggered = True
                     self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
 
                     # Register the last processed block for the watcher

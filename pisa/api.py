@@ -5,7 +5,6 @@ from binascii import hexlify
 
 from pisa import HOST, PORT, logging
 from pisa.logger import Logger
-from pisa.watcher import Watcher
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor

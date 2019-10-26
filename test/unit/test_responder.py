@@ -15,8 +15,8 @@ from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 
 @pytest.fixture(scope="module")
-def responder():
-    return Responder()
+def responder(db_manager):
+    return Responder(db_manager)
 
 
 def create_dummy_job_data(random_txid=False, justice_rawtx=None):
@@ -94,7 +94,9 @@ def test_add_response(responder):
     # setting the state to awake.
     responder.asleep = False
 
-    receipt = responder.add_response(uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx, job.appointment_end)
+    # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
+    receipt = responder.add_response(uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx, job.appointment_end,
+                                     block_hash=get_random_value_hex(32))
 
     assert receipt.delivered is True
 
@@ -235,12 +237,12 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_jobs():
+def test_get_completed_jobs(db_manager):
     bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
     initial_height = bitcoin_cli.getblockcount()
 
     # Let's use a fresh responder for this to make it easier to compare the results
-    responder = Responder()
+    responder = Responder(db_manager)
 
     # A complete job is a job that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
@@ -285,8 +287,8 @@ def test_get_completed_jobs():
     assert set(completed_jobs_ids) == set(ended_jobs_keys)
 
 
-def test_rebroadcast():
-    responder = Responder()
+def test_rebroadcast(db_manager):
+    responder = Responder(db_manager)
     responder.asleep = False
 
     txs_to_rebroadcast = []
@@ -305,7 +307,8 @@ def test_rebroadcast():
         if (i % 2) == 0:
             txs_to_rebroadcast.append(justice_txid)
 
-    receipts = responder.rebroadcast(txs_to_rebroadcast)
+    # The block_hash passed to rebroadcast does not matter much now. It will in the future to deal with errors
+    receipts = responder.rebroadcast(txs_to_rebroadcast, get_random_value_hex(32))
 
     # All txs should have been delivered and the missed confirmation reset
     for txid, receipt in receipts:

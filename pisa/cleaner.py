@@ -44,5 +44,5 @@ class Cleaner:
                 tx_job_map[justice_txid].remove(uuid)
 
             # Delete appointment from the db (both watchers's and responder's)
-            db_manager.ddelete_watcher_appointment(uuid)
+            db_manager.delete_watcher_appointment(uuid)
             db_manager.delete_responder_job(uuid)

@@ -38,8 +38,8 @@ with open(PISA_SECRET_KEY, "r") as key_file:
 
 
 @pytest.fixture(scope="module")
-def watcher():
-    return Watcher()
+def watcher(db_manager):
+    return Watcher(db_manager)
 
 
 def generate_dummy_appointment():

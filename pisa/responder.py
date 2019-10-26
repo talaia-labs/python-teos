@@ -108,7 +108,7 @@ class Responder:
         if confirmations == 0:
             self.unconfirmed_txs.append(justice_txid)
 
-        self.db_manager.store_responder_job(uuid.encode, job.to_json())
+        self.db_manager.store_responder_job(uuid, job.to_json())
 
         logger.info("New job added.", dispute_txid=dispute_txid, justice_txid=justice_txid,
                     appointment_end=appointment_end)
@@ -151,7 +151,7 @@ class Responder:
                     completed_jobs = self.get_completed_jobs(height)
 
                     Cleaner.delete_completed_jobs(self.jobs, self.tx_job_map, completed_jobs, height, self.db_manager)
-                    self.rebroadcast(txs_to_rebroadcast)
+                    self.rebroadcast(txs_to_rebroadcast, block_hash)
 
                 # NOTCOVERED
                 else:
@@ -199,7 +199,7 @@ class Responder:
 
         return completed_jobs
 
-    def rebroadcast(self, txs_to_rebroadcast):
+    def rebroadcast(self, txs_to_rebroadcast, block_hash):
         # DISCUSS: #22-discuss-confirmations-before-retry
         # ToDo: #23-define-behaviour-approaching-end
 
@@ -211,7 +211,7 @@ class Responder:
             for uuid in self.tx_job_map[txid]:
                 job = self.jobs[uuid]
                 receipt = self.add_response(uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx,
-                                            job.appointment_end, retry=True)
+                                            job.appointment_end, block_hash, retry=True)
 
                 logger.warning("Transaction has missed many confirmations. Rebroadcasting.",
                                justice_txid=job.justice_txid, confirmations_missed=CONFIRMATIONS_BEFORE_RETRY)

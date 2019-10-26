@@ -1,5 +1,4 @@
 import random
-from os import urandom
 from uuid import uuid4
 
 from pisa import logging
@@ -59,23 +58,26 @@ def set_up_jobs(total_jobs):
     return jobs, tx_job_map
 
 
-def test_delete_expired_appointment():
+def test_delete_expired_appointment(db_manager):
+
     for _ in range(ITERATIONS):
         appointments, locator_uuid_map = set_up_appointments(MAX_ITEMS)
         expired_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-        Cleaner.delete_expired_appointment(expired_appointments, appointments, locator_uuid_map)
+        Cleaner.delete_expired_appointment(expired_appointments, appointments, locator_uuid_map, db_manager)
 
         assert not set(expired_appointments).issubset(appointments.keys())
 
 
-def test_delete_completed_jobs():
+def test_delete_completed_jobs(db_manager):
+    height = 0
+
     for _ in range(ITERATIONS):
         jobs, tx_job_map = set_up_jobs(MAX_ITEMS)
         selected_jobs = random.sample(list(jobs.keys()), k=ITEMS)
 
         completed_jobs = [(job, 6) for job in selected_jobs]
 
-        Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, 0)
+        Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager)
 
         assert not set(completed_jobs).issubset(jobs.keys())

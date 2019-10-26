@@ -4,7 +4,10 @@ import requests
 from time import sleep
 from threading import Thread
 
+from pisa.conf import DB_PATH
 from pisa.api import start_api
+from pisa.watcher import Watcher
+from pisa.db_manager import DBManager
 from test.simulator.bitcoind_sim import run_simulator, HOST, PORT
 
 
@@ -20,7 +23,10 @@ def run_bitcoind():
 
 @pytest.fixture(scope='session')
 def run_api():
-    api_thread = Thread(target=start_api)
+    db_manager = DBManager(DB_PATH)
+    watcher = Watcher(db_manager)
+
+    api_thread = Thread(target=start_api, args=[watcher])
     api_thread.daemon = True
     api_thread.start()
 
@@ -31,6 +37,11 @@ def run_api():
 @pytest.fixture(scope='session', autouse=True)
 def prng_seed():
     random.seed(0)
+
+
+@pytest.fixture(scope='session')
+def db_manager():
+    return DBManager('test_db')
 
 
 def get_random_value_hex(nbytes):
