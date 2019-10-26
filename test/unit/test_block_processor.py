@@ -1,13 +1,13 @@
 import pytest
-import logging
 from uuid import uuid4
 from hashlib import sha256
 from binascii import unhexlify
 
+from pisa import c_logger
 from pisa.block_processor import BlockProcessor
 from test.unit.conftest import get_random_value_hex
 
-logging.getLogger().disabled = True
+c_logger.disabled = True
 
 APPOINTMENT_COUNT = 100
 TEST_SET_SIZE = 200

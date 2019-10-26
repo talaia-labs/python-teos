@@ -4,6 +4,7 @@ from uuid import uuid4
 from threading import Thread
 from queue import Queue, Empty
 
+from pisa import c_logger
 from pisa.tools import check_txid_format
 from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
@@ -12,6 +13,8 @@ from pisa.utils.auth_proxy import AuthServiceProxy
 from test.unit.conftest import get_random_value_hex
 from test.unit.conftest import generate_block, generate_blocks
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
+
+c_logger.disabled = True
 
 
 @pytest.fixture(scope="module")

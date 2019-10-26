@@ -1,6 +1,6 @@
 from binascii import unhexlify
 
-from pisa import logging
+from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
@@ -8,14 +8,14 @@ from pisa.block_processor import BlockProcessor
 from test.unit.conftest import get_random_value_hex
 from pisa.conf import MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
+c_logger.disabled = True
+
 inspector = Inspector()
 APPOINTMENT_OK = (0, None)
 
 NO_HEX_STRINGS = ["R" * 64, get_random_value_hex(31) + "PP", "$"*64, " "*64]
 WRONG_TYPES = [[], '', get_random_value_hex(32), 3.2, 2.0, (), object, {}, " "*32, object()]
 WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(32)), 3.2, 2.0, (), object, {}, object()]
-
-logging.getLogger().disabled = True
 
 
 def test_check_locator():

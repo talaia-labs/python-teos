@@ -5,14 +5,14 @@ from hashlib import sha256
 from binascii import unhexlify
 
 from apps.cli.blob import Blob
-from pisa import HOST, PORT, logging
+from pisa import HOST, PORT, c_logger
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
 from test.unit.conftest import generate_block, get_random_value_hex
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
-logging.getLogger().disabled = True
+c_logger.disabled = True
 
 PISA_API = "http://{}:{}".format(HOST, PORT)
 MULTIPLE_APPOINTMENTS = 10

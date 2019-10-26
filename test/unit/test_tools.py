@@ -1,8 +1,8 @@
-from pisa import logging
+from pisa import c_logger
 from pisa.tools import check_txid_format
 from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli
 
-logging.getLogger().disabled = True
+c_logger.disabled = True
 
 
 def test_in_correct_network(run_bitcoind):

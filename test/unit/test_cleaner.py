@@ -1,7 +1,7 @@
 import random
 from uuid import uuid4
 
-from pisa import logging
+from pisa import c_logger
 from pisa.responder import Job
 from pisa.cleaner import Cleaner
 from pisa.appointment import Appointment
@@ -12,7 +12,7 @@ ITEMS = 10
 MAX_ITEMS = 100
 ITERATIONS = 1000
 
-logging.getLogger().disabled = True
+c_logger.disabled = True
 
 
 def set_up_appointments(total_appointments):

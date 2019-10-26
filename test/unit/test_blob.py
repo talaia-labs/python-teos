@@ -1,11 +1,11 @@
 from binascii import unhexlify
 
-from pisa import logging
+from pisa import c_logger
 from apps.cli.blob import Blob
 from test.unit.conftest import get_random_value_hex
 from pisa.conf import SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
-logging.getLogger().disabled = True
+c_logger.disabled = True
 
 
 def test_init_blob():

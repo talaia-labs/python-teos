@@ -1,5 +1,4 @@
 import pytest
-import logging
 from uuid import uuid4
 from hashlib import sha256
 from threading import Thread
@@ -12,6 +11,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
 
+from pisa import c_logger
 from apps.cli.blob import Blob
 from pisa.watcher import Watcher
 from pisa.responder import Responder
@@ -24,7 +24,7 @@ from pisa.utils.auth_proxy import AuthServiceProxy
 from test.unit.conftest import generate_block, generate_blocks
 from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, PISA_SECRET_KEY
 
-logging.getLogger().disabled = True
+c_logger.disabled = True
 
 APPOINTMENTS = 5
 START_TIME_OFFSET = 1
