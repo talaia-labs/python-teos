@@ -16,9 +16,10 @@ logger = Logger("Daemon")
 
 
 def handle_signals(signal_received, frame):
-    logger.info("Shutting down PISA")
-    # TODO: #11-add-graceful-shutdown: add code to close the db, free any resources, etc.
+    logger.info("Closing connection with appointments db")
+    db_manager.db.close()
 
+    logger.info("Shutting down PISA")
     exit(0)
 
 
