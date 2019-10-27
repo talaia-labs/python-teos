@@ -29,20 +29,23 @@ class Job:
         self.locator = sha256(unhexlify(dispute_txid)).hexdigest()
 
     @classmethod
-    def from_dict(cls, jobs_data):
-        dispute_txid = jobs_data.get("dispute_txid")
-        justice_txid = jobs_data.get("justice_txid")
-        justice_rawtx = jobs_data.get("justice_rawtx")
-        appointment_end = jobs_data.get("appointment_end")
+    def from_dict(cls, job_data):
+        dispute_txid = job_data.get("dispute_txid")
+        justice_txid = job_data.get("justice_txid")
+        justice_rawtx = job_data.get("justice_rawtx")
+        appointment_end = job_data.get("appointment_end")
 
-        if all([dispute_txid, justice_txid, justice_rawtx, appointment_end]) is not None:
+        if all(v is not None for v in [dispute_txid, justice_txid, justice_rawtx, appointment_end]):
             job = cls(dispute_txid, justice_txid, justice_rawtx, appointment_end)
 
         else:
             raise ValueError("Wrong job data, some fields are missing")
 
+        return job
+
     def to_dict(self):
-        job = {"locator": self.locator, "justice_rawtx": self.justice_rawtx, "appointment_end": self.appointment_end}
+        job = {"locator": self.locator, "dispute_txid": self.dispute_txid, "justice_txid": self.justice_txid,
+               "justice_rawtx": self.justice_rawtx, "appointment_end": self.appointment_end}
 
         return job
 

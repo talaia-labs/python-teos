@@ -9,8 +9,8 @@ class Builder:
         appointments = {}
         locator_uuid_map = {}
 
-        for uuid, appointment_data in appointments_data.items():
-            appointment = Appointment.from_dict(appointment_data)
+        for uuid, data in appointments_data.items():
+            appointment = Appointment.from_dict(data)
             appointments[uuid] = appointment
 
             if appointment.locator in locator_uuid_map:
@@ -26,8 +26,8 @@ class Builder:
         jobs = {}
         tx_job_map = {}
 
-        for uuid, job_data in jobs_data.items():
-            job = Job.from_dict(jobs_data)
+        for uuid, data in jobs_data.items():
+            job = Job.from_dict(data)
             jobs[uuid] = job
 
             if job.justice_txid in tx_job_map:
