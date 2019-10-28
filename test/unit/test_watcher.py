@@ -102,12 +102,6 @@ def test_init(watcher):
     assert type(watcher.responder) is Responder
 
 
-def test_sign_appointment(watcher):
-    appointment, _ = generate_dummy_appointment()
-    signature = watcher.sign_appointment(appointment)
-    assert is_signature_valid(appointment, signature, public_key)
-
-
 def test_add_appointment(run_bitcoind, watcher):
     # The watcher automatically fires do_watch and do_subscribe on adding an appointment if it is asleep (initial state)
     # Avoid this by setting the state to awake.
@@ -120,6 +114,12 @@ def test_add_appointment(run_bitcoind, watcher):
 
         assert added_appointment is True
         assert is_signature_valid(appointment, sig, public_key)
+
+
+def test_sign_appointment(watcher):
+    appointment, _ = generate_dummy_appointment()
+    signature = watcher.sign_appointment(appointment)
+    assert is_signature_valid(appointment, signature, public_key)
 
 
 def test_add_too_many_appointments(watcher):
