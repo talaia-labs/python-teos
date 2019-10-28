@@ -12,3 +12,5 @@ appointments/
 test.py
 *.pyc
 .cache
+.pytest_cache/
+*.pem

@@ -3,19 +3,28 @@ import os
 import sys
 import json
 import requests
+import time
 from sys import argv
 from hashlib import sha256
 from binascii import unhexlify
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
+from uuid import uuid4
 
-from pisa.logger import Logger
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT
+from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY, APPOINTMENTS_FOLDER_NAME
+from apps.cli import logger
 
 
-logger = Logger("Client")
+HTTP_OK = 200
 
 
 # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
@@ -33,6 +42,47 @@ def generate_dummy_appointment():
     json.dump(dummy_appointment_data, open('dummy_appointment_data.json', 'w'))
 
     print('\nData stored in dummy_appointment_data.json')
+
+
+# Loads Pisa's public key from disk and verifies that the appointment signature is a valid signature from Pisa,
+# returning True or False accordingly.
+# Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
+# Will raise ValueError if it the public key file was present but it failed to be deserialized.
+def is_appointment_signature_valid(appointment, signature) -> bool:
+    # Load the key from disk
+    try:
+        with open(PISA_PUBLIC_KEY, "r") as key_file:
+            pubkey_pem = key_file.read().encode("utf-8")
+            pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
+    except UnsupportedAlgorithm:
+        raise ValueError("Could not deserialize the public key (unsupported algorithm).")
+
+    try:
+        sig_bytes = unhexlify(signature.encode('utf-8'))
+        data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
+        pisa_public_key.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
+        return True
+    except InvalidSignature:
+        return False
+
+
+# Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
+def save_signed_appointment(appointment, signature):
+    # Create the appointments directory if it doesn't already exist
+    try:
+        os.makedirs(APPOINTMENTS_FOLDER_NAME)
+    except FileExistsError:
+        # directory already exists, this is fine
+        pass
+
+    timestamp = int(time.time()*1000)
+    locator = appointment['locator']
+    uuid = uuid4()  # prevent filename collisions
+    filename = "{}/appointment-{}-{}-{}.json".format(APPOINTMENTS_FOLDER_NAME, timestamp, locator, uuid)
+    data = {"appointment": appointment, "signature": signature}
+
+    with open(filename, "w") as f:
+        json.dump(data, f)
 
 
 def add_appointment(args):
@@ -69,19 +119,64 @@ def add_appointment(args):
                 appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
                                                 appointment_data.get('start_time'), appointment_data.get('end_time'),
                                                 appointment_data.get('dispute_delta'))
+                appointment_json = json.dumps(appointment, sort_keys=True, separators=(',', ':'))
 
                 logger.info("Sending appointment to PISA")
 
                 try:
-                    r = requests.post(url=add_appointment_endpoint, json=json.dumps(appointment), timeout=5)
+                    r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
 
-                    logger.info("{} (code: {}).".format(r.text, r.status_code))
+                    response_json = r.json()
+
+                except json.JSONDecodeError:
+                    logger.error("The response was not valid JSON.")
+                    return
 
                 except ConnectTimeout:
                     logger.error("Can't connect to pisa API. Connection timeout.")
+                    return
 
                 except ConnectionError:
                     logger.error("Can't connect to pisa API. Server cannot be reached.")
+                    return
+
+                if r.status_code == HTTP_OK:
+                    if 'signature' not in response_json:
+                        logger.error("The response does not contain the signature of the appointment.")
+                    else:
+                        signature = response_json['signature']
+                        # verify that the returned signature is valid
+                        try:
+                            is_sig_valid = is_appointment_signature_valid(appointment, signature)
+                        except ValueError:
+                            logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+                            return
+                        except FileNotFoundError:
+                            logger.error("Pisa's public key file not found. Please check your settings.")
+                            return
+                        except IOError as e:
+                            logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+                            return
+
+                        if is_sig_valid:
+                            logger.info("Appointment accepted and signed by Pisa.")
+                            # all good, store appointment and signature
+                            try:
+                                save_signed_appointment(appointment, signature)
+                            except OSError as e:
+                                logger.error("There was an error while saving the appointment: {}".format(e))
+                        else:
+                            logger.error("The returned appointment's signature is invalid.")
+
+                else:
+                    if 'error' not in response_json:
+                        logger.error("The server returned status code {}, but no error description."
+                                     .format(r.status_code))
+                    else:
+                        error = r.json()['error']
+                        logger.error("The server returned status code {}, and the following error: {}."
+                                     .format(r.status_code, error))
+
             else:
                 logger.error("The provided locator is not valid.")
     else:
@@ -119,7 +214,7 @@ def get_appointment(args):
         logger.error("The provided locator is not valid.")
 
 
-def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
+def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
     locator = sha256(unhexlify(tx_id)).hexdigest()
 
     cipher = "AES-GCM-128"
@@ -129,9 +224,9 @@ def build_appointment(tx, tx_id, start_block, end_block, dispute_delta):
     blob = Blob(tx, cipher, hash_function)
     encrypted_blob = blob.encrypt(tx_id)
 
-    appointment = {"locator": locator, "start_time": start_block, "end_time": end_block,
-                   "dispute_delta": dispute_delta, "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function":
-                       hash_function}
+    appointment = {
+        'locator': locator, 'start_time': start_time, 'end_time': end_time, 'dispute_delta': dispute_delta,
+        'encrypted_blob': encrypted_blob, 'cipher': cipher, 'hash_function': hash_function}
 
     return appointment
 
@@ -223,4 +318,3 @@ if __name__ == '__main__':
 
     except json.JSONDecodeError as e:
         logger.error("Non-JSON encoded appointment passed as parameter.")
-

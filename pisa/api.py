@@ -1,6 +1,7 @@
 import os
 import json
-from flask import Flask, request, Response, abort, jsonify
+from flask import Flask, request, abort, jsonify
+from binascii import hexlify
 
 from pisa import HOST, PORT, logging
 from pisa.logger import Logger
@@ -31,30 +32,35 @@ def add_appointment():
     request_data = json.loads(request.get_json())
     appointment = inspector.inspect(request_data)
 
-    if type(appointment) == Appointment:
-        appointment_added = watcher.add_appointment(appointment)
+    error = None
+    response = None
 
-        # ToDo: #13-create-server-side-signature-receipt
+    if type(appointment) == Appointment:
+        appointment_added, signature = watcher.add_appointment(appointment)
+
         if appointment_added:
             rcode = HTTP_OK
-            response = "appointment accepted. locator: {}".format(appointment.locator)
+            response = {"locator": appointment.locator, "signature": hexlify(signature).decode('utf-8')}
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
-            response = "appointment rejected"
+            error = "appointment rejected"
 
     elif type(appointment) == tuple:
         rcode = HTTP_BAD_REQUEST
-        response = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
+        error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
 
     else:
         # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
         rcode = HTTP_BAD_REQUEST
-        response = "appointment rejected. Request does not match the standard"
+        error = "appointment rejected. Request does not match the standard"
 
     logger.info('Sending response and disconnecting',
-                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response)
+                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response, error=error)
 
-    return Response(response, status=rcode, mimetype='text/plain')
+    if error is None:
+        return jsonify(response), rcode
+    else:
+        return jsonify({"error": error}), rcode
 
 
 # FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
@@ -70,7 +76,7 @@ def get_appointment():
 
     if appointment_in_watcher:
         for uuid in appointment_in_watcher:
-            appointment_data = watcher.appointments[uuid].to_json()
+            appointment_data = watcher.appointments[uuid].to_dict()
             appointment_data['status'] = "being_watched"
             response.append(appointment_data)
 
@@ -79,7 +85,7 @@ def get_appointment():
 
         for job in responder_jobs.values():
             if job.locator == locator:
-                job_data = job.to_json()
+                job_data = job.to_dict()
                 job_data['status'] = "dispute_responded"
                 response.append(job_data)
 
@@ -100,7 +106,7 @@ def get_all_appointments():
 
     if request.remote_addr in request.host or request.remote_addr == '127.0.0.1':
         for uuid, appointment in watcher.appointments.items():
-            watcher_appointments[uuid] = appointment.to_json()
+            watcher_appointments[uuid] = appointment.to_dict()
 
         if watcher.responder:
             for uuid, job in watcher.responder.jobs.items():

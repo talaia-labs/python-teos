@@ -2,11 +2,15 @@ from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import ec
+
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
-from pisa.conf import EXPIRY_DELTA
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
 from pisa.responder import Responder
-from pisa.conf import MAX_APPOINTMENTS
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 
@@ -22,6 +26,17 @@ class Watcher:
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
         self.responder = Responder()
+
+        if PISA_SECRET_KEY is None:
+            raise ValueError("No signing key provided. Please fix your pisa.conf")
+        else:
+            with open(PISA_SECRET_KEY, "r") as key_file:
+                secret_key_pem = key_file.read().encode("utf-8")
+                self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
+
+    def sign_appointment(self, appointment):
+        data = appointment.to_json().encode("utf-8")
+        return self.signing_key.sign(data, ec.ECDSA(hashes.SHA256()))
 
     def add_appointment(self, appointment):
         # Rationale:
@@ -60,12 +75,14 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
+            signature = self.sign_appointment(appointment)
         else:
             appointment_added = False
+            signature = None
 
             logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
 
-        return appointment_added
+        return appointment_added, signature
 
     def do_subscribe(self):
         self.zmq_subscriber = ZMQHandler(parent="Watcher")

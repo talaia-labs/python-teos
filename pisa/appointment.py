@@ -1,3 +1,5 @@
+import json
+
 from pisa.encrypted_blob import EncryptedBlob
 
 
@@ -13,7 +15,7 @@ class Appointment:
         self.cipher = cipher
         self.hash_function = hash_function
 
-    def to_json(self):
+    def to_dict(self):
         appointment = {"locator": self.locator, "start_time": self.start_time, "end_time": self.end_time,
                        "dispute_delta": self.dispute_delta, "encrypted_blob": self.encrypted_blob.data,
                        "cipher": self.cipher, "hash_function": self.hash_function}
@@ -22,3 +24,5 @@ class Appointment:
 
         # ToDO: #3-improve-appointment-structure
 
+    def to_json(self):
+        return json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':'))

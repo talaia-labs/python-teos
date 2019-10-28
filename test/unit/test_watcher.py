@@ -6,6 +6,12 @@ from threading import Thread
 from binascii import unhexlify
 from queue import Queue, Empty
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
 from apps.cli.blob import Blob
 from pisa.watcher import Watcher
 from pisa.responder import Responder
@@ -16,13 +22,19 @@ from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
 from test.unit.conftest import generate_block, generate_blocks
-from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
+from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, PISA_SECRET_KEY
 
 logging.getLogger().disabled = True
 
 APPOINTMENTS = 5
 START_TIME_OFFSET = 1
 END_TIME_OFFSET = 1
+
+with open(PISA_SECRET_KEY, "r") as key_file:
+    pubkey_pem = key_file.read().encode("utf-8")
+    # TODO: should use the public key file instead, but it is not currently exported in the configuration
+    signing_key = load_pem_private_key(pubkey_pem, password=None, backend=default_backend())
+    public_key = signing_key.public_key()
 
 
 @pytest.fixture(scope="module")
@@ -70,6 +82,16 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
+def is_signature_valid(appointment, signature, pk):
+    # verify the signature
+    try:
+        data = appointment.to_json().encode('utf-8')
+        pk.verify(signature, data, ec.ECDSA(hashes.SHA256()))
+    except InvalidSignature:
+        return False
+    return True
+
+
 def test_init(watcher):
     assert type(watcher.appointments) is dict and len(watcher.appointments) == 0
     assert type(watcher.locator_uuid_map) is dict and len(watcher.locator_uuid_map) == 0
@@ -88,9 +110,16 @@ def test_add_appointment(run_bitcoind, watcher):
     # We should be able to add appointments up to the limit
     for _ in range(10):
         appointment, dispute_tx = generate_dummy_appointment()
-        added_appointment = watcher.add_appointment(appointment)
+        added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
+        assert is_signature_valid(appointment, sig, public_key)
+
+
+def test_sign_appointment(watcher):
+    appointment, _ = generate_dummy_appointment()
+    signature = watcher.sign_appointment(appointment)
+    assert is_signature_valid(appointment, signature, public_key)
 
 
 def test_add_too_many_appointments(watcher):
@@ -99,14 +128,16 @@ def test_add_too_many_appointments(watcher):
 
     for _ in range(MAX_APPOINTMENTS):
         appointment, dispute_tx = generate_dummy_appointment()
-        added_appointment = watcher.add_appointment(appointment)
+        added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
+        assert is_signature_valid(appointment, sig, public_key)
 
     appointment, dispute_tx = generate_dummy_appointment()
-    added_appointment = watcher.add_appointment(appointment)
+    added_appointment, sig = watcher.add_appointment(appointment)
 
     assert added_appointment is False
+    assert sig is None
 
 
 def test_do_subscribe(watcher):

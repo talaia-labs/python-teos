@@ -36,6 +36,9 @@ if __name__ == '__main__':
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
-        # Fire the api
-        start_api()
-
+        try:
+            # Fire the api
+            start_api()
+        except Exception as e:
+            logger.error("An error occurred: {}. Shutting down".format(e))
+            exit(1)
