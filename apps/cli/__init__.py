@@ -1,5 +1,5 @@
 import logging
-from .logger import Logger
+from apps.cli.logger import Logger
 
 # PISA-SERVER
 DEFAULT_PISA_API_SERVER = 'btc.pisa.watch'
