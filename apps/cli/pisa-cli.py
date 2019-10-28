@@ -48,7 +48,7 @@ def generate_dummy_appointment():
 # returning True or False accordingly.
 # Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
 # Will raise ValueError if it the public key file was present but it failed to be deserialized.
-def is_appointment_signature_valid(appointment, signature):
+def is_appointment_signature_valid(appointment, signature) -> bool:
     # Load the key from disk
     try:
         with open(PISA_PUBLIC_KEY, "r") as key_file:
@@ -61,10 +61,9 @@ def is_appointment_signature_valid(appointment, signature):
         sig_bytes = unhexlify(signature.encode('utf-8'))
         data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
         pisa_public_key.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
+        return True
     except InvalidSignature:
         return False
-
-    return True
 
 
 # Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
