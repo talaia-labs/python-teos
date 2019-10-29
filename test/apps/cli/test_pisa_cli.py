@@ -15,6 +15,7 @@ from test.unit.conftest import get_random_value_hex
 # TODO: should find a way of doing without this
 from apps.cli.pisa_cli import build_appointment
 
+# dummy keys for the tests
 pisa_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
 pisa_pk = pisa_sk.public_key()
 
@@ -52,10 +53,17 @@ def test_is_appointment_signature_valid():
     assert not pisa_cli.is_appointment_signature_valid(dummy_appointment, other_signature, pisa_pk)
 
 
+def get_dummy_pisa_pk():
+    return pisa_pk
+
+
 @responses.activate
-def test_add_appointment():
+def test_add_appointment(monkeypatch):
     # Simulate a request to add_appointment for dummy_appointment, make sure that the right endpoint is requested
     # and the return value is True
+
+    # make sure the test uses the right dummy key instead of loading it from disk
+    monkeypatch.setattr(pisa_cli, "load_pisa_public_key", get_dummy_pisa_pk)
 
     response = {"locator": dummy_appointment["locator"], "signature": sign_appointment(pisa_sk, dummy_appointment)}
 
@@ -71,9 +79,13 @@ def test_add_appointment():
 
 
 @responses.activate
-def test_add_appointment_with_invalid_signature():
+def test_add_appointment_with_invalid_signature(monkeypatch):
     # Simulate a request to add_appointment for dummy_appointment, but sign with a different key,
     # make sure that the right endpoint is requested, but the return value is False
+
+    # make sure the test uses the right dummy key instead of loading it from disk
+    monkeypatch.setattr(pisa_cli, "load_pisa_public_key", get_dummy_pisa_pk)
+
     response = {
         "locator": dummy_appointment["locator"],
         "signature": sign_appointment(other_sk, dummy_appointment),  # signing with a different key
