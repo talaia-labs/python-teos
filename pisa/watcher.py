@@ -147,4 +147,4 @@ class Watcher:
         self.asleep = True
         self.zmq_subscriber.terminate = True
 
-        logger.error("No more pending appointments, going back to sleep")
+        logger.info("No more pending appointments, going back to sleep")
