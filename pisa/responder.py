@@ -165,7 +165,7 @@ class Responder:
                     self.handle_reorgs()
 
                 # Register the last processed block for the responder
-                self.db_manager.store_last_block_responder(block_hash)
+                self.db_manager.store_last_block_hash_responder(block_hash)
 
                 prev_block_hash = block.get('hash')
 

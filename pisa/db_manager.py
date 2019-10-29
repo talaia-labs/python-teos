@@ -9,6 +9,9 @@ logger = Logger("DBManager")
 
 class DBManager:
     def __init__(self, db_path):
+        if not isinstance(db_path, str):
+            raise ValueError("db_path must be a valid path/name")
+
         try:
             self.db = plyvel.DB(db_path)
 
@@ -22,13 +25,13 @@ class DBManager:
 
         for k, v in self.db.iterator(prefix=prefix.encode('utf-8')):
             # Get uuid and appointment_data from the db
-            uuid = k[1:].decode('utf-8')
+            uuid = k[len(prefix):].decode('utf-8')
             data[uuid] = json.loads(v)
 
         return data
 
-    def get_last_known_block(self, prefix):
-        last_block = self.db.get(prefix)
+    def get_last_known_block(self, key):
+        last_block = self.db.get(key.encode('utf-8'))
 
         if last_block:
             last_block = last_block.decode('utf-8')
@@ -74,8 +77,14 @@ class DBManager:
         self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
         logger.info("Deleting appointment from Responder's db", uuid=uuid)
 
-    def store_last_block_watcher(self, block_hash):
+    def load_last_block_hash_watcher(self):
+        return self.get_last_known_block(WATCHER_LAST_BLOCK_KEY)
+
+    def load_last_block_hash_responder(self):
+        return self.get_last_known_block(RESPONDER_LAST_BLOCK_KEY)
+
+    def store_last_block_hash_watcher(self, block_hash):
         self.create_entry(WATCHER_LAST_BLOCK_KEY, block_hash)
 
-    def store_last_block_responder(self, block_hash):
+    def store_last_block_hash_responder(self, block_hash):
         self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)

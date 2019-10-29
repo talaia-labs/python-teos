@@ -141,7 +141,7 @@ class Watcher:
                     self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
 
                     # Register the last processed block for the watcher
-                    self.db_manager.store_last_block_watcher(block_hash)
+                    self.db_manager.store_last_block_hash_watcher(block_hash)
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
