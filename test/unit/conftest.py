@@ -2,6 +2,7 @@ import pytest
 import random
 import requests
 from time import sleep
+from shutil import rmtree
 from threading import Thread
 
 from pisa.conf import DB_PATH
@@ -39,9 +40,13 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='module')
 def db_manager():
-    return DBManager('test_db')
+    manager = DBManager('test_db')
+    yield manager
+
+    manager.db.close()
+    rmtree('test_db')
 
 
 def get_random_value_hex(nbytes):
