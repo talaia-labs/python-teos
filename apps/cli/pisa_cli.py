@@ -63,7 +63,7 @@ def is_appointment_signature_valid(appointment, signature, pk):
     try:
         sig_bytes = unhexlify(signature.encode('utf-8'))
         data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
-        pisa_public_key.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
+        pk.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
         return True
     except InvalidSignature:
         return False
@@ -72,15 +72,11 @@ def is_appointment_signature_valid(appointment, signature, pk):
 # Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
 def save_signed_appointment(appointment, signature):
     # Create the appointments directory if it doesn't already exist
-    try:
-        os.makedirs(APPOINTMENTS_FOLDER_NAME)
-    except FileExistsError:
-        # directory already exists, this is fine
-        pass
+    os.makedirs(APPOINTMENTS_FOLDER_NAME, exist_ok=True)
 
-    timestamp = int(time.time()*1000)
+    timestamp = int(time.time())
     locator = appointment['locator']
-    uuid = uuid4()  # prevent filename collisions
+    uuid = uuid4().hex  # prevent filename collisions
     filename = "{}/appointment-{}-{}-{}.json".format(APPOINTMENTS_FOLDER_NAME, timestamp, locator, uuid)
     data = {"appointment": appointment, "signature": signature}
 
@@ -110,7 +106,7 @@ def add_appointment(args):
 
             try:
                 with open(fin) as f:
-                    appointment_data = json.load(open(fin))
+                    appointment_data = json.load(f)
             except IOError as e:
                 logger.error("I/O error({}): {}".format(e.errno, e.strerror))
                 return False
