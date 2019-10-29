@@ -92,135 +92,146 @@ def add_appointment(args):
     appointment_data = None
     use_help = "Use 'help add_appointment' for help of how to use the command."
 
-    if args:
-        arg_opt = args.pop(0)
-
-        try:
-            if arg_opt in ['-h', '--help']:
-                sys.exit(help_add_appointment())
-
-            if arg_opt in ['-f', '--file']:
-                if args:
-                    fin = args.pop(0)
-                    if os.path.isfile(fin):
-                        appointment_data = json.load(open(fin))
-                    else:
-                        logger.error("Can't find file " + fin)
-                else:
-                    logger.error("No file provided as appointment. " + use_help)
-            else:
-                appointment_data = json.loads(arg_opt)
-
-        except json.JSONDecodeError:
-            logger.error("Non-JSON encoded data provided as appointment. " + use_help)
-
-        if appointment_data:
-            valid_locator = check_txid_format(appointment_data.get('tx_id'))
-
-            if valid_locator:
-                add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
-                appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
-                                                appointment_data.get('start_time'), appointment_data.get('end_time'),
-                                                appointment_data.get('dispute_delta'))
-                appointment_json = json.dumps(appointment, sort_keys=True, separators=(',', ':'))
-
-                logger.info("Sending appointment to PISA")
-
-                try:
-                    r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
-
-                    response_json = r.json()
-
-                except json.JSONDecodeError:
-                    logger.error("The response was not valid JSON.")
-                    return False
-
-                except ConnectTimeout:
-                    logger.error("Can't connect to pisa API. Connection timeout.")
-                    return False
-
-                except ConnectionError:
-                    logger.error("Can't connect to pisa API. Server cannot be reached.")
-                    return False
-
-                if r.status_code == HTTP_OK:
-                    if 'signature' not in response_json:
-                        logger.error("The response does not contain the signature of the appointment.")
-                    else:
-                        signature = response_json['signature']
-                        # verify that the returned signature is valid
-                        try:
-                            pk = load_pisa_public_key()
-                            is_sig_valid = is_appointment_signature_valid(appointment, signature, pk)
-                        except ValueError:
-                            logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
-                            return False
-                        except FileNotFoundError:
-                            logger.error("Pisa's public key file not found. Please check your settings.")
-                            return False
-                        except IOError as e:
-                            logger.error("I/O error({}): {}".format(e.errno, e.strerror))
-                            return False
-
-                        if is_sig_valid:
-                            logger.info("Appointment accepted and signed by Pisa.")
-                            # all good, store appointment and signature
-                            try:
-                                save_signed_appointment(appointment, signature)
-                                return True
-                            except OSError as e:
-                                logger.error("There was an error while saving the appointment: {}".format(e))
-                        else:
-                            logger.error("The returned appointment's signature is invalid.")
-
-                else:
-                    if 'error' not in response_json:
-                        logger.error("The server returned status code {}, but no error description."
-                                     .format(r.status_code))
-                    else:
-                        error = r.json()['error']
-                        logger.error("The server returned status code {}, and the following error: {}."
-                                     .format(r.status_code, error))
-
-            else:
-                logger.error("The provided locator is not valid.")
-    else:
+    if not args:
         logger.error("No appointment data provided. " + use_help)
+        return False
 
-    return False  # return False for any path that returned an error message
+    arg_opt = args.pop(0)
+
+    try:
+        if arg_opt in ['-h', '--help']:
+            sys.exit(help_add_appointment())
+
+        if arg_opt in ['-f', '--file']:
+            fin = args.pop(0)
+            if not os.path.isfile(fin):
+                logger.error("Can't find file " + fin)
+                return False
+
+            try:
+                with open(fin) as f:
+                    appointment_data = json.load(open(fin))
+            except IOError as e:
+                logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+                return False
+        else:
+            appointment_data = json.loads(arg_opt)
+
+    except json.JSONDecodeError:
+        logger.error("Non-JSON encoded data provided as appointment. " + use_help)
+        return False
+
+    if not appointment_data:
+        logger.error("The provided JSON is empty.")
+        return False
+
+    valid_locator = check_txid_format(appointment_data.get('tx_id'))
+
+    if not valid_locator:
+        logger.error("The provided locator is not valid.")
+        return False
+
+    add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
+    appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
+                                    appointment_data.get('start_time'), appointment_data.get('end_time'),
+                                    appointment_data.get('dispute_delta'))
+    appointment_json = json.dumps(appointment, sort_keys=True, separators=(',', ':'))
+
+    logger.info("Sending appointment to PISA")
+
+    try:
+        r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
+
+        response_json = r.json()
+
+    except json.JSONDecodeError:
+        logger.error("The response was not valid JSON.")
+        return False
+
+    except ConnectTimeout:
+        logger.error("Can't connect to pisa API. Connection timeout.")
+        return False
+
+    except ConnectionError:
+        logger.error("Can't connect to pisa API. Server cannot be reached.")
+        return False
+
+    if r.status_code != HTTP_OK:
+        if 'error' not in response_json:
+            logger.error("The server returned status code {}, but no error description."
+                         .format(r.status_code))
+        else:
+            error = response_json['error']
+            logger.error("The server returned status code {}, and the following error: {}."
+                         .format(r.status_code, error))
+        return False
+
+    if 'signature' not in response_json:
+        logger.error("The response does not contain the signature of the appointment.")
+        return False
+
+    signature = response_json['signature']
+    # verify that the returned signature is valid
+    try:
+        pk = load_pisa_public_key()
+        is_sig_valid = is_appointment_signature_valid(appointment, signature, pk)
+    except ValueError:
+        logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+        return False
+    except FileNotFoundError:
+        logger.error("Pisa's public key file not found. Please check your settings.")
+        return False
+    except IOError as e:
+        logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+        return False
+
+    if not is_sig_valid:
+        logger.error("The returned appointment's signature is invalid.")
+        return False
+
+    logger.info("Appointment accepted and signed by Pisa.")
+    # all good, store appointment and signature
+    try:
+        save_signed_appointment(appointment, signature)
+    except OSError as e:
+        logger.error("There was an error while saving the appointment: {}".format(e))
+        return False
+
+    return True
 
 
 def get_appointment(args):
-    if args:
-        arg_opt = args.pop(0)
+    if not args:
+        logger.error("No arguments were given.")
+        return False
 
-        if arg_opt in ['-h', '--help']:
-            sys.exit(help_get_appointment())
-        else:
-            locator = arg_opt
-            valid_locator = check_txid_format(locator)
+    arg_opt = args.pop(0)
 
-        if valid_locator:
-            get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
-            parameters = "?locator={}".format(locator)
-            try:
-                r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
-
-                print(json.dumps(r.json(), indent=4, sort_keys=True))
-                return True
-            except ConnectTimeout:
-                logger.error("Can't connect to pisa API. Connection timeout.")
-
-            except ConnectionError:
-                logger.error("Can't connect to pisa API. Server cannot be reached.")
-
-        else:
-            logger.error("The provided locator is not valid.")
-
+    if arg_opt in ['-h', '--help']:
+        sys.exit(help_get_appointment())
     else:
-        logger.error("The provided locator is not valid.")
+        locator = arg_opt
+        valid_locator = check_txid_format(locator)
 
-    return False  # return False for any path that returned an error message
+    if not valid_locator:
+        logger.error("The provided locator is not valid: {}".format(locator))
+        return False
+
+    get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
+    parameters = "?locator={}".format(locator)
+    try:
+        r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
+
+        print(json.dumps(r.json(), indent=4, sort_keys=True))
+    except ConnectTimeout:
+        logger.error("Can't connect to pisa API. Connection timeout.")
+        return False
+
+    except ConnectionError:
+        logger.error("Can't connect to pisa API. Server cannot be reached.")
+        return False
+
+    return True
 
 
 def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
