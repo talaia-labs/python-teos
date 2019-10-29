@@ -9,7 +9,7 @@ from pisa import HOST, PORT, c_logger
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.unit.conftest import generate_block, get_random_value_hex
+from test.unit.conftest import generate_blocks, get_random_value_hex, generate_block
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 c_logger.disabled = True
@@ -157,8 +157,8 @@ def test_get_all_appointments_responder():
         if locator in locators:
             bitcoin_cli.sendrawtransaction(dispute_tx)
 
-    # Wait a bit for them to get confirmed
-    generate_block()
+    # Confirm transactions
+    generate_blocks(6)
 
     # Get all appointments
     r = requests.get(url=PISA_API + "/get_all_appointments")
@@ -167,6 +167,9 @@ def test_get_all_appointments_responder():
     # Make sure there is not pending locator in the watcher
     responder_jobs = [v["locator"] for k, v in received_appointments["responder_jobs"].items()]
     local_locators = [appointment["locator"] for appointment in appointments]
+
+    watcher_appointments = [v["locator"] for k, v in received_appointments["watcher_appointments"].items()]
+    print(set(watcher_appointments) == set(local_locators))
 
     assert (set(responder_jobs) == set(local_locators))
     assert (len(received_appointments["watcher_appointments"]) == 0)
