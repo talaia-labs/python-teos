@@ -45,6 +45,18 @@ class BlockProcessor:
 
         return block_count
 
+    def get_missed_blocks(self, last_know_block_hash):
+        current_block_hash = self.get_best_block_hash()
+        missed_blocks = []
+
+        while current_block_hash != last_know_block_hash and current_block_hash is not None:
+            missed_blocks.append(current_block_hash)
+
+            current_block = self.get_block(current_block_hash)
+            current_block_hash = current_block.get("previousblockhash")
+
+        return missed_blocks[::-1]
+
     def get_distance_to_tip(self, target_block_hash):
         distance = None
 
