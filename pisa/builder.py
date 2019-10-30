@@ -1,3 +1,5 @@
+from queue import Queue
+
 from pisa.responder import Job
 from pisa.appointment import Appointment
 
@@ -37,3 +39,13 @@ class Builder:
                 tx_job_map[job.justice_txid] = [uuid]
 
         return jobs, tx_job_map
+
+    @staticmethod
+    def build_block_queue(missed_blocks):
+        block_queue = Queue()
+
+        for block in missed_blocks:
+            block_queue.put(block)
+
+        return block_queue
+
