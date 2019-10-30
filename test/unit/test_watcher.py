@@ -95,7 +95,7 @@ def is_signature_valid(appointment, signature, pk):
 def test_init(watcher):
     assert type(watcher.appointments) is dict and len(watcher.appointments) == 0
     assert type(watcher.locator_uuid_map) is dict and len(watcher.locator_uuid_map) == 0
-    assert watcher.block_queue is None
+    assert watcher.block_queue.empty()
     assert watcher.asleep is True
     assert watcher.max_appointments == MAX_APPOINTMENTS
     assert watcher.zmq_subscriber is None

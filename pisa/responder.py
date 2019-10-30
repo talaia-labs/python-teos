@@ -59,8 +59,8 @@ class Responder:
         self.tx_job_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
-        self.block_queue = None
         self.asleep = True
+        self.block_queue = Queue()
         self.zmq_subscriber = None
         self.db_manager = db_manager
 
@@ -118,7 +118,6 @@ class Responder:
 
         if self.asleep:
             self.asleep = False
-            self.block_queue = Queue()
             zmq_thread = Thread(target=self.do_subscribe)
             responder = Thread(target=self.do_watch)
             zmq_thread.start()
@@ -172,6 +171,7 @@ class Responder:
         # Go back to sleep if there are no more jobs
         self.asleep = True
         self.zmq_subscriber.terminate = True
+        self.block_queue = Queue()
 
         logger.info("No more pending jobs, going back to sleep")
 

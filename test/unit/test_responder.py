@@ -84,7 +84,7 @@ def test_init_responder(responder):
     assert type(responder.tx_job_map) is dict and len(responder.tx_job_map) == 0
     assert type(responder.unconfirmed_txs) is list and len(responder.unconfirmed_txs) == 0
     assert type(responder.missed_confirmations) is dict and len(responder.missed_confirmations) == 0
-    assert responder.block_queue is None
+    assert responder.block_queue.empty()
     assert responder.asleep is True
     assert responder.zmq_subscriber is None
 

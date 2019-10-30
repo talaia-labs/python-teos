@@ -21,15 +21,14 @@ class Watcher:
     def __init__(self, db_manager, responder=None, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
         self.locator_uuid_map = dict()
-        self.block_queue = None
         self.asleep = True
+        self.block_queue = Queue()
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
+        self.db_manager = db_manager
 
         if not isinstance(responder, Responder):
             self.responder = Responder(db_manager)
-
-        self.db_manager = db_manager
 
         if PISA_SECRET_KEY is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
@@ -67,7 +66,6 @@ class Watcher:
 
             if self.asleep:
                 self.asleep = False
-                self.block_queue = Queue()
                 zmq_thread = Thread(target=self.do_subscribe)
                 watcher = Thread(target=self.do_watch)
                 zmq_thread.start()
@@ -146,5 +144,6 @@ class Watcher:
         # Go back to sleep if there are no more appointments
         self.asleep = True
         self.zmq_subscriber.terminate = True
+        self.block_queue = Queue()
 
         logger.info("No more pending appointments, going back to sleep")
