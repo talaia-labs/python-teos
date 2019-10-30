@@ -10,6 +10,7 @@ from pisa.builder import Builder
 from pisa.conf import BTC_NETWORK
 from pisa.responder import Responder
 from pisa.db_manager import DBManager
+from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
 logger = Logger("Daemon")
@@ -55,11 +56,22 @@ if __name__ == '__main__':
 
             else:
                 logger.info("Bootstrapping from backed up data")
+                block_processor = BlockProcessor()
+
+                last_block_watcher = db_manager.load_last_block_hash_watcher()
+                last_block_responder = db_manager.load_last_block_hash_responder()
+
+                missed_blocks_watcher = block_processor.get_missed_blocks(last_block_watcher)
+                missed_blocks_responder = missed_blocks_watcher if last_block_watcher == last_block_responder \
+                    else block_processor.get_missed_blocks(last_block_watcher)
+
                 responder = Responder(db_manager)
                 responder.jobs, responder.tx_job_map = Builder.build_jobs(responder_jobs_data)
+                responder.block_queue = Builder.build_block_queue(last_block_responder)
 
                 watcher.responder = responder
                 watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(watcher_appointments_data)
+                watcher.block_queue = Builder.build_block_queue(last_block_responder)   
 
             # Create an instance of the Watcher and fire the API
             start_api(watcher)
