@@ -1,7 +1,7 @@
 import pytest
+from queue import Queue, Empty
 from uuid import uuid4
 from threading import Thread
-from queue import Queue, Empty
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -14,6 +14,7 @@ from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import check_txid_format
 from pisa.utils.auth_proxy import AuthServiceProxy
+from pisa.utils.zmq_subscriber import ZMQHandler
 from test.unit.conftest import generate_block, generate_blocks, generate_dummy_appointment
 from pisa.conf import (
     EXPIRY_DELTA,
@@ -74,15 +75,14 @@ def is_signature_valid(appointment, signature, pk):
 def test_init(watcher):
     assert type(watcher.appointments) is dict and len(watcher.appointments) == 0
     assert type(watcher.locator_uuid_map) is dict and len(watcher.locator_uuid_map) == 0
-    assert watcher.block_queue.empty()
     assert watcher.asleep is True
     assert watcher.max_appointments == MAX_APPOINTMENTS
-    assert watcher.zmq_subscriber is None
+    assert type(watcher.zmq_subscriber) is ZMQHandler
     assert type(watcher.responder) is Responder
 
 
 def test_add_appointment(run_bitcoind, watcher):
-    # The watcher automatically fires do_watch and do_subscribe on adding an appointment if it is asleep (initial state)
+    # The watcher automatically fires do_watch and subscribes to ZMQ on adding an appointment if it is asleep (initial state)
     # Avoid this by setting the state to awake.
     watcher.asleep = False
 
@@ -125,16 +125,17 @@ def test_add_too_many_appointments(watcher):
     assert sig is None
 
 
-def test_do_subscribe(watcher):
-    watcher.block_queue = Queue()
+def test_zmq_subscribe(watcher):
+    watcher.zmq_subscriber.watch_block_queue = Queue()
 
-    zmq_thread = Thread(target=watcher.do_subscribe)
+    watcher.zmq_subscriber.watch_awake = True
+    zmq_thread = Thread(target=watcher.zmq_subscriber.handle)
     zmq_thread.daemon = True
     zmq_thread.start()
 
     try:
         generate_block()
-        block_hash = watcher.block_queue.get()
+        block_hash = watcher.zmq_subscriber.watch_block_queue.get()
         assert check_txid_format(block_hash)
 
     except Empty:

@@ -2,14 +2,16 @@ import json
 import pytest
 from uuid import uuid4
 from threading import Thread
-from queue import Queue, Empty
+from time import sleep
 
 from pisa import c_logger
-from pisa.tools import check_txid_format
+from pisa.watcher import Watcher
+from test.unit.test_watcher import generate_dummy_appointment
 from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
 from test.simulator.bitcoind_sim import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
+from pisa.utils.zmq_subscriber import ZMQHandler
 from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
@@ -18,7 +20,7 @@ c_logger.disabled = True
 
 @pytest.fixture(scope="module")
 def responder(db_manager):
-    return Responder(db_manager)
+    return Responder(db_manager, ZMQHandler())
 
 
 def create_dummy_job_data(random_txid=False, justice_rawtx=None):
@@ -95,9 +97,8 @@ def test_init_responder(responder):
     assert type(responder.tx_job_map) is dict and len(responder.tx_job_map) == 0
     assert type(responder.unconfirmed_txs) is list and len(responder.unconfirmed_txs) == 0
     assert type(responder.missed_confirmations) is dict and len(responder.missed_confirmations) == 0
-    assert responder.block_queue.empty()
     assert responder.asleep is True
-    assert responder.zmq_subscriber is None
+    assert type(responder.zmq_subscriber) is ZMQHandler
 
 
 def test_add_response(responder):
@@ -164,22 +165,6 @@ def test_create_job_already_confirmed(responder):
         responder.create_job(uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
 
         assert justice_txid not in responder.unconfirmed_txs
-
-
-def test_do_subscribe(responder):
-    responder.block_queue = Queue()
-
-    zmq_thread = Thread(target=responder.do_subscribe)
-    zmq_thread.daemon = True
-    zmq_thread.start()
-
-    try:
-        generate_block()
-        block_hash = responder.block_queue.get()
-        assert check_txid_format(block_hash)
-
-    except Empty:
-        assert False
 
 
 def test_do_watch(responder):
@@ -267,7 +252,7 @@ def test_get_completed_jobs(db_manager):
     initial_height = bitcoin_cli.getblockcount()
 
     # Let's use a fresh responder for this to make it easier to compare the results
-    responder = Responder(db_manager)
+    responder = Responder(db_manager, ZMQHandler())
 
     # A complete job is a job that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
@@ -313,7 +298,7 @@ def test_get_completed_jobs(db_manager):
 
 
 def test_rebroadcast(db_manager):
-    responder = Responder(db_manager)
+    responder = Responder(db_manager, ZMQHandler())
     responder.asleep = False
 
     txs_to_rebroadcast = []
