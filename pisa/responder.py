@@ -1,15 +1,14 @@
 import json
-from queue import Queue
 from hashlib import sha256
 from threading import Thread
 from binascii import unhexlify
+from queue import Queue
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.tools import check_tx_in_chain
 from pisa.block_processor import BlockProcessor
-from pisa.utils.zmq_subscriber import ZMQHandler
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
@@ -59,14 +58,13 @@ class Job:
 
 
 class Responder:
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, zmq_subscriber):
         self.jobs = dict()
         self.tx_job_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
         self.asleep = True
-        self.block_queue = Queue()
-        self.zmq_subscriber = None
+        self.zmq_subscriber = zmq_subscriber
         self.db_manager = db_manager
 
     @staticmethod
@@ -124,14 +122,9 @@ class Responder:
 
         if self.asleep:
             self.asleep = False
-            zmq_thread = Thread(target=self.do_subscribe)
+            self.zmq_subscriber.respond_asleep = False
             responder = Thread(target=self.do_watch)
-            zmq_thread.start()
             responder.start()
-
-    def do_subscribe(self):
-        self.zmq_subscriber = ZMQHandler(parent="Responder")
-        self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
         # ToDo: #9-add-data-persistence
@@ -140,7 +133,7 @@ class Responder:
 
         while len(self.jobs) > 0:
             # We get notified for every new received block
-            block_hash = self.block_queue.get()
+            block_hash = self.zmq_subscriber.respond_block_queue.get()
             block = BlockProcessor.get_block(block_hash)
 
             if block is not None:
@@ -181,8 +174,8 @@ class Responder:
 
         # Go back to sleep if there are no more jobs
         self.asleep = True
-        self.zmq_subscriber.terminate = True
-        self.block_queue = Queue()
+        self.zmq_subscriber.respond_asleep = True
+        self.zmq_subscriber.respond_block_queue = Queue()
 
         logger.info("No more pending jobs, going back to sleep")
 

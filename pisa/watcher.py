@@ -22,13 +22,12 @@ class Watcher:
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
-        self.block_queue = Queue()
         self.max_appointments = max_appointments
-        self.zmq_subscriber = None
+        self.zmq_subscriber = ZMQHandler()
         self.db_manager = db_manager
 
         if not isinstance(responder, Responder):
-            self.responder = Responder(db_manager)
+            self.responder = Responder(db_manager, self.zmq_subscriber)
 
         if PISA_SECRET_KEY is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
@@ -66,7 +65,8 @@ class Watcher:
 
             if self.asleep:
                 self.asleep = False
-                zmq_thread = Thread(target=self.do_subscribe)
+                self.zmq_subscriber.watch_asleep = False
+                zmq_thread = Thread(target=self.zmq_subscriber.handle)
                 watcher = Thread(target=self.do_watch)
                 zmq_thread.start()
                 watcher.start()
@@ -89,13 +89,9 @@ class Watcher:
 
         return appointment_added, signature
 
-    def do_subscribe(self):
-        self.zmq_subscriber = ZMQHandler(parent="Watcher")
-        self.zmq_subscriber.handle(self.block_queue)
-
     def do_watch(self):
         while len(self.appointments) > 0:
-            block_hash = self.block_queue.get()
+            block_hash = self.zmq_subscriber.watch_block_queue.get()
             logger.info("New block received", block_hash=block_hash)
 
             block = BlockProcessor.get_block(block_hash)
@@ -158,7 +154,7 @@ class Watcher:
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
-        self.zmq_subscriber.terminate = True
-        self.block_queue = Queue()
+        self.zmq_subscriber.watch_asleep = True
+        self.zmq_subscriber.watch_block_queue = Queue()
 
         logger.info("No more pending appointments, going back to sleep")
