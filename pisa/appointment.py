@@ -27,7 +27,7 @@ class Appointment:
         hash_function = appointment_data.get("hash_function")
 
         if all([locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function]) is not None:
-            appointment = cls(locator, start_time, end_time, dispute_delta, EncryptedBlob(encrypted_blob_data), cipher,
+            appointment = cls(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher,
                               hash_function)
 
         else:
