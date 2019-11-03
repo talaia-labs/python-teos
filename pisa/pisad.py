@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
                 watcher.responder = responder
                 watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(watcher_appointments_data)
-                watcher.block_queue = Builder.build_block_queue(last_block_responder)   
+                watcher.block_queue = Builder.build_block_queue(last_block_responder)
 
             # Create an instance of the Watcher and fire the API
             start_api(watcher)
