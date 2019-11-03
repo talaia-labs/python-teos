@@ -6,10 +6,11 @@ from binascii import unhexlify
 
 from apps.cli.blob import Blob
 from pisa import HOST, PORT, c_logger
+from pisa.tools import bitcoin_cli
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.unit.conftest import generate_blocks, get_random_value_hex, generate_block
+from test.unit.conftest import generate_blocks, get_random_value_hex
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 c_logger.disabled = True
@@ -22,9 +23,7 @@ locator_dispute_tx_map = {}
 
 
 def generate_dummy_appointment():
-    r = requests.get(url=PISA_API + '/get_block_count', timeout=5)
-
-    current_height = r.json().get("block_count")
+    current_height = bitcoin_cli().getblockcount()
 
     dispute_tx = TX.create_dummy_transaction()
     dispute_txid = sha256d(dispute_tx)
