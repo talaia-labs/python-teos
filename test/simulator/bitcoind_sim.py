@@ -238,8 +238,7 @@ def load_data():
 
 
 def simulate_mining(mode, time_between_blocks):
-    global mempool, mined_transactions, blocks, blockchain, mine_new_block
-    prev_block_hash = GENESIS_PARENT
+    global mempool, mined_transactions, blocks, blockchain, mine_new_block, prev_block_hash
 
     mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
                                     feed_port=FEED_PORT)
