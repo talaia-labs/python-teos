@@ -6,7 +6,8 @@ from pisa.encrypted_blob import EncryptedBlob
 # Basic appointment structure
 class Appointment:
     # DISCUSS: 35-appointment-checks
-    def __init__(self, locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function):
+    def __init__(self, locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function,
+                 triggered=False):
         self.locator = locator
         self.start_time = start_time    # ToDo: #4-standardize-appointment-fields
         self.end_time = end_time    # ToDo: #4-standardize-appointment-fields
@@ -14,7 +15,7 @@ class Appointment:
         self.encrypted_blob = EncryptedBlob(encrypted_blob)
         self.cipher = cipher
         self.hash_function = hash_function
-        self.triggered = False
+        self.triggered = triggered
 
     @classmethod
     def from_dict(cls, appointment_data):
@@ -25,10 +26,12 @@ class Appointment:
         encrypted_blob_data = appointment_data.get("encrypted_blob")
         cipher = appointment_data.get("cipher")
         hash_function = appointment_data.get("hash_function")
+        triggered = appointment_data.get("triggered")
 
-        if all([locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function]) is not None:
+        if all(v is not None for v in [locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher,
+                                       hash_function, triggered]):
             appointment = cls(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher,
-                              hash_function)
+                              hash_function, triggered)
 
         else:
             raise ValueError("Wrong appointment data, some fields are missing")
@@ -39,7 +42,7 @@ class Appointment:
         # ToDO: #3-improve-appointment-structure
         appointment = {"locator": self.locator, "start_time": self.start_time, "end_time": self.end_time,
                        "dispute_delta": self.dispute_delta, "encrypted_blob": self.encrypted_blob.data,
-                       "cipher": self.cipher, "hash_function": self.hash_function}
+                       "cipher": self.cipher, "hash_function": self.hash_function, "triggered": self.triggered}
 
         return appointment
 
