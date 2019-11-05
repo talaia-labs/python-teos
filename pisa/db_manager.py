@@ -56,7 +56,11 @@ class DBManager:
         self.db.delete(key)
 
     def load_watcher_appointments(self):
-        return self.load_appointments_db(prefix=WATCHER_PREFIX)
+        all_appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
+        non_triggered_appointments = {uuid: appointment for uuid, appointment in all_appointments.items()
+                                      if appointment["triggered"] is False}
+
+        return non_triggered_appointments
 
     def load_responder_jobs(self):
         return self.load_appointments_db(prefix=RESPONDER_PREFIX)
