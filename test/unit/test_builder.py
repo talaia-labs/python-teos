@@ -1,37 +1,27 @@
 from uuid import uuid4
 
 from pisa.builder import Builder
-from test.unit.conftest import get_random_value_hex
-from test.unit.test_api import generate_dummy_appointment
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_job
 
 
-def generate_dummy_job():
-    dispute_txid = get_random_value_hex(32)
-    justice_txid = get_random_value_hex(32)
-    justice_rawtx = get_random_value_hex(100)
-
-    return {"dispute_txid": dispute_txid, "justice_txid": justice_txid, "justice_rawtx": justice_rawtx,
-            "appointment_end": 100}
-
-
-def test_build_appointments(run_bitcoind):
+def test_build_appointments():
     appointments_data = {}
 
     # Create some appointment data
     for i in range(10):
-        data, _ = generate_dummy_appointment()
+        appointment = generate_dummy_appointment()
         uuid = uuid4().hex
 
-        appointments_data[uuid] = data
+        appointments_data[uuid] = appointment.to_dict()
 
         # Add some additional appointments that share the same locator to test all the builder's cases
         if i % 2 == 0:
-            locator = data["locator"]
-            data, _ = generate_dummy_appointment()
+            locator = appointment.locator
+            appointment = generate_dummy_appointment()
             uuid = uuid4().hex
-            data["locator"] = locator
+            appointment.locator = locator
 
-            appointments_data[uuid] = data
+            appointments_data[uuid] = appointment.to_dict()
 
     # Use the builder to create the data structures
     appointments, locator_uuid_map = Builder.build_appointments(appointments_data)
@@ -48,17 +38,17 @@ def test_build_jobs():
 
     # Create some jobs data
     for i in range(10):
-        data = generate_dummy_job()
+        job = generate_dummy_job()
 
-        jobs_data[uuid4().hex] = data
+        jobs_data[uuid4().hex] = job.to_dict()
 
         # Add some additional jobs that share the same locator to test all the builder's cases
         if i % 2 == 0:
-            justice_txid = data["justice_txid"]
-            data = generate_dummy_job()
-            data["justice_txid"] = justice_txid
+            justice_txid = job.justice_txid
+            job = generate_dummy_job()
+            job.justice_txid = justice_txid
 
-            jobs_data[uuid4().hex] = data
+            jobs_data[uuid4().hex] = job.to_dict()
 
     jobs, tx_job_map = Builder.build_jobs(jobs_data)
 
@@ -68,7 +58,6 @@ def test_build_jobs():
         job_dict = job.to_dict()
 
         # The locator is not part of the job_data found in the database (for now)
-        job_dict.pop('locator')
         assert jobs_data[uuid] == job_dict
         assert uuid in tx_job_map[job.justice_txid]
 

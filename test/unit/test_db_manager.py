@@ -5,13 +5,13 @@ import shutil
 from uuid import uuid4
 
 from pisa.db_manager import DBManager
-from test.unit.conftest import get_random_value_hex
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_job
 from pisa.conf import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY
 
 
 @pytest.fixture(scope='module')
 def watcher_appointments():
-    return {uuid4().hex: get_random_value_hex(32) for _ in range(10)}
+    return {uuid4().hex: generate_dummy_appointment() for _ in range(10)}
 
 
 @pytest.fixture(scope='module')
@@ -148,15 +148,19 @@ def test_load_responder_jobs_empty(db_manager):
 
 
 def test_store_load_watcher_appointment(db_manager, watcher_appointments):
-    for key, value in watcher_appointments.items():
-        db_manager.store_watcher_appointment(key, json.dumps({'value': value}))
+    for uuid, appointment in watcher_appointments.items():
+        db_manager.store_watcher_appointment(uuid, appointment.to_json())
 
     db_watcher_appointments = db_manager.load_watcher_appointments()
 
-    values = [appointment["value"] for appointment in db_watcher_appointments.values()]
+    # Check that the two appointment collections are equal by checking:
+    # - Their size is equal
+    # - Each element in one collection exists in the other
 
     assert watcher_appointments.keys() == db_watcher_appointments.keys()
-    assert set(watcher_appointments.values()) == set(values) and len(watcher_appointments) == len(values)
+
+    for uuid, appointment in watcher_appointments.items():
+        assert db_watcher_appointments[uuid] == appointment.to_dict()
 
 
 def test_store_load_appointment_jobs(db_manager, responder_jobs):
