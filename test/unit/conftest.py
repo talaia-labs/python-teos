@@ -7,8 +7,10 @@ from threading import Thread
 
 from pisa.conf import DB_PATH
 from pisa.api import start_api
+from pisa.responder import Job
 from pisa.watcher import Watcher
 from pisa.db_manager import DBManager
+from pisa.appointment import Appointment
 from test.simulator.bitcoind_sim import run_simulator, HOST, PORT
 
 
@@ -64,4 +66,29 @@ def generate_blocks(n):
     for _ in range(n):
         generate_block()
 
+
+def generate_dummy_appointment():
+    locator = get_random_value_hex(32)
+    encrypted_blob = get_random_value_hex(250)
+    start_time = 100
+    end_time = 120
+    dispute_delta = 20
+    cipher = "AES-GCM-128"
+    hash_function = "SHA256"
+
+    appointment_data = dict(locator=locator, start_time=start_time, end_time=end_time, dispute_delta=dispute_delta,
+                            encrypted_blob=encrypted_blob, cipher=cipher, hash_function=hash_function, triggered=False)
+
+    return Appointment.from_dict(appointment_data)
+
+
+def generate_dummy_job():
+    dispute_txid = get_random_value_hex(32)
+    justice_txid = get_random_value_hex(32)
+    justice_rawtx = get_random_value_hex(100)
+
+    job_data = dict(dispute_txid=dispute_txid, justice_txid=justice_txid, justice_rawtx=justice_rawtx,
+                    appointment_end=100)
+
+    return Job.from_dict(job_data)
 

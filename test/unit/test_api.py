@@ -22,7 +22,7 @@ appointments = []
 locator_dispute_tx_map = {}
 
 
-def generate_dummy_appointment():
+def generate_dummy_appointment_data():
     current_height = bitcoin_cli().getblockcount()
 
     dispute_tx = TX.create_dummy_transaction()
@@ -43,14 +43,15 @@ def generate_dummy_appointment():
     appointment = {"locator": locator, "start_time": dummy_appointment_data.get("start_time"),
                    "end_time": dummy_appointment_data.get("end_time"),
                    "dispute_delta": dummy_appointment_data.get("dispute_delta"),
-                   "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function": hash_function}
+                   "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function": hash_function,
+                   "triggered": False}
 
     return appointment, dispute_tx
 
 
 @pytest.fixture
 def new_appointment():
-    appointment, dispute_tx = generate_dummy_appointment()
+    appointment, dispute_tx = generate_dummy_appointment_data()
     locator_dispute_tx_map[appointment["locator"]] = dispute_tx
 
     return appointment
