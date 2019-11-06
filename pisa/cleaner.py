@@ -33,6 +33,7 @@ class Cleaner:
 
             # ToDo: #9-add-data-persistence
             justice_txid = jobs[uuid].justice_txid
+            locator = jobs[uuid].locator
             jobs.pop(uuid)
 
             if len(tx_job_map[justice_txid]) == 1:
@@ -46,3 +47,20 @@ class Cleaner:
             # Delete appointment from the db (both watchers's and responder's)
             db_manager.delete_watcher_appointment(uuid)
             db_manager.delete_responder_job(uuid)
+
+            # Update / delete the locator map
+            locator_map = db_manager.load_locator_map(locator)
+            if locator_map is not None:
+                if uuid in locator_map:
+                    if len(locator_map) == 1:
+                        db_manager.delete_locator_map(locator)
+
+                    else:
+                        locator_map.remove(uuid)
+                        db_manager.store_update_locator_map(locator, locator_map)
+
+                else:
+                    logger.error("UUID not found in the db.", uuid=uuid)
+
+            else:
+                logger.error("Locator not found in the db.", uuid=uuid)

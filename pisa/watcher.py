@@ -74,6 +74,7 @@ class Watcher:
                 logger.info("Waking up")
 
             self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+            self.db_manager.store_update_locator_map(appointment.locator, uuid)
 
             appointment_added = True
 
