@@ -5,8 +5,8 @@ import shutil
 from uuid import uuid4
 
 from pisa.db_manager import DBManager
-from test.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_job
-from pisa.conf import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment
+from pisa.conf import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
 
 
 @pytest.fixture(scope='module')
@@ -145,6 +145,41 @@ def test_load_watcher_appointments_empty(db_manager):
 
 def test_load_responder_jobs_empty(db_manager):
     assert len(db_manager.load_responder_jobs()) == 0
+
+
+def test_load_locator_map_empty(db_manager):
+    assert db_manager.load_locator_map(get_random_value_hex(32)) is None
+
+
+def test_store_update_locator_map_empty(db_manager):
+    uuid = uuid4().hex
+    locator = get_random_value_hex(32)
+    db_manager.store_update_locator_map(locator, uuid)
+
+    # Check that the locator map has been properly stored
+    assert db_manager.load_locator_map(locator) == [uuid]
+
+    # If we try to add the same uuid again the list shouldn't change
+    db_manager.store_update_locator_map(locator, uuid)
+    assert db_manager.load_locator_map(locator) == [uuid]
+
+    # Add another uuid to the same locator and check that it also works
+    uuid2 = uuid4().hex
+    db_manager.store_update_locator_map(locator, uuid2)
+
+    assert set(db_manager.load_locator_map(locator)) == set([uuid, uuid2])
+
+
+def test_delete_locator_map(db_manager):
+    locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
+    assert(len(locator_maps) != 0)
+
+    for locator, uuids in locator_maps.items():
+        print(locator)
+        db_manager.delete_locator_map(locator)
+
+    locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
+    assert (len(locator_maps) == 0)
 
 
 def test_store_load_watcher_appointment(db_manager, watcher_appointments):

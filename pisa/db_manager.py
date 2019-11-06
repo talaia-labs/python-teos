@@ -2,7 +2,8 @@ import json
 import plyvel
 
 from pisa.logger import Logger
-from pisa.conf import WATCHER_PREFIX, RESPONDER_PREFIX, WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY
+from pisa.conf import WATCHER_PREFIX, RESPONDER_PREFIX, WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, \
+    LOCATOR_MAP_PREFIX
 
 logger = Logger("DBManager")
 
@@ -72,6 +73,40 @@ class DBManager:
     def store_responder_job(self, uuid, job):
         self.create_entry(uuid, job, prefix=RESPONDER_PREFIX)
         logger.info("Adding appointment to Responder's db", uuid=uuid)
+
+    def load_locator_map(self, locator):
+        key = (LOCATOR_MAP_PREFIX+locator).encode('utf-8')
+        locator_map = self.db.get(key)
+
+        if locator_map is not None:
+            locator_map = json.loads(locator_map.decode('utf-8'))
+
+        else:
+            logger.info("Locator not found in the db", locator=locator)
+
+        return locator_map
+
+    def store_update_locator_map(self, locator, uuid):
+        locator_map = self.load_locator_map(locator)
+
+        if locator_map is not None:
+            if uuid not in locator_map:
+                locator_map.append(uuid)
+                logger.info("Updating locator map", locator=locator, uuid=uuid)
+
+            else:
+                logger.info("UUID already in the map", locator=locator, uuid=uuid)
+
+        else:
+            locator_map = [uuid]
+            logger.info("Creating new locator map", locator=locator, uuid=uuid)
+
+        key = (LOCATOR_MAP_PREFIX + locator).encode('utf-8')
+        self.db.put(key, json.dumps(locator_map).encode('utf-8'))
+
+    def delete_locator_map(self, locator):
+        self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
+        logger.info("Deleting locator map from db", uuid=locator)
 
     def delete_watcher_appointment(self, uuid):
         self.delete_entry(uuid, prefix=WATCHER_PREFIX)
