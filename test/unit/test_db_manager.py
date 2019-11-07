@@ -11,7 +11,7 @@ from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LO
 
 @pytest.fixture(scope="module")
 def watcher_appointments():
-    return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
+    return {uuid4().hex: generate_dummy_appointment(real_height=False)[0] for _ in range(10)}
 
 
 @pytest.fixture(scope="module")

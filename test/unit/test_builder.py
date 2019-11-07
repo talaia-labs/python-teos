@@ -9,7 +9,7 @@ def test_build_appointments():
 
     # Create some appointment data
     for i in range(10):
-        appointment, _ = generate_dummy_appointment()
+        appointment, _ = generate_dummy_appointment(real_height=False)
         uuid = uuid4().hex
 
         appointments_data[uuid] = appointment.to_dict()
@@ -17,7 +17,7 @@ def test_build_appointments():
         # Add some additional appointments that share the same locator to test all the builder's cases
         if i % 2 == 0:
             locator = appointment.locator
-            appointment, _ = generate_dummy_appointment()
+            appointment, _ = generate_dummy_appointment(real_height=False)
             uuid = uuid4().hex
             appointment.locator = locator
 

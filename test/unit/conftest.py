@@ -73,8 +73,12 @@ def generate_blocks(n):
         generate_block()
 
 
-def generate_dummy_appointment_data(start_time_offset=5, end_time_offset=30):
-    current_height = bitcoin_cli().getblockcount()
+def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
+    if real_height:
+        current_height = bitcoin_cli().getblockcount()
+
+    else:
+        current_height = 10
 
     dispute_tx = TX.create_dummy_transaction()
     dispute_txid = sha256d(dispute_tx)
@@ -110,9 +114,9 @@ def generate_dummy_appointment_data(start_time_offset=5, end_time_offset=30):
     return appointment_data, dispute_tx
 
 
-def generate_dummy_appointment(start_time_offset=5, end_time_offset=30):
+def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_offset=30):
     appointment_data, dispute_tx = generate_dummy_appointment_data(
-        start_time_offset=start_time_offset, end_time_offset=end_time_offset
+        real_height=real_height, start_time_offset=start_time_offset, end_time_offset=end_time_offset
     )
 
     return Appointment.from_dict(appointment_data), dispute_tx
