@@ -26,6 +26,24 @@ class Cleaner:
             db_manager.delete_watcher_appointment(uuid)
 
     @staticmethod
+    def delete_complete_appointment(appointments, locator_uuid_map, locator, uuid, db_manager):
+        # Delete the appointment
+        appointment = appointments.pop(uuid)
+
+        # If there was only one appointment that matches the locator we can delete the whole list
+        if len(locator_uuid_map[locator]) == 1:
+            locator_uuid_map.pop(locator)
+        else:
+            # Otherwise we just delete the appointment that matches locator:appointment_pos
+            locator_uuid_map[locator].remove(uuid)
+
+        # DISCUSS: instead of deleting the appointment, we will mark it as triggered and delete it from both
+        #          the watcher's and responder's db after fulfilled
+        # Update appointment in the db
+        appointment.triggered = True
+        db_manager.store_watcher_appointment(uuid, appointment.to_json())
+
+    @staticmethod
     def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager):
         for uuid, confirmations in completed_jobs:
             logger.info(
