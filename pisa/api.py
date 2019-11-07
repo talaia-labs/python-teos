@@ -32,7 +32,9 @@ def add_appointment():
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
     inspector = Inspector()
-    appointment = inspector.inspect(request_data)
+    appointment = inspector.inspect(
+        request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
+    )
 
     error = None
     response = None
