@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pisa.db_manager import DBManager
 from test.unit.conftest import get_random_value_hex, generate_dummy_appointment
-from pisa.conf import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
+from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
 
 
 @pytest.fixture(scope='module')
@@ -252,28 +252,6 @@ def test_store_load_last_block_hash_responder(db_manager):
     db_last_block_hash = db_manager.load_last_block_hash_responder()
 
     assert local_last_block_hash == db_last_block_hash
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

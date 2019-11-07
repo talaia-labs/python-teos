@@ -2,10 +2,14 @@ import json
 import plyvel
 
 from pisa.logger import Logger
-from pisa.conf import WATCHER_PREFIX, RESPONDER_PREFIX, WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, \
-    LOCATOR_MAP_PREFIX
 
 logger = Logger("DBManager")
+
+WATCHER_PREFIX = "w"
+WATCHER_LAST_BLOCK_KEY = "bw"
+RESPONDER_PREFIX = "r"
+RESPONDER_LAST_BLOCK_KEY = "br"
+LOCATOR_MAP_PREFIX = 'm'
 
 
 class DBManager:
