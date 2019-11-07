@@ -5,13 +5,11 @@ from threading import Thread
 from queue import Queue, Empty
 
 from pisa import c_logger
-from pisa.tools import check_txid_format
+from pisa.tools import check_txid_format, bitcoin_cli
 from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
 from test.simulator.bitcoind_sim import TX
-from pisa.utils.auth_proxy import AuthServiceProxy
 from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 c_logger.disabled = True
 
@@ -22,8 +20,6 @@ def responder(db_manager):
 
 
 def create_dummy_job_data(random_txid=False, justice_rawtx=None):
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
-
     # The following transaction data corresponds to a valid transaction. For some test it may be interesting to have
     # some valid data, but for others we may need multiple different justice_txids.
 
@@ -46,7 +42,7 @@ def create_dummy_job_data(random_txid=False, justice_rawtx=None):
     if random_txid is True:
         justice_txid = get_random_value_hex(32)
 
-    appointment_end = bitcoin_cli.getblockcount() + 2
+    appointment_end = bitcoin_cli().getblockcount() + 2
 
     return dispute_txid, justice_txid, justice_rawtx, appointment_end
 
@@ -189,8 +185,6 @@ def test_do_watch(responder):
     responder.unconfirmed_txs = []
     responder.missed_confirmations = dict()
 
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
-
     jobs = [create_dummy_job(justice_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
 
     # Let's set up the jobs first
@@ -210,7 +204,7 @@ def test_do_watch(responder):
     # And broadcast some of the transactions
     broadcast_txs = []
     for job in jobs[:5]:
-        bitcoin_cli.sendrawtransaction(job.justice_rawtx)
+        bitcoin_cli().sendrawtransaction(job.justice_rawtx)
         broadcast_txs.append(job.justice_txid)
 
     # Mine a block
@@ -229,7 +223,7 @@ def test_do_watch(responder):
     # Do the rest
     broadcast_txs = []
     for job in jobs[5:]:
-        bitcoin_cli.sendrawtransaction(job.justice_rawtx)
+        bitcoin_cli().sendrawtransaction(job.justice_rawtx)
         broadcast_txs.append(job.justice_txid)
 
     # Mine a block
@@ -263,8 +257,7 @@ def test_get_txs_to_rebroadcast(responder):
 
 
 def test_get_completed_jobs(db_manager):
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
-    initial_height = bitcoin_cli.getblockcount()
+    initial_height = bitcoin_cli().getblockcount()
 
     # Let's use a fresh responder for this to make it easier to compare the results
     responder = Responder(db_manager)
@@ -291,7 +284,7 @@ def test_get_completed_jobs(db_manager):
     responder.jobs.update(jobs_no_end)
 
     for uuid, job in responder.jobs.items():
-        bitcoin_cli.sendrawtransaction(job.justice_rawtx)
+        bitcoin_cli().sendrawtransaction(job.justice_rawtx)
 
     # The dummy appointments have a end_appointment time of current + 2, but jobs need at least 6 confs by default
     generate_blocks(6)

@@ -3,9 +3,9 @@ import pytest
 import requests
 
 from pisa import HOST, PORT, c_logger
-from pisa.utils.auth_proxy import AuthServiceProxy
+from pisa.tools import bitcoin_cli
 from test.unit.conftest import generate_blocks, get_random_value_hex, generate_dummy_appointment_data
-from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
+from pisa.conf import MAX_APPOINTMENTS
 
 c_logger.disabled = True
 
@@ -117,12 +117,10 @@ def test_get_all_appointments_watcher():
 
 def test_get_all_appointments_responder():
     # Trigger all disputes
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
-
     locators = [appointment["locator"] for appointment in appointments]
     for locator, dispute_tx in locator_dispute_tx_map.items():
         if locator in locators:
-            bitcoin_cli.sendrawtransaction(dispute_tx)
+            bitcoin_cli().sendrawtransaction(dispute_tx)
 
     # Confirm transactions
     generate_blocks(6)

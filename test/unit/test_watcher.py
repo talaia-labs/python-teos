@@ -12,18 +12,9 @@ from cryptography.exceptions import InvalidSignature
 from pisa import c_logger
 from pisa.watcher import Watcher
 from pisa.responder import Responder
-from pisa.tools import check_txid_format
-from pisa.utils.auth_proxy import AuthServiceProxy
+from pisa.tools import check_txid_format, bitcoin_cli
 from test.unit.conftest import generate_block, generate_blocks, generate_dummy_appointment
-from pisa.conf import (
-    EXPIRY_DELTA,
-    BTC_RPC_USER,
-    BTC_RPC_PASSWD,
-    BTC_RPC_HOST,
-    BTC_RPC_PORT,
-    PISA_SECRET_KEY,
-    MAX_APPOINTMENTS,
-)
+from pisa.conf import EXPIRY_DELTA, PISA_SECRET_KEY, MAX_APPOINTMENTS
 
 c_logger.disabled = True
 
@@ -157,8 +148,6 @@ def test_do_subscribe(watcher):
 
 
 def test_do_watch(watcher):
-    bitcoin_cli = AuthServiceProxy("http://%s:%s@%s:%d" % (BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT))
-
     # We will wipe all the previous data and add 5 appointments
     watcher.appointments, watcher.locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
 
@@ -168,7 +157,7 @@ def test_do_watch(watcher):
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
-        bitcoin_cli.sendrawtransaction(dispute_tx)
+        bitcoin_cli().sendrawtransaction(dispute_tx)
 
     # After leaving some time for the block to be mined and processed, the number of appointments should have reduced
     # by two
