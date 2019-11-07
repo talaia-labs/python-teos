@@ -255,25 +255,3 @@ def test_store_load_last_block_hash_responder(db_manager):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -35,11 +35,11 @@ class Job:
         justice_rawtx = job_data.get("justice_rawtx")
         appointment_end = job_data.get("appointment_end")
 
-        if all(v is not None for v in [dispute_txid, justice_txid, justice_rawtx, appointment_end]):
-            job = cls(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+        if any(v is None for v in [dispute_txid, justice_txid, justice_rawtx, appointment_end]):
+            raise ValueError("Wrong job data, some fields are missing")
 
         else:
-            raise ValueError("Wrong job data, some fields are missing")
+            job = cls(dispute_txid, justice_txid, justice_rawtx, appointment_end)
 
         return job
 

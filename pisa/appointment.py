@@ -28,13 +28,13 @@ class Appointment:
         hash_function = appointment_data.get("hash_function")
         triggered = appointment_data.get("triggered")
 
-        if all(v is not None for v in [locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher,
-                                       hash_function, triggered]):
-            appointment = cls(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher,
-                              hash_function, triggered)
+        if any(v is None for v in [locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher,
+                                   hash_function, triggered]):
+            raise ValueError("Wrong appointment data, some fields are missing")
 
         else:
-            raise ValueError("Wrong appointment data, some fields are missing")
+            appointment = cls(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function,
+                              triggered)
 
         return appointment
 
