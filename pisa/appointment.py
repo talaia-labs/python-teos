@@ -48,3 +48,8 @@ class Appointment:
 
     def to_json(self):
         return json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':'))
+
+    def serialize(self):
+        data = self.to_dict()
+        data.pop("triggered")
+        return json.dumps(data, sort_keys=True, separators=(',', ':')).encode("utf-8")
