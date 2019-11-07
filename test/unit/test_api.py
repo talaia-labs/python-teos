@@ -1,16 +1,10 @@
 import json
 import pytest
 import requests
-from hashlib import sha256
-from binascii import unhexlify
 
-from apps.cli.blob import Blob
 from pisa import HOST, PORT, c_logger
-from pisa.tools import bitcoin_cli
-from test.simulator.utils import sha256d
-from test.simulator.transaction import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.unit.conftest import generate_blocks, get_random_value_hex
+from test.unit.conftest import generate_blocks, get_random_value_hex, generate_dummy_appointment_data
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, MAX_APPOINTMENTS
 
 c_logger.disabled = True
@@ -20,33 +14,6 @@ MULTIPLE_APPOINTMENTS = 10
 
 appointments = []
 locator_dispute_tx_map = {}
-
-
-def generate_dummy_appointment_data():
-    current_height = bitcoin_cli().getblockcount()
-
-    dispute_tx = TX.create_dummy_transaction()
-    dispute_txid = sha256d(dispute_tx)
-    justice_tx = TX.create_dummy_transaction(dispute_txid)
-
-    dummy_appointment_data = {"tx": justice_tx, "tx_id": dispute_txid, "start_time": current_height + 5,
-                              "end_time": current_height + 30, "dispute_delta": 20}
-
-    cipher = "AES-GCM-128"
-    hash_function = "SHA256"
-
-    locator = sha256(unhexlify(dispute_txid)).hexdigest()
-    blob = Blob(dummy_appointment_data.get("tx"), cipher, hash_function)
-
-    encrypted_blob = blob.encrypt((dummy_appointment_data.get("tx_id")))
-
-    appointment = {"locator": locator, "start_time": dummy_appointment_data.get("start_time"),
-                   "end_time": dummy_appointment_data.get("end_time"),
-                   "dispute_delta": dummy_appointment_data.get("dispute_delta"),
-                   "encrypted_blob": encrypted_blob, "cipher": cipher, "hash_function": hash_function,
-                   "triggered": False}
-
-    return appointment, dispute_tx
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
 from pisa import c_logger
-from pisa.tools import check_txid_format
-from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli
+from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli, check_txid_format
 
 c_logger.disabled = True
 

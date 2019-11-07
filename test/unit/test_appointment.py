@@ -10,7 +10,6 @@ from test.unit.conftest import get_random_value_hex
 c_logger.disabled = True
 
 # Not much to test here, adding it for completeness
-
 @fixture
 def appointment_data():
     locator = get_random_value_hex(32)
