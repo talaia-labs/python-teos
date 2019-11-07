@@ -27,7 +27,8 @@ class Appointment:
         encrypted_blob_data = appointment_data.get("encrypted_blob")
         cipher = appointment_data.get("cipher")
         hash_function = appointment_data.get("hash_function")
-        triggered = appointment_data.get("triggered")
+
+        triggered = True if appointment_data.get("triggered") is True else False
 
         if any(
             v is None

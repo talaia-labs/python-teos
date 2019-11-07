@@ -16,34 +16,26 @@ logger = Logger("Inspector")
 
 class Inspector:
     def inspect(self, data):
-        locator = data.get("locator")
-        start_time = data.get("start_time")
-        end_time = data.get("end_time")
-        dispute_delta = data.get("dispute_delta")
-        encrypted_blob = data.get("encrypted_blob")
-        cipher = data.get("cipher")
-        hash_function = data.get("hash_function")
-
         block_height = BlockProcessor.get_block_count()
 
         if block_height is not None:
-            rcode, message = self.check_locator(locator)
+            rcode, message = self.check_locator(data.get("locator"))
 
             if rcode == 0:
-                rcode, message = self.check_start_time(start_time, block_height)
+                rcode, message = self.check_start_time(data.get("start_time"), block_height)
             if rcode == 0:
-                rcode, message = self.check_end_time(end_time, start_time, block_height)
+                rcode, message = self.check_end_time(data.get("end_time"), data.get("start_time"), block_height)
             if rcode == 0:
-                rcode, message = self.check_delta(dispute_delta)
+                rcode, message = self.check_delta(data.get("dispute_delta"))
             if rcode == 0:
-                rcode, message = self.check_blob(encrypted_blob)
+                rcode, message = self.check_blob(data.get("encrypted_blob"))
             if rcode == 0:
-                rcode, message = self.check_cipher(cipher)
+                rcode, message = self.check_cipher(data.get("cipher"))
             if rcode == 0:
-                rcode, message = self.check_hash_function(hash_function)
+                rcode, message = self.check_hash_function(data.get("hash_function"))
 
             if rcode == 0:
-                r = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function)
+                r = Appointment.from_dict(data)
             else:
                 r = (rcode, message)
 
