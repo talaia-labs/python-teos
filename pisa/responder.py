@@ -44,8 +44,13 @@ class Job:
         return job
 
     def to_dict(self):
-        job = {"locator": self.locator, "dispute_txid": self.dispute_txid, "justice_txid": self.justice_txid,
-               "justice_rawtx": self.justice_rawtx, "appointment_end": self.appointment_end}
+        job = {
+            "locator": self.locator,
+            "dispute_txid": self.dispute_txid,
+            "justice_txid": self.justice_txid,
+            "justice_rawtx": self.justice_rawtx,
+            "appointment_end": self.appointment_end,
+        }
 
         return job
 
@@ -113,8 +118,9 @@ class Responder:
 
         self.db_manager.store_responder_job(uuid, job.to_json())
 
-        logger.info("New job added.", dispute_txid=dispute_txid, justice_txid=justice_txid,
-                    appointment_end=appointment_end)
+        logger.info(
+            "New job added.", dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end
+        )
 
         if self.asleep:
             self.asleep = False
@@ -124,7 +130,7 @@ class Responder:
             responder.start()
 
     def do_subscribe(self):
-        self.zmq_subscriber = ZMQHandler(parent='Responder')
+        self.zmq_subscriber = ZMQHandler(parent="Responder")
         self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
@@ -138,16 +144,18 @@ class Responder:
             block = BlockProcessor.get_block(block_hash)
 
             if block is not None:
-                txs = block.get('tx')
-                height = block.get('height')
+                txs = block.get("tx")
+                height = block.get("height")
 
-                logger.info("New block received",
-                            block_hash=block_hash, prev_block_hash=block.get('previousblockhash'), txs=txs)
+                logger.info(
+                    "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"), txs=txs
+                )
 
                 # ToDo: #9-add-data-persistence
-                if prev_block_hash == block.get('previousblockhash'):
+                if prev_block_hash == block.get("previousblockhash"):
                     self.unconfirmed_txs, self.missed_confirmations = BlockProcessor.check_confirmations(
-                        txs, self.unconfirmed_txs, self.tx_job_map, self.missed_confirmations)
+                        txs, self.unconfirmed_txs, self.tx_job_map, self.missed_confirmations
+                    )
 
                     txs_to_rebroadcast = self.get_txs_to_rebroadcast(txs)
                     completed_jobs = self.get_completed_jobs(height)
@@ -157,8 +165,11 @@ class Responder:
 
                 # NOTCOVERED
                 else:
-                    logger.warning("Reorg found", local_prev_block_hash=prev_block_hash,
-                                   remote_prev_block_hash=block.get('previousblockhash'))
+                    logger.warning(
+                        "Reorg found",
+                        local_prev_block_hash=prev_block_hash,
+                        remote_prev_block_hash=block.get("previousblockhash"),
+                    )
 
                     # ToDo: #24-properly-handle-reorgs
                     self.handle_reorgs()
@@ -166,7 +177,7 @@ class Responder:
                 # Register the last processed block for the responder
                 self.db_manager.store_last_block_hash_responder(block_hash)
 
-                prev_block_hash = block.get('hash')
+                prev_block_hash = block.get("hash")
 
         # Go back to sleep if there are no more jobs
         self.asleep = True
@@ -194,7 +205,7 @@ class Responder:
 
                 # FIXME: Should be improved with the librarian
                 if tx is not None:
-                    confirmations = tx.get('confirmations')
+                    confirmations = tx.get("confirmations")
 
                     if confirmations >= MIN_CONFIRMATIONS:
                         # The end of the appointment has been reached
@@ -213,11 +224,21 @@ class Responder:
 
             for uuid in self.tx_job_map[txid]:
                 job = self.jobs[uuid]
-                receipt = self.add_response(uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx,
-                                            job.appointment_end, block_hash, retry=True)
+                receipt = self.add_response(
+                    uuid,
+                    job.dispute_txid,
+                    job.justice_txid,
+                    job.justice_rawtx,
+                    job.appointment_end,
+                    block_hash,
+                    retry=True,
+                )
 
-                logger.warning("Transaction has missed many confirmations. Rebroadcasting.",
-                               justice_txid=job.justice_txid, confirmations_missed=CONFIRMATIONS_BEFORE_RETRY)
+                logger.warning(
+                    "Transaction has missed many confirmations. Rebroadcasting.",
+                    justice_txid=job.justice_txid,
+                    confirmations_missed=CONFIRMATIONS_BEFORE_RETRY,
+                )
 
                 receipts.append((txid, receipt))
 
@@ -229,19 +250,22 @@ class Responder:
         for uuid, job in self.jobs.items():
             # First we check if the dispute transaction is still in the blockchain. If not, the justice can not be
             # there either, so we'll need to call the reorg manager straight away
-            dispute_in_chain, _ = check_tx_in_chain(job.dispute_txid, logger=logger, tx_label='Dispute tx')
+            dispute_in_chain, _ = check_tx_in_chain(job.dispute_txid, logger=logger, tx_label="Dispute tx")
 
             # If the dispute is there, we can check the justice tx
             if dispute_in_chain:
-                justice_in_chain, justice_confirmations = check_tx_in_chain(job.justice_txid, logger=logger,
-                                                                            tx_label='Justice tx')
+                justice_in_chain, justice_confirmations = check_tx_in_chain(
+                    job.justice_txid, logger=logger, tx_label="Justice tx"
+                )
 
                 # If both transactions are there, we only need to update the justice tx confirmation count
                 if justice_in_chain:
-                    logger.info("Updating confirmation count for transaction.",
-                                justice_txid=job.justice_txid,
-                                prev_count=job.confirmations,
-                                curr_count=justice_confirmations)
+                    logger.info(
+                        "Updating confirmation count for transaction.",
+                        justice_txid=job.justice_txid,
+                        prev_count=job.confirmations,
+                        curr_count=justice_confirmations,
+                    )
 
                     job.confirmations = justice_confirmations
 

@@ -14,11 +14,11 @@ FEED_PORT = None
 MAX_APPOINTMENTS = 100
 EXPIRY_DELTA = 6
 MIN_DISPUTE_DELTA = 20
-SERVER_LOG_FILE = 'pisa.log'
-PISA_SECRET_KEY = 'pisa_sk.pem'
+SERVER_LOG_FILE = "pisa.log"
+PISA_SECRET_KEY = "pisa_sk.pem"
 
 # PISA-CLI
-CLIENT_LOG_FILE = 'pisa.log'
+CLIENT_LOG_FILE = "pisa.log"
 
 # TEST
 TEST_LOG_FILE = "test.log"

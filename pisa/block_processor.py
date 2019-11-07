@@ -101,7 +101,7 @@ class BlockProcessor:
                 try:
                     # ToDo: #20-test-tx-decrypting-edge-cases
                     justice_rawtx = appointments[uuid].encrypted_blob.decrypt(dispute_txid)
-                    justice_txid = bitcoin_cli().decoderawtransaction(justice_rawtx).get('txid')
+                    justice_txid = bitcoin_cli().decoderawtransaction(justice_rawtx).get("txid")
                     logger.info("Match found for locator.", locator=locator, uuid=uuid, justice_txid=justice_txid)
 
                 except JSONRPCException as e:

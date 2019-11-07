@@ -16,13 +16,13 @@ logger = Logger("Inspector")
 
 class Inspector:
     def inspect(self, data):
-        locator = data.get('locator')
-        start_time = data.get('start_time')
-        end_time = data.get('end_time')
-        dispute_delta = data.get('dispute_delta')
-        encrypted_blob = data.get('encrypted_blob')
-        cipher = data.get('cipher')
-        hash_function = data.get('hash_function')
+        locator = data.get("locator")
+        start_time = data.get("start_time")
+        end_time = data.get("end_time")
+        dispute_delta = data.get("dispute_delta")
+        encrypted_blob = data.get("encrypted_blob")
+        cipher = data.get("cipher")
+        hash_function = data.get("hash_function")
 
         block_height = BlockProcessor.get_block_count()
 
@@ -61,14 +61,17 @@ class Inspector:
         if locator is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty locator received"
+
         elif type(locator) != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong locator data type ({})".format(type(locator))
+
         elif len(locator) != 64:
             rcode = errors.APPOINTMENT_WRONG_FIELD_SIZE
             message = "wrong locator size ({})".format(len(locator))
             # TODO: #12-check-txid-regexp
-        elif re.search(r'^[0-9A-Fa-f]+$', locator) is None:
+
+        elif re.search(r"^[0-9A-Fa-f]+$", locator) is None:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong locator format ({})".format(locator)
 
@@ -90,9 +93,11 @@ class Inspector:
         if start_time is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty start_time received"
+
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong start_time data type ({})".format(t)
+
         elif start_time <= block_height:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             if start_time < block_height:
@@ -118,21 +123,24 @@ class Inspector:
         if end_time is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty end_time received"
+
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong end_time data type ({})".format(t)
+
         elif start_time >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             if start_time > end_time:
                 message = "end_time is smaller than start_time"
             else:
                 message = "end_time is equal to start_time"
+
         elif block_height >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             if block_height > end_time:
-                message = 'end_time is in the past'
+                message = "end_time is in the past"
             else:
-                message = 'end_time is too close to current height'
+                message = "end_time is too close to current height"
 
         if message is not None:
             logger.error(message)
@@ -149,13 +157,16 @@ class Inspector:
         if dispute_delta is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty dispute_delta received"
+
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong dispute_delta data type ({})".format(t)
+
         elif dispute_delta < conf.MIN_DISPUTE_DELTA:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
-                conf.MIN_DISPUTE_DELTA, dispute_delta)
+                conf.MIN_DISPUTE_DELTA, dispute_delta
+            )
 
         if message is not None:
             logger.error(message)
@@ -173,10 +184,12 @@ class Inspector:
         if encrypted_blob is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty encrypted_blob received"
+
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
-        elif re.search(r'^[0-9A-Fa-f]+$', encrypted_blob) is None:
+
+        elif re.search(r"^[0-9A-Fa-f]+$", encrypted_blob) is None:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong encrypted_blob format ({})".format(encrypted_blob)
 
@@ -195,9 +208,11 @@ class Inspector:
         if cipher is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty cipher received"
+
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong cipher data type ({})".format(t)
+
         elif cipher.upper() not in conf.SUPPORTED_CIPHERS:
             rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
             message = "cipher not supported: {}".format(cipher)
@@ -217,9 +232,11 @@ class Inspector:
         if hash_function is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty hash_function received"
+
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong hash_function data type ({})".format(t)
+
         elif hash_function.upper() not in conf.SUPPORTED_HASH_FUNCTIONS:
             rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
             message = "hash_function not supported {}".format(hash_function)

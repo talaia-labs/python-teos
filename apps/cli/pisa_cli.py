@@ -11,7 +11,6 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from uuid import uuid4
 
-
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
@@ -34,14 +33,19 @@ def generate_dummy_appointment():
 
     current_height = r.json().get("block_count")
 
-    dummy_appointment_data = {"tx": os.urandom(192).hex(), "tx_id": os.urandom(32).hex(),
-                              "start_time": current_height + 5, "end_time": current_height + 10, "dispute_delta": 20}
+    dummy_appointment_data = {
+        "tx": os.urandom(192).hex(),
+        "tx_id": os.urandom(32).hex(),
+        "start_time": current_height + 5,
+        "end_time": current_height + 10,
+        "dispute_delta": 20,
+    }
 
-    print('Generating dummy appointment data:''\n\n' + json.dumps(dummy_appointment_data, indent=4, sort_keys=True))
+    print("Generating dummy appointment data:" "\n\n" + json.dumps(dummy_appointment_data, indent=4, sort_keys=True))
 
-    json.dump(dummy_appointment_data, open('dummy_appointment_data.json', 'w'))
+    json.dump(dummy_appointment_data, open("dummy_appointment_data.json", "w"))
 
-    print('\nData stored in dummy_appointment_data.json')
+    print("\nData stored in dummy_appointment_data.json")
 
 
 # Loads and returns Pisa's public key from disk.
@@ -53,6 +57,7 @@ def load_pisa_public_key():
             pubkey_pem = key_file.read().encode("utf-8")
             pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
             return pisa_public_key
+
     except UnsupportedAlgorithm:
         raise ValueError("Could not deserialize the public key (unsupported algorithm).")
 
@@ -61,10 +66,11 @@ def load_pisa_public_key():
 # returning True or False accordingly.
 def is_appointment_signature_valid(appointment, signature, pk):
     try:
-        sig_bytes = unhexlify(signature.encode('utf-8'))
-        data = json.dumps(appointment, sort_keys=True, separators=(',', ':')).encode("utf-8")
+        sig_bytes = unhexlify(signature.encode("utf-8"))
+        data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
         pk.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
         return True
+
     except InvalidSignature:
         return False
 
@@ -75,8 +81,9 @@ def save_signed_appointment(appointment, signature):
     os.makedirs(APPOINTMENTS_FOLDER_NAME, exist_ok=True)
 
     timestamp = int(time.time())
-    locator = appointment['locator']
+    locator = appointment["locator"]
     uuid = uuid4().hex  # prevent filename collisions
+
     filename = "{}/appointment-{}-{}-{}.json".format(APPOINTMENTS_FOLDER_NAME, timestamp, locator, uuid)
     data = {"appointment": appointment, "signature": signature}
 
@@ -95,10 +102,10 @@ def add_appointment(args):
     arg_opt = args.pop(0)
 
     try:
-        if arg_opt in ['-h', '--help']:
+        if arg_opt in ["-h", "--help"]:
             sys.exit(help_add_appointment())
 
-        if arg_opt in ['-f', '--file']:
+        if arg_opt in ["-f", "--file"]:
             fin = args.pop(0)
             if not os.path.isfile(fin):
                 logger.error("Can't find file " + fin)
@@ -107,6 +114,7 @@ def add_appointment(args):
             try:
                 with open(fin) as f:
                     appointment_data = json.load(f)
+
             except IOError as e:
                 logger.error("I/O error({}): {}".format(e.errno, e.strerror))
                 return False
@@ -121,17 +129,21 @@ def add_appointment(args):
         logger.error("The provided JSON is empty.")
         return False
 
-    valid_locator = check_txid_format(appointment_data.get('tx_id'))
+    valid_locator = check_txid_format(appointment_data.get("tx_id"))
 
     if not valid_locator:
         logger.error("The provided locator is not valid.")
         return False
 
     add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
-    appointment = build_appointment(appointment_data.get('tx'), appointment_data.get('tx_id'),
-                                    appointment_data.get('start_time'), appointment_data.get('end_time'),
-                                    appointment_data.get('dispute_delta'))
-    appointment_json = json.dumps(appointment, sort_keys=True, separators=(',', ':'))
+    appointment = build_appointment(
+        appointment_data.get("tx"),
+        appointment_data.get("tx_id"),
+        appointment_data.get("start_time"),
+        appointment_data.get("end_time"),
+        appointment_data.get("dispute_delta"),
+    )
+    appointment_json = json.dumps(appointment, sort_keys=True, separators=(",", ":"))
 
     logger.info("Sending appointment to PISA")
 
@@ -153,30 +165,33 @@ def add_appointment(args):
         return False
 
     if r.status_code != HTTP_OK:
-        if 'error' not in response_json:
-            logger.error("The server returned status code {}, but no error description."
-                         .format(r.status_code))
+        if "error" not in response_json:
+            logger.error("The server returned status code {}, but no error description.".format(r.status_code))
         else:
-            error = response_json['error']
-            logger.error("The server returned status code {}, and the following error: {}."
-                         .format(r.status_code, error))
+            error = response_json["error"]
+            logger.error(
+                "The server returned status code {}, and the following error: {}.".format(r.status_code, error)
+            )
         return False
 
-    if 'signature' not in response_json:
+    if "signature" not in response_json:
         logger.error("The response does not contain the signature of the appointment.")
         return False
 
-    signature = response_json['signature']
+    signature = response_json["signature"]
     # verify that the returned signature is valid
     try:
         pk = load_pisa_public_key()
         is_sig_valid = is_appointment_signature_valid(appointment, signature, pk)
+
     except ValueError:
         logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
         return False
+
     except FileNotFoundError:
         logger.error("Pisa's public key file not found. Please check your settings.")
         return False
+
     except IOError as e:
         logger.error("I/O error({}): {}".format(e.errno, e.strerror))
         return False
@@ -189,6 +204,7 @@ def add_appointment(args):
     # all good, store appointment and signature
     try:
         save_signed_appointment(appointment, signature)
+
     except OSError as e:
         logger.error("There was an error while saving the appointment: {}".format(e))
         return False
@@ -203,7 +219,7 @@ def get_appointment(args):
 
     arg_opt = args.pop(0)
 
-    if arg_opt in ['-h', '--help']:
+    if arg_opt in ["-h", "--help"]:
         sys.exit(help_get_appointment())
     else:
         locator = arg_opt
@@ -215,6 +231,7 @@ def get_appointment(args):
 
     get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
     parameters = "?locator={}".format(locator)
+
     try:
         r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
 
@@ -241,8 +258,14 @@ def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
     encrypted_blob = blob.encrypt(tx_id)
 
     appointment = {
-        'locator': locator, 'start_time': start_time, 'end_time': end_time, 'dispute_delta': dispute_delta,
-        'encrypted_blob': encrypted_blob, 'cipher': cipher, 'hash_function': hash_function}
+        "locator": locator,
+        "start_time": start_time,
+        "end_time": end_time,
+        "dispute_delta": dispute_delta,
+        "encrypted_blob": encrypted_blob,
+        "cipher": cipher,
+        "hash_function": hash_function,
+    }
 
     return appointment
 
@@ -252,61 +275,62 @@ def check_txid_format(txid):
         sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
 
     # TODO: #12-check-txid-regexp
-    return re.search(r'^[0-9A-Fa-f]+$', txid) is not None
+    return re.search(r"^[0-9A-Fa-f]+$", txid) is not None
 
 
 def show_usage():
-    return ('USAGE: '
-            '\n\tpython pisa-cli.py [global options] command [command options] [arguments]'
-            '\n\nCOMMANDS:'
-            '\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server.'
-            '\n\tget_appointment \tGets json formatted data about an appointment from the PISA server.'
-            '\n\thelp \t\t\tShows a list of commands or help for a specific command.'
+    return (
+        "USAGE: "
+        "\n\tpython pisa-cli.py [global options] command [command options] [arguments]"
+        "\n\nCOMMANDS:"
+        "\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server."
+        "\n\tget_appointment \tGets json formatted data about an appointment from the PISA server."
+        "\n\thelp \t\t\tShows a list of commands or help for a specific command."
+        "\n\nGLOBAL OPTIONS:"
+        "\n\t-s, --server \tAPI server where to send the requests. Defaults to btc.pisa.watch (modifiable in "
+        "__init__.py)"
+        "\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)"
+        "\n\t-d, --debug \tshows debug information and stores it in pisa.log"
+        "\n\t-h --help \tshows this message."
+    )
 
-            '\n\nGLOBAL OPTIONS:'
-            '\n\t-s, --server \tAPI server where to send the requests. Defaults to btc.pisa.watch (modifiable in '
-            '__init__.py)'
-            '\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)'
-            '\n\t-d, --debug \tshows debug information and stores it in pisa.log'
-            '\n\t-h --help \tshows this message.')
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     pisa_api_server = DEFAULT_PISA_API_SERVER
     pisa_api_port = DEFAULT_PISA_API_PORT
-    commands = ['add_appointment', 'get_appointment', 'help']
-    testing_commands = ['generate_dummy_appointment']
+    commands = ["add_appointment", "get_appointment", "help"]
+    testing_commands = ["generate_dummy_appointment"]
 
     try:
-        opts, args = getopt(argv[1:], 's:p:h', ['server', 'port', 'help'])
+        opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])
 
         for opt, arg in opts:
-            if opt in ['-s', 'server']:
+            if opt in ["-s", "server"]:
                 if arg:
                     pisa_api_server = arg
 
-            if opt in ['-p', '--port']:
+            if opt in ["-p", "--port"]:
                 if arg:
                     pisa_api_port = int(arg)
 
-            if opt in ['-h', '--help']:
+            if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
 
         if args:
             command = args.pop(0)
 
             if command in commands:
-                if command == 'add_appointment':
+                if command == "add_appointment":
                     add_appointment(args)
 
-                elif command == 'get_appointment':
+                elif command == "get_appointment":
                     get_appointment(args)
 
-                elif command == 'help':
+                elif command == "help":
                     if args:
                         command = args.pop(0)
 
-                        if command == 'add_appointment':
+                        if command == "add_appointment":
                             sys.exit(help_add_appointment())
 
                         elif command == "get_appointment":
@@ -320,7 +344,7 @@ if __name__ == '__main__':
 
             # FIXME: testing command, not for production
             elif command in testing_commands:
-                if command == 'generate_dummy_appointment':
+                if command == "generate_dummy_appointment":
                     generate_dummy_appointment()
 
             else:

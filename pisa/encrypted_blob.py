@@ -26,11 +26,13 @@ class EncryptedBlob:
         sk = master_key[:16]
         nonce = master_key[16:]
 
-        logger.info("Creating new blob.",
-                    master_key=hexlify(master_key).decode(),
-                    sk=hexlify(sk).decode(),
-                    nonce=hexlify(sk).decode(),
-                    encrypted_blob=self.data)
+        logger.info(
+            "Creating new blob.",
+            master_key=hexlify(master_key).decode(),
+            sk=hexlify(sk).decode(),
+            nonce=hexlify(sk).decode(),
+            encrypted_blob=self.data,
+        )
 
         # Decrypt
         aesgcm = AESGCM(sk)
@@ -38,7 +40,7 @@ class EncryptedBlob:
 
         try:
             raw_tx = aesgcm.decrypt(nonce=nonce, data=data, associated_data=None)
-            hex_raw_tx = hexlify(raw_tx).decode('utf8')
+            hex_raw_tx = hexlify(raw_tx).decode("utf8")
 
         except InvalidTag:
             hex_raw_tx = None

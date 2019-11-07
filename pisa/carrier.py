@@ -26,7 +26,7 @@ class Carrier:
             receipt = Receipt(delivered=True)
 
         except JSONRPCException as e:
-            errno = e.error.get('code')
+            errno = e.error.get("code")
             # Since we're pushing a raw transaction to the network we can face several rejections
             if errno == RPC_VERIFY_REJECTED:
                 # DISCUSS: 37-transaction-rejection
@@ -64,7 +64,7 @@ class Carrier:
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", method='Carrier.send_transaction', error=e.error)
+                logger.error("JSONRPCException.", method="Carrier.send_transaction", error=e.error)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         return receipt
@@ -79,11 +79,11 @@ class Carrier:
             # While it's quite unlikely, the transaction that was already in the blockchain could have been
             # reorged while we were querying bitcoind to get the confirmation count. In such a case we just
             # restart the job
-            if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
+            if e.error.get("code") == RPC_INVALID_ADDRESS_OR_KEY:
                 logger.info("Transaction got reorged before obtaining information", txid=txid)
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", method='Carrier.get_transaction', error=e.error)
+                logger.error("JSONRPCException.", method="Carrier.get_transaction", error=e.error)
 
         return tx_info

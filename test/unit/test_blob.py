@@ -18,7 +18,7 @@ def test_init_blob():
 
         for case in cipher_cases:
             blob = Blob(data, case, hash_function)
-            assert(blob.data == data and blob.cipher == case and blob.hash_function == hash_function)
+            assert blob.data == data and blob.cipher == case and blob.hash_function == hash_function
 
     # Fixed (valid) cipher, try different valid hash functions
     cipher = SUPPORTED_CIPHERS[0]
@@ -27,7 +27,7 @@ def test_init_blob():
 
         for case in hash_function_cases:
             blob = Blob(data, cipher, case)
-            assert(blob.data == data and blob.cipher == cipher and blob.hash_function == case)
+            assert blob.data == data and blob.cipher == cipher and blob.hash_function == case
 
     # Invalid data
     data = unhexlify(get_random_value_hex(64))
@@ -87,4 +87,4 @@ def test_encrypt():
     # Check that two encryptions of the same data have the same result
     encrypted_blob2 = blob.encrypt(key)
 
-    assert(encrypted_blob == encrypted_blob2 and id(encrypted_blob) != id(encrypted_blob2))
+    assert encrypted_blob == encrypted_blob2 and id(encrypted_blob) != id(encrypted_blob2)

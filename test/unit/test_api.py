@@ -36,22 +36,22 @@ def add_appointment(appointment):
 def test_add_appointment(run_api, run_bitcoind, new_appointment):
     # Properly formatted appointment
     r = add_appointment(new_appointment)
-    assert (r.status_code == 200)
+    assert r.status_code == 200
 
     # Incorrect appointment
     new_appointment["dispute_delta"] = 0
     r = add_appointment(new_appointment)
-    assert (r.status_code == 400)
+    assert r.status_code == 400
 
 
 def test_request_appointment(new_appointment):
     # First we need to add an appointment
     r = add_appointment(new_appointment)
-    assert (r.status_code == 200)
+    assert r.status_code == 200
 
     # Next we can request it
     r = requests.get(url=PISA_API + "/get_appointment?locator=" + new_appointment["locator"])
-    assert (r.status_code == 200)
+    assert r.status_code == 200
 
     # Each locator may point to multiple appointments, check them all
     received_appointments = json.loads(r.content)
@@ -60,20 +60,20 @@ def test_request_appointment(new_appointment):
     appointment_status = [appointment.pop("status") for appointment in received_appointments]
 
     # Check that the appointment is within the received appoints
-    assert (new_appointment in received_appointments)
+    assert new_appointment in received_appointments
 
     # Check that all the appointments are being watched
-    assert (all([status == "being_watched" for status in appointment_status]))
+    assert all([status == "being_watched" for status in appointment_status])
 
 
 def test_request_random_appointment():
     r = requests.get(url=PISA_API + "/get_appointment?locator=" + get_random_value_hex(32))
-    assert (r.status_code == 200)
+    assert r.status_code == 200
 
     received_appointments = json.loads(r.content)
     appointment_status = [appointment.pop("status") for appointment in received_appointments]
 
-    assert (all([status == "not_found" for status in appointment_status]))
+    assert all([status == "not_found" for status in appointment_status])
 
 
 def test_add_appointment_multiple_times(new_appointment, n=MULTIPLE_APPOINTMENTS):
@@ -81,29 +81,29 @@ def test_add_appointment_multiple_times(new_appointment, n=MULTIPLE_APPOINTMENTS
     # DISCUSS: #34-store-identical-appointments
     for _ in range(n):
         r = add_appointment(new_appointment)
-        assert (r.status_code == 200)
+        assert r.status_code == 200
 
 
 def test_request_multiple_appointments_same_locator(new_appointment, n=MULTIPLE_APPOINTMENTS):
     for _ in range(n):
         r = add_appointment(new_appointment)
-        assert (r.status_code == 200)
+        assert r.status_code == 200
 
     test_request_appointment(new_appointment)
 
 
 def test_add_too_many_appointment(new_appointment):
-    for _ in range(MAX_APPOINTMENTS-len(appointments)):
+    for _ in range(MAX_APPOINTMENTS - len(appointments)):
         r = add_appointment(new_appointment)
-        assert (r.status_code == 200)
+        assert r.status_code == 200
 
     r = add_appointment(new_appointment)
-    assert (r.status_code == 503)
+    assert r.status_code == 503
 
 
 def test_get_all_appointments_watcher():
     r = requests.get(url=PISA_API + "/get_all_appointments")
-    assert (r.status_code == 200 and r.reason == 'OK')
+    assert r.status_code == 200 and r.reason == "OK"
 
     received_appointments = json.loads(r.content)
 
@@ -111,8 +111,8 @@ def test_get_all_appointments_watcher():
     watcher_locators = [v["locator"] for k, v in received_appointments["watcher_appointments"].items()]
     local_locators = [appointment["locator"] for appointment in appointments]
 
-    assert(set(watcher_locators) == set(local_locators))
-    assert(len(received_appointments["responder_jobs"]) == 0)
+    assert set(watcher_locators) == set(local_locators)
+    assert len(received_appointments["responder_jobs"]) == 0
 
 
 def test_get_all_appointments_responder():
@@ -138,5 +138,5 @@ def test_get_all_appointments_responder():
     watcher_appointments = [v["locator"] for k, v in received_appointments["watcher_appointments"].items()]
     print(set(watcher_appointments) == set(local_locators))
 
-    assert (set(responder_jobs) == set(local_locators))
-    assert (len(received_appointments["watcher_appointments"]) == 0)
+    assert set(responder_jobs) == set(local_locators)
+    assert len(received_appointments["watcher_appointments"]) == 0

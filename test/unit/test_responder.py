@@ -31,12 +31,14 @@ def create_dummy_job_data(random_txid=False, justice_rawtx=None):
     justice_txid = "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
 
     if justice_rawtx is None:
-        justice_rawtx = "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402" \
-                        "204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4" \
-                        "acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b" \
-                        "13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1ba" \
-                        "ded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482e" \
-                        "cad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000"
+        justice_rawtx = (
+            "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402"
+            "204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4"
+            "acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b"
+            "13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1ba"
+            "ded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482e"
+            "cad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000"
+        )
 
     else:
         justice_txid = sha256d(justice_rawtx)
@@ -58,24 +60,34 @@ def test_job_init(run_bitcoind):
     dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data()
     job = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
 
-    assert job.dispute_txid == dispute_txid and job.justice_txid == justice_txid \
-        and job.justice_rawtx == justice_rawtx and job.appointment_end == appointment_end
+    assert (
+        job.dispute_txid == dispute_txid
+        and job.justice_txid == justice_txid
+        and job.justice_rawtx == justice_rawtx
+        and job.appointment_end == appointment_end
+    )
 
 
 def test_job_to_dict():
     job = create_dummy_job()
     job_dict = job.to_dict()
 
-    assert job.locator == job_dict["locator"] and job.justice_rawtx == job_dict["justice_rawtx"] \
+    assert (
+        job.locator == job_dict["locator"]
+        and job.justice_rawtx == job_dict["justice_rawtx"]
         and job.appointment_end == job_dict["appointment_end"]
+    )
 
 
 def test_job_to_json():
     job = create_dummy_job()
     job_dict = json.loads(job.to_json())
 
-    assert job.locator == job_dict["locator"] and job.justice_rawtx == job_dict["justice_rawtx"] \
+    assert (
+        job.locator == job_dict["locator"]
+        and job.justice_rawtx == job_dict["justice_rawtx"]
         and job.appointment_end == job_dict["appointment_end"]
+    )
 
 
 def test_init_responder(responder):
@@ -97,8 +109,14 @@ def test_add_response(responder):
     responder.asleep = False
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
-    receipt = responder.add_response(uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx, job.appointment_end,
-                                     block_hash=get_random_value_hex(32))
+    receipt = responder.add_response(
+        uuid,
+        job.dispute_txid,
+        job.justice_txid,
+        job.justice_rawtx,
+        job.appointment_end,
+        block_hash=get_random_value_hex(32),
+    )
 
     assert receipt.delivered is True
 
@@ -124,9 +142,13 @@ def test_create_job(responder):
 
         # Check that the rest of job data also matches
         job = responder.jobs[uuid]
-        assert job.dispute_txid == dispute_txid and job.justice_txid == justice_txid \
-            and job.justice_rawtx == justice_rawtx and job.appointment_end == appointment_end \
+        assert (
+            job.dispute_txid == dispute_txid
+            and job.justice_txid == justice_txid
+            and job.justice_rawtx == justice_rawtx
             and job.appointment_end == appointment_end
+            and job.appointment_end == appointment_end
+        )
 
 
 def test_create_job_already_confirmed(responder):
@@ -134,9 +156,10 @@ def test_create_job_already_confirmed(responder):
 
     for i in range(20):
         uuid = uuid4().hex
-        confirmations = i+1
+        confirmations = i + 1
         dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
-            justice_rawtx=TX.create_dummy_transaction())
+            justice_rawtx=TX.create_dummy_transaction()
+        )
 
         responder.create_job(uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
 
@@ -218,7 +241,7 @@ def test_do_watch(responder):
 
 def test_get_txs_to_rebroadcast(responder):
     # Let's create a few fake txids and assign at least 6 missing confirmations to each
-    txs_missing_too_many_conf = {get_random_value_hex(32): 6+i for i in range(10)}
+    txs_missing_too_many_conf = {get_random_value_hex(32): 6 + i for i in range(10)}
 
     # Let's create some other transaction that has missed some confirmations but not that many
     txs_missing_some_conf = {get_random_value_hex(32): 3 for _ in range(10)}
@@ -299,7 +322,8 @@ def test_rebroadcast(db_manager):
     for i in range(20):
         uuid = uuid4().hex
         dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
-            justice_rawtx=TX.create_dummy_transaction())
+            justice_rawtx=TX.create_dummy_transaction()
+        )
 
         responder.jobs[uuid] = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
         responder.tx_job_map[justice_txid] = [uuid]
@@ -319,20 +343,3 @@ def test_rebroadcast(db_manager):
 
         assert receipt.delivered is True
         assert responder.missed_confirmations[txid] == 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

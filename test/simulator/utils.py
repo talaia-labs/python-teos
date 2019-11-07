@@ -17,7 +17,7 @@ def change_endianness(x):
 
     y = unhexlify(x)
     z = y[::-1]
-    return hexlify(z).decode('utf-8')
+    return hexlify(z).decode("utf-8")
 
 
 def parse_varint(tx):
@@ -30,10 +30,10 @@ def parse_varint(tx):
 
     # First of all, the offset of the hex transaction if moved to the proper position (i.e where the varint should be
     #  located) and the length and format of the data to be analyzed is checked.
-    data = tx.hex[tx.offset:]
-    assert (len(data) > 0)
+    data = tx.hex[tx.offset :]
+    assert len(data) > 0
     size = int(data[:2], 16)
-    assert (size <= 255)
+    assert size <= 255
 
     # Then, the integer is encoded as a varint using the proper prefix, if needed.
     if size <= 252:  # No prefix
@@ -49,7 +49,7 @@ def parse_varint(tx):
 
     # Finally, the storage length is used to extract the proper number of bytes from the transaction hex and the
     # transaction offset is updated.
-    varint = data[:storage_length * 2]
+    varint = data[: storage_length * 2]
     tx.offset += storage_length * 2
 
     return varint
@@ -65,7 +65,7 @@ def parse_element(tx, size):
     :rtype: hex str
     """
 
-    element = tx.hex[tx.offset:tx.offset + size * 2]
+    element = tx.hex[tx.offset : tx.offset + size * 2]
     tx.offset += size * 2
     return element
 
@@ -97,7 +97,7 @@ def encode_varint(value):
             prefix = 255  # 0xFF
         else:
             raise Exception("Wrong input data size")
-        varint = format(prefix, 'x') + change_endianness(int2bytes(value, size))
+        varint = format(prefix, "x") + change_endianness(int2bytes(value, size))
 
     return varint
 
@@ -112,12 +112,13 @@ def int2bytes(a, b):
     :rtype: hex str
     """
 
-    m = pow(2, 8*b) - 1
+    m = pow(2, 8 * b) - 1
     if a > m:
-        raise Exception(str(a) + " is too big to be represented with " + str(b) + " bytes. Maximum value is "
-                        + str(m) + ".")
+        raise Exception(
+            str(a) + " is too big to be represented with " + str(b) + " bytes. Maximum value is " + str(m) + "."
+        )
 
-    return ('%0' + str(2 * b) + 'x') % a
+    return ("%0" + str(2 * b) + "x") % a
 
 
 def sha256d(hex_data):
@@ -125,4 +126,3 @@ def sha256d(hex_data):
     double_sha256 = sha256(sha256(data).digest()).hexdigest()
 
     return change_endianness(double_sha256)
-

@@ -1,6 +1,4 @@
-import pytest
 import responses
-import requests
 import json
 from binascii import hexlify
 
@@ -9,7 +7,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
 import apps.cli.pisa_cli as pisa_cli
-from apps.cli import PISA_PUBLIC_KEY
 from test.unit.conftest import get_random_value_hex
 
 # TODO: should find a way of doing without this

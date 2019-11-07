@@ -137,14 +137,16 @@ class TX:
         tx.prev_out_index = [prev_out_index]
         tx.nLockTime = 0
         tx.scriptSig = [
-            '47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860'
-            'a4acdd12909d831cc56cbbac4622082221a8768d1d0901']
+            "47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860"
+            "a4acdd12909d831cc56cbbac4622082221a8768d1d0901"
+        ]
         tx.scriptSig_len = [77]
         tx.nSequence = [4294967295]
         tx.value = [5000000000]
         tx.scriptPubKey = [
-            '4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c'
-            '1b7303b8a0626f1baded5c72a704f7e6cd84cac']
+            "4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c"
+            "1b7303b8a0626f1baded5c72a704f7e6cd84cac"
+        ]
         tx.scriptPubKey_len = [67]
 
         return tx.serialize()

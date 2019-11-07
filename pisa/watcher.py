@@ -101,15 +101,19 @@ class Watcher:
             block = BlockProcessor.get_block(block_hash)
 
             if block is not None:
-                txids = block.get('tx')
+                txids = block.get("tx")
 
                 logger.info("List of transactions.", txids=txids)
 
-                expired_appointments = [uuid for uuid, appointment in self.appointments.items()
-                                        if block["height"] > appointment.end_time + EXPIRY_DELTA]
+                expired_appointments = [
+                    uuid
+                    for uuid, appointment in self.appointments.items()
+                    if block["height"] > appointment.end_time + EXPIRY_DELTA
+                ]
 
-                Cleaner.delete_expired_appointment(expired_appointments, self.appointments, self.locator_uuid_map,
-                                                   self.db_manager)
+                Cleaner.delete_expired_appointment(
+                    expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
+                )
 
                 potential_matches = BlockProcessor.get_potential_matches(txids, self.locator_uuid_map)
                 matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
@@ -117,11 +121,21 @@ class Watcher:
                 for locator, uuid, dispute_txid, justice_txid, justice_rawtx in matches:
                     # Errors decrypting the Blob will result in a None justice_txid
                     if justice_txid is not None:
-                        logger.info("Notifying responder and deleting appointment.", justice_txid=justice_txid,
-                                    locator=locator, uuid=uuid)
+                        logger.info(
+                            "Notifying responder and deleting appointment.",
+                            justice_txid=justice_txid,
+                            locator=locator,
+                            uuid=uuid,
+                        )
 
-                        self.responder.add_response(uuid, dispute_txid, justice_txid, justice_rawtx,
-                                                    self.appointments[uuid].end_time, block_hash)
+                        self.responder.add_response(
+                            uuid,
+                            dispute_txid,
+                            justice_txid,
+                            justice_rawtx,
+                            self.appointments[uuid].end_time,
+                            block_hash,
+                        )
 
                     # Delete the appointment
                     appointment = self.appointments.pop(uuid)

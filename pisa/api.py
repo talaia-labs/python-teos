@@ -22,12 +22,12 @@ logger = Logger("API")
 watcher = None
 
 
-@app.route('/', methods=['POST'])
+@app.route("/", methods=["POST"])
 def add_appointment():
-    remote_addr = request.environ.get('REMOTE_ADDR')
-    remote_port = request.environ.get('REMOTE_PORT')
+    remote_addr = request.environ.get("REMOTE_ADDR")
+    remote_port = request.environ.get("REMOTE_PORT")
 
-    logger.info('Connection accepted', from_addr_port='{}:{}'.format(remote_addr, remote_port))
+    logger.info("Connection accepted", from_addr_port="{}:{}".format(remote_addr, remote_port))
 
     # Check content type once if properly defined
     request_data = json.loads(request.get_json())
@@ -42,7 +42,7 @@ def add_appointment():
 
         if appointment_added:
             rcode = HTTP_OK
-            response = {"locator": appointment.locator, "signature": hexlify(signature).decode('utf-8')}
+            response = {"locator": appointment.locator, "signature": hexlify(signature).decode("utf-8")}
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
             error = "appointment rejected"
@@ -56,8 +56,12 @@ def add_appointment():
         rcode = HTTP_BAD_REQUEST
         error = "appointment rejected. Request does not match the standard"
 
-    logger.info('Sending response and disconnecting',
-                from_addr_port='{}:{}'.format(remote_addr, remote_port), response=response, error=error)
+    logger.info(
+        "Sending response and disconnecting",
+        from_addr_port="{}:{}".format(remote_addr, remote_port),
+        response=response,
+        error=error,
+    )
 
     if error is None:
         return jsonify(response), rcode
@@ -67,9 +71,9 @@ def add_appointment():
 
 # FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
 # ToDo: #17-add-api-keys
-@app.route('/get_appointment', methods=['GET'])
+@app.route("/get_appointment", methods=["GET"])
 def get_appointment():
-    locator = request.args.get('locator')
+    locator = request.args.get("locator")
     response = []
 
     # ToDo: #15-add-system-monitor
@@ -79,7 +83,7 @@ def get_appointment():
     if appointment_in_watcher:
         for uuid in appointment_in_watcher:
             appointment_data = watcher.appointments[uuid].to_dict()
-            appointment_data['status'] = "being_watched"
+            appointment_data["status"] = "being_watched"
             response.append(appointment_data)
 
     if watcher.responder:
@@ -88,7 +92,7 @@ def get_appointment():
         for job in responder_jobs.values():
             if job.locator == locator:
                 job_data = job.to_dict()
-                job_data['status'] = "dispute_responded"
+                job_data["status"] = "dispute_responded"
                 response.append(job_data)
 
     if not response:
@@ -99,14 +103,14 @@ def get_appointment():
     return response
 
 
-@app.route('/get_all_appointments', methods=['GET'])
+@app.route("/get_all_appointments", methods=["GET"])
 def get_all_appointments():
     watcher_appointments = {}
     responder_jobs = {}
 
     # ToDo: #15-add-system-monitor
 
-    if request.remote_addr in request.host or request.remote_addr == '127.0.0.1':
+    if request.remote_addr in request.host or request.remote_addr == "127.0.0.1":
         for uuid, appointment in watcher.appointments.items():
             watcher_appointments[uuid] = appointment.to_dict()
 
@@ -122,7 +126,7 @@ def get_all_appointments():
     return response
 
 
-@app.route('/get_block_count', methods=['GET'])
+@app.route("/get_block_count", methods=["GET"])
 def get_block_count():
     return jsonify({"block_count": BlockProcessor.get_block_count()})
 
@@ -135,7 +139,7 @@ def start_api(w):
     watcher = w
 
     # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
-    os.environ['WERKZEUG_RUN_MAIN'] = 'true'
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
     app.run(host=HOST, port=PORT)

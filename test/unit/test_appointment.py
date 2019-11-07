@@ -33,9 +33,15 @@ def test_init_appointment(appointment_data):
 
     appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
 
-    assert (locator == appointment.locator and start_time == appointment.start_time and end_time == appointment.end_time
-            and EncryptedBlob(encrypted_blob_data) == appointment.encrypted_blob and cipher == appointment.cipher
-            and dispute_delta == appointment.dispute_delta and hash_function == appointment.hash_function)
+    assert (
+        locator == appointment.locator
+        and start_time == appointment.start_time
+        and end_time == appointment.end_time
+        and EncryptedBlob(encrypted_blob_data) == appointment.encrypted_blob
+        and cipher == appointment.cipher
+        and dispute_delta == appointment.dispute_delta
+        and hash_function == appointment.hash_function
+    )
 
 
 def test_to_dict(appointment_data):
@@ -44,10 +50,15 @@ def test_to_dict(appointment_data):
 
     dict_appointment = appointment.to_dict()
 
-    assert (locator == dict_appointment.get("locator") and start_time == dict_appointment.get("start_time")
-            and end_time == dict_appointment.get("end_time") and dispute_delta == dict_appointment.get("dispute_delta")
-            and cipher == dict_appointment.get("cipher") and hash_function == dict_appointment.get("hash_function")
-            and encrypted_blob_data == dict_appointment.get("encrypted_blob"))
+    assert (
+        locator == dict_appointment.get("locator")
+        and start_time == dict_appointment.get("start_time")
+        and end_time == dict_appointment.get("end_time")
+        and dispute_delta == dict_appointment.get("dispute_delta")
+        and cipher == dict_appointment.get("cipher")
+        and hash_function == dict_appointment.get("hash_function")
+        and encrypted_blob_data == dict_appointment.get("encrypted_blob")
+    )
 
 
 def test_to_json(appointment_data):
@@ -56,7 +67,12 @@ def test_to_json(appointment_data):
 
     dict_appointment = json.loads(appointment.to_json())
 
-    assert (locator == dict_appointment.get("locator") and start_time == dict_appointment.get("start_time")
-            and end_time == dict_appointment.get("end_time") and dispute_delta == dict_appointment.get("dispute_delta")
-            and cipher == dict_appointment.get("cipher") and hash_function == dict_appointment.get("hash_function")
-            and encrypted_blob_data == dict_appointment.get("encrypted_blob"))
+    assert (
+        locator == dict_appointment.get("locator")
+        and start_time == dict_appointment.get("start_time")
+        and end_time == dict_appointment.get("end_time")
+        and dispute_delta == dict_appointment.get("dispute_delta")
+        and cipher == dict_appointment.get("cipher")
+        and hash_function == dict_appointment.get("hash_function")
+        and encrypted_blob_data == dict_appointment.get("encrypted_blob")
+    )

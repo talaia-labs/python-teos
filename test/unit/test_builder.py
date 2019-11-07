@@ -74,6 +74,3 @@ def test_build_block_queue():
         blocks.remove(block)
 
     assert len(blocks) == 0
-
-
-

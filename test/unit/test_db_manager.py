@@ -9,12 +9,12 @@ from test.unit.conftest import get_random_value_hex, generate_dummy_appointment
 from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def watcher_appointments():
     return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def responder_jobs():
     return {get_random_value_hex(32): get_random_value_hex(32) for _ in range(10)}
 
@@ -31,7 +31,7 @@ def open_create_db(db_path):
 
 
 def test_init():
-    db_path = 'init_test_db'
+    db_path = "init_test_db"
 
     # First we check if the db exists, and if so we delete it
     if os.path.isdir(db_path):
@@ -57,7 +57,7 @@ def test_init():
 
 def test_load_appointments_db(db_manager):
     # Let's made up a prefix and try to load data from the database using it
-    prefix = 'XX'
+    prefix = "XX"
     db_appointments = db_manager.load_appointments_db(prefix)
 
     assert len(db_appointments) == 0
@@ -69,7 +69,7 @@ def test_load_appointments_db(db_manager):
         value = get_random_value_hex(32)
         local_appointments[key] = value
 
-        db_manager.db.put((prefix+key).encode('utf-8'), json.dumps({'value': value}).encode('utf-8'))
+        db_manager.db.put((prefix + key).encode("utf-8"), json.dumps({"value": value}).encode("utf-8"))
 
     db_appointments = db_manager.load_appointments_db(prefix)
 
@@ -88,7 +88,7 @@ def test_get_last_known_block(db_manager):
     # After saving some block in the db we should get that exact value
     for key in [WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY]:
         block_hash = get_random_value_hex(32)
-        db_manager.db.put(key.encode('utf-8'), block_hash.encode('utf-8'))
+        db_manager.db.put(key.encode("utf-8"), block_hash.encode("utf-8"))
         assert db_manager.get_last_known_block(key) == block_hash
 
 
@@ -100,24 +100,24 @@ def test_create_entry(db_manager):
     db_manager.create_entry(key, value)
 
     # We should be able to get it straightaway from the key
-    assert db_manager.db.get(key.encode('utf-8')).decode('utf-8') == value
+    assert db_manager.db.get(key.encode("utf-8")).decode("utf-8") == value
 
     # If we prefix the key we should be able to get it if we add the prefix, but not otherwise
     key = get_random_value_hex(32)
-    prefix = 'w'
+    prefix = "w"
     db_manager.create_entry(key, value, prefix=prefix)
 
-    assert db_manager.db.get((prefix+key).encode('utf-8')).decode('utf-8') == value
-    assert db_manager.db.get(key.encode('utf-8')) is None
+    assert db_manager.db.get((prefix + key).encode("utf-8")).decode("utf-8") == value
+    assert db_manager.db.get(key.encode("utf-8")) is None
 
     # Same if we try to use any other prefix
-    another_prefix = 'r'
-    assert db_manager.db.get((another_prefix+key).encode('utf-8')) is None
+    another_prefix = "r"
+    assert db_manager.db.get((another_prefix + key).encode("utf-8")) is None
 
 
 def test_delete_entry(db_manager):
     # Let's first get the key all the things we've wrote so far in the db
-    data = [k.decode('utf-8') for k, v in db_manager.db.iterator()]
+    data = [k.decode("utf-8") for k, v in db_manager.db.iterator()]
 
     # Let's empty the db now
     for key in data:
@@ -132,11 +132,11 @@ def test_delete_entry(db_manager):
     db_manager.create_entry(key, value, prefix)
 
     # Checks it's there
-    assert db_manager.db.get((prefix + key).encode('utf-8')).decode('utf-8') == value
+    assert db_manager.db.get((prefix + key).encode("utf-8")).decode("utf-8") == value
 
     # And now it's gone
     db_manager.delete_entry(key, prefix)
-    assert db_manager.db.get((prefix+key).encode('utf-8')) is None
+    assert db_manager.db.get((prefix + key).encode("utf-8")) is None
 
 
 def test_load_watcher_appointments_empty(db_manager):
@@ -172,14 +172,14 @@ def test_store_update_locator_map_empty(db_manager):
 
 def test_delete_locator_map(db_manager):
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
-    assert(len(locator_maps) != 0)
+    assert len(locator_maps) != 0
 
     for locator, uuids in locator_maps.items():
         print(locator)
         db_manager.delete_locator_map(locator)
 
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
-    assert (len(locator_maps) == 0)
+    assert len(locator_maps) == 0
 
 
 def test_store_load_watcher_appointment(db_manager, watcher_appointments):
@@ -200,7 +200,7 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
 
 def test_store_load_appointment_jobs(db_manager, responder_jobs):
     for key, value in responder_jobs.items():
-        db_manager.store_responder_job(key, json.dumps({'value': value}))
+        db_manager.store_responder_job(key, json.dumps({"value": value}))
 
     db_responder_jobs = db_manager.load_responder_jobs()
 
@@ -252,6 +252,3 @@ def test_store_load_last_block_hash_responder(db_manager):
     db_last_block_hash = db_manager.load_last_block_hash_responder()
 
     assert local_last_block_hash == db_last_block_hash
-
-
-

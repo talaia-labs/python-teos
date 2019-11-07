@@ -24,14 +24,14 @@ def handle_signals(signal_received, frame):
     exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger.info("Starting PISA")
 
     signal(SIGINT, handle_signals)
     signal(SIGTERM, handle_signals)
     signal(SIGQUIT, handle_signals)
 
-    opts, _ = getopt(argv[1:], '', [''])
+    opts, _ = getopt(argv[1:], "", [""])
     for opt, arg in opts:
         # FIXME: Leaving this here for future option/arguments
         pass
@@ -62,8 +62,11 @@ if __name__ == '__main__':
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 missed_blocks_watcher = block_processor.get_missed_blocks(last_block_watcher)
-                missed_blocks_responder = missed_blocks_watcher if last_block_watcher == last_block_responder \
+                missed_blocks_responder = (
+                    missed_blocks_watcher
+                    if last_block_watcher == last_block_responder
                     else block_processor.get_missed_blocks(last_block_watcher)
+                )
 
                 responder = Responder(db_manager)
                 responder.jobs, responder.tx_job_map = Builder.build_jobs(responder_jobs_data)
@@ -79,4 +82,3 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
-

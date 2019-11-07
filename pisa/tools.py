@@ -9,13 +9,14 @@ from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 
 # NOTCOVERED
 def bitcoin_cli():
-    return AuthServiceProxy("http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST,
-                                                    conf.BTC_RPC_PORT))
+    return AuthServiceProxy(
+        "http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST, conf.BTC_RPC_PORT)
+    )
 
 
 # TODO: currently only used in the Responder; might move there or in the BlockProcessor
 # NOTCOVERED
-def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
+def check_tx_in_chain(tx_id, logger=Logger(), tx_label="Transaction"):
     tx_in_chain = False
     confirmations = 0
 
@@ -31,12 +32,12 @@ def check_tx_in_chain(tx_id, logger=Logger(), tx_label='Transaction'):
             logger.error("{} found in mempool".format(tx_label), txid=tx_id)
 
     except JSONRPCException as e:
-        if e.error.get('code') == RPC_INVALID_ADDRESS_OR_KEY:
+        if e.error.get("code") == RPC_INVALID_ADDRESS_OR_KEY:
             logger.error("{} not found in mempool nor blockchain".format(tx_label), txid=tx_id)
 
         else:
             # ToDO: Unhandled errors, check this properly
-            logger.error("JSONRPCException.", method='tools.check_tx_in_chain', error=e.error)
+            logger.error("JSONRPCException.", method="tools.check_tx_in_chain", error=e.error)
 
     return tx_in_chain, confirmations
 
@@ -60,11 +61,11 @@ def in_correct_network(network):
 
     genesis_block_hash = bitcoin_cli().getblockhash(0)
 
-    if network == 'mainnet' and genesis_block_hash == mainnet_genesis_block_hash:
+    if network == "mainnet" and genesis_block_hash == mainnet_genesis_block_hash:
         correct_network = True
-    elif network == 'testnet' and genesis_block_hash == testnet3_genesis_block_hash:
+    elif network == "testnet" and genesis_block_hash == testnet3_genesis_block_hash:
         correct_network = True
-    elif network == 'regtest' and genesis_block_hash not in [mainnet_genesis_block_hash, testnet3_genesis_block_hash]:
+    elif network == "regtest" and genesis_block_hash not in [mainnet_genesis_block_hash, testnet3_genesis_block_hash]:
         correct_network = True
 
     return correct_network
@@ -72,5 +73,4 @@ def in_correct_network(network):
 
 def check_txid_format(txid):
     # TODO: #12-check-txid-regexp
-    return isinstance(txid, str) and re.search(r'^[0-9A-Fa-f]{64}$', txid) is not None
-
+    return isinstance(txid, str) and re.search(r"^[0-9A-Fa-f]{64}$", txid) is not None

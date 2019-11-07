@@ -13,8 +13,8 @@ from test.simulator.zmq_publisher import ZMQPublisher
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
 app = Flask(__name__)
-HOST = 'localhost'
-PORT = '18443'
+HOST = "localhost"
+PORT = "18443"
 
 blockchain = []
 blocks = {}
@@ -24,20 +24,20 @@ mempool = []
 mine_new_block = Event()
 
 TIME_BETWEEN_BLOCKS = 5
-GENESIS_PARENT = '0000000000000000000000000000000000000000000000000000000000000000'
+GENESIS_PARENT = "0000000000000000000000000000000000000000000000000000000000000000"
 prev_block_hash = GENESIS_PARENT
 
-        
-@app.route('/generate', methods=['POST'])
+
+@app.route("/generate", methods=["POST"])
 def generate():
     global mine_new_block
 
     mine_new_block.set()
 
-    return Response(status=200, mimetype='application/json')
+    return Response(status=200, mimetype="application/json")
 
 
-@app.route('/fork', methods=['POST'])
+@app.route("/fork", methods=["POST"])
 def create_fork():
     """
     create_fork processes chain fork requests. It will create a fork with the following parameters:
@@ -67,10 +67,10 @@ def create_fork():
         #        block heights and blockchain length is currently incorrect. It does the trick to test forks, but should
         #        be fixed for better testing.
 
-    return Response(json.dumps(response), status=200, mimetype='application/json')
+    return Response(json.dumps(response), status=200, mimetype="application/json")
 
 
-@app.route('/', methods=['POST'])
+@app.route("/", methods=["POST"])
 def process_request():
     """
     process_requests simulates the bitcoin-rpc server run by bitcoind. The available commands are limited to the ones
@@ -108,7 +108,7 @@ def process_request():
 
     global mempool
     request_data = request.get_json()
-    method = request_data.get('method')
+    method = request_data.get("method")
 
     response = {"id": 0, "result": 0, "error": None}
     no_param_err = {"code": RPC_MISC_ERROR, "message": "JSON value is not a {} as expected"}
@@ -142,8 +142,10 @@ def process_request():
                     response["result"] = {"txid": txid}
 
                 else:
-                    response["error"] = {"code": RPC_VERIFY_ALREADY_IN_CHAIN,
-                                         "message": "Transaction already in block chain"}
+                    response["error"] = {
+                        "code": RPC_VERIFY_ALREADY_IN_CHAIN,
+                        "message": "Transaction already in block chain",
+                    }
 
             else:
                 response["error"] = {"code": RPC_DESERIALIZATION_ERROR, "message": "TX decode failed"}
@@ -158,16 +160,18 @@ def process_request():
         if isinstance(txid, str):
             if txid in mined_transactions:
                 block = blocks.get(mined_transactions[txid]["block"])
-                rawtx = mined_transactions[txid].get('tx')
-                response["result"] = {"hex": rawtx, "confirmations": len(blockchain) - block.get('height')}
+                rawtx = mined_transactions[txid].get("tx")
+                response["result"] = {"hex": rawtx, "confirmations": len(blockchain) - block.get("height")}
 
             elif txid in mempool:
                 response["result"] = {"confirmations": 0}
 
             else:
-                response["error"] = {'code': RPC_INVALID_ADDRESS_OR_KEY,
-                                     'message': 'No such mempool or blockchain transaction. Use gettransaction for '
-                                                'wallet transactions.'}
+                response["error"] = {
+                    "code": RPC_INVALID_ADDRESS_OR_KEY,
+                    "message": "No such mempool or blockchain transaction. Use gettransaction for "
+                    "wallet transactions.",
+                }
         else:
             response["error"] = no_param_err
             response["error"]["message"] = response["error"]["message"].format("string")
@@ -219,7 +223,7 @@ def process_request():
     else:
         return abort(404, "Method not found")
 
-    return Response(json.dumps(response), status=200, mimetype='application/json')
+    return Response(json.dumps(response), status=200, mimetype="application/json")
 
 
 def get_param(request_data):
@@ -240,8 +244,9 @@ def load_data():
 def simulate_mining(mode, time_between_blocks):
     global mempool, mined_transactions, blocks, blockchain, mine_new_block, prev_block_hash
 
-    mining_simulator = ZMQPublisher(topic=b'hashblock', feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR,
-                                    feed_port=FEED_PORT)
+    mining_simulator = ZMQPublisher(
+        topic=b"hashblock", feed_protocol=FEED_PROTOCOL, feed_addr=FEED_ADDR, feed_port=FEED_PORT
+    )
 
     # Set the mining event to initialize the blockchain with a block
     mine_new_block.set()
@@ -266,8 +271,12 @@ def simulate_mining(mode, time_between_blocks):
             mined_transactions[txid] = {"tx": tx, "block": block_hash}
 
         # FIXME: chain_work is being defined as a incremental counter for now. Multiple chains should be possible.
-        blocks[block_hash] = {"tx": list(txs_to_mine.keys()), "height": len(blockchain), "previousblockhash": prev_block_hash,
-                              "chainwork": '{:x}'.format(len(blockchain))}
+        blocks[block_hash] = {
+            "tx": list(txs_to_mine.keys()),
+            "height": len(blockchain),
+            "previousblockhash": prev_block_hash,
+            "chainwork": "{:x}".format(len(blockchain)),
+        }
 
         mining_simulator.publish_data(binascii.unhexlify(block_hash))
         blockchain.append(block_hash)
@@ -276,22 +285,22 @@ def simulate_mining(mode, time_between_blocks):
         print("New block mined: {}".format(block_hash))
         print("\tTransactions: {}".format(list(txs_to_mine.keys())))
 
-        if mode == 'time':
+        if mode == "time":
             time.sleep(time_between_blocks)
 
         else:
             mine_new_block.clear()
-            
 
-def run_simulator(mode='time', time_between_blocks=TIME_BETWEEN_BLOCKS):
-    if mode not in ["time", 'event']:
+
+def run_simulator(mode="time", time_between_blocks=TIME_BETWEEN_BLOCKS):
+    if mode not in ["time", "event"]:
         raise ValueError("Node must be time or event")
 
     mining_thread = Thread(target=simulate_mining, args=[mode, time_between_blocks])
     mining_thread.start()
 
     # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
-    os.environ['WERKZEUG_RUN_MAIN'] = 'true'
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
     app.run(host=HOST, port=PORT)

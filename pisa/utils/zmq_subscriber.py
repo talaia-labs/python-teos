@@ -7,6 +7,7 @@ from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 # ToDo: #7-add-async-back-to-zmq
 class ZMQHandler:
     """ Adapted from https://github.com/bitcoin/bitcoin/blob/master/contrib/zmq/zmq_sub.py"""
+
     def __init__(self, parent):
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
@@ -27,7 +28,7 @@ class ZMQHandler:
                 body = msg[1]
 
                 if topic == b"hashblock":
-                    block_hash = binascii.hexlify(body).decode('UTF-8')
+                    block_hash = binascii.hexlify(body).decode("UTF-8")
                     block_queue.put(block_hash)
 
                     self.logger.info("New block received via ZMQ", block_hash=block_hash)

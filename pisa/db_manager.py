@@ -9,7 +9,7 @@ WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"
 RESPONDER_PREFIX = "r"
 RESPONDER_LAST_BLOCK_KEY = "br"
-LOCATOR_MAP_PREFIX = 'm'
+LOCATOR_MAP_PREFIX = "m"
 
 
 class DBManager:
@@ -21,25 +21,25 @@ class DBManager:
             self.db = plyvel.DB(db_path)
 
         except plyvel.Error as e:
-            if 'create_if_missing is false' in str(e):
+            if "create_if_missing is false" in str(e):
                 logger.info("No db found. Creating a fresh one")
                 self.db = plyvel.DB(db_path, create_if_missing=True)
 
     def load_appointments_db(self, prefix):
         data = {}
 
-        for k, v in self.db.iterator(prefix=prefix.encode('utf-8')):
+        for k, v in self.db.iterator(prefix=prefix.encode("utf-8")):
             # Get uuid and appointment_data from the db
-            uuid = k[len(prefix):].decode('utf-8')
+            uuid = k[len(prefix) :].decode("utf-8")
             data[uuid] = json.loads(v)
 
         return data
 
     def get_last_known_block(self, key):
-        last_block = self.db.get(key.encode('utf-8'))
+        last_block = self.db.get(key.encode("utf-8"))
 
         if last_block:
-            last_block = last_block.decode('utf-8')
+            last_block = last_block.decode("utf-8")
 
         return last_block
 
@@ -47,23 +47,24 @@ class DBManager:
         if isinstance(prefix, str):
             key = prefix + key
 
-        key = key.encode('utf-8')
-        value = value.encode('utf-8')
+        key = key.encode("utf-8")
+        value = value.encode("utf-8")
 
         self.db.put(key, value)
 
-    def delete_entry(self, key,  prefix=None):
+    def delete_entry(self, key, prefix=None):
         if isinstance(prefix, str):
             key = prefix + key
 
-        key = key.encode('utf-8')
+        key = key.encode("utf-8")
 
         self.db.delete(key)
 
     def load_watcher_appointments(self):
         all_appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
-        non_triggered_appointments = {uuid: appointment for uuid, appointment in all_appointments.items()
-                                      if appointment["triggered"] is False}
+        non_triggered_appointments = {
+            uuid: appointment for uuid, appointment in all_appointments.items() if appointment["triggered"] is False
+        }
 
         return non_triggered_appointments
 
@@ -79,11 +80,11 @@ class DBManager:
         logger.info("Adding appointment to Responder's db", uuid=uuid)
 
     def load_locator_map(self, locator):
-        key = (LOCATOR_MAP_PREFIX+locator).encode('utf-8')
+        key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
         locator_map = self.db.get(key)
 
         if locator_map is not None:
-            locator_map = json.loads(locator_map.decode('utf-8'))
+            locator_map = json.loads(locator_map.decode("utf-8"))
 
         else:
             logger.info("Locator not found in the db", locator=locator)
@@ -105,8 +106,8 @@ class DBManager:
             locator_map = [uuid]
             logger.info("Creating new locator map", locator=locator, uuid=uuid)
 
-        key = (LOCATOR_MAP_PREFIX + locator).encode('utf-8')
-        self.db.put(key, json.dumps(locator_map).encode('utf-8'))
+        key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
+        self.db.put(key, json.dumps(locator_map).encode("utf-8"))
 
     def delete_locator_map(self, locator):
         self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)

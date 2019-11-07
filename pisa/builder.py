@@ -5,7 +5,6 @@ from pisa.appointment import Appointment
 
 
 class Builder:
-
     @staticmethod
     def build_appointments(appointments_data):
         appointments = {}
@@ -48,4 +47,3 @@ class Builder:
             block_queue.put(block)
 
         return block_queue
-

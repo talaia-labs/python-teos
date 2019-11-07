@@ -28,8 +28,12 @@ class Cleaner:
     @staticmethod
     def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager):
         for uuid, confirmations in completed_jobs:
-            logger.info("Job completed. Appointment ended after reaching enough confirmations.",
-                        uuid=uuid, height=height, confirmations=confirmations)
+            logger.info(
+                "Job completed. Appointment ended after reaching enough confirmations.",
+                uuid=uuid,
+                height=height,
+                confirmations=confirmations,
+            )
 
             # ToDo: #9-add-data-persistence
             justice_txid = jobs[uuid].justice_txid

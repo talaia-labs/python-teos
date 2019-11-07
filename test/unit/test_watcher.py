@@ -15,8 +15,15 @@ from pisa.responder import Responder
 from pisa.tools import check_txid_format
 from pisa.utils.auth_proxy import AuthServiceProxy
 from test.unit.conftest import generate_block, generate_blocks, generate_dummy_appointment
-from pisa.conf import EXPIRY_DELTA, BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT, PISA_SECRET_KEY, \
-    MAX_APPOINTMENTS
+from pisa.conf import (
+    EXPIRY_DELTA,
+    BTC_RPC_USER,
+    BTC_RPC_PASSWD,
+    BTC_RPC_HOST,
+    BTC_RPC_PORT,
+    PISA_SECRET_KEY,
+    MAX_APPOINTMENTS,
+)
 
 c_logger.disabled = True
 
@@ -42,8 +49,9 @@ def create_appointments(n):
     dispute_txs = []
 
     for i in range(n):
-        appointment, dispute_tx = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET,
-                                                             end_time_offset=END_TIME_OFFSET)
+        appointment, dispute_tx = generate_dummy_appointment(
+            start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
+        )
         uuid = uuid4().hex
 
         appointments[uuid] = appointment
@@ -80,8 +88,9 @@ def test_add_appointment(run_bitcoind, watcher):
 
     # We should be able to add appointments up to the limit
     for _ in range(10):
-        appointment, dispute_tx = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET,
-                                                             end_time_offset=END_TIME_OFFSET)
+        appointment, dispute_tx = generate_dummy_appointment(
+            start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
+        )
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
@@ -89,8 +98,7 @@ def test_add_appointment(run_bitcoind, watcher):
 
 
 def test_sign_appointment(watcher):
-    appointment, _ = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET,
-                                                             end_time_offset=END_TIME_OFFSET)
+    appointment, _ = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET)
     signature = watcher.sign_appointment(appointment)
     assert is_signature_valid(appointment, signature, public_key)
 
@@ -100,15 +108,17 @@ def test_add_too_many_appointments(watcher):
     watcher.appointments = dict()
 
     for _ in range(MAX_APPOINTMENTS):
-        appointment, dispute_tx = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET,
-                                                             end_time_offset=END_TIME_OFFSET)
+        appointment, dispute_tx = generate_dummy_appointment(
+            start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
+        )
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
         assert is_signature_valid(appointment, sig, public_key)
 
-    appointment, dispute_tx = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET,
-                                                             end_time_offset=END_TIME_OFFSET)
+    appointment, dispute_tx = generate_dummy_appointment(
+        start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
+    )
     added_appointment, sig = watcher.add_appointment(appointment)
 
     assert added_appointment is False
