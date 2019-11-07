@@ -20,7 +20,15 @@ def appointment_data():
     cipher = "AES-GCM-128"
     hash_function = "SHA256"
 
-    return locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function
+    return {
+        "locator": locator,
+        "start_time": start_time,
+        "end_time": end_time,
+        "dispute_delta": dispute_delta,
+        "encrypted_blob": encrypted_blob_data,
+        "cipher": cipher,
+        "hash_function": hash_function,
+    }
 
 
 def test_init_appointment(appointment_data):
@@ -28,51 +36,95 @@ def test_init_appointment(appointment_data):
     # creating appointments.
     # DISCUSS: whether this makes sense by design or checks should be ported from the inspector to the appointment
     #          35-appointment-checks
-
-    locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function = appointment_data
-
-    appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
+    appointment = Appointment(
+        appointment_data["locator"],
+        appointment_data["start_time"],
+        appointment_data["end_time"],
+        appointment_data["dispute_delta"],
+        appointment_data["encrypted_blob"],
+        appointment_data["cipher"],
+        appointment_data["hash_function"],
+    )
 
     assert (
-        locator == appointment.locator
-        and start_time == appointment.start_time
-        and end_time == appointment.end_time
-        and EncryptedBlob(encrypted_blob_data) == appointment.encrypted_blob
-        and cipher == appointment.cipher
-        and dispute_delta == appointment.dispute_delta
-        and hash_function == appointment.hash_function
+        appointment_data["locator"] == appointment.locator
+        and appointment_data["start_time"] == appointment.start_time
+        and appointment_data["end_time"] == appointment.end_time
+        and appointment_data["dispute_delta"] == appointment.dispute_delta
+        and EncryptedBlob(appointment_data["encrypted_blob"]) == appointment.encrypted_blob
+        and appointment_data["cipher"] == appointment.cipher
+        and appointment_data["hash_function"] == appointment.hash_function
     )
 
 
 def test_to_dict(appointment_data):
-    locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function = appointment_data
-    appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
+    appointment = Appointment(
+        appointment_data["locator"],
+        appointment_data["start_time"],
+        appointment_data["end_time"],
+        appointment_data["dispute_delta"],
+        appointment_data["encrypted_blob"],
+        appointment_data["cipher"],
+        appointment_data["hash_function"],
+    )
 
     dict_appointment = appointment.to_dict()
 
     assert (
-        locator == dict_appointment.get("locator")
-        and start_time == dict_appointment.get("start_time")
-        and end_time == dict_appointment.get("end_time")
-        and dispute_delta == dict_appointment.get("dispute_delta")
-        and cipher == dict_appointment.get("cipher")
-        and hash_function == dict_appointment.get("hash_function")
-        and encrypted_blob_data == dict_appointment.get("encrypted_blob")
+        appointment_data["locator"] == dict_appointment["locator"]
+        and appointment_data["start_time"] == dict_appointment["start_time"]
+        and appointment_data["end_time"] == dict_appointment["end_time"]
+        and appointment_data["dispute_delta"] == dict_appointment["dispute_delta"]
+        and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
+        and appointment_data["cipher"] == dict_appointment["cipher"]
+        and appointment_data["hash_function"] == dict_appointment["hash_function"]
     )
 
 
 def test_to_json(appointment_data):
-    locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function = appointment_data
-    appointment = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function)
+    appointment = Appointment(
+        appointment_data["locator"],
+        appointment_data["start_time"],
+        appointment_data["end_time"],
+        appointment_data["dispute_delta"],
+        appointment_data["encrypted_blob"],
+        appointment_data["cipher"],
+        appointment_data["hash_function"],
+    )
 
     dict_appointment = json.loads(appointment.to_json())
 
     assert (
-        locator == dict_appointment.get("locator")
-        and start_time == dict_appointment.get("start_time")
-        and end_time == dict_appointment.get("end_time")
-        and dispute_delta == dict_appointment.get("dispute_delta")
-        and cipher == dict_appointment.get("cipher")
-        and hash_function == dict_appointment.get("hash_function")
-        and encrypted_blob_data == dict_appointment.get("encrypted_blob")
+        appointment_data["locator"] == dict_appointment["locator"]
+        and appointment_data["start_time"] == dict_appointment["start_time"]
+        and appointment_data["end_time"] == dict_appointment["end_time"]
+        and appointment_data["dispute_delta"] == dict_appointment["dispute_delta"]
+        and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
+        and appointment_data["cipher"] == dict_appointment["cipher"]
+        and appointment_data["hash_function"] == dict_appointment["hash_function"]
     )
+
+
+def test_from_dict(appointment_data):
+    # The appointment should be build if we don't miss any field
+    appointment = Appointment.from_dict(appointment_data)
+    assert isinstance(appointment, Appointment)
+
+    # Otherwise it should fail
+    appointment_data["hash_function"] = None
+
+    try:
+        Appointment.from_dict(appointment_data)
+        assert False
+
+    except ValueError:
+        assert True
+
+
+def test_serialize(appointment_data):
+    appointment = Appointment.from_dict(appointment_data)
+
+    assert appointment.triggered is False
+    ser_appointment = appointment.serialize()
+
+    assert ser_appointment == json.dumps(appointment_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
