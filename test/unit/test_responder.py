@@ -10,8 +10,7 @@ from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
 from test.simulator.bitcoind_sim import TX
 from pisa.utils.auth_proxy import AuthServiceProxy
-from test.unit.conftest import get_random_value_hex
-from test.unit.conftest import generate_block, generate_blocks
+from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT
 
 c_logger.disabled = True
