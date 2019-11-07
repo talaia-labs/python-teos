@@ -81,6 +81,15 @@ def test_init(watcher):
     assert type(watcher.responder) is Responder
 
 
+def test_init_no_key(db_manager):
+    try:
+        Watcher(db_manager, pisa_sk_file=None)
+        assert False
+
+    except ValueError:
+        assert True
+
+
 def test_add_appointment(run_bitcoind, watcher):
     # The watcher automatically fires do_watch and do_subscribe on adding an appointment if it is asleep (initial state)
     # Avoid this by setting the state to awake.
@@ -91,6 +100,12 @@ def test_add_appointment(run_bitcoind, watcher):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
+        added_appointment, sig = watcher.add_appointment(appointment)
+
+        assert added_appointment is True
+        assert is_signature_valid(appointment, sig, public_key)
+
+        # Check that we can also add an already added appointment (same locator)
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
