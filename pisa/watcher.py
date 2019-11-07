@@ -38,7 +38,7 @@ class Watcher:
                 self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
 
     def sign_appointment(self, appointment):
-        data = appointment.to_json().encode("utf-8")
+        data = appointment.serialize()
         return self.signing_key.sign(data, ec.ECDSA(hashes.SHA256()))
 
     def add_appointment(self, appointment):
