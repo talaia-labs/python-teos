@@ -11,6 +11,14 @@ def test_init_encrypted_blob():
     assert EncryptedBlob(data).data == data
 
 
+def test_equal():
+    data = get_random_value_hex(64)
+    e_blob1 = EncryptedBlob(data)
+    e_blob2 = EncryptedBlob(data)
+
+    assert e_blob1 == e_blob2 and id(e_blob1) != id(e_blob2)
+
+
 def test_decrypt():
     # TODO: The decryption tests are assuming the cipher is AES-GCM-128, since EncryptedBlob assumes the same. Fix this.
     key = get_random_value_hex(32)
