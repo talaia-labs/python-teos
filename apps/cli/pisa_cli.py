@@ -6,21 +6,28 @@ import requests
 import time
 from sys import argv
 from hashlib import sha256
-from binascii import unhexlify
+from binascii import hexlify, unhexlify
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from uuid import uuid4
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli import DEFAULT_PISA_API_SERVER, DEFAULT_PISA_API_PORT, PISA_PUBLIC_KEY, APPOINTMENTS_FOLDER_NAME
-from apps.cli import logger
+from apps.cli import (
+    DEFAULT_PISA_API_SERVER,
+    DEFAULT_PISA_API_PORT,
+    CLI_PUBLIC_KEY,
+    CLI_PRIVATE_KEY,
+    PISA_PUBLIC_KEY,
+    APPOINTMENTS_FOLDER_NAME,
+    logger,
+)
 
 
 HTTP_OK = 200
@@ -48,21 +55,42 @@ def generate_dummy_appointment():
     print("\nData stored in dummy_appointment_data.json")
 
 
-# Loads and returns Pisa's public key from disk.
-# Will raise NotFoundError or IOError if the attempts to open and read the public key file fail.
-# Will raise ValueError if it the public key file was present but it failed to be deserialized.
-def load_pisa_public_key():
+def sign_appointment(sk, appointment):
+    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
+
+
+# Loads and returns Pisa keys from disk
+def load_key_file_data(file_name):
     try:
-        with open(PISA_PUBLIC_KEY, "r") as key_file:
-            pubkey_pem = key_file.read().encode("utf-8")
-            pisa_public_key = load_pem_public_key(pubkey_pem, backend=default_backend())
-            return pisa_public_key
+        with open(file_name, "r") as key_file:
+            key_pem = key_file.read().encode("utf-8")
+        return key_pem
+
+    except FileNotFoundError:
+        raise FileNotFoundError("File not found.")
+
+
+# Deserialize public key from pem data.
+def load_public_key(pk_pem):
+    try:
+        pisa_pk = load_pem_public_key(pk_pem, backend=default_backend())
+        return pisa_pk
 
     except UnsupportedAlgorithm:
         raise ValueError("Could not deserialize the public key (unsupported algorithm).")
 
 
-# Verifies that the appointment signature is a valid signature with public key `pk`,
+# Deserialize private key from pem data.
+def load_private_key(sk_pem):
+    try:
+        cli_sk = load_pem_private_key(sk_pem, None, backend=default_backend())
+        return cli_sk
+
+    except UnsupportedAlgorithm:
+        raise ValueError("Could not deserialize the private key (unsupported algorithm).")
+
+
 # returning True or False accordingly.
 def is_appointment_signature_valid(appointment, signature, pk):
     try:
@@ -143,7 +171,38 @@ def add_appointment(args):
         appointment_data.get("end_time"),
         appointment_data.get("dispute_delta"),
     )
-    appointment_json = json.dumps(appointment, sort_keys=True, separators=(",", ":"))
+
+    try:
+        sk_pem = load_key_file_data(CLI_PRIVATE_KEY)
+        cli_sk = load_private_key(sk_pem)
+
+    except ValueError:
+        logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+        return False
+
+    except FileNotFoundError:
+        logger.error("Client's private key file not found. Please check your settings.")
+        return False
+
+    except IOError as e:
+        logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+        return False
+
+    signature = sign_appointment(cli_sk, appointment)
+    try:
+        cli_pk_pem = load_key_file_data(CLI_PUBLIC_KEY)
+
+    except FileNotFoundError:
+        logger.error("Client's private key file not found. Please check your settings.")
+        return False
+
+    except IOError as e:
+        logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+        return False
+
+    data = {"appointment": appointment, "signature": signature, "public_key": cli_pk_pem.decode("utf-8")}
+
+    appointment_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
 
     logger.info("Sending appointment to PISA")
 
@@ -181,7 +240,8 @@ def add_appointment(args):
     signature = response_json["signature"]
     # verify that the returned signature is valid
     try:
-        pk = load_pisa_public_key()
+        pk_pem = load_key_file_data(PISA_PUBLIC_KEY)
+        pk = load_public_key(pk_pem)
         is_sig_valid = is_appointment_signature_valid(appointment, signature, pk)
 
     except ValueError:

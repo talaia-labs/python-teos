@@ -13,6 +13,8 @@ APPOINTMENTS_FOLDER_NAME = "appointments"
 SUPPORTED_HASH_FUNCTIONS = ["SHA256"]
 SUPPORTED_CIPHERS = ["AES-GCM-128"]
 
+CLI_PUBLIC_KEY = "cli_pk.pem"
+CLI_PRIVATE_KEY = "cli_sk.pem"
 PISA_PUBLIC_KEY = "pisa_pk.pem"
 
 # Configure logging
