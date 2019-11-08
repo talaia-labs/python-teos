@@ -17,6 +17,12 @@ class Cryptographer:
         if rtype not in ["hex", "bytes"]:
             raise ValueError("Wrong return type. Return type must be 'hex' or 'bytes'")
 
+        if len(encrypted_blob.data) % 2:
+            logger.info(
+                "Incorrect (Odd-length) value to be decrypted.", encrypted_blob=encrypted_blob.data, dispute_txid=key
+            )
+            return None
+
         # master_key = H(tx_id | tx_id)
         key = unhexlify(key)
         master_key = sha256(key + key).digest()
