@@ -80,25 +80,3 @@ class BlockProcessor:
             distance = chain_tip_height - target_block_height
 
         return distance
-
-    # DISCUSS: This method comes from the Responder and seems like it could go back there.
-    @staticmethod
-    # NOTCOVERED
-    def check_confirmations(txs, unconfirmed_txs, tx_job_map, missed_confirmations):
-
-        for tx in txs:
-            if tx in tx_job_map and tx in unconfirmed_txs:
-                unconfirmed_txs.remove(tx)
-
-                logger.info("Confirmation received for transaction", tx=tx)
-
-            elif tx in unconfirmed_txs:
-                if tx in missed_confirmations:
-                    missed_confirmations[tx] += 1
-
-                else:
-                    missed_confirmations[tx] = 1
-
-                logger.info("Transaction missed a confirmation", tx=tx, missed_confirmations=missed_confirmations[tx])
-
-        return unconfirmed_txs, missed_confirmations
