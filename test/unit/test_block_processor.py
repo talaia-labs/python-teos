@@ -1,26 +1,10 @@
 import pytest
-from uuid import uuid4
-from hashlib import sha256
-from binascii import unhexlify
 
 from pisa import c_logger
 from pisa.block_processor import BlockProcessor
 from test.unit.conftest import get_random_value_hex
 
 c_logger.disabled = True
-
-APPOINTMENT_COUNT = 100
-TEST_SET_SIZE = 200
-
-
-@pytest.fixture(scope="module")
-def txids():
-    return [get_random_value_hex(32) for _ in range(APPOINTMENT_COUNT)]
-
-
-@pytest.fixture(scope="module")
-def locator_uuid_map(txids):
-    return {sha256(unhexlify(txid)).hexdigest(): uuid4().hex for txid in txids}
 
 
 @pytest.fixture
@@ -52,29 +36,3 @@ def test_get_random_block():
 def test_get_block_count():
     block_count = BlockProcessor.get_block_count()
     assert isinstance(block_count, int) and block_count >= 0
-
-
-def test_potential_matches(txids, locator_uuid_map):
-    potential_matches = BlockProcessor.get_potential_matches(txids, locator_uuid_map)
-
-    # All the txids must match
-    assert locator_uuid_map.keys() == potential_matches.keys()
-
-
-def test_potential_matches_random(locator_uuid_map):
-    txids = [get_random_value_hex(32) for _ in range(len(locator_uuid_map))]
-
-    potential_matches = BlockProcessor.get_potential_matches(txids, locator_uuid_map)
-
-    # None of the ids should match
-    assert len(potential_matches) == 0
-
-
-def test_potential_matches_random_data(locator_uuid_map):
-    # The likelihood of finding a potential match with random data should be negligible
-    txids = [get_random_value_hex(32) for _ in range(TEST_SET_SIZE)]
-
-    potential_matches = BlockProcessor.get_potential_matches(txids, locator_uuid_map)
-
-    # None of the txids should match
-    assert len(potential_matches) == 0
