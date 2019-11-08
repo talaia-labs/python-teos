@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
-from pisa.appointment import Appointment
 from pisa.cryptographer import Cryptographer
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
@@ -40,6 +39,10 @@ class Watcher:
             with open(PISA_SECRET_KEY, "r") as key_file:
                 secret_key_pem = key_file.read().encode("utf-8")
                 self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
+
+    @staticmethod
+    def compute_locator(tx_id):
+        return sha256(unhexlify(tx_id)).hexdigest()
 
     def sign_appointment(self, appointment):
         data = appointment.serialize()
@@ -119,8 +122,7 @@ class Watcher:
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                matches = self.get_matches(txids, self.locator_uuid_map)
-                filtered_matches = self.filter_valid_matches(matches, self.locator_uuid_map, self.appointments)
+                filtered_matches = self.filter_valid_matches(self.get_matches(txids))
 
                 for uuid, filtered_match in filtered_matches.items():
                     # Errors decrypting the Blob will result in a None justice_txid
@@ -156,17 +158,11 @@ class Watcher:
 
         logger.info("No more pending appointments, going back to sleep")
 
-    @staticmethod
-    def compute_locator(tx_id):
-        return sha256(unhexlify(tx_id)).hexdigest()
-
-    # DISCUSS: 36-who-should-check-appointment-trigger
-    @staticmethod
-    def get_matches(txids, locator_uuid_map):
+    def get_matches(self, txids):
         potential_locators = {Watcher.compute_locator(txid): txid for txid in txids}
 
         # Check is any of the tx_ids in the received block is an actual match
-        intersection = set(locator_uuid_map.keys()).intersection(potential_locators.keys())
+        intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
         matches = {locator: potential_locators[locator] for locator in intersection}
 
         if len(matches) > 0:
@@ -177,18 +173,16 @@ class Watcher:
 
         return matches
 
-    @staticmethod
-    # NOTCOVERED
-    def filter_valid_matches(matches, locator_uuid_map, appointments):
+    def filter_valid_matches(self, matches):
         filtered_matches = {}
 
         for locator, dispute_txid in matches.items():
-            for uuid in locator_uuid_map[locator]:
+            for uuid in self.locator_uuid_map[locator]:
 
-                justice_rawtx = Cryptographer.decrypt(appointments[uuid].encrypted_blob, dispute_txid)
+                justice_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
                 justice_tx = BlockProcessor.decode_raw_transaction(justice_rawtx)
 
-                if justice_rawtx is not None:
+                if justice_tx is not None:
                     justice_txid = justice_tx.get("txid")
                     valid_match = True
 
