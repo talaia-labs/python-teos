@@ -26,7 +26,7 @@ class Cleaner:
             db_manager.delete_watcher_appointment(uuid)
 
     @staticmethod
-    def delete_complete_appointment(appointments, locator_uuid_map, locator, uuid, db_manager):
+    def delete_completed_appointment(locator, uuid, appointments, locator_uuid_map, db_manager):
         # Delete the appointment
         appointment = appointments.pop(uuid)
 
