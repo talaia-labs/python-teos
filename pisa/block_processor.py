@@ -72,7 +72,7 @@ class BlockProcessor:
         chain_tip = self.get_best_block_hash()
         chain_tip_height = self.get_block(chain_tip).get("height")
 
-        target_block = self.get_block(target_block_hash).get("height")
+        target_block = self.get_block(target_block_hash)
 
         if target_block is not None:
             target_block_height = target_block.get("height")
