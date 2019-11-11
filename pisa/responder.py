@@ -113,7 +113,8 @@ class Responder:
         else:
             self.tx_job_map[justice_txid] = [uuid]
 
-        if confirmations == 0:
+        # In the case we receive two jobs with the same justice txid we only add it to the unconfirmed txs list once
+        if justice_txid not in self.unconfirmed_txs and confirmations == 0:
             self.unconfirmed_txs.append(justice_txid)
 
         self.db_manager.store_responder_job(uuid, job.to_json())
@@ -145,7 +146,6 @@ class Responder:
 
             if block is not None:
                 txs = block.get("tx")
-                height = block.get("height")
 
                 logger.info(
                     "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"), txs=txs
@@ -155,6 +155,7 @@ class Responder:
                 if prev_block_hash == block.get("previousblockhash"):
                     self.check_confirmations(txs)
 
+                    height = block.get("height")
                     txs_to_rebroadcast = self.get_txs_to_rebroadcast(txs)
                     completed_jobs = self.get_completed_jobs(height)
 
@@ -184,25 +185,25 @@ class Responder:
 
         logger.info("No more pending jobs, going back to sleep")
 
-    # NOTCOVERED
     def check_confirmations(self, txs):
-
+        # If a new confirmed tx matches a tx we are watching, then we remove it from the unconfirmed txs map
         for tx in txs:
+            print(tx, tx in self.tx_job_map and tx in self.unconfirmed_txs)
             if tx in self.tx_job_map and tx in self.unconfirmed_txs:
                 self.unconfirmed_txs.remove(tx)
 
                 logger.info("Confirmation received for transaction", tx=tx)
 
-            elif tx in self.unconfirmed_txs:
-                if tx in self.missed_confirmations:
-                    self.missed_confirmations[tx] += 1
+        # We also add a missing confirmation to all those txs waiting to be confirmed that have not been confirmed in
+        # the current block
+        for tx in self.unconfirmed_txs:
+            if tx in self.missed_confirmations:
+                self.missed_confirmations[tx] += 1
 
-                else:
-                    self.missed_confirmations[tx] = 1
+            else:
+                self.missed_confirmations[tx] = 1
 
-                logger.info(
-                    "Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx]
-                )
+            logger.info("Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx])
 
     def get_txs_to_rebroadcast(self, txs):
         txs_to_rebroadcast = []
