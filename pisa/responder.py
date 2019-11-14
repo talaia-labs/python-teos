@@ -188,7 +188,6 @@ class Responder:
     def check_confirmations(self, txs):
         # If a new confirmed tx matches a tx we are watching, then we remove it from the unconfirmed txs map
         for tx in txs:
-            print(tx, tx in self.tx_job_map and tx in self.unconfirmed_txs)
             if tx in self.tx_job_map and tx in self.unconfirmed_txs:
                 self.unconfirmed_txs.remove(tx)
 
