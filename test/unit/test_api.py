@@ -1,11 +1,15 @@
 import json
 import pytest
 import requests
+from time import sleep
+from threading import Thread
 
-from pisa import HOST, PORT, c_logger
+from pisa.api import start_api
+from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
-from test.unit.conftest import generate_blocks, get_random_value_hex, generate_dummy_appointment_data
+from pisa import HOST, PORT, c_logger
 from pisa.conf import MAX_APPOINTMENTS
+from test.unit.conftest import generate_blocks, get_random_value_hex, generate_dummy_appointment_data
 
 c_logger.disabled = True
 
@@ -14,6 +18,18 @@ MULTIPLE_APPOINTMENTS = 10
 
 appointments = []
 locator_dispute_tx_map = {}
+
+
+@pytest.fixture(scope="module")
+def run_api(db_manager):
+    watcher = Watcher(db_manager)
+
+    api_thread = Thread(target=start_api, args=[watcher])
+    api_thread.daemon = True
+    api_thread.start()
+
+    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
+    sleep(0.1)
 
 
 @pytest.fixture

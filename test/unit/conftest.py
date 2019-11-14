@@ -8,9 +8,7 @@ from hashlib import sha256
 from binascii import unhexlify
 
 from apps.cli.blob import Blob
-from pisa.api import start_api
 from pisa.responder import Job
-from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from pisa.appointment import Appointment
@@ -24,18 +22,6 @@ def run_bitcoind():
     bitcoind_thread = Thread(target=run_simulator, kwargs={"mode": "event"})
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    sleep(0.1)
-
-
-@pytest.fixture(scope="session")
-def run_api(db_manager):
-    watcher = Watcher(db_manager)
-
-    api_thread = Thread(target=start_api, args=[watcher])
-    api_thread.daemon = True
-    api_thread.start()
 
     # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
     sleep(0.1)
