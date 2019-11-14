@@ -7,7 +7,6 @@ from threading import Thread
 from hashlib import sha256
 from binascii import unhexlify
 
-from pisa.conf import DB_PATH
 from apps.cli.blob import Blob
 from pisa.api import start_api
 from pisa.responder import Job
@@ -31,8 +30,7 @@ def run_bitcoind():
 
 
 @pytest.fixture(scope="session")
-def run_api():
-    db_manager = DBManager(DB_PATH)
+def run_api(db_manager):
     watcher = Watcher(db_manager)
 
     api_thread = Thread(target=start_api, args=[watcher])
@@ -48,7 +46,7 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def db_manager():
     manager = DBManager("test_db")
     yield manager
