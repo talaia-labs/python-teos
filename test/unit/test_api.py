@@ -9,7 +9,7 @@ from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT, c_logger
 from pisa.conf import MAX_APPOINTMENTS
-from test.unit.conftest import generate_blocks, get_random_value_hex, generate_dummy_appointment_data
+from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex, generate_dummy_appointment_data
 
 c_logger.disabled = True
 
@@ -36,6 +36,7 @@ def run_api(db_manager):
 def new_appointment():
     appointment, dispute_tx = generate_dummy_appointment_data()
     locator_dispute_tx_map[appointment["locator"]] = dispute_tx
+    del appointment["triggered"]
 
     return appointment
 
@@ -58,28 +59,6 @@ def test_add_appointment(run_api, run_bitcoind, new_appointment):
     new_appointment["dispute_delta"] = 0
     r = add_appointment(new_appointment)
     assert r.status_code == 400
-
-
-def test_request_appointment(new_appointment):
-    # First we need to add an appointment
-    r = add_appointment(new_appointment)
-    assert r.status_code == 200
-
-    # Next we can request it
-    r = requests.get(url=PISA_API + "/get_appointment?locator=" + new_appointment["locator"])
-    assert r.status_code == 200
-
-    # Each locator may point to multiple appointments, check them all
-    received_appointments = json.loads(r.content)
-
-    # Take the status out and leave the received appointments ready to compare
-    appointment_status = [appointment.pop("status") for appointment in received_appointments]
-
-    # Check that the appointment is within the received appoints
-    assert new_appointment in received_appointments
-
-    # Check that all the appointments are being watched
-    assert all([status == "being_watched" for status in appointment_status])
 
 
 def test_request_random_appointment():
@@ -105,7 +84,7 @@ def test_request_multiple_appointments_same_locator(new_appointment, n=MULTIPLE_
         r = add_appointment(new_appointment)
         assert r.status_code == 200
 
-    test_request_appointment(new_appointment)
+    test_request_appointment_watcher(new_appointment)
 
 
 def test_add_too_many_appointment(new_appointment):
@@ -149,8 +128,49 @@ def test_get_all_appointments_responder():
     responder_jobs = [v["locator"] for k, v in received_appointments["responder_jobs"].items()]
     local_locators = [appointment["locator"] for appointment in appointments]
 
-    watcher_appointments = [v["locator"] for k, v in received_appointments["watcher_appointments"].items()]
-    print(set(watcher_appointments) == set(local_locators))
-
     assert set(responder_jobs) == set(local_locators)
     assert len(received_appointments["watcher_appointments"]) == 0
+
+
+def test_request_appointment_watcher(new_appointment):
+    # First we need to add an appointment
+    r = add_appointment(new_appointment)
+    assert r.status_code == 200
+
+    # Next we can request it
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + new_appointment["locator"])
+    assert r.status_code == 200
+
+    # Each locator may point to multiple appointments, check them all
+    received_appointments = json.loads(r.content)
+
+    # Take the status out and leave the received appointments ready to compare
+    appointment_status = [appointment.pop("status") for appointment in received_appointments]
+
+    # Check that the appointment is within the received appoints
+    assert new_appointment in received_appointments
+
+    # Check that all the appointments are being watched
+    assert all([status == "being_watched" for status in appointment_status])
+
+
+def test_request_appointment_responder(new_appointment):
+    # Let's do something similar to what we did with the watcher but now we'll send the dispute tx to the network
+    dispute_tx = locator_dispute_tx_map[new_appointment["locator"]]
+    bitcoin_cli().sendrawtransaction(dispute_tx)
+
+    r = add_appointment(new_appointment)
+    assert r.status_code == 200
+
+    # Generate a block to trigger the watcher
+    generate_block()
+
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + new_appointment["locator"])
+    assert r.status_code == 200
+
+    received_appointments = json.loads(r.content)
+    appointment_status = [appointment.pop("status") for appointment in received_appointments]
+    appointment_locators = [appointment["locator"] for appointment in received_appointments]
+
+    assert new_appointment["locator"] in appointment_locators and len(received_appointments) == 1
+    assert all([status == "dispute_responded" for status in appointment_status]) and len(appointment_status) == 1
