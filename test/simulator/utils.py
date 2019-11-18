@@ -31,9 +31,14 @@ def parse_varint(tx):
     # First of all, the offset of the hex transaction if moved to the proper position (i.e where the varint should be
     #  located) and the length and format of the data to be analyzed is checked.
     data = tx.hex[tx.offset :]
-    assert len(data) > 0
-    size = int(data[:2], 16)
-    assert size <= 255
+    if len(data) > 0:
+        size = int(data[:2], 16)
+
+    else:
+        raise ValueError("No data to be parsed")
+
+    if size > 255:
+        raise ValueError("Wrong value (varint size > 255)")
 
     # Then, the integer is encoded as a varint using the proper prefix, if needed.
     if size <= 252:  # No prefix
