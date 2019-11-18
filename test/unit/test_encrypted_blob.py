@@ -11,6 +11,24 @@ def test_init_encrypted_blob():
     assert EncryptedBlob(data).data == data
 
 
+def test_init_encrypted_blob_wrong_cipher():
+    try:
+        EncryptedBlob(get_random_value_hex(64), cipher="")
+        assert False
+
+    except ValueError:
+        assert True
+
+
+def test_init_encrypted_blob_wrong_hash_function():
+    try:
+        EncryptedBlob(get_random_value_hex(64), hash_function="")
+        assert False
+
+    except ValueError:
+        assert True
+
+
 def test_equal():
     data = get_random_value_hex(64)
     e_blob1 = EncryptedBlob(data)
