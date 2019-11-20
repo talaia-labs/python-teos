@@ -72,24 +72,3 @@ def test_get_non_existing_transaction():
     tx_info = Carrier.get_transaction(get_random_value_hex(32))
 
     assert tx_info is None
-
-
-def test_check_tx_in_chain(carrier):
-    # Let's starts by looking for a random transaction
-    random_tx = TX.create_dummy_transaction()
-    random_txid = sha256d(random_tx)
-    tx_in_chain, confirmations = carrier.check_tx_in_chain(random_txid)
-    assert tx_in_chain is False and confirmations is None
-
-    # We can now broadcast the transaction and check again
-    carrier.send_transaction(random_tx, random_txid)
-    tx_in_chain, confirmations = carrier.check_tx_in_chain(random_txid)
-
-    # The tx should be on mempool now, so same
-    assert tx_in_chain is False and confirmations is None
-
-    # Finally we can mine a block and check again
-    generate_block()
-    tx_in_chain, confirmations = carrier.check_tx_in_chain(random_txid)
-
-    assert tx_in_chain is True and confirmations == 1

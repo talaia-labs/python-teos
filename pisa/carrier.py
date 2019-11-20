@@ -87,21 +87,3 @@ class Carrier:
                 logger.error("JSONRPCException.", method="Carrier.get_transaction", error=e.error)
 
         return tx_info
-
-    def check_tx_in_chain(self, txid):
-        tx_in_chain = False
-        confirmations = None
-
-        tx_info = self.get_transaction(txid)
-
-        if tx_info is not None:
-            confirmations = int(tx_info.get("confirmations")) if tx_info.get("confirmations") is not None else None
-
-            if confirmations is not None:
-                tx_in_chain = True
-                logger.error("Transaction found in the blockchain", txid=txid)
-
-            else:
-                logger.error("Transaction found in mempool", txid=txid)
-
-        return tx_in_chain, confirmations
