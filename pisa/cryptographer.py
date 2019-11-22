@@ -35,7 +35,7 @@ class Cryptographer:
             "Creating new blob.",
             master_key=hexlify(master_key).decode(),
             sk=hexlify(sk).decode(),
-            nonce=hexlify(sk).decode(),
+            nonce=hexlify(nonce).decode(),
             encrypted_blob=encrypted_blob.data,
         )
 

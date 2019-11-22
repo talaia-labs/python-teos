@@ -111,14 +111,17 @@ def test_from_dict(appointment_data):
     assert isinstance(appointment, Appointment)
 
     # Otherwise it should fail
-    appointment_data["hash_function"] = None
+    for key in appointment_data.keys():
+        prev_val = appointment_data[key]
+        appointment_data[key] = None
 
-    try:
-        Appointment.from_dict(appointment_data)
-        assert False
+        try:
+            Appointment.from_dict(appointment_data)
+            assert False
 
-    except ValueError:
-        assert True
+        except ValueError:
+            appointment_data[key] = prev_val
+            assert True
 
 
 def test_serialize(appointment_data):

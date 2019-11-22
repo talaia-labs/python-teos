@@ -53,12 +53,13 @@ def set_up_jobs(db_manager, total_jobs):
         uuid = uuid4().hex
 
         # We use the same txid for justice and dispute here, it shouldn't matter
-        txid = get_random_value_hex(32)
+        justice_txid = get_random_value_hex(32)
+        dispute_txid = get_random_value_hex(32)
 
         # Assign both justice_txid and dispute_txid the same id (it shouldn't matter)
-        job = Job(txid, txid, None, None)
+        job = Job(dispute_txid, justice_txid, None, None)
         jobs[uuid] = job
-        tx_job_map[txid] = [uuid]
+        tx_job_map[justice_txid] = [uuid]
 
         db_manager.store_responder_job(uuid, job.to_json())
         db_manager.store_update_locator_map(job.locator, uuid)
@@ -68,7 +69,7 @@ def set_up_jobs(db_manager, total_jobs):
             uuid = uuid4().hex
 
             jobs[uuid] = job
-            tx_job_map[txid].append(uuid)
+            tx_job_map[justice_txid].append(uuid)
 
             db_manager.store_responder_job(uuid, job.to_json())
             db_manager.store_update_locator_map(job.locator, uuid)
@@ -129,19 +130,21 @@ def test_delete_completed_jobs_no_db_match(db_manager):
         # another job that is stored in the db.
         for uuid in selected_jobs[: ITEMS // 2]:
             justice_txid = jobs[uuid].justice_txid
+            dispute_txid = get_random_value_hex(32)
             new_uuid = uuid4().hex
 
-            jobs[new_uuid] = Job(justice_txid, justice_txid, None, None)
+            jobs[new_uuid] = Job(dispute_txid, justice_txid, None, None)
             tx_job_map[justice_txid].append(new_uuid)
             selected_jobs.append(new_uuid)
 
         # Let's add some random data
         for i in range(ITEMS // 2):
             uuid = uuid4().hex
-            txid = get_random_value_hex(32)
+            justice_txid = get_random_value_hex(32)
+            dispute_txid = get_random_value_hex(32)
 
-            jobs[uuid] = Job(txid, txid, None, None)
-            tx_job_map[txid] = [uuid]
+            jobs[uuid] = Job(dispute_txid, justice_txid, None, None)
+            tx_job_map[justice_txid] = [uuid]
             selected_jobs.append(uuid)
 
         completed_jobs = [(job, 6) for job in selected_jobs]

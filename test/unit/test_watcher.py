@@ -186,7 +186,7 @@ def test_do_watch(watcher):
     assert watcher.asleep is True
 
 
-def test_matches(watcher, txids, locator_uuid_map):
+def test_get_matches(watcher, txids, locator_uuid_map):
     watcher.locator_uuid_map = locator_uuid_map
     potential_matches = watcher.get_matches(txids)
 
@@ -194,7 +194,7 @@ def test_matches(watcher, txids, locator_uuid_map):
     assert locator_uuid_map.keys() == potential_matches.keys()
 
 
-def test_matches_random_data(watcher, locator_uuid_map):
+def test_get_matches_random_data(watcher, locator_uuid_map):
     # The likelihood of finding a potential match with random data should be negligible
     watcher.locator_uuid_map = locator_uuid_map
     txids = [get_random_value_hex(32) for _ in range(TEST_SET_SIZE)]

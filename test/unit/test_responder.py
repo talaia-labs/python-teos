@@ -2,11 +2,13 @@ import json
 import pytest
 import random
 from uuid import uuid4
+from shutil import rmtree
 from copy import deepcopy
 from threading import Thread
 from queue import Queue, Empty
 
 from pisa import c_logger
+from pisa.db_manager import DBManager
 from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
 from test.simulator.bitcoind_sim import TX
@@ -20,6 +22,16 @@ c_logger.disabled = True
 @pytest.fixture(scope="module")
 def responder(db_manager):
     return Responder(db_manager)
+
+
+@pytest.fixture()
+def temp_db_manager():
+    db_name = get_random_value_hex(8)
+    db_manager = DBManager(db_name)
+    yield db_manager
+
+    db_manager.db.close()
+    rmtree(db_name)
 
 
 def create_dummy_job_data(random_txid=False, justice_rawtx=None):
@@ -274,12 +286,13 @@ def test_do_subscribe(responder):
         assert False
 
 
-def test_do_watch(responder):
-    # Reinitializing responder (but keeping the subscriber)
-    responder.jobs = dict()
-    responder.tx_job_map = dict()
-    responder.unconfirmed_txs = []
-    responder.missed_confirmations = dict()
+def test_do_watch(temp_db_manager):
+    responder = Responder(temp_db_manager)
+    responder.block_queue = Queue()
+
+    zmq_thread = Thread(target=responder.do_subscribe)
+    zmq_thread.daemon = True
+    zmq_thread.start()
 
     jobs = [create_dummy_job(justice_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
 
@@ -329,12 +342,13 @@ def test_do_watch(responder):
     assert responder.asleep is True
 
 
-def test_check_confirmations(responder):
-    # Reinitializing responder (but keeping the subscriber)
-    responder.jobs = dict()
-    responder.tx_job_map = dict()
-    responder.unconfirmed_txs = []
-    responder.missed_confirmations = dict()
+def test_check_confirmations(temp_db_manager):
+    responder = Responder(temp_db_manager)
+    responder.block_queue = Queue()
+
+    zmq_thread = Thread(target=responder.do_subscribe)
+    zmq_thread.daemon = True
+    zmq_thread.start()
 
     # check_confirmations checks, given a list of transaction for a block, what of the known justice transaction have
     # been confirmed. To test this we need to create a list of transactions and the state of the responder
