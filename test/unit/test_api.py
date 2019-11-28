@@ -17,40 +17,40 @@ locator_dispute_tx_map = {}
 
 
 @pytest.fixture
-def new_appointment():
-    appointment, dispute_tx = generate_dummy_appointment_data()
-    locator_dispute_tx_map[appointment["locator"]] = dispute_tx
+def new_appt_data():
+    appt_data, dispute_tx = generate_dummy_appointment_data()
+    locator_dispute_tx_map[appt_data["appointment"]["locator"]] = dispute_tx
 
-    return appointment
+    return appt_data
 
 
-def add_appointment(appointment):
-    r = requests.post(url=PISA_API, json=json.dumps(appointment), timeout=5)
+def add_appointment(new_appt_data):
+    r = requests.post(url=PISA_API, json=json.dumps(new_appt_data), timeout=5)
 
     if r.status_code == 200:
-        appointments.append(appointment)
+        appointments.append(new_appt_data["appointment"])
 
     return r
 
 
-def test_add_appointment(run_api, run_bitcoind, new_appointment):
+def test_add_appointment(run_api, run_bitcoind, new_appt_data):
     # Properly formatted appointment
-    r = add_appointment(new_appointment)
+    r = add_appointment(new_appt_data)
     assert r.status_code == 200
 
     # Incorrect appointment
-    new_appointment["dispute_delta"] = 0
-    r = add_appointment(new_appointment)
+    new_appt_data["appointment"]["dispute_delta"] = 0
+    r = add_appointment(new_appt_data)
     assert r.status_code == 400
 
 
-def test_request_appointment(new_appointment):
+def test_request_appointment(new_appt_data):
     # First we need to add an appointment
-    r = add_appointment(new_appointment)
+    r = add_appointment(new_appt_data)
     assert r.status_code == 200
 
     # Next we can request it
-    r = requests.get(url=PISA_API + "/get_appointment?locator=" + new_appointment["locator"])
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + new_appt_data["appointment"]["locator"])
     assert r.status_code == 200
 
     # Each locator may point to multiple appointments, check them all
@@ -60,7 +60,7 @@ def test_request_appointment(new_appointment):
     appointment_status = [appointment.pop("status") for appointment in received_appointments]
 
     # Check that the appointment is within the received appoints
-    assert new_appointment in received_appointments
+    assert new_appt_data["appointment"] in received_appointments
 
     # Check that all the appointments are being watched
     assert all([status == "being_watched" for status in appointment_status])
@@ -76,28 +76,28 @@ def test_request_random_appointment():
     assert all([status == "not_found" for status in appointment_status])
 
 
-def test_add_appointment_multiple_times(new_appointment, n=MULTIPLE_APPOINTMENTS):
+def test_add_appointment_multiple_times(new_appt_data, n=MULTIPLE_APPOINTMENTS):
     # Multiple appointments with the same locator should be valid
     # DISCUSS: #34-store-identical-appointments
     for _ in range(n):
-        r = add_appointment(new_appointment)
+        r = add_appointment(new_appt_data)
         assert r.status_code == 200
 
 
-def test_request_multiple_appointments_same_locator(new_appointment, n=MULTIPLE_APPOINTMENTS):
+def test_request_multiple_appointments_same_locator(new_appt_data, n=MULTIPLE_APPOINTMENTS):
     for _ in range(n):
-        r = add_appointment(new_appointment)
+        r = add_appointment(new_appt_data)
         assert r.status_code == 200
 
-    test_request_appointment(new_appointment)
+    test_request_appointment(new_appt_data)
 
 
-def test_add_too_many_appointment(new_appointment):
+def test_add_too_many_appointment(new_appt_data):
     for _ in range(MAX_APPOINTMENTS - len(appointments)):
-        r = add_appointment(new_appointment)
+        r = add_appointment(new_appt_data)
         assert r.status_code == 200
 
-    r = add_appointment(new_appointment)
+    r = add_appointment(new_appt_data)
     assert r.status_code == 503
 
 

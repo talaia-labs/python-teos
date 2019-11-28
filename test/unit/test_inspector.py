@@ -1,11 +1,18 @@
-from binascii import unhexlify
+import json
+from binascii import hexlify, unhexlify
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+
+from apps.cli.pisa_cli import build_appointment
 from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 from test.unit.conftest import get_random_value_hex
+
 from pisa.conf import MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
 
 c_logger.disabled = True
@@ -16,6 +23,11 @@ APPOINTMENT_OK = (0, None)
 NO_HEX_STRINGS = ["R" * 64, get_random_value_hex(31) + "PP", "$" * 64, " " * 64]
 WRONG_TYPES = [[], "", get_random_value_hex(32), 3.2, 2.0, (), object, {}, " " * 32, object()]
 WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(32)), 3.2, 2.0, (), object, {}, object()]
+
+
+def sign_appointment(sk, appointment):
+    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
 
 
 def test_check_locator():
@@ -189,13 +201,42 @@ def test_check_hash_function():
     assert Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_EMPTY_FIELD
 
 
-def test_inspect(run_bitcoind):
+def test_check_appointment_signature(generate_keypair):
+    client_sk, client_pk = generate_keypair
+
+    dummy_appointment_request = {
+        "tx": get_random_value_hex(192),
+        "tx_id": get_random_value_hex(32),
+        "start_time": 1500,
+        "end_time": 50000,
+        "dispute_delta": 200,
+    }
+    dummy_appointment = build_appointment(**dummy_appointment_request)
+
+    # Verify that an appointment signed by the client is valid
+    signature = sign_appointment(client_sk, dummy_appointment)
+    assert Inspector.check_appointment_signature(dummy_appointment, signature, client_pk)
+
+    fake_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+
+    # Create a bad signature to make sure inspector rejects it
+    bad_signature = sign_appointment(fake_sk, dummy_appointment)
+    assert (
+        Inspector.check_appointment_signature(dummy_appointment, bad_signature, client_pk)[0]
+        == APPOINTMENT_INVALID_SIGNATURE
+    )
+
+
+def test_inspect(run_bitcoind, generate_keypair):
     # At this point every single check function has been already tested, let's test inspect with an invalid and a valid
     # appointments.
 
+    client_sk, client_pk = generate_keypair
+
     # Invalid appointment, every field is empty
     appointment_data = dict()
-    appointment = inspector.inspect(appointment_data)
+    signature = sign_appointment(client_sk, appointment_data)
+    appointment = inspector.inspect(appointment_data, signature, client_pk)
     assert type(appointment) == tuple and appointment[0] != 0
 
     # Valid appointment
@@ -217,7 +258,9 @@ def test_inspect(run_bitcoind):
         "hash_function": hash_function,
     }
 
-    appointment = inspector.inspect(appointment_data)
+    signature = sign_appointment(client_sk, appointment_data)
+
+    appointment = inspector.inspect(appointment_data, signature, client_pk)
 
     assert (
         type(appointment) == Appointment

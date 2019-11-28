@@ -1,4 +1,12 @@
+import json
 import re
+from binascii import unhexlify
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.exceptions import InvalidSignature
 
 from pisa import errors
 import pisa.conf as conf
@@ -15,14 +23,14 @@ logger = Logger("Inspector")
 
 
 class Inspector:
-    def inspect(self, data):
-        locator = data.get("locator")
-        start_time = data.get("start_time")
-        end_time = data.get("end_time")
-        dispute_delta = data.get("dispute_delta")
-        encrypted_blob = data.get("encrypted_blob")
-        cipher = data.get("cipher")
-        hash_function = data.get("hash_function")
+    def inspect(self, appt, signature, public_key):
+        locator = appt.get("locator")
+        start_time = appt.get("start_time")
+        end_time = appt.get("end_time")
+        dispute_delta = appt.get("dispute_delta")
+        encrypted_blob = appt.get("encrypted_blob")
+        cipher = appt.get("cipher")
+        hash_function = appt.get("hash_function")
 
         block_height = BlockProcessor.get_block_count()
 
@@ -41,6 +49,8 @@ class Inspector:
                 rcode, message = self.check_cipher(cipher)
             if rcode == 0:
                 rcode, message = self.check_hash_function(hash_function)
+            if rcode == 0:
+                rcode, message = self.check_appointment_signature(appt, signature, public_key)
 
             if rcode == 0:
                 r = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function)
@@ -243,5 +253,26 @@ class Inspector:
 
         if message is not None:
             logger.error(message)
+
+        return rcode, message
+
+    @staticmethod
+    # Verifies that the appointment signature is a valid signature with public key
+    def check_appointment_signature(appointment, signature, pk_pem):
+        message = None
+        rcode = 0
+
+        if signature is None:
+            rcode = errors.APPOINTMENT_EMPTY_FIELD
+            message = "empty signature received"
+
+        try:
+            sig_bytes = unhexlify(signature.encode("utf-8"))
+            client_pk = load_pem_public_key(pk_pem.encode("utf-8"), backend=default_backend())
+            data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            client_pk.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
+
+        except InvalidSignature:
+            rcode = errors.APPOINTMENT_INVALID_SIGNATURE
 
         return rcode, message

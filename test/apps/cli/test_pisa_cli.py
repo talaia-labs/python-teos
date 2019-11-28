@@ -50,7 +50,7 @@ def test_is_appointment_signature_valid():
     assert not pisa_cli.is_appointment_signature_valid(dummy_appointment, other_signature, pisa_pk)
 
 
-def get_dummy_pisa_pk():
+def get_dummy_pisa_pk(pem_data):
     return pisa_pk
 
 
@@ -60,7 +60,7 @@ def test_add_appointment(monkeypatch):
     # and the return value is True
 
     # make sure the test uses the right dummy key instead of loading it from disk
-    monkeypatch.setattr(pisa_cli, "load_pisa_public_key", get_dummy_pisa_pk)
+    monkeypatch.setattr(pisa_cli, "load_public_key", get_dummy_pisa_pk)
 
     response = {"locator": dummy_appointment["locator"], "signature": sign_appointment(pisa_sk, dummy_appointment)}
 
@@ -81,7 +81,7 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
     # make sure that the right endpoint is requested, but the return value is False
 
     # make sure the test uses the right dummy key instead of loading it from disk
-    monkeypatch.setattr(pisa_cli, "load_pisa_public_key", get_dummy_pisa_pk)
+    monkeypatch.setattr(pisa_cli, "load_public_key", get_dummy_pisa_pk)
 
     response = {
         "locator": dummy_appointment["locator"],
