@@ -3,7 +3,7 @@ from queue import Queue
 from threading import Thread
 
 from common.cryptographer import Cryptographer
-from common.constants import LOCATOR_LEN_HEX
+from common.tools import compute_locator
 
 from common.logger import Logger
 from pisa.cleaner import Cleaner
@@ -70,20 +70,6 @@ class Watcher:
 
         if not isinstance(responder, Responder):
             self.responder = Responder(db_manager)
-
-    @staticmethod
-    def compute_locator(tx_id):
-        """
-        Computes an appointment locator given a transaction id.
-
-        Args:
-            tx_id (:obj:`str`): the transaction id used to compute the locator.
-
-        Returns:
-           (:obj:`str`): The computed locator.
-        """
-
-        return tx_id[:LOCATOR_LEN_HEX]
 
     def add_appointment(self, appointment):
         """
@@ -238,7 +224,7 @@ class Watcher:
             found.
         """
 
-        potential_locators = {Watcher.compute_locator(txid): txid for txid in txids}
+        potential_locators = {compute_locator(txid): txid for txid in txids}
 
         # Check is any of the tx_ids in the received block is an actual match
         intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
