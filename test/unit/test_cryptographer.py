@@ -6,7 +6,7 @@ from test.unit.conftest import get_random_value_hex
 
 data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
 key = "b2e984a570f6f49bc38ace178e09147b0aa296cbb7c92eb01412f7e2d07b5659"
-encrypted_data = "092e93d4a34aac4367075506f2c050ddfa1a201ee6669b65058572904dcea642aeb01ea4b57293618e8c46809dfadadc"
+encrypted_data = "8f31028097a8bf12a92e088caab5cf3fcddf0d35ed2b72c24b12269373efcdea04f9d2a820adafe830c20ff132d89810"
 encrypted_blob = EncryptedBlob(encrypted_data)
 
 
@@ -49,3 +49,27 @@ def test_decrypt_wrong_return():
 
     except ValueError:
         assert True
+
+
+# def test_encrypt():
+#     # Valid data, valid key
+#     data = get_random_value_hex(64)
+#     blob = Blob(data, SUPPORTED_CIPHERS[0], SUPPORTED_HASH_FUNCTIONS[0])
+#     key = get_random_value_hex(32)
+#
+#     encrypted_blob = blob.encrypt(key)
+#
+#     # Invalid key (note that encrypt cannot be called with invalid data since that's checked when the Blob is created)
+#     invalid_key = unhexlify(get_random_value_hex(32))
+#
+#     try:
+#         blob.encrypt(invalid_key)
+#         assert False, "Able to create encrypt with invalid key"
+#
+#     except ValueError:
+#         assert True
+#
+#     # Check that two encryptions of the same data have the same result
+#     encrypted_blob2 = blob.encrypt(key)
+#
+#     assert encrypted_blob == encrypted_blob2 and id(encrypted_blob) != id(encrypted_blob2)

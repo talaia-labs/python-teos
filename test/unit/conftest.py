@@ -5,8 +5,7 @@ import requests
 from time import sleep
 from shutil import rmtree
 from threading import Thread
-from hashlib import sha256
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -15,6 +14,7 @@ from cryptography.hazmat.primitives import serialization
 
 from apps.cli.blob import Blob
 from pisa.responder import Job
+from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from pisa.appointment import Appointment
@@ -99,9 +99,6 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "dispute_delta": 20,
     }
 
-    cipher = "AES-GCM-128"
-    hash_function = "SHA256"
-
     # dummy keys for this test
     client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
     client_pk = (
@@ -110,8 +107,8 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         .decode("utf-8")
     )
 
-    locator = sha256(unhexlify(dispute_txid)).hexdigest()
-    blob = Blob(dummy_appointment_data.get("tx"), cipher, hash_function)
+    locator = Watcher.compute_locator(dispute_txid)
+    blob = Blob(dummy_appointment_data.get("tx"))
 
     encrypted_blob = blob.encrypt((dummy_appointment_data.get("tx_id")))
 
@@ -121,8 +118,6 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "end_time": dummy_appointment_data.get("end_time"),
         "dispute_delta": dummy_appointment_data.get("dispute_delta"),
         "encrypted_blob": encrypted_blob,
-        "cipher": cipher,
-        "hash_function": hash_function,
     }
 
     signature = sign_appointment(client_sk, appointment_data)

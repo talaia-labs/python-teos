@@ -1,8 +1,6 @@
 import json
 from queue import Queue
-from hashlib import sha256
 from threading import Thread
-from binascii import unhexlify
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
@@ -25,7 +23,7 @@ class Job:
 
         # FIXME: locator is here so we can give info about jobs for now. It can be either passed from watcher or info
         #        can be directly got from DB
-        self.locator = sha256(unhexlify(dispute_txid)).hexdigest()
+        self.locator = dispute_txid[:32]
 
     @classmethod
     def from_dict(cls, job_data):

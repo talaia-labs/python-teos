@@ -1,8 +1,6 @@
 from uuid import uuid4
 from queue import Queue
-from hashlib import sha256
 from threading import Thread
-from binascii import unhexlify
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
@@ -42,7 +40,7 @@ class Watcher:
 
     @staticmethod
     def compute_locator(tx_id):
-        return sha256(unhexlify(tx_id)).hexdigest()
+        return tx_id[:32]
 
     def sign_appointment(self, appointment):
         data = appointment.serialize()

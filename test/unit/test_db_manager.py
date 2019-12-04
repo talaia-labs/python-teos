@@ -40,7 +40,6 @@ def test_init():
     # Check that the db can be created if it does not exist
     db_manager = open_create_db(db_path)
     assert isinstance(db_manager, DBManager)
-    print(type(db_manager))
     db_manager.db.close()
 
     # Check that we can open an already create db
@@ -188,7 +187,6 @@ def test_delete_locator_map(db_manager):
     assert len(locator_maps) != 0
 
     for locator, uuids in locator_maps.items():
-        print(locator)
         db_manager.delete_locator_map(locator)
 
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)

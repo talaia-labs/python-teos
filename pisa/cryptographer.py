@@ -1,7 +1,7 @@
 from hashlib import sha256
 from binascii import unhexlify, hexlify
 from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from pisa.logger import Logger
 
@@ -23,24 +23,19 @@ class Cryptographer:
             )
             return None
 
-        # master_key = H(tx_id | tx_id)
-        key = unhexlify(key)
-        master_key = sha256(key + key).digest()
-
-        # The 16 MSB of the master key will serve as the AES GCM 128 secret key. The 16 LSB will serve as the IV.
-        sk = master_key[:16]
-        nonce = master_key[16:]
+        # sk is the H(txid) (32-byte) and nonce is set to 0 (12-byte)
+        sk = sha256(unhexlify(key)).digest()
+        nonce = bytearray(12)
 
         logger.info(
             "Creating new blob.",
-            master_key=hexlify(master_key).decode(),
             sk=hexlify(sk).decode(),
             nonce=hexlify(nonce).decode(),
             encrypted_blob=encrypted_blob.data,
         )
 
         # Decrypt
-        cipher = AESGCM(sk)
+        cipher = ChaCha20Poly1305(sk)
         data = unhexlify(encrypted_blob.data.encode())
 
         try:

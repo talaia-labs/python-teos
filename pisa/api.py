@@ -79,7 +79,7 @@ def get_appointment():
     response = []
 
     # ToDo: #15-add-system-monitor
-    if not isinstance(locator, str) or len(locator) != 64:
+    if not isinstance(locator, str) or len(locator) != 32:
         response.append({"locator": locator, "status": "not_found"})
         return jsonify(response)
 

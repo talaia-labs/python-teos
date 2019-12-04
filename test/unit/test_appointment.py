@@ -17,8 +17,6 @@ def appointment_data():
     end_time = 120
     dispute_delta = 20
     encrypted_blob_data = get_random_value_hex(100)
-    cipher = "AES-GCM-128"
-    hash_function = "SHA256"
 
     return {
         "locator": locator,
@@ -26,8 +24,6 @@ def appointment_data():
         "end_time": end_time,
         "dispute_delta": dispute_delta,
         "encrypted_blob": encrypted_blob_data,
-        "cipher": cipher,
-        "hash_function": hash_function,
     }
 
 
@@ -42,8 +38,6 @@ def test_init_appointment(appointment_data):
         appointment_data["end_time"],
         appointment_data["dispute_delta"],
         appointment_data["encrypted_blob"],
-        appointment_data["cipher"],
-        appointment_data["hash_function"],
     )
 
     assert (
@@ -52,8 +46,6 @@ def test_init_appointment(appointment_data):
         and appointment_data["end_time"] == appointment.end_time
         and appointment_data["dispute_delta"] == appointment.dispute_delta
         and EncryptedBlob(appointment_data["encrypted_blob"]) == appointment.encrypted_blob
-        and appointment_data["cipher"] == appointment.cipher
-        and appointment_data["hash_function"] == appointment.hash_function
     )
 
 
@@ -64,8 +56,6 @@ def test_to_dict(appointment_data):
         appointment_data["end_time"],
         appointment_data["dispute_delta"],
         appointment_data["encrypted_blob"],
-        appointment_data["cipher"],
-        appointment_data["hash_function"],
     )
 
     dict_appointment = appointment.to_dict()
@@ -76,8 +66,6 @@ def test_to_dict(appointment_data):
         and appointment_data["end_time"] == dict_appointment["end_time"]
         and appointment_data["dispute_delta"] == dict_appointment["dispute_delta"]
         and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
-        and appointment_data["cipher"] == dict_appointment["cipher"]
-        and appointment_data["hash_function"] == dict_appointment["hash_function"]
     )
 
 
@@ -88,8 +76,6 @@ def test_to_json(appointment_data):
         appointment_data["end_time"],
         appointment_data["dispute_delta"],
         appointment_data["encrypted_blob"],
-        appointment_data["cipher"],
-        appointment_data["hash_function"],
     )
 
     dict_appointment = json.loads(appointment.to_json())
@@ -100,8 +86,6 @@ def test_to_json(appointment_data):
         and appointment_data["end_time"] == dict_appointment["end_time"]
         and appointment_data["dispute_delta"] == dict_appointment["dispute_delta"]
         and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
-        and appointment_data["cipher"] == dict_appointment["cipher"]
-        and appointment_data["hash_function"] == dict_appointment["hash_function"]
     )
 
 

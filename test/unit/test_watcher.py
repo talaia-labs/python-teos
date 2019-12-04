@@ -1,8 +1,6 @@
 import pytest
 from uuid import uuid4
-from hashlib import sha256
 from threading import Thread
-from binascii import unhexlify
 from queue import Queue, Empty
 
 from cryptography.hazmat.backends import default_backend
@@ -44,7 +42,7 @@ def txids():
 
 @pytest.fixture(scope="module")
 def locator_uuid_map(txids):
-    return {sha256(unhexlify(txid)).hexdigest(): uuid4().hex for txid in txids}
+    return {Watcher.compute_locator(txid): uuid4().hex for txid in txids}
 
 
 def create_appointments(n):
@@ -232,18 +230,17 @@ def test_filter_valid_matches_random_data(watcher):
 def test_filter_valid_matches(watcher):
     dispute_txid = "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
     encrypted_blob = (
-        "29f55518945408f567bb7feb4d7bb15ba88b7d8ca0223a44d5c67dfe32d038caee7613e35736025d95ad4ecd6538a50"
-        "74cbe8d7739705697a5dc4d19b8a6e4459ed2d1b0d0a9b18c49bc2187dcbfb4046b14d58a1add83235fc632efc398d5"
-        "0abcb7738f1a04b3783d025c1828b4e8a8dc8f13f2843e6bc3bf08eade02fc7e2c4dce7d2f83b055652e944ac114e0b"
-        "72a9abcd98fd1d785a5d976c05ed780e033e125fa083c6591b6029aa68dbc099f148a2bc2e0cb63733e68af717d48d5"
-        "a312b5f5b2fcca9561b2ff4191f9cdff936a43f6efef4ee45fbaf1f18d0a4b006f3fc8399dd8ecb21f709d4583bba14"
-        "4af6d49fa99d7be2ca21059a997475aa8642b66b921dc7fc0321b6a2f6927f6f9bab55c75e17a19dc3b2ae895b6d4a4"
-        "f64f8eb21b1e"
+        "a62aa9bb3c8591e4d5de10f1bd49db92432ce2341af55762cdc9242c08662f97f5f47da0a1aa88373508cd6e67e87eefddeca0cee98c1"
+        "967ec1c1ecbb4c5e8bf08aa26159214e6c0bc4b2c7c247f87e7601d15c746fc4e711be95ba0e363001280138ba9a65b06c4aa6f592b21"
+        "3635ee763984d522a4c225814510c8f7ab0801f36d4a68f5ee7dd3930710005074121a172c29beba79ed647ebaf7e7fab1bbd9a208251"
+        "ef5486feadf2c46e33a7d66adf9dbbc5f67b55a34b1b3c4909dd34a482d759b0bc25ecd2400f656db509466d7479b5b92a2fadabccc9e"
+        "c8918da8979a9feadea27531643210368fee494d3aaa4983e05d6cf082a49105e2f8a7c7821899239ba7dee12940acd7d8a629894b5d31"
+        "e94b439cfe8d2e9f21e974ae5342a70c91e8"
     )
 
     dummy_appointment, _ = generate_dummy_appointment()
     dummy_appointment.encrypted_blob.data = encrypted_blob
-    dummy_appointment.locator = sha256(unhexlify(dispute_txid)).hexdigest()
+    dummy_appointment.locator = Watcher.compute_locator(dispute_txid)
     uuid = uuid4().hex
 
     appointments = {uuid: dummy_appointment}

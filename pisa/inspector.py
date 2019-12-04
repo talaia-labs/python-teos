@@ -38,10 +38,6 @@ class Inspector:
             if rcode == 0:
                 rcode, message = self.check_blob(appt.get("encrypted_blob"))
             if rcode == 0:
-                rcode, message = self.check_cipher(appt.get("cipher"))
-            if rcode == 0:
-                rcode, message = self.check_hash_function(appt.get("hash_function"))
-            if rcode == 0:
                 rcode, message = self.check_appointment_signature(appt, signature, public_key)
 
             if rcode == 0:
@@ -68,7 +64,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong locator data type ({})".format(type(locator))
 
-        elif len(locator) != 64:
+        elif len(locator) != 32:
             rcode = errors.APPOINTMENT_WRONG_FIELD_SIZE
             message = "wrong locator size ({})".format(len(locator))
             # TODO: #12-check-txid-regexp
@@ -194,54 +190,6 @@ class Inspector:
         elif re.search(r"^[0-9A-Fa-f]+$", encrypted_blob) is None:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
             message = "wrong encrypted_blob format ({})".format(encrypted_blob)
-
-        if message is not None:
-            logger.error(message)
-
-        return rcode, message
-
-    @staticmethod
-    def check_cipher(cipher):
-        message = None
-        rcode = 0
-
-        t = type(cipher)
-
-        if cipher is None:
-            rcode = errors.APPOINTMENT_EMPTY_FIELD
-            message = "empty cipher received"
-
-        elif t != str:
-            rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
-            message = "wrong cipher data type ({})".format(t)
-
-        elif cipher.upper() not in conf.SUPPORTED_CIPHERS:
-            rcode = errors.APPOINTMENT_CIPHER_NOT_SUPPORTED
-            message = "cipher not supported: {}".format(cipher)
-
-        if message is not None:
-            logger.error(message)
-
-        return rcode, message
-
-    @staticmethod
-    def check_hash_function(hash_function):
-        message = None
-        rcode = 0
-
-        t = type(hash_function)
-
-        if hash_function is None:
-            rcode = errors.APPOINTMENT_EMPTY_FIELD
-            message = "empty hash_function received"
-
-        elif t != str:
-            rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
-            message = "wrong hash_function data type ({})".format(t)
-
-        elif hash_function.upper() not in conf.SUPPORTED_HASH_FUNCTIONS:
-            rcode = errors.APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
-            message = "hash_function not supported {}".format(hash_function)
 
         if message is not None:
             logger.error(message)

@@ -5,7 +5,6 @@ import json
 import requests
 import time
 from sys import argv
-from hashlib import sha256
 from binascii import hexlify, unhexlify
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
@@ -89,6 +88,10 @@ def load_private_key(sk_pem):
 
     except UnsupportedAlgorithm:
         raise ValueError("Could not deserialize the private key (unsupported algorithm).")
+
+
+def compute_locator(tx_id):
+    return tx_id[:32]
 
 
 # returning True or False accordingly.
@@ -308,13 +311,10 @@ def get_appointment(args):
 
 
 def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
-    locator = sha256(unhexlify(tx_id)).hexdigest()
-
-    cipher = "AES-GCM-128"
-    hash_function = "SHA256"
+    locator = compute_locator(tx_id)
 
     # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
-    blob = Blob(tx, cipher, hash_function)
+    blob = Blob(tx)
     encrypted_blob = blob.encrypt(tx_id)
 
     appointment = {
@@ -323,8 +323,6 @@ def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
         "end_time": end_time,
         "dispute_delta": dispute_delta,
         "encrypted_blob": encrypted_blob,
-        "cipher": cipher,
-        "hash_function": hash_function,
     }
 
     return appointment
