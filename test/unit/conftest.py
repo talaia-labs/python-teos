@@ -13,11 +13,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
-from pisa.conf import DB_PATH
 from apps.cli.blob import Blob
-from pisa.api import start_api
 from pisa.responder import Job
-from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from pisa.appointment import Appointment
@@ -31,19 +28,6 @@ def run_bitcoind():
     bitcoind_thread = Thread(target=run_simulator, kwargs={"mode": "event"})
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    sleep(0.1)
-
-
-@pytest.fixture(scope="session")
-def run_api():
-    db_manager = DBManager(DB_PATH)
-    watcher = Watcher(db_manager)
-
-    api_thread = Thread(target=start_api, args=[watcher])
-    api_thread.daemon = True
-    api_thread.start()
 
     # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
     sleep(0.1)
@@ -66,7 +50,7 @@ def generate_keypair():
     return client_sk, client_pk
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def db_manager():
     manager = DBManager("test_db")
     yield manager
@@ -96,8 +80,12 @@ def sign_appointment(sk, appointment):
     return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
 
 
-def generate_dummy_appointment_data(start_time_offset=5, end_time_offset=30):
-    current_height = bitcoin_cli().getblockcount()
+def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
+    if real_height:
+        current_height = bitcoin_cli().getblockcount()
+
+    else:
+        current_height = 10
 
     dispute_tx = TX.create_dummy_transaction()
     dispute_txid = sha256d(dispute_tx)
@@ -135,7 +123,6 @@ def generate_dummy_appointment_data(start_time_offset=5, end_time_offset=30):
         "encrypted_blob": encrypted_blob,
         "cipher": cipher,
         "hash_function": hash_function,
-        "triggered": False,
     }
 
     signature = sign_appointment(client_sk, appointment_data)
@@ -145,9 +132,9 @@ def generate_dummy_appointment_data(start_time_offset=5, end_time_offset=30):
     return data, dispute_tx
 
 
-def generate_dummy_appointment(start_time_offset=5, end_time_offset=30):
+def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_offset=30):
     appointment_data, dispute_tx = generate_dummy_appointment_data(
-        start_time_offset=start_time_offset, end_time_offset=end_time_offset
+        real_height=real_height, start_time_offset=start_time_offset, end_time_offset=end_time_offset
     )
 
     return Appointment.from_dict(appointment_data["appointment"]), dispute_tx

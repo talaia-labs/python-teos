@@ -7,7 +7,6 @@ from binascii import unhexlify
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
-from pisa.tools import check_tx_in_chain
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 
@@ -113,7 +112,8 @@ class Responder:
         else:
             self.tx_job_map[justice_txid] = [uuid]
 
-        if confirmations == 0:
+        # In the case we receive two jobs with the same justice txid we only add it to the unconfirmed txs list once
+        if justice_txid not in self.unconfirmed_txs and confirmations == 0:
             self.unconfirmed_txs.append(justice_txid)
 
         self.db_manager.store_responder_job(uuid, job.to_json())
@@ -145,7 +145,6 @@ class Responder:
 
             if block is not None:
                 txs = block.get("tx")
-                height = block.get("height")
 
                 logger.info(
                     "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"), txs=txs
@@ -153,10 +152,9 @@ class Responder:
 
                 # ToDo: #9-add-data-persistence
                 if prev_block_hash == block.get("previousblockhash"):
-                    self.unconfirmed_txs, self.missed_confirmations = BlockProcessor.check_confirmations(
-                        txs, self.unconfirmed_txs, self.tx_job_map, self.missed_confirmations
-                    )
+                    self.check_confirmations(txs)
 
+                    height = block.get("height")
                     txs_to_rebroadcast = self.get_txs_to_rebroadcast(txs)
                     completed_jobs = self.get_completed_jobs(height)
 
@@ -172,7 +170,7 @@ class Responder:
                     )
 
                     # ToDo: #24-properly-handle-reorgs
-                    self.handle_reorgs()
+                    self.handle_reorgs(block_hash)
 
                 # Register the last processed block for the responder
                 self.db_manager.store_last_block_hash_responder(block_hash)
@@ -185,6 +183,25 @@ class Responder:
         self.block_queue = Queue()
 
         logger.info("No more pending jobs, going back to sleep")
+
+    def check_confirmations(self, txs):
+        # If a new confirmed tx matches a tx we are watching, then we remove it from the unconfirmed txs map
+        for tx in txs:
+            if tx in self.tx_job_map and tx in self.unconfirmed_txs:
+                self.unconfirmed_txs.remove(tx)
+
+                logger.info("Confirmation received for transaction", tx=tx)
+
+        # We also add a missing confirmation to all those txs waiting to be confirmed that have not been confirmed in
+        # the current block
+        for tx in self.unconfirmed_txs:
+            if tx in self.missed_confirmations:
+                self.missed_confirmations[tx] += 1
+
+            else:
+                self.missed_confirmations[tx] = 1
+
+            logger.info("Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx])
 
     def get_txs_to_rebroadcast(self, txs):
         txs_to_rebroadcast = []
@@ -244,41 +261,43 @@ class Responder:
 
         return receipts
 
-    # FIXME: Legacy code, must be checked and updated/fixed
     # NOTCOVERED
-    def handle_reorgs(self):
+    def handle_reorgs(self, block_hash):
+        carrier = Carrier()
+
         for uuid, job in self.jobs.items():
-            # First we check if the dispute transaction is still in the blockchain. If not, the justice can not be
-            # there either, so we'll need to call the reorg manager straight away
-            dispute_in_chain, _ = check_tx_in_chain(job.dispute_txid, logger=logger, tx_label="Dispute tx")
+            # First we check if the dispute transaction is known (exists either in mempool or blockchain)
+            dispute_tx = carrier.get_transaction(job.dispute_txid)
 
-            # If the dispute is there, we can check the justice tx
-            if dispute_in_chain:
-                justice_in_chain, justice_confirmations = check_tx_in_chain(
-                    job.justice_txid, logger=logger, tx_label="Justice tx"
-                )
+            if dispute_tx is not None:
+                # If the dispute is there, we check the justice
+                justice_tx = carrier.get_transaction(job.justice_txid)
 
-                # If both transactions are there, we only need to update the justice tx confirmation count
-                if justice_in_chain:
-                    logger.info(
-                        "Updating confirmation count for transaction.",
-                        justice_txid=job.justice_txid,
-                        prev_count=job.confirmations,
-                        curr_count=justice_confirmations,
-                    )
+                if justice_tx is not None:
+                    # If the justice exists we need to check is it's on the blockchain or not so we can update the
+                    # unconfirmed transactions list accordingly.
+                    if justice_tx.get("confirmations") is None:
+                        self.unconfirmed_txs.append(job.justice_txid)
 
-                    job.confirmations = justice_confirmations
+                        logger.info(
+                            "Justice transaction back in mempool. Updating unconfirmed transactions.",
+                            justice_txid=job.justice_txid,
+                        )
 
                 else:
-                    # Otherwise, we will add the job back (implying rebroadcast of the tx) and monitor it again
+                    # If the justice transaction is missing, we need to reset the job.
                     # DISCUSS: Adding job back, should we flag it as retried?
                     # FIXME: Whether we decide to increase the retried counter or not, the current counter should be
                     #        maintained. There is no way of doing so with the current approach. Update if required
-                    self.add_response(uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx, job.appointment_end)
+                    self.add_response(
+                        uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx, job.appointment_end, block_hash
+                    )
+
+                    logger.warning("Justice transaction banished. Resetting the job", justice_tx=job.justice_txid)
 
             else:
                 # ToDo: #24-properly-handle-reorgs
                 # FIXME: if the dispute is not on chain (either in mempool or not there at all), we need to call the
                 #        reorg manager
-                logger.warning("Dispute and justice transaction missing. Calling the reorg manager")
-                logger.error("Reorg manager not yet implemented")
+                logger.warning("Dispute and justice transaction missing. Calling the reorg manager.")
+                logger.error("Reorg manager not yet implemented.")

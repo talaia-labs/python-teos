@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import binascii
+from itertools import islice
 from threading import Thread, Event
 from flask import Flask, request, Response, abort
 
@@ -19,7 +20,7 @@ PORT = "18443"
 blockchain = []
 blocks = {}
 mined_transactions = {}
-mempool = []
+mempool = {}
 
 mine_new_block = Event()
 
@@ -138,7 +139,7 @@ def process_request():
 
             if TX.deserialize(rawtx) is not None:
                 if txid not in list(mined_transactions.keys()):
-                    mempool.append(rawtx)
+                    mempool[txid] = rawtx
                     response["result"] = {"txid": txid}
 
                 else:
@@ -164,7 +165,7 @@ def process_request():
                 response["result"] = {"hex": rawtx, "confirmations": len(blockchain) - block.get("height")}
 
             elif txid in mempool:
-                response["result"] = {"confirmations": 0}
+                response["result"] = {"confirmations": None}
 
             else:
                 response["error"] = {
@@ -260,11 +261,9 @@ def simulate_mining(mode, time_between_blocks):
 
         if len(mempool) != 0:
             # We'll mine up to 100 txs per block
-            for rawtx in mempool[:99]:
-                txid = sha256d(rawtx)
+            for txid, rawtx in dict(islice(mempool.items(), 99)).items():
                 txs_to_mine[txid] = rawtx
-
-            mempool = mempool[99:]
+                mempool.pop(txid)
 
         # Keep track of the mined transaction (to respond to getrawtransaction)
         for txid, tx in txs_to_mine.items():

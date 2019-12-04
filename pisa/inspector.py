@@ -24,36 +24,28 @@ logger = Logger("Inspector")
 
 class Inspector:
     def inspect(self, appt, signature, public_key):
-        locator = appt.get("locator")
-        start_time = appt.get("start_time")
-        end_time = appt.get("end_time")
-        dispute_delta = appt.get("dispute_delta")
-        encrypted_blob = appt.get("encrypted_blob")
-        cipher = appt.get("cipher")
-        hash_function = appt.get("hash_function")
-
         block_height = BlockProcessor.get_block_count()
 
         if block_height is not None:
-            rcode, message = self.check_locator(locator)
+            rcode, message = self.check_locator(appt.get("locator"))
 
             if rcode == 0:
-                rcode, message = self.check_start_time(start_time, block_height)
+                rcode, message = self.check_start_time(appt.get("start_time"), block_height)
             if rcode == 0:
-                rcode, message = self.check_end_time(end_time, start_time, block_height)
+                rcode, message = self.check_end_time(appt.get("end_time"), appt.get("start_time"), block_height)
             if rcode == 0:
-                rcode, message = self.check_delta(dispute_delta)
+                rcode, message = self.check_delta(appt.get("dispute_delta"))
             if rcode == 0:
-                rcode, message = self.check_blob(encrypted_blob)
+                rcode, message = self.check_blob(appt.get("encrypted_blob"))
             if rcode == 0:
-                rcode, message = self.check_cipher(cipher)
+                rcode, message = self.check_cipher(appt.get("cipher"))
             if rcode == 0:
-                rcode, message = self.check_hash_function(hash_function)
+                rcode, message = self.check_hash_function(appt.get("hash_function"))
             if rcode == 0:
                 rcode, message = self.check_appointment_signature(appt, signature, public_key)
 
             if rcode == 0:
-                r = Appointment(locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function)
+                r = Appointment.from_dict(appt)
             else:
                 r = (rcode, message)
 
@@ -274,5 +266,6 @@ class Inspector:
 
         except InvalidSignature:
             rcode = errors.APPOINTMENT_INVALID_SIGNATURE
+            message = "invalid signature"
 
         return rcode, message

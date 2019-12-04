@@ -79,25 +79,30 @@ def get_appointment():
     response = []
 
     # ToDo: #15-add-system-monitor
+    if not isinstance(locator, str) or len(locator) != 64:
+        response.append({"locator": locator, "status": "not_found"})
+        return jsonify(response)
 
-    appointment_in_watcher = watcher.locator_uuid_map.get(locator)
+    locator_map = watcher.db_manager.load_locator_map(locator)
 
-    if appointment_in_watcher:
-        for uuid in appointment_in_watcher:
-            appointment_data = watcher.appointments[uuid].to_dict()
-            appointment_data["status"] = "being_watched"
-            response.append(appointment_data)
+    if locator_map is not None:
+        for uuid in locator_map:
+            appointment_data = watcher.db_manager.load_watcher_appointment(uuid)
 
-    if watcher.responder:
-        responder_jobs = watcher.responder.jobs
+            if appointment_data is not None and appointment_data["triggered"] is False:
+                # Triggered is an internal flag that does not need to be send
+                del appointment_data["triggered"]
 
-        for job in responder_jobs.values():
-            if job.locator == locator:
-                job_data = job.to_dict()
+                appointment_data["status"] = "being_watched"
+                response.append(appointment_data)
+
+            job_data = watcher.db_manager.load_responder_job(uuid)
+
+            if job_data is not None:
                 job_data["status"] = "dispute_responded"
                 response.append(job_data)
 
-    if not response:
+    else:
         response.append({"locator": locator, "status": "not_found"})
 
     response = jsonify(response)
@@ -107,18 +112,12 @@ def get_appointment():
 
 @app.route("/get_all_appointments", methods=["GET"])
 def get_all_appointments():
-    watcher_appointments = {}
-    responder_jobs = {}
-
     # ToDo: #15-add-system-monitor
+    response = None
 
     if request.remote_addr in request.host or request.remote_addr == "127.0.0.1":
-        for uuid, appointment in watcher.appointments.items():
-            watcher_appointments[uuid] = appointment.to_dict()
-
-        if watcher.responder:
-            for uuid, job in watcher.responder.jobs.items():
-                responder_jobs[uuid] = job.to_dict()
+        watcher_appointments = watcher.db_manager.load_watcher_appointments()
+        responder_jobs = watcher.db_manager.load_responder_jobs()
 
         response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
 

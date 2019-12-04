@@ -52,6 +52,11 @@ class DBManager:
 
         self.db.put(key, value)
 
+    def load_entry(self, key):
+        data = self.db.get(key.encode("utf-8"))
+        data = json.loads(data) if data is not None else data
+        return data
+
     def delete_entry(self, key, prefix=None):
         if isinstance(prefix, str):
             key = prefix + key
@@ -59,6 +64,12 @@ class DBManager:
         key = key.encode("utf-8")
 
         self.db.delete(key)
+
+    def load_watcher_appointment(self, key):
+        return self.load_entry(WATCHER_PREFIX + key)
+
+    def load_responder_job(self, key):
+        return self.load_entry(RESPONDER_PREFIX + key)
 
     def load_watcher_appointments(self):
         all_appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)

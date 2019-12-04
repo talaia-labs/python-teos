@@ -1,24 +1,27 @@
 from uuid import uuid4
 from queue import Queue
+from hashlib import sha256
 from threading import Thread
+from binascii import unhexlify
 
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
 from pisa.responder import Responder
+from pisa.cryptographer import Cryptographer
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
 
 logger = Logger("Watcher")
 
 
 class Watcher:
-    def __init__(self, db_manager, responder=None, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, pisa_sk_file=PISA_SECRET_KEY, responder=None, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
@@ -30,12 +33,16 @@ class Watcher:
         if not isinstance(responder, Responder):
             self.responder = Responder(db_manager)
 
-        if PISA_SECRET_KEY is None:
+        if pisa_sk_file is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
         else:
             with open(PISA_SECRET_KEY, "r") as key_file:
                 secret_key_pem = key_file.read().encode("utf-8")
                 self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
+
+    @staticmethod
+    def compute_locator(tx_id):
+        return sha256(unhexlify(tx_id)).hexdigest()
 
     def sign_appointment(self, appointment):
         data = appointment.serialize()
@@ -115,46 +122,34 @@ class Watcher:
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                potential_matches = BlockProcessor.get_potential_matches(txids, self.locator_uuid_map)
-                matches = BlockProcessor.get_matches(potential_matches, self.locator_uuid_map, self.appointments)
+                filtered_matches = self.filter_valid_matches(self.get_matches(txids))
 
-                for locator, uuid, dispute_txid, justice_txid, justice_rawtx in matches:
+                for uuid, filtered_match in filtered_matches.items():
                     # Errors decrypting the Blob will result in a None justice_txid
-                    if justice_txid is not None:
+                    if filtered_match["valid_match"] is True:
                         logger.info(
                             "Notifying responder and deleting appointment.",
-                            justice_txid=justice_txid,
-                            locator=locator,
+                            justice_txid=filtered_match["justice_txid"],
+                            locator=filtered_match["locator"],
                             uuid=uuid,
                         )
 
                         self.responder.add_response(
                             uuid,
-                            dispute_txid,
-                            justice_txid,
-                            justice_rawtx,
+                            filtered_match["dispute_txid"],
+                            filtered_match["justice_txid"],
+                            filtered_match["justice_rawtx"],
                             self.appointments[uuid].end_time,
                             block_hash,
                         )
 
-                    # Delete the appointment
-                    appointment = self.appointments.pop(uuid)
+                    # Delete the appointment and update db
+                    Cleaner.delete_completed_appointment(
+                        filtered_match["locator"], uuid, self.appointments, self.locator_uuid_map, self.db_manager
+                    )
 
-                    # If there was only one appointment that matches the locator we can delete the whole list
-                    if len(self.locator_uuid_map[locator]) == 1:
-                        self.locator_uuid_map.pop(locator)
-                    else:
-                        # Otherwise we just delete the appointment that matches locator:appointment_pos
-                        self.locator_uuid_map[locator].remove(uuid)
-
-                    # DISCUSS: instead of deleting the appointment, we will mark it as triggered and delete it from both
-                    #          the watcher's and responder's db after fulfilled
-                    # Update appointment in the db
-                    appointment.triggered = True
-                    self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
-
-                    # Register the last processed block for the watcher
-                    self.db_manager.store_last_block_hash_watcher(block_hash)
+                # Register the last processed block for the watcher
+                self.db_manager.store_last_block_hash_watcher(block_hash)
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
@@ -162,3 +157,47 @@ class Watcher:
         self.block_queue = Queue()
 
         logger.info("No more pending appointments, going back to sleep")
+
+    def get_matches(self, txids):
+        potential_locators = {Watcher.compute_locator(txid): txid for txid in txids}
+
+        # Check is any of the tx_ids in the received block is an actual match
+        intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
+        matches = {locator: potential_locators[locator] for locator in intersection}
+
+        if len(matches) > 0:
+            logger.info("List of matches", potential_matches=matches)
+
+        else:
+            logger.info("No matches found")
+
+        return matches
+
+    def filter_valid_matches(self, matches):
+        filtered_matches = {}
+
+        for locator, dispute_txid in matches.items():
+            for uuid in self.locator_uuid_map[locator]:
+
+                justice_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
+                justice_tx = BlockProcessor.decode_raw_transaction(justice_rawtx)
+
+                if justice_tx is not None:
+                    justice_txid = justice_tx.get("txid")
+                    valid_match = True
+
+                    logger.info("Match found for locator.", locator=locator, uuid=uuid, justice_txid=justice_txid)
+
+                else:
+                    justice_txid = None
+                    valid_match = False
+
+                filtered_matches[uuid] = {
+                    "locator": locator,
+                    "dispute_txid": dispute_txid,
+                    "justice_txid": justice_txid,
+                    "justice_rawtx": justice_rawtx,
+                    "valid_match": valid_match,
+                }
+
+        return filtered_matches

@@ -65,16 +65,16 @@ if __name__ == "__main__":
                 missed_blocks_responder = (
                     missed_blocks_watcher
                     if last_block_watcher == last_block_responder
-                    else block_processor.get_missed_blocks(last_block_watcher)
+                    else block_processor.get_missed_blocks(last_block_responder)
                 )
 
                 responder = Responder(db_manager)
                 responder.jobs, responder.tx_job_map = Builder.build_jobs(responder_jobs_data)
-                responder.block_queue = Builder.build_block_queue(last_block_responder)
+                responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
 
                 watcher.responder = responder
                 watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(watcher_appointments_data)
-                watcher.block_queue = Builder.build_block_queue(last_block_responder)
+                watcher.block_queue = Builder.build_block_queue(missed_blocks_watcher)
 
             # Create an instance of the Watcher and fire the API
             start_api(watcher)

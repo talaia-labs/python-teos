@@ -11,7 +11,7 @@ from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LO
 
 @pytest.fixture(scope="module")
 def watcher_appointments():
-    return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
+    return {uuid4().hex: generate_dummy_appointment(real_height=False)[0] for _ in range(10)}
 
 
 @pytest.fixture(scope="module")
@@ -80,8 +80,18 @@ def test_load_appointments_db(db_manager):
     assert set(values) == set(local_appointments.values()) and (len(values) == len(local_appointments))
 
 
-def test_get_last_known_block(db_manager):
+def test_get_last_known_block():
+    db_path = "empty_db"
+
+    # First we check if the db exists, and if so we delete it
+    if os.path.isdir(db_path):
+        shutil.rmtree(db_path)
+
+    # Check that the db can be created if it does not exist
+    db_manager = open_create_db(db_path)
+
     # Trying to get any last block for either the watcher or the responder should return None for an empty db
+
     for key in [WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY]:
         assert db_manager.get_last_known_block(key) is None
 
@@ -90,6 +100,9 @@ def test_get_last_known_block(db_manager):
         block_hash = get_random_value_hex(32)
         db_manager.db.put(key.encode("utf-8"), block_hash.encode("utf-8"))
         assert db_manager.get_last_known_block(key) == block_hash
+
+    # Removing test db
+    shutil.rmtree(db_path)
 
 
 def test_create_entry(db_manager):
