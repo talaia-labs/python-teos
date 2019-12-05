@@ -134,8 +134,7 @@ class Responder:
         self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
-        # ToDo: #9-add-data-persistence
-        #       change prev_block_hash to the last known tip when bootstrapping
+        # ToDo: change prev_block_hash to the last known tip when bootstrapping
         prev_block_hash = BlockProcessor.get_best_block_hash()
 
         while len(self.jobs) > 0:
@@ -150,7 +149,6 @@ class Responder:
                     "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"), txs=txs
                 )
 
-                # ToDo: #9-add-data-persistence
                 if prev_block_hash == block.get("previousblockhash"):
                     self.check_confirmations(txs)
 

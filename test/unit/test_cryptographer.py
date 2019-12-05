@@ -10,7 +10,6 @@ encrypted_data = "8f31028097a8bf12a92e088caab5cf3fcddf0d35ed2b72c24b12269373efcd
 encrypted_blob = EncryptedBlob(encrypted_data)
 
 
-# TODO: The decryption tests are assuming the cipher is AES-GCM-128, since EncryptedBlob assumes the same. Fix this.
 def test_decrypt_wrong_data():
     random_key = get_random_value_hex(32)
     random_encrypted_data = get_random_value_hex(64)

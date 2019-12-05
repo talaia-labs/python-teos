@@ -8,8 +8,6 @@ from pisa.logger import Logger
 logger = Logger("Cryptographer")
 
 
-# FIXME: Cryptographer is assuming AES-128-GCM and SHA256 since they are the only pair accepted by the encrypted blob
-#   and the only pair programmed so far.
 class Cryptographer:
     @staticmethod
     # ToDo: #20-test-tx-decrypting-edge-cases
