@@ -1,6 +1,6 @@
 import binascii
 
-from pisa.cryptographer import Cryptographer
+from common.cryptographer import Cryptographer
 from pisa.encrypted_blob import EncryptedBlob
 from test.unit.conftest import get_random_value_hex
 

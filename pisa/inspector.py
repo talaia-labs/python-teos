@@ -8,6 +8,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.exceptions import InvalidSignature
 
+from common.constants import LOCATOR_LEN_HEX
+
 from pisa import errors
 import pisa.conf as conf
 from pisa.logger import Logger
@@ -64,7 +66,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong locator data type ({})".format(type(locator))
 
-        elif len(locator) != 32:
+        elif len(locator) != LOCATOR_LEN_HEX:
             rcode = errors.APPOINTMENT_WRONG_FIELD_SIZE
             message = "wrong locator size ({})".format(len(locator))
             # TODO: #12-check-txid-regexp
