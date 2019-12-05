@@ -28,6 +28,8 @@ from apps.cli import (
     logger,
 )
 
+from common.constants import LOCATOR_LEN_HEX
+
 
 HTTP_OK = 200
 
@@ -91,7 +93,7 @@ def load_private_key(sk_pem):
 
 
 def compute_locator(tx_id):
-    return tx_id[:32]
+    return tx_id[:LOCATOR_LEN_HEX]
 
 
 # returning True or False accordingly.

@@ -5,8 +5,11 @@ import shutil
 from uuid import uuid4
 
 from pisa.db_manager import DBManager
-from test.unit.conftest import get_random_value_hex, generate_dummy_appointment
 from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
+
+from common.constants import LOCATOR_LEN_BYTES
+
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment
 
 
 @pytest.fixture(scope="module")
@@ -16,7 +19,7 @@ def watcher_appointments():
 
 @pytest.fixture(scope="module")
 def responder_jobs():
-    return {get_random_value_hex(32): get_random_value_hex(32) for _ in range(10)}
+    return {get_random_value_hex(16): get_random_value_hex(32) for _ in range(10)}
 
 
 def open_create_db(db_path):
@@ -64,7 +67,7 @@ def test_load_appointments_db(db_manager):
     # We can add a bunch of data to the db and try again (data is stored in json by the manager)
     local_appointments = {}
     for _ in range(10):
-        key = get_random_value_hex(32)
+        key = get_random_value_hex(16)
         value = get_random_value_hex(32)
         local_appointments[key] = value
 
@@ -105,7 +108,7 @@ def test_get_last_known_block():
 
 
 def test_create_entry(db_manager):
-    key = get_random_value_hex(32)
+    key = get_random_value_hex(16)
     value = get_random_value_hex(32)
 
     # Adding a value with no prefix (create entry encodes values in utf-8 internally)
@@ -115,7 +118,7 @@ def test_create_entry(db_manager):
     assert db_manager.db.get(key.encode("utf-8")).decode("utf-8") == value
 
     # If we prefix the key we should be able to get it if we add the prefix, but not otherwise
-    key = get_random_value_hex(32)
+    key = get_random_value_hex(16)
     prefix = "w"
     db_manager.create_entry(key, value, prefix=prefix)
 
@@ -139,7 +142,7 @@ def test_delete_entry(db_manager):
 
     # Let's check that the same works if a prefix is provided.
     prefix = "r"
-    key = get_random_value_hex(32)
+    key = get_random_value_hex(16)
     value = get_random_value_hex(32)
     db_manager.create_entry(key, value, prefix)
 
@@ -160,12 +163,12 @@ def test_load_responder_jobs_empty(db_manager):
 
 
 def test_load_locator_map_empty(db_manager):
-    assert db_manager.load_locator_map(get_random_value_hex(32)) is None
+    assert db_manager.load_locator_map(get_random_value_hex(LOCATOR_LEN_BYTES)) is None
 
 
 def test_store_update_locator_map_empty(db_manager):
     uuid = uuid4().hex
-    locator = get_random_value_hex(32)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     db_manager.store_update_locator_map(locator, uuid)
 
     # Check that the locator map has been properly stored

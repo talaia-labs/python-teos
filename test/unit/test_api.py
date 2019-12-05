@@ -9,7 +9,10 @@ from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT, c_logger
 from pisa.conf import MAX_APPOINTMENTS
+
 from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex, generate_dummy_appointment_data
+
+from common.constants import LOCATOR_LEN_BYTES
 
 c_logger.disabled = True
 
@@ -61,7 +64,7 @@ def test_add_appointment(run_api, run_bitcoind, new_appt_data):
 
 
 def test_request_random_appointment():
-    r = requests.get(url=PISA_API + "/get_appointment?locator=" + get_random_value_hex(32))
+    r = requests.get(url=PISA_API + "/get_appointment?locator=" + get_random_value_hex(LOCATOR_LEN_BYTES))
     assert r.status_code == 200
 
     received_appointments = json.loads(r.content)

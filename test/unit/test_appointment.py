@@ -4,15 +4,19 @@ from pytest import fixture
 from pisa import c_logger
 from pisa.appointment import Appointment
 from pisa.encrypted_blob import EncryptedBlob
+
 from test.unit.conftest import get_random_value_hex
+
+from common.constants import LOCATOR_LEN_BYTES
 
 
 c_logger.disabled = True
 
+
 # Not much to test here, adding it for completeness
 @fixture
 def appointment_data():
-    locator = get_random_value_hex(32)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     start_time = 100
     end_time = 120
     dispute_delta = 20

@@ -8,7 +8,8 @@ from pisa.logger import Logger
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
-from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE
+
+from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
 
 
 # ToDo: #5-add-async-to-api
@@ -74,7 +75,7 @@ def get_appointment():
     response = []
 
     # ToDo: #15-add-system-monitor
-    if not isinstance(locator, str) or len(locator) != 32:
+    if not isinstance(locator, str) or len(locator) != LOCATOR_LEN_HEX:
         response.append({"locator": locator, "status": "not_found"})
         return jsonify(response)
 

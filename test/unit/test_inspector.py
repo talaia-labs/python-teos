@@ -6,23 +6,42 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from apps.cli.pisa_cli import build_appointment
+
 from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
+from pisa.conf import MIN_DISPUTE_DELTA
+
 from test.unit.conftest import get_random_value_hex
 
-from pisa.conf import MIN_DISPUTE_DELTA
+from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
 c_logger.disabled = True
 
 inspector = Inspector()
 APPOINTMENT_OK = (0, None)
 
-NO_HEX_STRINGS = ["R" * 32, get_random_value_hex(15) + "PP", "$" * 32, " " * 32]
-WRONG_TYPES = [[], "", get_random_value_hex(16), 3.2, 2.0, (), object, {}, " " * 32, object()]
-WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(16)), 3.2, 2.0, (), object, {}, object()]
+NO_HEX_STRINGS = [
+    "R" * LOCATOR_LEN_HEX,
+    get_random_value_hex(LOCATOR_LEN_BYTES - 1) + "PP",
+    "$" * LOCATOR_LEN_HEX,
+    " " * LOCATOR_LEN_HEX,
+]
+WRONG_TYPES = [
+    [],
+    "",
+    get_random_value_hex(LOCATOR_LEN_BYTES),
+    3.2,
+    2.0,
+    (),
+    object,
+    {},
+    " " * LOCATOR_LEN_HEX,
+    object(),
+]
+WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
 
 
 def sign_appointment(sk, appointment):
@@ -32,15 +51,15 @@ def sign_appointment(sk, appointment):
 
 def test_check_locator():
     # Right appointment type, size and format
-    locator = get_random_value_hex(16)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     assert Inspector.check_locator(locator) == APPOINTMENT_OK
 
     # Wrong size (too big)
-    locator = get_random_value_hex(17)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES + 1)
     assert Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_SIZE
 
     # Wrong size (too small)
-    locator = get_random_value_hex(15)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES - 1)
     assert Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_SIZE
 
     # Empty
@@ -196,7 +215,7 @@ def test_inspect(run_bitcoind, generate_keypair):
     assert type(appointment) == tuple and appointment[0] != 0
 
     # Valid appointment
-    locator = get_random_value_hex(16)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     start_time = BlockProcessor.get_block_count() + 5
     end_time = start_time + 20
     dispute_delta = MIN_DISPUTE_DELTA
