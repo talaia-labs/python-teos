@@ -7,10 +7,12 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
+from common.cryptographer import Cryptographer
+from common.constants import LOCATOR_LEN_HEX
+
 from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
-from pisa.cryptographer import Cryptographer
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQHandler
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
@@ -40,7 +42,7 @@ class Watcher:
 
     @staticmethod
     def compute_locator(tx_id):
-        return tx_id[:32]
+        return tx_id[:LOCATOR_LEN_HEX]
 
     def sign_appointment(self, appointment):
         data = appointment.serialize()
@@ -134,6 +136,7 @@ class Watcher:
 
                         self.responder.add_response(
                             uuid,
+                            filtered_match["locator"],
                             filtered_match["dispute_txid"],
                             filtered_match["justice_txid"],
                             filtered_match["justice_rawtx"],

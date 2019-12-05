@@ -6,7 +6,10 @@ from pisa.responder import Job
 from pisa.cleaner import Cleaner
 from pisa.appointment import Appointment
 from pisa.db_manager import WATCHER_PREFIX
+
 from test.unit.conftest import get_random_value_hex
+
+from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
 CONFIRMATIONS = 6
 ITEMS = 10
@@ -23,7 +26,7 @@ def set_up_appointments(db_manager, total_appointments):
 
     for i in range(total_appointments):
         uuid = uuid4().hex
-        locator = get_random_value_hex(32)
+        locator = get_random_value_hex(LOCATOR_LEN_BYTES)
 
         appointment = Appointment(locator, None, None, None, None, None)
         appointments[uuid] = appointment
@@ -55,9 +58,10 @@ def set_up_jobs(db_manager, total_jobs):
         # We use the same txid for justice and dispute here, it shouldn't matter
         justice_txid = get_random_value_hex(32)
         dispute_txid = get_random_value_hex(32)
+        locator = dispute_txid[:LOCATOR_LEN_HEX]
 
         # Assign both justice_txid and dispute_txid the same id (it shouldn't matter)
-        job = Job(dispute_txid, justice_txid, None, None)
+        job = Job(locator, dispute_txid, justice_txid, None, None)
         jobs[uuid] = job
         tx_job_map[justice_txid] = [uuid]
 
@@ -131,9 +135,10 @@ def test_delete_completed_jobs_no_db_match(db_manager):
         for uuid in selected_jobs[: ITEMS // 2]:
             justice_txid = jobs[uuid].justice_txid
             dispute_txid = get_random_value_hex(32)
+            locator = dispute_txid[:LOCATOR_LEN_HEX]
             new_uuid = uuid4().hex
 
-            jobs[new_uuid] = Job(dispute_txid, justice_txid, None, None)
+            jobs[new_uuid] = Job(locator, dispute_txid, justice_txid, None, None)
             tx_job_map[justice_txid].append(new_uuid)
             selected_jobs.append(new_uuid)
 
@@ -142,8 +147,9 @@ def test_delete_completed_jobs_no_db_match(db_manager):
             uuid = uuid4().hex
             justice_txid = get_random_value_hex(32)
             dispute_txid = get_random_value_hex(32)
+            locator = dispute_txid[:LOCATOR_LEN_HEX]
 
-            jobs[uuid] = Job(dispute_txid, justice_txid, None, None)
+            jobs[uuid] = Job(locator, dispute_txid, justice_txid, None, None)
             tx_job_map[justice_txid] = [uuid]
             selected_jobs.append(uuid)
 

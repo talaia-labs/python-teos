@@ -18,9 +18,12 @@ from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from pisa.appointment import Appointment
+
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from test.simulator.bitcoind_sim import run_simulator, HOST, PORT
+
+from common.constants import LOCATOR_LEN_HEX
 
 
 @pytest.fixture(scope="session")
@@ -139,9 +142,14 @@ def generate_dummy_job():
     dispute_txid = get_random_value_hex(32)
     justice_txid = get_random_value_hex(32)
     justice_rawtx = get_random_value_hex(100)
+    locator = dispute_txid[:LOCATOR_LEN_HEX]
 
     job_data = dict(
-        dispute_txid=dispute_txid, justice_txid=justice_txid, justice_rawtx=justice_rawtx, appointment_end=100
+        locator=locator,
+        dispute_txid=dispute_txid,
+        justice_txid=justice_txid,
+        justice_rawtx=justice_rawtx,
+        appointment_end=100,
     )
 
     return Job.from_dict(job_data)

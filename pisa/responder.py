@@ -15,28 +15,26 @@ logger = Logger("Responder")
 
 
 class Job:
-    def __init__(self, dispute_txid, justice_txid, justice_rawtx, appointment_end):
+    def __init__(self, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end):
+        self.locator = locator
         self.dispute_txid = dispute_txid
         self.justice_txid = justice_txid
         self.justice_rawtx = justice_rawtx
         self.appointment_end = appointment_end
 
-        # FIXME: locator is here so we can give info about jobs for now. It can be either passed from watcher or info
-        #        can be directly got from DB
-        self.locator = dispute_txid[:32]
-
     @classmethod
     def from_dict(cls, job_data):
+        locator = job_data.get("locator")
         dispute_txid = job_data.get("dispute_txid")
         justice_txid = job_data.get("justice_txid")
         justice_rawtx = job_data.get("justice_rawtx")
         appointment_end = job_data.get("appointment_end")
 
-        if any(v is None for v in [dispute_txid, justice_txid, justice_rawtx, appointment_end]):
+        if any(v is None for v in [locator, dispute_txid, justice_txid, justice_rawtx, appointment_end]):
             raise ValueError("Wrong job data, some fields are missing")
 
         else:
-            job = cls(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+            job = cls(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
 
         return job
 
@@ -79,7 +77,9 @@ class Responder:
 
         return synchronized
 
-    def add_response(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, block_hash, retry=False):
+    def add_response(
+        self, uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, block_hash, retry=False
+    ):
         if self.asleep:
             logger.info("Waking up")
 
@@ -90,7 +90,9 @@ class Responder:
         # retry holds that information. If retry is true the job already exists
         if receipt.delivered:
             if not retry:
-                self.create_job(uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, receipt.confirmations)
+                self.create_job(
+                    uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, receipt.confirmations
+                )
 
         else:
             # TODO: Add the missing reasons (e.g. RPC_VERIFY_REJECTED)
@@ -100,8 +102,8 @@ class Responder:
 
         return receipt
 
-    def create_job(self, uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations=0):
-        job = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+    def create_job(self, uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations=0):
+        job = Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
         self.jobs[uuid] = job
 
         if justice_txid in self.tx_job_map:
@@ -240,6 +242,7 @@ class Responder:
             for uuid in self.tx_job_map[txid]:
                 job = self.jobs[uuid]
                 receipt = self.add_response(
+                    job.locator,
                     uuid,
                     job.dispute_txid,
                     job.justice_txid,
@@ -288,7 +291,13 @@ class Responder:
                     # FIXME: Whether we decide to increase the retried counter or not, the current counter should be
                     #        maintained. There is no way of doing so with the current approach. Update if required
                     self.add_response(
-                        uuid, job.dispute_txid, job.justice_txid, job.justice_rawtx, job.appointment_end, block_hash
+                        job.locator,
+                        uuid,
+                        job.dispute_txid,
+                        job.justice_txid,
+                        job.justice_rawtx,
+                        job.appointment_end,
+                        block_hash,
                     )
 
                     logger.warning("Justice transaction banished. Resetting the job", justice_tx=job.justice_txid)
