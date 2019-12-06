@@ -180,7 +180,12 @@ class Watcher:
         for locator, dispute_txid in matches.items():
             for uuid in self.locator_uuid_map[locator]:
 
-                justice_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
+                try:
+                    justice_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
+
+                except ValueError:
+                    justice_rawtx = None
+
                 justice_tx = BlockProcessor.decode_raw_transaction(justice_rawtx)
 
                 if justice_tx is not None:

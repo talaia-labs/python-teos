@@ -5,8 +5,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from apps.cli.pisa_cli import build_appointment
-
 from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
@@ -14,7 +12,7 @@ from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 from pisa.conf import MIN_DISPUTE_DELTA
 
-from test.unit.conftest import get_random_value_hex
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment_data
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
@@ -179,25 +177,17 @@ def test_check_blob():
 def test_check_appointment_signature(generate_keypair):
     client_sk, client_pk = generate_keypair
 
-    dummy_appointment_request = {
-        "tx": get_random_value_hex(192),
-        "tx_id": get_random_value_hex(32),
-        "start_time": 1500,
-        "end_time": 50000,
-        "dispute_delta": 200,
-    }
-    dummy_appointment = build_appointment(**dummy_appointment_request)
-
-    # Verify that an appointment signed by the client is valid
-    signature = sign_appointment(client_sk, dummy_appointment)
-    assert Inspector.check_appointment_signature(dummy_appointment, signature, client_pk)
+    dummy_appointment_data, _ = generate_dummy_appointment_data(real_height=False)
+    assert Inspector.check_appointment_signature(
+        dummy_appointment_data["appointment"], dummy_appointment_data["signature"], dummy_appointment_data["public_key"]
+    )
 
     fake_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
 
     # Create a bad signature to make sure inspector rejects it
-    bad_signature = sign_appointment(fake_sk, dummy_appointment)
+    bad_signature = sign_appointment(fake_sk, dummy_appointment_data["appointment"])
     assert (
-        Inspector.check_appointment_signature(dummy_appointment, bad_signature, client_pk)[0]
+        Inspector.check_appointment_signature(dummy_appointment_data["appointment"], bad_signature, client_pk)[0]
         == APPOINTMENT_INVALID_SIGNATURE
     )
 

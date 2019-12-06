@@ -1,5 +1,7 @@
 from pisa import c_logger
-from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli, check_txid_format
+from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli
+
+from common.tools import check_sha256_hex_format
 
 c_logger.disabled = True
 
@@ -30,14 +32,30 @@ def test_bitcoin_cli():
         assert False
 
 
-def test_check_txid_format():
-    assert check_txid_format(None) is False
-    assert check_txid_format("") is False
-    assert check_txid_format(0x0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF) is False  # wrong type
-    assert check_txid_format("abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd") is True  # lowercase
-    assert check_txid_format("ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD") is True  # uppercase
-    assert check_txid_format("0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789ABCDEF") is True  # mixed case
-    assert check_txid_format("0123456789012345678901234567890123456789012345678901234567890123") is True  # only nums
-    assert check_txid_format("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdf") is False  # too short
-    assert check_txid_format("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0") is False  # too long
-    assert check_txid_format("g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") is False  # non-hex
+def test_check_sha256_hex_format():
+    assert check_sha256_hex_format(None) is False
+    assert check_sha256_hex_format("") is False
+    assert (
+        check_sha256_hex_format(0x0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF) is False
+    )  # wrong type
+    assert (
+        check_sha256_hex_format("abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd") is True
+    )  # lowercase
+    assert (
+        check_sha256_hex_format("ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD") is True
+    )  # uppercase
+    assert (
+        check_sha256_hex_format("0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789ABCDEF") is True
+    )  # mixed case
+    assert (
+        check_sha256_hex_format("0123456789012345678901234567890123456789012345678901234567890123") is True
+    )  # only nums
+    assert (
+        check_sha256_hex_format("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdf") is False
+    )  # too short
+    assert (
+        check_sha256_hex_format("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0") is False
+    )  # too long
+    assert (
+        check_sha256_hex_format("g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") is False
+    )  # non-hex

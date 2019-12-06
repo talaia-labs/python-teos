@@ -12,9 +12,11 @@ from cryptography.exceptions import InvalidSignature
 from pisa import c_logger
 from pisa.watcher import Watcher
 from pisa.responder import Responder
-from pisa.tools import check_txid_format, bitcoin_cli
+from pisa.tools import bitcoin_cli
 from test.unit.conftest import generate_block, generate_blocks, generate_dummy_appointment, get_random_value_hex
 from pisa.conf import EXPIRY_DELTA, PISA_SECRET_KEY, MAX_APPOINTMENTS
+
+from common.tools import check_sha256_hex_format
 
 c_logger.disabled = True
 
@@ -152,7 +154,7 @@ def test_do_subscribe(watcher):
     try:
         generate_block()
         block_hash = watcher.block_queue.get()
-        assert check_txid_format(block_hash)
+        assert check_sha256_hex_format(block_hash)
 
     except Empty:
         assert False

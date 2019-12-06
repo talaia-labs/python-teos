@@ -1,4 +1,3 @@
-import re
 import os
 import sys
 import json
@@ -29,6 +28,8 @@ from apps.cli import (
 )
 
 from common.constants import LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
+from common.tools import check_sha256_hex_format
 
 
 HTTP_OK = 200
@@ -162,7 +163,7 @@ def add_appointment(args):
         logger.error("The provided JSON is empty.")
         return False
 
-    valid_locator = check_txid_format(appointment_data.get("tx_id"))
+    valid_locator = check_sha256_hex_format(appointment_data.get("tx_id"))
 
     if not valid_locator:
         logger.error("The provided locator is not valid.")
@@ -288,7 +289,7 @@ def get_appointment(args):
         sys.exit(help_get_appointment())
     else:
         locator = arg_opt
-        valid_locator = check_txid_format(locator)
+        valid_locator = check_sha256_hex_format(locator)
 
     if not valid_locator:
         logger.error("The provided locator is not valid: {}".format(locator))
@@ -317,7 +318,7 @@ def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
 
     # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
     blob = Blob(tx)
-    encrypted_blob = blob.encrypt(tx_id)
+    encrypted_blob = Cryptographer.encrypt(blob, tx_id)
 
     appointment = {
         "locator": locator,
@@ -328,14 +329,6 @@ def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
     }
 
     return appointment
-
-
-def check_txid_format(txid):
-    if len(txid) != 64:
-        sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
-
-    # TODO: #12-check-txid-regexp
-    return re.search(r"^[0-9A-Fa-f]+$", txid) is not None
 
 
 def show_usage():

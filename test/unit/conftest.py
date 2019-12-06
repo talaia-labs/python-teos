@@ -24,6 +24,7 @@ from test.simulator.transaction import TX
 from test.simulator.bitcoind_sim import run_simulator, HOST, PORT
 
 from common.constants import LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
 
 
 @pytest.fixture(scope="session")
@@ -113,7 +114,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
     locator = Watcher.compute_locator(dispute_txid)
     blob = Blob(dummy_appointment_data.get("tx"))
 
-    encrypted_blob = blob.encrypt((dummy_appointment_data.get("tx_id")))
+    encrypted_blob = Cryptographer.encrypt(blob, dummy_appointment_data.get("tx_id"))
 
     appointment_data = {
         "locator": locator,

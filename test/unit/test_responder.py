@@ -11,9 +11,10 @@ from pisa import c_logger
 from pisa.db_manager import DBManager
 from pisa.responder import Responder, Job
 from pisa.block_processor import BlockProcessor
-from pisa.tools import check_txid_format, bitcoin_cli
+from pisa.tools import bitcoin_cli
 
 from common.constants import LOCATOR_LEN_HEX
+from common.tools import check_sha256_hex_format
 
 from test.simulator.utils import sha256d
 from test.simulator.bitcoind_sim import TX
@@ -288,7 +289,7 @@ def test_do_subscribe(responder):
     try:
         generate_block()
         block_hash = responder.block_queue.get()
-        assert check_txid_format(block_hash)
+        assert check_sha256_hex_format(block_hash)
 
     except Empty:
         assert False
