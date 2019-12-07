@@ -7,27 +7,27 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 
 # Simple tool to generate an ECDSA private key using the secp256k1 curve and save private and public keys
-# as 'pisa_sk.pem' 'and pisa_pk.pem', respectively.
+# as 'pisa_sk.der' 'and pisa_pk.der', respectively.
 
-SK_FILE_NAME = "pisa_sk.pem"
-PK_FILE_NAME = "pisa_pk.pem"
+SK_FILE_NAME = "../pisa_sk.der"
+PK_FILE_NAME = "../pisa_pk.der"
 
 
 def save_sk(sk, filename):
-    pem = sk.private_bytes(
-        encoding=serialization.Encoding.PEM,
+    der = sk.private_bytes(
+        encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    with open(filename, "wb") as pem_out:
-        pem_out.write(pem)
+    with open(filename, "wb") as der_out:
+        der_out.write(der)
 
 
 def save_pk(pk, filename):
-    pem = pk.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
-    with open(filename, "wb") as pem_out:
-        pem_out.write(pem)
+    der = pk.public_bytes(encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    with open(filename, "wb") as der_out:
+        der_out.write(der)
 
 
 if __name__ == "__main__":

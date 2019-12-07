@@ -9,9 +9,9 @@ DEFAULT_PISA_API_PORT = 9814
 CLIENT_LOG_FILE = "pisa-cli.log"
 APPOINTMENTS_FOLDER_NAME = "appointments"
 
-CLI_PUBLIC_KEY = "cli_pk.pem"
-CLI_PRIVATE_KEY = "cli_sk.pem"
-PISA_PUBLIC_KEY = "pisa_pk.pem"
+CLI_PUBLIC_KEY = "cli_pk.der"
+CLI_PRIVATE_KEY = "cli_sk.der"
+PISA_PUBLIC_KEY = "pisa_pk.der"
 
 # Configure logging
 logging.basicConfig(
