@@ -112,10 +112,11 @@ def test_from_dict(appointment_data):
             assert True
 
 
+# This test is pretty worthless atm, it would make sense once we have a proper serialize function
 def test_serialize(appointment_data):
     appointment = Appointment.from_dict(appointment_data)
 
     assert appointment.triggered is False
     ser_appointment = appointment.serialize()
 
-    assert ser_appointment == json.dumps(appointment_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    assert ser_appointment == appointment.to_dict(include_triggered=False)

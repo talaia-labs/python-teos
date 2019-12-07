@@ -1,7 +1,6 @@
 import os
 import json
 from flask import Flask, request, abort, jsonify
-from binascii import hexlify
 
 from pisa import HOST, PORT, logging
 from pisa.logger import Logger
@@ -40,7 +39,7 @@ def add_appointment():
 
         if appointment_added:
             rcode = HTTP_OK
-            response = {"locator": appointment.locator, "signature": hexlify(signature).decode("utf-8")}
+            response = {"locator": appointment.locator, "signature": signature}
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
             error = "appointment rejected"

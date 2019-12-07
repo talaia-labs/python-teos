@@ -32,7 +32,7 @@ class Appointment:
 
         return appointment
 
-    def to_dict(self):
+    def to_dict(self, include_triggered=True):
         # ToDO: #3-improve-appointment-structure
         appointment = {
             "locator": self.locator,
@@ -40,8 +40,10 @@ class Appointment:
             "end_time": self.end_time,
             "dispute_delta": self.dispute_delta,
             "encrypted_blob": self.encrypted_blob.data,
-            "triggered": self.triggered,
         }
+
+        if include_triggered:
+            appointment["triggered"] = self.triggered
 
         return appointment
 
@@ -49,6 +51,5 @@ class Appointment:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
     def serialize(self):
-        data = self.to_dict()
-        data.pop("triggered")
-        return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        # FIXME: This is temporary serialization. A proper one is required
+        return self.to_dict(include_triggered=False)

@@ -1,14 +1,8 @@
-import json
 import re
 from binascii import unhexlify
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
-from cryptography.exceptions import InvalidSignature
-
 from common.constants import LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
 
 from pisa import errors
 import pisa.conf as conf
@@ -200,7 +194,7 @@ class Inspector:
 
     @staticmethod
     # Verifies that the appointment signature is a valid signature with public key
-    def check_appointment_signature(appointment, signature, pk_pem):
+    def check_appointment_signature(appointment, signature, pk_der):
         message = None
         rcode = 0
 
@@ -208,13 +202,10 @@ class Inspector:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty signature received"
 
-        try:
-            sig_bytes = unhexlify(signature.encode("utf-8"))
-            client_pk = load_pem_public_key(pk_pem.encode("utf-8"), backend=default_backend())
-            data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            client_pk.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
+        pk = Cryptographer.load_public_key_der(unhexlify(pk_der.encode("utf-8")))
+        valid_sig = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pk)
 
-        except InvalidSignature:
+        if not valid_sig:
             rcode = errors.APPOINTMENT_INVALID_SIGNATURE
             message = "invalid signature"
 

@@ -3,12 +3,6 @@ from uuid import uuid4
 from threading import Thread
 from queue import Queue, Empty
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.exceptions import InvalidSignature
-
 from pisa import c_logger
 from pisa.watcher import Watcher
 from pisa.responder import Responder
@@ -17,6 +11,7 @@ from test.unit.conftest import generate_block, generate_blocks, generate_dummy_a
 from pisa.conf import EXPIRY_DELTA, PISA_SECRET_KEY, MAX_APPOINTMENTS
 
 from common.tools import check_sha256_hex_format
+from common.cryptographer import Cryptographer
 
 c_logger.disabled = True
 
@@ -25,10 +20,9 @@ START_TIME_OFFSET = 1
 END_TIME_OFFSET = 1
 TEST_SET_SIZE = 200
 
-with open(PISA_SECRET_KEY, "r") as key_file:
-    pubkey_pem = key_file.read().encode("utf-8")
-    # TODO: should use the public key file instead, but it is not currently exported in the configuration
-    signing_key = load_pem_private_key(pubkey_pem, password=None, backend=default_backend())
+with open(PISA_SECRET_KEY, "rb") as key_file_der:
+    sk_der = key_file_der.read()
+    signing_key = Cryptographer.load_private_key_der(sk_der)
     public_key = signing_key.public_key()
 
 
@@ -65,16 +59,6 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
-def is_signature_valid(appointment, signature, pk):
-    # verify the signature
-    try:
-        data = appointment.serialize()
-        pk.verify(signature, data, ec.ECDSA(hashes.SHA256()))
-    except InvalidSignature:
-        return False
-    return True
-
-
 def test_init(watcher):
     assert type(watcher.appointments) is dict and len(watcher.appointments) == 0
     assert type(watcher.locator_uuid_map) is dict and len(watcher.locator_uuid_map) == 0
@@ -107,19 +91,13 @@ def test_add_appointment(run_bitcoind, watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert is_signature_valid(appointment, sig, public_key)
+        assert Cryptographer.verify(Cryptographer.signature_format(appointment.to_dict()), sig, public_key)
 
         # Check that we can also add an already added appointment (same locator)
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert is_signature_valid(appointment, sig, public_key)
-
-
-def test_sign_appointment(watcher):
-    appointment, _ = generate_dummy_appointment(start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET)
-    signature = watcher.sign_appointment(appointment)
-    assert is_signature_valid(appointment, signature, public_key)
+        assert Cryptographer.verify(Cryptographer.signature_format(appointment.to_dict()), sig, public_key)
 
 
 def test_add_too_many_appointments(watcher):
@@ -133,7 +111,7 @@ def test_add_too_many_appointments(watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert is_signature_valid(appointment, sig, public_key)
+        assert Cryptographer.verify(Cryptographer.signature_format(appointment.to_dict()), sig, public_key)
 
     appointment, dispute_tx = generate_dummy_appointment(
         start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET

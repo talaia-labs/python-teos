@@ -1,9 +1,8 @@
-import json
 from binascii import hexlify, unhexlify
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
 
 from pisa import c_logger
 from pisa.errors import *
@@ -12,9 +11,10 @@ from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 from pisa.conf import MIN_DISPUTE_DELTA
 
-from test.unit.conftest import get_random_value_hex, generate_dummy_appointment_data
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
 
 c_logger.disabled = True
 
@@ -40,11 +40,6 @@ WRONG_TYPES = [
     object(),
 ]
 WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
-
-
-def sign_appointment(sk, appointment):
-    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
 
 
 def test_check_locator():
@@ -174,8 +169,13 @@ def test_check_blob():
         assert Inspector.check_blob(encrypted_blob)[0] == APPOINTMENT_WRONG_FIELD_FORMAT
 
 
-def test_check_appointment_signature(generate_keypair):
-    client_sk, client_pk = generate_keypair
+def test_check_appointment_signature():
+    # The inspector receives the public key as hex
+    client_sk, client_pk = generate_keypair()
+    client_pk_der = client_pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    client_pk_hex = hexlify(client_pk_der).decode("utf-8")
 
     dummy_appointment_data, _ = generate_dummy_appointment_data(real_height=False)
     assert Inspector.check_appointment_signature(
@@ -185,22 +185,26 @@ def test_check_appointment_signature(generate_keypair):
     fake_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
 
     # Create a bad signature to make sure inspector rejects it
-    bad_signature = sign_appointment(fake_sk, dummy_appointment_data["appointment"])
+    bad_signature = Cryptographer.sign(Cryptographer.signature_format(dummy_appointment_data["appointment"]), fake_sk)
     assert (
-        Inspector.check_appointment_signature(dummy_appointment_data["appointment"], bad_signature, client_pk)[0]
+        Inspector.check_appointment_signature(dummy_appointment_data["appointment"], bad_signature, client_pk_hex)[0]
         == APPOINTMENT_INVALID_SIGNATURE
     )
 
 
-def test_inspect(run_bitcoind, generate_keypair):
+def test_inspect(run_bitcoind):
     # At this point every single check function has been already tested, let's test inspect with an invalid and a valid
     # appointments.
 
-    client_sk, client_pk = generate_keypair
+    client_sk, client_pk = generate_keypair()
+    client_pk_der = client_pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    client_pk_hex = hexlify(client_pk_der).decode("utf-8")
 
     # Invalid appointment, every field is empty
     appointment_data = dict()
-    signature = sign_appointment(client_sk, appointment_data)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
     appointment = inspector.inspect(appointment_data, signature, client_pk)
     assert type(appointment) == tuple and appointment[0] != 0
 
@@ -219,9 +223,9 @@ def test_inspect(run_bitcoind, generate_keypair):
         "encrypted_blob": encrypted_blob,
     }
 
-    signature = sign_appointment(client_sk, appointment_data)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
 
-    appointment = inspector.inspect(appointment_data, signature, client_pk)
+    appointment = inspector.inspect(appointment_data, signature, client_pk_hex)
 
     assert (
         type(appointment) == Appointment

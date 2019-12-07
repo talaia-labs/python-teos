@@ -150,7 +150,6 @@ def test_request_appointment_watcher(new_appt_data):
     appointment_status = [appointment.pop("status") for appointment in received_appointments]
 
     # Check that the appointment is within the received appoints
-    print("AAA", new_appt_data["appointment"], received_appointments)
     assert new_appt_data["appointment"] in received_appointments
 
     # Check that all the appointments are being watched

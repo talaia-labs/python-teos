@@ -1,8 +1,14 @@
+import json
 from hashlib import sha256
 from binascii import unhexlify, hexlify
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
+from cryptography.exceptions import InvalidTag, UnsupportedAlgorithm
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+from cryptography.hazmat.primitives.serialization import load_der_public_key, load_der_private_key
+from cryptography.exceptions import InvalidSignature
 from common.tools import check_sha256_hex_format
 
 from pisa.logger import Logger
@@ -85,3 +91,63 @@ class Cryptographer:
             blob = None
 
         return blob
+
+    # NOTCOVERED
+    @staticmethod
+    def signature_format(data):
+        # FIXME: This is temporary serialization. A proper one is required. Data need to be unhexlified too (can't atm)
+        return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+    # Deserialize public key from der data.
+    @staticmethod
+    def load_public_key_der(pk_der):
+        try:
+            pk = load_der_public_key(pk_der, backend=default_backend())
+            return pk
+
+        except UnsupportedAlgorithm:
+            raise ValueError("Could not deserialize the public key (unsupported algorithm).")
+
+    # Deserialize private key from der data.
+    @staticmethod
+    def load_private_key_der(sk_der):
+        try:
+            sk = load_der_private_key(sk_der, None, backend=default_backend())
+            return sk
+
+        except UnsupportedAlgorithm:
+            raise ValueError("Could not deserialize the private key (unsupported algorithm).")
+
+    @staticmethod
+    def sign(data, sk, rtype="hex"):
+        if rtype not in ["hex", "bytes"]:
+            raise ValueError("Wrong return type. Return type must be 'hex' or 'bytes'")
+
+        if not isinstance(sk, ec.EllipticCurvePrivateKey):
+            logger.error("Wrong public key.")
+            return None
+
+        else:
+            signature = sk.sign(data, ec.ECDSA(hashes.SHA256()))
+
+            if rtype == "hex":
+                signature = hexlify(signature).decode("utf-8")
+
+            return signature
+
+    @staticmethod
+    def verify(message, signature, pk):
+        if not isinstance(pk, ec.EllipticCurvePublicKey):
+            logger.error("Wrong public key.")
+            return False
+
+        if isinstance(signature, str):
+            signature = unhexlify(signature.encode("utf-8"))
+
+        try:
+            pk.verify(signature, message, ec.ECDSA(hashes.SHA256()))
+
+            return True
+
+        except InvalidSignature:
+            return False

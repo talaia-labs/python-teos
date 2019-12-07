@@ -2,11 +2,6 @@ from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
-
 from common.cryptographer import Cryptographer
 from common.constants import LOCATOR_LEN_HEX
 
@@ -36,17 +31,13 @@ class Watcher:
         if pisa_sk_file is None:
             raise ValueError("No signing key provided. Please fix your pisa.conf")
         else:
-            with open(PISA_SECRET_KEY, "r") as key_file:
-                secret_key_pem = key_file.read().encode("utf-8")
-                self.signing_key = load_pem_private_key(secret_key_pem, password=None, backend=default_backend())
+            with open(PISA_SECRET_KEY, "rb") as key_file:
+                secret_key_der = key_file.read()
+                self.signing_key = Cryptographer.load_private_key_der(secret_key_der)
 
     @staticmethod
     def compute_locator(tx_id):
         return tx_id[:LOCATOR_LEN_HEX]
-
-    def sign_appointment(self, appointment):
-        data = appointment.serialize()
-        return self.signing_key.sign(data, ec.ECDSA(hashes.SHA256()))
 
     def add_appointment(self, appointment):
         # Rationale:
@@ -87,7 +78,8 @@ class Watcher:
 
             logger.info("New appointment accepted.", locator=appointment.locator)
 
-            signature = self.sign_appointment(appointment)
+            signature = Cryptographer.sign(Cryptographer.signature_format(appointment.to_dict()), self.signing_key)
+
         else:
             appointment_added = False
             signature = None

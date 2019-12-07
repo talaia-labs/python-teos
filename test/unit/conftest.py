@@ -1,4 +1,3 @@
-import json
 import pytest
 import random
 import requests
@@ -8,7 +7,6 @@ from threading import Thread
 from binascii import hexlify
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
@@ -42,18 +40,6 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope="module")
-def generate_keypair():
-    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    client_pk = (
-        client_sk.public_key()
-        .public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
-        .decode("utf-8")
-    )
-
-    return client_sk, client_pk
-
-
 @pytest.fixture(scope="session")
 def db_manager():
     manager = DBManager("test_db")
@@ -61,6 +47,13 @@ def db_manager():
 
     manager.db.close()
     rmtree("test_db")
+
+
+def generate_keypair():
+    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+    client_pk = client_sk.public_key()
+
+    return client_sk, client_pk
 
 
 def get_random_value_hex(nbytes):
@@ -77,11 +70,6 @@ def generate_block():
 def generate_blocks(n):
     for _ in range(n):
         generate_block()
-
-
-def sign_appointment(sk, appointment):
-    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
 
 
 def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
@@ -104,11 +92,9 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
     }
 
     # dummy keys for this test
-    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    client_pk = (
-        client_sk.public_key()
-        .public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
-        .decode("utf-8")
+    client_sk, client_pk = generate_keypair()
+    client_pk_der = client_pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
     locator = Watcher.compute_locator(dispute_txid)
@@ -124,9 +110,10 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "encrypted_blob": encrypted_blob,
     }
 
-    signature = sign_appointment(client_sk, appointment_data)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
+    pk_hex = hexlify(client_pk_der).decode("utf-8")
 
-    data = {"appointment": appointment_data, "signature": signature, "public_key": client_pk}
+    data = {"appointment": appointment_data, "signature": signature, "public_key": pk_hex}
 
     return data, dispute_tx
 

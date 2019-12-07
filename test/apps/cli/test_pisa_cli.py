@@ -34,23 +34,15 @@ dummy_appointment_request = {
 }
 dummy_appointment = build_appointment(**dummy_appointment_request)
 
+# FIXME: USE CRYPTOGRAPHER
+
 
 def sign_appointment(sk, appointment):
     data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
 
 
-def test_is_appointment_signature_valid():
-    # Verify that an appointment signed by Pisa is valid
-    signature = sign_appointment(pisa_sk, dummy_appointment)
-    assert pisa_cli.is_appointment_signature_valid(dummy_appointment, signature, pisa_pk)
-
-    # Test that a signature from a different key is indeed invalid
-    other_signature = sign_appointment(other_sk, dummy_appointment)
-    assert not pisa_cli.is_appointment_signature_valid(dummy_appointment, other_signature, pisa_pk)
-
-
-def get_dummy_pisa_pk(pem_data):
+def get_dummy_pisa_pk(der_data):
     return pisa_pk
 
 
