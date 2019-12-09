@@ -9,12 +9,12 @@ class Appointment:
 
     Args:
         locator (str): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
-        for the tower to decrypt and broadcast the penalty transaction.
+            for the tower to decrypt and broadcast the penalty transaction.
         start_time (int): The block height at which the tower is hired to start watching for breaches.
         end_time (int): The block height at which the tower will stop watching for breaches.
         dispute_delta (int): The `to_self_delay` encoded in the CSV of the HTLC that this appointment is covering.
-        encrypted_blob (EncryptedBlob): An `EncryptedBlob` object containing an encrypted penalty transaction. The tower
-        will decrypt it and broadcast the penalty transaction upon seeing a breach on the blockchain.
+            encrypted_blob (EncryptedBlob): An `EncryptedBlob` object containing an encrypted penalty transaction.
+            The tower will decrypt it and broadcast the penalty transaction upon seeing a breach on the blockchain.
     """
 
     # DISCUSS: 35-appointment-checks
@@ -86,8 +86,8 @@ class Appointment:
 
         Args:
             triggered (bool): Whether the dispute has been triggered or not. When an appointment passes from the
-            `Watcher` to the `Responder` it is not deleted straightaway. Instead, the appointment is stored in the DB
-            flagged as triggered. This aims to ease handling block reorgs in the future.
+                `Watcher` to the `Responder` it is not deleted straightaway. Instead, the appointment is stored in the
+                DB flagged as triggered. This aims to ease handling block reorgs in the future.
 
         Returns:
             appointment (str): A json-encoded str representing the appointment.
