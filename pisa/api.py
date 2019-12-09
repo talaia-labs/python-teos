@@ -19,6 +19,19 @@ watcher = None
 
 @app.route("/", methods=["POST"])
 def add_appointment():
+    """
+    Add appointment endpoint, it is used as the main endpoint of the Watchtower.
+
+    The client sends requests (appointments) to this endpoint to request a job to the Watchtower. Requests must be json
+    encoded and contain an appointment field and optionally a signature and public_key fields.
+
+    Returns:
+        tuple: A tuple containing the response (json) and response code (`int:rcode`). For accepted appointments, the
+        `rcode` is always 0 and the response contains the signed receipt. For rejected appointments, the `rcode` is a
+        negative value and the response contains the error message. Error messages can be found at
+        (errors.py)[./errors.py]
+    """
+
     remote_addr = request.environ.get("REMOTE_ADDR")
     remote_port = request.environ.get("REMOTE_PORT")
 
@@ -40,6 +53,7 @@ def add_appointment():
         if appointment_added:
             rcode = HTTP_OK
             response = {"locator": appointment.locator, "signature": signature}
+
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
             error = "appointment rejected"
@@ -70,6 +84,20 @@ def add_appointment():
 # ToDo: #17-add-api-keys
 @app.route("/get_appointment", methods=["GET"])
 def get_appointment():
+    """
+    Get appointment endpoint, it gives information about a given appointment state in the Watchtower.
+
+    The information is requested by locator.
+
+    Returns:
+        dict: A json formatted dictionary containing information about the requested appointment.
+
+        A `status` flag is added to the data provided by either the `Watcher` or the `Responder` that signals the status
+        of the appointment. Appointments hold by the `Watcher` are flagged as `being_watched` whereas appointments that
+        has already been triggered, and are therefore hold by the responder, are flagged as `dispute_responded`.
+        An special flag is raise for unknown appoints: `not_found`.
+    """
+
     locator = request.args.get("locator")
     response = []
 
@@ -85,7 +113,7 @@ def get_appointment():
             appointment_data = watcher.db_manager.load_watcher_appointment(uuid)
 
             if appointment_data is not None and appointment_data["triggered"] is False:
-                # Triggered is an internal flag that does not need to be send
+                # Triggered is an internal flag
                 del appointment_data["triggered"]
 
                 appointment_data["status"] = "being_watched"
@@ -107,6 +135,17 @@ def get_appointment():
 
 @app.route("/get_all_appointments", methods=["GET"])
 def get_all_appointments():
+    """
+    Get all appointments endpoint, it gives information about all the appointments in the Watchtower.
+
+    This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
+
+    Returns:
+        dict: a json formatted dictionary containing all the appointments hold by the `Watcher` (`watcher_appointments)`
+        and by the `Responder` (`responder_jobs`).
+
+    """
+
     # ToDo: #15-add-system-monitor
     response = None
 
@@ -124,10 +163,29 @@ def get_all_appointments():
 
 @app.route("/get_block_count", methods=["GET"])
 def get_block_count():
+    """
+    Get block count endpoint, it provides the block height of the Watchtower.
+
+    This is a testing endpoint that (most likely) will be removed in production. Its purpose is to give information to
+    testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
+
+    Returns:
+        dict: a json encoded dictionary containing the block height.
+
+    """
+
     return jsonify({"block_count": BlockProcessor.get_block_count()})
 
 
 def start_api(w):
+    """
+    This function starts the Flask server used to run the API.
+
+    Args:
+          w (Watcher): a `Watcher` object.
+
+    """
+
     # FIXME: Pretty ugly but I haven't found a proper way to pass it to add_appointment
     global watcher
 
