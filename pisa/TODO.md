@@ -1,8 +1,0 @@
-- Start jobs according to the start time, jobs are now started when they are received
-- Add DB
-- Store jobs in DB until start time?
-- Handle failures in the underlying system (i.e. bitcoind crashes)
-- Add checks related with OP_CSV in justice tx and dispute_delta provided once the blob is decrypted
-- Do not accept new appointments if the locator has already been used
-- <s> Check all the interactions with core, figure out the edge cases and error codes i.e: The justice transaction can already be in the blockchain the first time we push it <s>
-- <s> Handle reconnection with ZMQ in case of broken pipe. The current version of the code fails if it does happen <s>
