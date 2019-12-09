@@ -110,13 +110,3 @@ def test_from_dict(appointment_data):
         except ValueError:
             appointment_data[key] = prev_val
             assert True
-
-
-# This test is pretty worthless atm, it would make sense once we have a proper serialize function
-def test_serialize(appointment_data):
-    appointment = Appointment.from_dict(appointment_data)
-
-    assert appointment.triggered is False
-    ser_appointment = appointment.serialize()
-
-    assert ser_appointment == appointment.to_dict(include_triggered=False)

@@ -49,7 +49,3 @@ class Appointment:
 
     def to_json(self):
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
-
-    def serialize(self):
-        # FIXME: This is temporary serialization. A proper one is required
-        return self.to_dict(include_triggered=False)
