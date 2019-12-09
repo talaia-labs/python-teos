@@ -23,13 +23,13 @@ def add_appointment():
     Add appointment endpoint, it is used as the main endpoint of the Watchtower.
 
     The client sends requests (appointments) to this endpoint to request a job to the Watchtower. Requests must be json
-    encoded and contain an appointment field and optionally a signature and public_key fields.
+    encoded and contain an ``appointment`` field and optionally a ``signature`` and ``public_key`` fields.
 
     Returns:
-        tuple: A tuple containing the response (json) and response code (`int:rcode`). For accepted appointments, the
-        `rcode` is always 0 and the response contains the signed receipt. For rejected appointments, the `rcode` is a
-        negative value and the response contains the error message. Error messages can be found at
-        (errors.py)[./errors.py]
+        tuple: A tuple containing the response (``json``) and response code (``int``). For accepted appointments, the
+        ``rcode`` is always 0 and the response contains the signed receipt. For rejected appointments, the ``rcode`` is
+        a negative value and the response contains the error message. Error messages can be found at
+        :mod:`Errors <pisa.errors>`.
     """
 
     remote_addr = request.environ.get("REMOTE_ADDR")
@@ -87,15 +87,17 @@ def get_appointment():
     """
     Get appointment endpoint, it gives information about a given appointment state in the Watchtower.
 
-    The information is requested by locator.
+    The information is requested by ``locator``.
 
     Returns:
         dict: A json formatted dictionary containing information about the requested appointment.
 
-        A `status` flag is added to the data provided by either the `Watcher` or the `Responder` that signals the status
-        of the appointment. Appointments hold by the `Watcher` are flagged as `being_watched` whereas appointments that
-        has already been triggered, and are therefore hold by the responder, are flagged as `dispute_responded`.
-        An special flag is raise for unknown appoints: `not_found`.
+        A ``status`` flag is added to the data provided by either the :mod:`Watcher <pisa.watcher>` or the
+        :mod:`Responder <pisa.responder>` that signals the status of the appointment.
+
+        - Appointments hold by the :mod:`Watcher <pisa.watcher>` are flagged as ``being_watched``.
+        - Appointments hold by the :mod:`Responder <pisa.responder>` are flagged as ``dispute_triggered``.
+        - Unknown appointments are flagged as ``not_found``.
     """
 
     locator = request.args.get("locator")
@@ -141,8 +143,8 @@ def get_all_appointments():
     This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
 
     Returns:
-        dict: a json formatted dictionary containing all the appointments hold by the `Watcher` (`watcher_appointments)`
-        and by the `Responder` (`responder_jobs`).
+        dict: a json formatted dictionary containing all the appointments hold by the :mod:`Watcher <pisa.watcher>`
+        (``watcher_appointments``) and by the :mod:`Responder <pisa.responder>` (``responder_jobs``).
 
     """
 
@@ -182,7 +184,7 @@ def start_api(w):
     This function starts the Flask server used to run the API.
 
     Args:
-          w (Watcher): a `Watcher` object.
+          w (Watcher): a :mod:`Watcher <pisa.watcher>` object.
 
     """
 

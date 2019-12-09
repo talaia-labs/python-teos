@@ -5,16 +5,18 @@ from pisa.encrypted_blob import EncryptedBlob
 
 class Appointment:
     """
-    The Appointment class contains the information regarding an appointment between a client and the Watchtower.
+    The ``Appointment`` contains the information regarding an appointment between a client and the Watchtower.
 
     Args:
         locator (str): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
             for the tower to decrypt and broadcast the penalty transaction.
         start_time (int): The block height at which the tower is hired to start watching for breaches.
         end_time (int): The block height at which the tower will stop watching for breaches.
-        dispute_delta (int): The `to_self_delay` encoded in the CSV of the HTLC that this appointment is covering.
-            encrypted_blob (EncryptedBlob): An `EncryptedBlob` object containing an encrypted penalty transaction.
-            The tower will decrypt it and broadcast the penalty transaction upon seeing a breach on the blockchain.
+        dispute_delta (int): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
+            covering.
+        encrypted_blob (EncryptedBlob): An :mod:`EncryptedBlob <pisa.encrypted_blob>` object containing an encrypted
+            penalty transaction. The tower will decrypt it and broadcast the penalty transaction upon seeing a breach on
+            the blockchain.
     """
 
     # DISCUSS: 35-appointment-checks
@@ -34,13 +36,13 @@ class Appointment:
 
         Args:
             appointment_data (dict): a dictionary containing the following keys:
-                `{locator, start_time, end_time, dispute_delta, encrypted_blob}`
+                ``{locator, start_time, end_time, dispute_delta, encrypted_blob}``
 
         Returns:
             Appointment: An appointment initialized using the provided data.
 
         Raises:
-            ValueError: If one of the mandatory keys is missing in `appointment_data`.
+            ValueError: If one of the mandatory keys is missing in ``appointment_data``.
         """
 
         locator = appointment_data.get("locator")
@@ -59,10 +61,10 @@ class Appointment:
 
     def to_dict(self):
         """
-        Exports an `Appointment` as a dictionary.
+        Exports an appointment as a dictionary.
 
         Returns:
-            appointment (dict): A dictionary containing the `Appointment` attributes.
+            appointment (dict): A dictionary containing the appointment attributes.
 
         """
 
@@ -79,15 +81,16 @@ class Appointment:
 
     def to_json(self, triggered=False):
         """
-        Exports an `Appointment` as a deterministic json encoded string.
+        Exports an appointment as a deterministic json encoded string.
 
         This method ensures that multiple invocations with the same data yield the same value. This is the format used
         to store appointments in the database.
 
         Args:
             triggered (bool): Whether the dispute has been triggered or not. When an appointment passes from the
-                `Watcher` to the `Responder` it is not deleted straightaway. Instead, the appointment is stored in the
-                DB flagged as triggered. This aims to ease handling block reorgs in the future.
+                :mod:`Watcher <pisa.watcher>` to the :mod:`Responder <pisa.responder>` it is not deleted straightaway.
+                Instead, the appointment is stored in the DB flagged as ``triggered``. This aims to ease handling block
+                reorgs in the future.
 
         Returns:
             appointment (str): A json-encoded str representing the appointment.
