@@ -16,3 +16,4 @@ test.py
 *.der
 .coverage
 htmlcov
+docs/
