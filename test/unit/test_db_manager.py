@@ -209,10 +209,26 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
     assert watcher_appointments.keys() == db_watcher_appointments.keys()
 
     for uuid, appointment in watcher_appointments.items():
-        assert db_watcher_appointments[uuid] == appointment.to_dict()
+        assert json.dumps(db_watcher_appointments[uuid], sort_keys=True, separators=(",", ":")) == appointment.to_json()
 
 
-def test_store_load_appointment_jobs(db_manager, responder_jobs):
+def test_store_load_triggered_appointment(db_manager):
+    db_watcher_appointments = db_manager.load_watcher_appointments()
+    db_watcher_appointments_with_triggered = db_manager.load_watcher_appointments(include_triggered=True)
+
+    assert db_watcher_appointments == db_watcher_appointments_with_triggered
+
+    # Create an appointment flagged as triggered
+    triggered_appointment, _ = generate_dummy_appointment(real_height=False)
+    uuid = uuid4().hex
+    db_manager.store_watcher_appointment(uuid, triggered_appointment.to_json(triggered=True))
+
+    # The new appointment is grabbed only if we set include_triggered
+    assert db_watcher_appointments == db_manager.load_watcher_appointments()
+    assert uuid in db_manager.load_watcher_appointments(include_triggered=True)
+
+
+def test_store_load_responder_jobs(db_manager, responder_jobs):
     for key, value in responder_jobs.items():
         db_manager.store_responder_job(key, json.dumps({"value": value}))
 
@@ -226,7 +242,7 @@ def test_store_load_appointment_jobs(db_manager, responder_jobs):
 
 def test_delete_watcher_appointment(db_manager, watcher_appointments):
     # Let's delete all we added
-    db_watcher_appointments = db_manager.load_watcher_appointments()
+    db_watcher_appointments = db_manager.load_watcher_appointments(include_triggered=True)
     assert len(db_watcher_appointments) != 0
 
     for key in watcher_appointments.keys():

@@ -28,7 +28,7 @@ def set_up_appointments(db_manager, total_appointments):
         uuid = uuid4().hex
         locator = get_random_value_hex(LOCATOR_LEN_BYTES)
 
-        appointment = Appointment(locator, None, None, None, None, None)
+        appointment = Appointment(locator, None, None, None, None)
         appointments[uuid] = appointment
         locator_uuid_map[locator] = [uuid]
 

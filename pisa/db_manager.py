@@ -71,13 +71,15 @@ class DBManager:
     def load_responder_job(self, key):
         return self.load_entry(RESPONDER_PREFIX + key)
 
-    def load_watcher_appointments(self):
-        all_appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
-        non_triggered_appointments = {
-            uuid: appointment for uuid, appointment in all_appointments.items() if appointment["triggered"] is False
-        }
+    def load_watcher_appointments(self, include_triggered=False):
+        appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
 
-        return non_triggered_appointments
+        if not include_triggered:
+            appointments = {
+                uuid: appointment for uuid, appointment in appointments.items() if appointment["triggered"] is False
+            }
+
+        return appointments
 
     def load_responder_jobs(self):
         return self.load_appointments_db(prefix=RESPONDER_PREFIX)

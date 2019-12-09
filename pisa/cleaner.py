@@ -40,8 +40,7 @@ class Cleaner:
         # DISCUSS: instead of deleting the appointment, we will mark it as triggered and delete it from both
         #          the watcher's and responder's db after fulfilled
         # Update appointment in the db
-        appointment.triggered = True
-        db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        db_manager.store_watcher_appointment(uuid, appointment.to_json(triggered=True))
 
     @staticmethod
     def delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager):
