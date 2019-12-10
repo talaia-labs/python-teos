@@ -13,6 +13,23 @@ LOCATOR_MAP_PREFIX = "m"
 
 
 class DBManager:
+    """
+    The ``DBManager`` is the class in charge of interacting with the appointments database (``LevelDB``).
+    Keys and values are stored as bytes in the database but processed as strings by the manager.
+
+    The database is split in five prefixes:
+
+        - ``WATCHER_PREFIX``, defined as ``b'w``, is used to store :mod:`Watcher <pisa.watcher>` appointments.
+        - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :mod:`Responder <pisa.responder>` jobs.
+        - ``WATCHER_LAST_BLOCK_KEY``, defined as ``b'bw``, is used to store the last block hash known by the :mod:`Watcher <pisa.watcher>`.
+        - ``RESPONDER_LAST_BLOCK_KEY``, defined as ``b'br``, is used to store the last block hash known by the :mod:`Responder <pisa.responder>`.
+        - ``LOCATOR_MAP_PREFIX``, defined as ``b'm``, is used to store the ``locator:uuid`` maps.
+
+    Args:
+        db_path (str): the path (relative or absolute) to the system folder containing the database. A fresh new
+            database will be create if the specified path does not contain one.
+    """
+
     def __init__(self, db_path):
         if not isinstance(db_path, str):
             raise ValueError("db_path must be a valid path/name")
@@ -26,6 +43,19 @@ class DBManager:
                 self.db = plyvel.DB(db_path, create_if_missing=True)
 
     def load_appointments_db(self, prefix):
+        """
+        Loads all data from the appointments database given a prefix. Two prefixes are defined: ``WATCHER_PREFIX`` and
+        ``RESPONDER_PREFIX``.
+
+        Args:
+            prefix (str): the prefix of the data to load.
+
+        Returns:
+            (``dict``): A dictionary containing the requested data (appointments or jobs) indexed by ``uuid``.
+
+            Returns an empty dictionary if no data is found.
+        """
+
         data = {}
 
         for k, v in self.db.iterator(prefix=prefix.encode("utf-8")):
@@ -36,6 +66,15 @@ class DBManager:
         return data
 
     def get_last_known_block(self, key):
+        """
+        Loads the last known block given a key (either ``WATCHER_LAST_BLOCK_KEY`` or ``RESPONDER_LAST_BLOCK_KEY``).
+
+        Returns:
+            (``str`` or ``None``): A 16-byte hex-encoded str representing the last known block hash.
+
+            Returns ``None`` if the entry is not found.
+        """
+
         last_block = self.db.get(key.encode("utf-8"))
 
         if last_block:
@@ -44,6 +83,15 @@ class DBManager:
         return last_block
 
     def create_entry(self, key, value, prefix=None):
+        """
+        Creates a new entry in the database.
+
+        Args:
+            key (str): the key of the new entry, used to identify it.
+            value (str): the data stored under the given ``key``.
+            prefix (str): an optional prefix added to the ``key``.
+        """
+
         if isinstance(prefix, str):
             key = prefix + key
 
@@ -53,11 +101,31 @@ class DBManager:
         self.db.put(key, value)
 
     def load_entry(self, key):
+        """
+        Loads an entry from the database given a ``key``.
+
+        Args:
+            key (str): the key that identifies the entry to be loaded.
+
+        Returns:
+            (``dict`` or ``None``): A dictionary containing the requested data (an appointment or a job).
+
+            Returns ``None`` if the entry is not found.
+        """
+
         data = self.db.get(key.encode("utf-8"))
         data = json.loads(data) if data is not None else data
         return data
 
     def delete_entry(self, key, prefix=None):
+        """
+        Deletes an entry from the database given an ``key`` (and optionally a ``prefix``)
+
+        Args:
+            key (str): the key that identifies the data to be deleted.
+            prefix (str): an optional prefix to be prepended to the ``key``.
+        """
+
         if isinstance(prefix, str):
             key = prefix + key
 
@@ -66,12 +134,42 @@ class DBManager:
         self.db.delete(key)
 
     def load_watcher_appointment(self, key):
+        """
+        Loads an appointment from the database using ``WATCHER_PREFIX`` as prefix to the given ``key``.
+
+        Returns:
+            (``dict``): A dictionary containing the appointment data if they ``key`` is found.
+
+            Returns ``None`` otherwise.
+        """
+
         return self.load_entry(WATCHER_PREFIX + key)
 
     def load_responder_job(self, key):
+        """
+        Loads a job from the database using ``RESPONDER_PREFIX`` as a prefix to the given ``key``.
+
+        Returns:
+            (``dict``): A dictionary containing the job data if they ``key`` is found.
+
+            Returns ``None`` otherwise.
+        """
+
         return self.load_entry(RESPONDER_PREFIX + key)
 
     def load_watcher_appointments(self, include_triggered=False):
+        """
+        Loads all the appointments from the database (all entries with the ``WATCHER_PREFIX`` prefix).
+
+        Args:
+            include_triggered (bool): Whether to include the appointments flagged as triggered or not. ``False`` by
+            default.
+
+        Returns:
+            (``dict``): A dictionary with all the appointments stored in the database. An empty dictionary is there are
+            none.
+        """
+
         appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
 
         if not include_triggered:
@@ -82,17 +180,45 @@ class DBManager:
         return appointments
 
     def load_responder_jobs(self):
+        """
+        Loads all the jobs from the database (all entries with the ``RESPONDER_PREFIX`` prefix).
+
+        Returns:
+            (``dict``): A dictionary with all the jobs stored in the database. An empty dictionary is there are
+            none.
+        """
+
         return self.load_appointments_db(prefix=RESPONDER_PREFIX)
 
     def store_watcher_appointment(self, uuid, appointment):
+        """
+        Stores an appointment in the database using the ``WATCHER_PREFIX`` prefix.
+        """
+
         self.create_entry(uuid, appointment, prefix=WATCHER_PREFIX)
         logger.info("Adding appointment to Watchers's db", uuid=uuid)
 
     def store_responder_job(self, uuid, job):
+        """
+        Stores a job in the database using the ``RESPONDER_PREFIX`` prefix.
+        """
+
         self.create_entry(uuid, job, prefix=RESPONDER_PREFIX)
         logger.info("Adding appointment to Responder's db", uuid=uuid)
 
     def load_locator_map(self, locator):
+        """
+        Loads the ``locator:uuid`` map of a given ``locator`` from the database.
+
+        Args:
+            locator (str): a 16-byte hex-encoded string representing the appointment locator.
+
+        Returns:
+            (``dict`` or ``None``): The requested ``locator:uuid`` map if found.
+
+            Returns ``None`` otherwise.
+        """
+
         key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
         locator_map = self.db.get(key)
 
@@ -105,6 +231,16 @@ class DBManager:
         return locator_map
 
     def store_update_locator_map(self, locator, uuid):
+        """
+        Stores (or updates if already exists) a ``locator:uuid`` map.
+
+        If the map already exists, the new ``uuid`` is appended to the existing ones (if it is not already there).
+
+        Args:
+            locator (str): a 16-byte hex-encoded string used as the key of the map.
+            uuid (str): a 16-byte hex-encoded unique id to create (or add to) the map.
+        """
+
         locator_map = self.load_locator_map(locator)
 
         if locator_map is not None:
@@ -123,25 +259,76 @@ class DBManager:
         self.db.put(key, json.dumps(locator_map).encode("utf-8"))
 
     def delete_locator_map(self, locator):
+        """
+        Deletes a ``locator:uuid`` map.
+
+        Args:
+            locator (str): a 16-byte hex-encoded string identifying the map to delete.
+        """
+
         self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
         logger.info("Deleting locator map from db", uuid=locator)
 
     def delete_watcher_appointment(self, uuid):
+        """
+        Deletes an appointment from the database.
+
+        Args:
+           uuid (str): a 16-byte hex-encoded string identifying the appointment to be deleted.
+        """
+
         self.delete_entry(uuid, prefix=WATCHER_PREFIX)
         logger.info("Deleting appointment from Watcher's db", uuid=uuid)
 
     def delete_responder_job(self, uuid):
+        """
+        Deletes a job from the database.
+
+        Args:
+           uuid (str): a 16-byte hex-encoded string identifying the job to be deleted.
+        """
+
         self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
         logger.info("Deleting appointment from Responder's db", uuid=uuid)
 
     def load_last_block_hash_watcher(self):
+        """
+        Loads the last known block hash of the :mod:`Watcher <pisa.watcher>` from the database.
+
+        Returns:
+            (``str`` or ``None``): A 32-byte hex-encoded string representing the last known block hash if found.
+
+            Returns ``None`` otherwise.
+        """
         return self.get_last_known_block(WATCHER_LAST_BLOCK_KEY)
 
     def load_last_block_hash_responder(self):
+        """
+        Loads the last known block hash of the :mod:`Responder <pisa.responder>` from the database.
+
+        Returns:
+            (``str`` or ``None``): A 32-byte hex-encoded string representing the last known block hash if found.
+
+            Returns ``None`` otherwise.
+        """
         return self.get_last_known_block(RESPONDER_LAST_BLOCK_KEY)
 
     def store_last_block_hash_watcher(self, block_hash):
+        """
+        Stores a block hash as the last known block of the :mod:`Watcher <pisa.watcher>`.
+
+        Args:
+            block_hash (str): the block hash to be stored (32-byte hex-encoded)
+        """
+
         self.create_entry(WATCHER_LAST_BLOCK_KEY, block_hash)
 
     def store_last_block_hash_responder(self, block_hash):
+        """
+        Stores a block hash as the last known block of the :mod:`Responder <pisa.responder>`.
+
+        Args:
+            block_hash (str): the block hash to be stored (32-byte hex-encoded)
+        """
+
         self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)
