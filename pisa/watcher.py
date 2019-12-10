@@ -138,7 +138,7 @@ class Watcher:
 
                     # Delete the appointment and update db
                     Cleaner.delete_completed_appointment(
-                        filtered_match["locator"], uuid, self.appointments, self.locator_uuid_map, self.db_manager
+                        uuid, self.appointments, self.locator_uuid_map, self.db_manager
                     )
 
                 # Register the last processed block for the watcher

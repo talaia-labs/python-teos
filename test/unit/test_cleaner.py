@@ -96,9 +96,7 @@ def test_delete_completed_appointments(db_manager):
     uuids = list(appointments.keys())
 
     for uuid in uuids:
-        Cleaner.delete_completed_appointment(
-            appointments[uuid].locator, uuid, appointments, locator_uuid_map, db_manager
-        )
+        Cleaner.delete_completed_appointment(uuid, appointments, locator_uuid_map, db_manager)
 
     # All appointments should have been deleted
     assert len(appointments) == 0
@@ -118,7 +116,7 @@ def test_delete_completed_jobs_db_match(db_manager):
 
         completed_jobs = [(job, 6) for job in selected_jobs]
 
-        Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager)
+        Cleaner.delete_completed_jobs(completed_jobs, height, jobs, tx_job_map, db_manager)
 
         assert not set(completed_jobs).issubset(jobs.keys())
 
@@ -156,5 +154,5 @@ def test_delete_completed_jobs_no_db_match(db_manager):
         completed_jobs = [(job, 6) for job in selected_jobs]
 
         # We should be able to delete the correct ones and not fail in the others
-        Cleaner.delete_completed_jobs(jobs, tx_job_map, completed_jobs, height, db_manager)
+        Cleaner.delete_completed_jobs(completed_jobs, height, jobs, tx_job_map, db_manager)
         assert not set(completed_jobs).issubset(jobs.keys())
