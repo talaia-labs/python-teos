@@ -143,7 +143,7 @@ def get_all_appointments():
     This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
 
     Returns:
-        dict: a json formatted dictionary containing all the appointments hold by the :mod:`Watcher <pisa.watcher>`
+        dict: A json formatted dictionary containing all the appointments hold by the :mod:`Watcher <pisa.watcher>`
         (``watcher_appointments``) and by the :mod:`Responder <pisa.responder>` (``responder_jobs``).
 
     """
@@ -172,7 +172,7 @@ def get_block_count():
     testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
 
     Returns:
-        dict: a json encoded dictionary containing the block height.
+        dict: A json encoded dictionary containing the block height.
 
     """
 
@@ -184,7 +184,7 @@ def start_api(w):
     This function starts the Flask server used to run the API.
 
     Args:
-          w (Watcher): a :mod:`Watcher <pisa.watcher>` object.
+          w (Watcher): A :mod:`Watcher <pisa.watcher>` object.
 
     """
 
