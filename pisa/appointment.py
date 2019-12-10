@@ -39,7 +39,7 @@ class Appointment:
                 ``{locator, start_time, end_time, dispute_delta, encrypted_blob}``
 
         Returns:
-            Appointment: An appointment initialized using the provided data.
+            ``Appointment``: An appointment initialized using the provided data.
 
         Raises:
             ValueError: If one of the mandatory keys is missing in ``appointment_data``.
@@ -64,7 +64,7 @@ class Appointment:
         Exports an appointment as a dictionary.
 
         Returns:
-            appointment (dict): A dictionary containing the appointment attributes.
+            ``dict``: A dictionary containing the appointment attributes.
 
         """
 
@@ -93,7 +93,7 @@ class Appointment:
                 reorgs in the future.
 
         Returns:
-            appointment (str): A json-encoded str representing the appointment.
+            ``str``: A json-encoded str representing the appointment.
         """
 
         appointment = self.to_dict()

@@ -20,7 +20,7 @@ class BlockProcessor:
             block_hash (str): The block hash to be queried.
 
         Returns:
-            block (dict): A dictionary containing the requested block data if the block is found.
+            ``dict`` or ``None``: A dictionary containing the requested block data if the block is found.
 
             Returns ``None`` otherwise.
         """
@@ -40,7 +40,7 @@ class BlockProcessor:
         Returns the hash of the current best chain tip.
 
         Returns:
-            block_hash (str): The hash of the block if it can be found.
+            ``str`` or ``None``: The hash of the block if it can be found.
 
             Returns ``None`` otherwise (not even sure this can actually happen).
         """
@@ -60,7 +60,7 @@ class BlockProcessor:
         Returns the block height of the best chain.
 
         Returns:
-            block_count (int): The block height if it can be computed.
+            ``int`` or ``None``: The block height if it can be computed.
 
             Returns ``None`` otherwise (not even sure this can actually happen).
         """
@@ -84,7 +84,7 @@ class BlockProcessor:
             raw_tx (str): The hex representation of the transaction.
 
         Returns:
-            tx (dict): The decoding of the given ``raw_tx`` if the transaction is well formaed.
+            ``dict`` or ``None``: The decoding of the given ``raw_tx`` if the transaction is well formatted.
 
             Returns ``None`` otherwise.
         """
@@ -111,8 +111,8 @@ class BlockProcessor:
             last_know_block_hash (hex): the hash of the last known block.
 
         Returns:
-            missed_blocks (list): A list of blocks between the last given block and the current best chain tip, starting
-            from the child of ``last_know_block_hash``.
+            ``list``: A list of blocks between the last given block and the current best chain tip, starting from the
+            child of ``last_know_block_hash``.
         """
 
         current_block_hash = self.get_best_block_hash()
@@ -134,8 +134,8 @@ class BlockProcessor:
             target_block_hash (str): the hash of the target block (the one to compute the distance form the tip).
 
         Returns:
-            distance (int): The distance between the target and the best chain tip is the target block can be found on
-            the blockchain.
+            ``int`` or ``None``: The distance between the target and the best chain tip is the target block can be found
+            on the blockchain.
 
             Returns ``None`` otherwise.
         """

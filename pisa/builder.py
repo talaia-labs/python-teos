@@ -23,9 +23,9 @@ class Builder:
                     ``{uuid: {locator: str, start_time: int, ...}, uuid: {locator:...}}``
 
         Returns:
-            appointments, locator_uuid_map (tuple): A tuple with two dictionaries. ``appointments`` containing the
-            appointment information in :mod:`Appointment <pisa.appointment>` objects and ``locator_uuid_map``
-            containing a map of appointment (``uuid:locator``).
+            ``tuple``: A tuple with two dictionaries. ``appointments`` containing the appointment information in
+            :mod:`Appointment <pisa.appointment>` objects and ``locator_uuid_map`` containing a map of appointment
+            (``uuid:locator``).
         """
 
         appointments = {}
@@ -56,7 +56,7 @@ class Builder:
                     ``{uuid: {locator: str, dispute_txid: str, ...}, uuid: {locator:...}}``
 
         Returns:
-            jobs, tx_job_map (tuple): A tuple with two dictionaries. ``jobs`` containing the jobs information in
+            ``tuple``: A tuple with two dictionaries. ``jobs`` containing the jobs information in
             :class:`Job <pisa.responder>` objects and a ``tx_job_map`` containing the map of jobs
             (``penalty_txid: uuid``).
 
@@ -87,7 +87,7 @@ class Builder:
             missed_blocks (list): list of block hashes missed by the Watchtower (do to a crash or shutdown).
 
         Returns:
-            block_queue (Queue): A `Queue` containing all the missed blocks hashes.
+            ``Queue``: A `Queue` containing all the missed blocks hashes.
         """
 
         block_queue = Queue()
