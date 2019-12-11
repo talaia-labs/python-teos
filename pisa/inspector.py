@@ -19,25 +19,47 @@ logger = Logger("Inspector")
 
 
 class Inspector:
-    def inspect(self, appt, signature, public_key):
+    """
+    The ``Inspector`` class is in charge of verifying that the appointment data provided by the user is correct.
+    """
+
+    def inspect(self, appointment_data, signature, public_key):
+        """
+        Inspects whether the data provided by the user is correct.
+
+        Args:
+            appointment_data (dict): a dictionary containing the appointment data.
+            signature (str): the appointment signature provided by the user (hex encoded).
+            public_key (str): the user's public key (hex encoded).
+
+        Returns:
+            ``Appointment`` or ``tuple``: An appointment initialized with the provided data if it is correct.
+
+            Returns a tuple (`return code`, `message`) describing the error otherwise.
+
+            Errors are defined in :mod:`errors <pisa.errors>`.
+        """
+
         block_height = BlockProcessor.get_block_count()
 
         if block_height is not None:
-            rcode, message = self.check_locator(appt.get("locator"))
+            rcode, message = self.check_locator(appointment_data.get("locator"))
 
             if rcode == 0:
-                rcode, message = self.check_start_time(appt.get("start_time"), block_height)
+                rcode, message = self.check_start_time(appointment_data.get("start_time"), block_height)
             if rcode == 0:
-                rcode, message = self.check_end_time(appt.get("end_time"), appt.get("start_time"), block_height)
+                rcode, message = self.check_end_time(
+                    appointment_data.get("end_time"), appointment_data.get("start_time"), block_height
+                )
             if rcode == 0:
-                rcode, message = self.check_delta(appt.get("dispute_delta"))
+                rcode, message = self.check_to_self_delay(appointment_data.get("to_self_delay"))
             if rcode == 0:
-                rcode, message = self.check_blob(appt.get("encrypted_blob"))
+                rcode, message = self.check_blob(appointment_data.get("encrypted_blob"))
             if rcode == 0:
-                rcode, message = self.check_appointment_signature(appt, signature, public_key)
+                rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
 
             if rcode == 0:
-                r = Appointment.from_dict(appt)
+                r = Appointment.from_dict(appointment_data)
             else:
                 r = (rcode, message)
 
@@ -49,6 +71,24 @@ class Inspector:
 
     @staticmethod
     def check_locator(locator):
+        """
+        Checks if the provided ``locator`` is correct.
+
+        Locators must be 16-byte hex encoded strings.
+
+        Args:
+            locator (str): the locator to be checked.
+
+        Returns:
+            ``tuple``: A tuple (return code, message) as follows:
+
+            - ``(0, None)`` if the ``locator`` is correct.
+            - ``!= (0, None)`` otherwise.
+
+            The possible return errors are: ``APPOINTMENT_EMPTY_FIELD``, ``APPOINTMENT_WRONG_FIELD_TYPE``,
+            ``APPOINTMENT_WRONG_FIELD_SIZE``, and ``APPOINTMENT_WRONG_FIELD_FORMAT``.
+        """
+
         message = None
         rcode = 0
 
@@ -76,6 +116,25 @@ class Inspector:
 
     @staticmethod
     def check_start_time(start_time, block_height):
+        """
+        Checks if the provided ``start_time`` is correct.
+
+        Start times must be ahead the current best chain tip.
+
+        Args:
+            start_time (int): the block height at which the tower is requested to start watching for breaches.
+            block_height (int): the chain height.
+
+        Returns:
+            ``tuple``: A tuple (return code, message) as follows:
+
+            - ``(0, None)`` if the ``start_time`` is correct.
+            - ``!= (0, None)`` otherwise.
+
+             The possible return errors are: ``APPOINTMENT_EMPTY_FIELD``, ``APPOINTMENT_WRONG_FIELD_TYPE``, and
+             ``APPOINTMENT_FIELD_TOO_SMALL``.
+        """
+
         message = None
         rcode = 0
 
@@ -106,6 +165,26 @@ class Inspector:
 
     @staticmethod
     def check_end_time(end_time, start_time, block_height):
+        """
+        Checks if the provided ``end_time`` is correct.
+
+        End times must be ahead both the ``start_time`` and the current best chain tip.
+
+        Args:
+            end_time (int): the block height at which the tower is requested to stop watching for breaches.
+            start_time (int): the block height at which the tower is requested to start watching for breaches.
+            block_height (int): the chain height.
+
+        Returns:
+            ``tuple``: A tuple (return code, message) as follows:
+
+            - ``(0, None)`` if the ``end_time`` is correct.
+            - ``!= (0, None)`` otherwise.
+
+            The possible return errors are: ``APPOINTMENT_EMPTY_FIELD``, ``APPOINTMENT_WRONG_FIELD_TYPE``, and
+            ``APPOINTMENT_FIELD_TOO_SMALL``.
+        """
+
         message = None
         rcode = 0
 
@@ -142,24 +221,43 @@ class Inspector:
         return rcode, message
 
     @staticmethod
-    def check_delta(dispute_delta):
+    def check_to_self_delay(to_self_delay):
+        """
+        Checks if the provided ``to_self_delay`` is correct.
+
+        To self delays must be greater or equal to ``MIN_TO_SELF_DELAY``.
+
+        Args:
+            to_self_delay (int): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
+                covering.
+
+        Returns:
+            ``tuple``: A tuple (return code, message) as follows:
+
+            - ``(0, None)`` if the ``to_self_delay`` is correct.
+            - ``!= (0, None)`` otherwise.
+
+            The possible return errors are: ``APPOINTMENT_EMPTY_FIELD``, ``APPOINTMENT_WRONG_FIELD_TYPE``, and
+            ``APPOINTMENT_FIELD_TOO_SMALL``.
+        """
+
         message = None
         rcode = 0
 
-        t = type(dispute_delta)
+        t = type(to_self_delay)
 
-        if dispute_delta is None:
+        if to_self_delay is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
-            message = "empty dispute_delta received"
+            message = "empty to_self_delay received"
 
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
-            message = "wrong dispute_delta data type ({})".format(t)
+            message = "wrong to_self_delay data type ({})".format(t)
 
-        elif dispute_delta < conf.MIN_DISPUTE_DELTA:
+        elif to_self_delay < conf.MIN_TO_SELF_DELAY:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
-            message = "dispute delta too small. The dispute delta should be at least {} (current: {})".format(
-                conf.MIN_DISPUTE_DELTA, dispute_delta
+            message = "to_self_delay too small. The to_self_delay should be at least {} (current: {})".format(
+                conf.MIN_TO_SELF_DELAY, to_self_delay
             )
 
         if message is not None:
@@ -170,6 +268,24 @@ class Inspector:
     # ToDo: #6-define-checks-encrypted-blob
     @staticmethod
     def check_blob(encrypted_blob):
+        """
+        Checks if the provided ``encrypted_blob`` may be correct.
+
+        FIXME: Currently this only checks format and not empty. It must be improved.
+
+        Args:
+            encrypted_blob (str): the encrypted blob to be checked (hex encoded).
+
+        Returns:
+            ``tuple``: A tuple (return code, message) as follows:
+
+            - ``(0, None)`` if the ``encrypted_blob`` is correct.
+            - ``!= (0, None)`` otherwise.
+
+            The possible return errors are: ``APPOINTMENT_EMPTY_FIELD``, ``APPOINTMENT_WRONG_FIELD_TYPE``, and
+            ``APPOINTMENT_WRONG_FIELD_FORMAT``.
+        """
+
         message = None
         rcode = 0
 
@@ -195,6 +311,24 @@ class Inspector:
     @staticmethod
     # Verifies that the appointment signature is a valid signature with public key
     def check_appointment_signature(appointment, signature, pk_der):
+        """
+        Checks if the provided user signature is correct.
+
+        Args:
+            appointment (dict): the appointment that was signed by the user.
+            signature (str): the user's signature (hex encoded).
+            pk_der (str): the user's public key (hex encoded, DER format).
+
+        Returns:
+            ``tuple``: A tuple (return code, message) as follows:
+
+            - ``(0, None)`` if the ``signature`` is correct.
+            - ``!= (0, None)`` otherwise.
+
+            The possible return errors are: ``APPOINTMENT_EMPTY_FIELD``, ``APPOINTMENT_WRONG_FIELD_TYPE``, and
+            ``APPOINTMENT_WRONG_FIELD_FORMAT``.
+        """
+
         message = None
         rcode = 0
 
