@@ -81,14 +81,14 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
 
     dispute_tx = TX.create_dummy_transaction()
     dispute_txid = sha256d(dispute_tx)
-    justice_tx = TX.create_dummy_transaction(dispute_txid)
+    penalty_tx = TX.create_dummy_transaction(dispute_txid)
 
     dummy_appointment_data = {
-        "tx": justice_tx,
+        "tx": penalty_tx,
         "tx_id": dispute_txid,
         "start_time": current_height + start_time_offset,
         "end_time": current_height + end_time_offset,
-        "dispute_delta": 20,
+        "to_self_delay": 20,
     }
 
     # dummy keys for this test
@@ -106,7 +106,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "locator": locator,
         "start_time": dummy_appointment_data.get("start_time"),
         "end_time": dummy_appointment_data.get("end_time"),
-        "dispute_delta": dummy_appointment_data.get("dispute_delta"),
+        "to_self_delay": dummy_appointment_data.get("to_self_delay"),
         "encrypted_blob": encrypted_blob,
     }
 
@@ -128,15 +128,15 @@ def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_o
 
 def generate_dummy_job():
     dispute_txid = get_random_value_hex(32)
-    justice_txid = get_random_value_hex(32)
-    justice_rawtx = get_random_value_hex(100)
+    penalty_txid = get_random_value_hex(32)
+    penalty_rawtx = get_random_value_hex(100)
     locator = dispute_txid[:LOCATOR_LEN_HEX]
 
     job_data = dict(
         locator=locator,
         dispute_txid=dispute_txid,
-        justice_txid=justice_txid,
-        justice_rawtx=justice_rawtx,
+        penalty_txid=penalty_txid,
+        penalty_rawtx=penalty_rawtx,
         appointment_end=100,
     )
 

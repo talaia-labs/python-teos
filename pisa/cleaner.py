@@ -88,17 +88,17 @@ class Cleaner:
                 confirmations=confirmations,
             )
 
-            justice_txid = jobs[uuid].justice_txid
+            penalty_txid = jobs[uuid].penalty_txid
             locator = jobs[uuid].locator
             jobs.pop(uuid)
 
-            if len(tx_job_map[justice_txid]) == 1:
-                tx_job_map.pop(justice_txid)
+            if len(tx_job_map[penalty_txid]) == 1:
+                tx_job_map.pop(penalty_txid)
 
-                logger.info("No more jobs for justice transaction.", justice_txid=justice_txid)
+                logger.info("No more jobs for penalty transaction.", penalty_txid=penalty_txid)
 
             else:
-                tx_job_map[justice_txid].remove(uuid)
+                tx_job_map[penalty_txid].remove(uuid)
 
             # Delete appointment from the db (both watchers's and responder's)
             db_manager.delete_watcher_appointment(uuid)

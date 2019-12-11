@@ -40,7 +40,7 @@ def generate_dummy_appointment():
         "tx_id": os.urandom(32).hex(),
         "start_time": current_height + 5,
         "end_time": current_height + 10,
-        "dispute_delta": 20,
+        "to_self_delay": 20,
     }
 
     print("Generating dummy appointment data:" "\n\n" + json.dumps(dummy_appointment_data, indent=4, sort_keys=True))
@@ -131,7 +131,7 @@ def add_appointment(args):
         appointment_data.get("tx_id"),
         appointment_data.get("start_time"),
         appointment_data.get("end_time"),
-        appointment_data.get("dispute_delta"),
+        appointment_data.get("to_self_delay"),
     )
 
     try:
@@ -205,11 +205,12 @@ def add_appointment(args):
     try:
         pisa_pk_der = load_key_file_data(PISA_PUBLIC_KEY)
         pisa_pk = Cryptographer.load_public_key_der(pisa_pk_der)
-        is_sig_valid = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pisa_pk)
 
-    except ValueError:
-        logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
-        return False
+        if pisa_pk is None:
+            logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+            return False
+
+        is_sig_valid = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pisa_pk)
 
     except FileNotFoundError:
         logger.error("Pisa's public key file not found. Please check your settings.")
@@ -270,7 +271,7 @@ def get_appointment(args):
     return True
 
 
-def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
+def build_appointment(tx, tx_id, start_time, end_time, to_self_delay):
     locator = compute_locator(tx_id)
 
     # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
@@ -281,7 +282,7 @@ def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
         "locator": locator,
         "start_time": start_time,
         "end_time": end_time,
-        "dispute_delta": dispute_delta,
+        "to_self_delay": to_self_delay,
         "encrypted_blob": encrypted_blob,
     }
 

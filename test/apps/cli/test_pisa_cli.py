@@ -30,7 +30,7 @@ dummy_appointment_request = {
     "tx_id": get_random_value_hex(32),
     "start_time": 1500,
     "end_time": 50000,
-    "dispute_delta": 200,
+    "to_self_delay": 200,
 }
 dummy_appointment = build_appointment(**dummy_appointment_request)
 

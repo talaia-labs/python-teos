@@ -19,14 +19,14 @@ def appointment_data():
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     start_time = 100
     end_time = 120
-    dispute_delta = 20
+    to_self_delay = 20
     encrypted_blob_data = get_random_value_hex(100)
 
     return {
         "locator": locator,
         "start_time": start_time,
         "end_time": end_time,
-        "dispute_delta": dispute_delta,
+        "to_self_delay": to_self_delay,
         "encrypted_blob": encrypted_blob_data,
     }
 
@@ -40,7 +40,7 @@ def test_init_appointment(appointment_data):
         appointment_data["locator"],
         appointment_data["start_time"],
         appointment_data["end_time"],
-        appointment_data["dispute_delta"],
+        appointment_data["to_self_delay"],
         appointment_data["encrypted_blob"],
     )
 
@@ -48,7 +48,7 @@ def test_init_appointment(appointment_data):
         appointment_data["locator"] == appointment.locator
         and appointment_data["start_time"] == appointment.start_time
         and appointment_data["end_time"] == appointment.end_time
-        and appointment_data["dispute_delta"] == appointment.dispute_delta
+        and appointment_data["to_self_delay"] == appointment.to_self_delay
         and EncryptedBlob(appointment_data["encrypted_blob"]) == appointment.encrypted_blob
     )
 
@@ -58,7 +58,7 @@ def test_to_dict(appointment_data):
         appointment_data["locator"],
         appointment_data["start_time"],
         appointment_data["end_time"],
-        appointment_data["dispute_delta"],
+        appointment_data["to_self_delay"],
         appointment_data["encrypted_blob"],
     )
 
@@ -68,7 +68,7 @@ def test_to_dict(appointment_data):
         appointment_data["locator"] == dict_appointment["locator"]
         and appointment_data["start_time"] == dict_appointment["start_time"]
         and appointment_data["end_time"] == dict_appointment["end_time"]
-        and appointment_data["dispute_delta"] == dict_appointment["dispute_delta"]
+        and appointment_data["to_self_delay"] == dict_appointment["to_self_delay"]
         and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
     )
 
@@ -78,7 +78,7 @@ def test_to_json(appointment_data):
         appointment_data["locator"],
         appointment_data["start_time"],
         appointment_data["end_time"],
-        appointment_data["dispute_delta"],
+        appointment_data["to_self_delay"],
         appointment_data["encrypted_blob"],
     )
 
@@ -88,7 +88,7 @@ def test_to_json(appointment_data):
         appointment_data["locator"] == dict_appointment["locator"]
         and appointment_data["start_time"] == dict_appointment["start_time"]
         and appointment_data["end_time"] == dict_appointment["end_time"]
-        and appointment_data["dispute_delta"] == dict_appointment["dispute_delta"]
+        and appointment_data["to_self_delay"] == dict_appointment["to_self_delay"]
         and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
     )
 

@@ -58,7 +58,7 @@ def test_add_appointment(run_api, run_bitcoind, new_appt_data):
     assert r.status_code == 200
 
     # Incorrect appointment
-    new_appt_data["appointment"]["dispute_delta"] = 0
+    new_appt_data["appointment"]["to_self_delay"] = 0
     r = add_appointment(new_appt_data)
     assert r.status_code == 400
 

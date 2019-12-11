@@ -9,7 +9,7 @@ from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
-from pisa.conf import MIN_DISPUTE_DELTA
+from pisa.conf import MIN_TO_SELF_DELAY
 
 from test.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair
 
@@ -124,25 +124,25 @@ def test_check_end_time():
         assert Inspector.check_end_time(end_time, start_time, current_time)[0] == APPOINTMENT_WRONG_FIELD_TYPE
 
 
-def test_check_delta():
+def test_check_to_self_delay():
     # Right value, right format
-    deltas = [MIN_DISPUTE_DELTA, MIN_DISPUTE_DELTA + 1, MIN_DISPUTE_DELTA + 1000]
-    for delta in deltas:
-        assert Inspector.check_delta(delta) == APPOINTMENT_OK
+    to_self_delays = [MIN_TO_SELF_DELAY, MIN_TO_SELF_DELAY + 1, MIN_TO_SELF_DELAY + 1000]
+    for to_self_delay in to_self_delays:
+        assert Inspector.check_to_self_delay(to_self_delay) == APPOINTMENT_OK
 
-    # Delta too small
-    deltas = [MIN_DISPUTE_DELTA - 1, MIN_DISPUTE_DELTA - 2, 0, -1, -1000]
-    for delta in deltas:
-        assert Inspector.check_delta(delta)[0] == APPOINTMENT_FIELD_TOO_SMALL
+    # to_self_delay too small
+    to_self_delays = [MIN_TO_SELF_DELAY - 1, MIN_TO_SELF_DELAY - 2, 0, -1, -1000]
+    for to_self_delay in to_self_delays:
+        assert Inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_FIELD_TOO_SMALL
 
     # Empty field
-    delta = None
-    assert Inspector.check_delta(delta)[0] == APPOINTMENT_EMPTY_FIELD
+    to_self_delay = None
+    assert Inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_EMPTY_FIELD
 
     # Wrong data type
-    deltas = WRONG_TYPES
-    for delta in deltas:
-        assert Inspector.check_delta(delta)[0] == APPOINTMENT_WRONG_FIELD_TYPE
+    to_self_delays = WRONG_TYPES
+    for to_self_delay in to_self_delays:
+        assert Inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_WRONG_FIELD_TYPE
 
 
 def test_check_blob():
@@ -212,14 +212,14 @@ def test_inspect(run_bitcoind):
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     start_time = BlockProcessor.get_block_count() + 5
     end_time = start_time + 20
-    dispute_delta = MIN_DISPUTE_DELTA
+    to_self_delay = MIN_TO_SELF_DELAY
     encrypted_blob = get_random_value_hex(64)
 
     appointment_data = {
         "locator": locator,
         "start_time": start_time,
         "end_time": end_time,
-        "dispute_delta": dispute_delta,
+        "to_self_delay": to_self_delay,
         "encrypted_blob": encrypted_blob,
     }
 
@@ -232,6 +232,6 @@ def test_inspect(run_bitcoind):
         and appointment.locator == locator
         and appointment.start_time == start_time
         and appointment.end_time == end_time
-        and appointment.dispute_delta == dispute_delta
+        and appointment.to_self_delay == to_self_delay
         and appointment.encrypted_blob.data == encrypted_blob
     )

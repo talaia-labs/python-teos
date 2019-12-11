@@ -44,9 +44,9 @@ def test_build_jobs():
 
         # Add some additional jobs that share the same locator to test all the builder's cases
         if i % 2 == 0:
-            justice_txid = job.justice_txid
+            penalty_txid = job.penalty_txid
             job = generate_dummy_job()
-            job.justice_txid = justice_txid
+            job.penalty_txid = penalty_txid
 
             jobs_data[uuid4().hex] = job.to_dict()
 
@@ -59,7 +59,7 @@ def test_build_jobs():
 
         # The locator is not part of the job_data found in the database (for now)
         assert jobs_data[uuid] == job_dict
-        assert uuid in tx_job_map[job.justice_txid]
+        assert uuid in tx_job_map[job.penalty_txid]
 
 
 def test_build_block_queue():

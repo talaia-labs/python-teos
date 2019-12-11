@@ -15,26 +15,26 @@ logger = Logger("Responder")
 
 
 class Job:
-    def __init__(self, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end):
+    def __init__(self, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end):
         self.locator = locator
         self.dispute_txid = dispute_txid
-        self.justice_txid = justice_txid
-        self.justice_rawtx = justice_rawtx
+        self.penalty_txid = penalty_txid
+        self.penalty_rawtx = penalty_rawtx
         self.appointment_end = appointment_end
 
     @classmethod
     def from_dict(cls, job_data):
         locator = job_data.get("locator")
         dispute_txid = job_data.get("dispute_txid")
-        justice_txid = job_data.get("justice_txid")
-        justice_rawtx = job_data.get("justice_rawtx")
+        penalty_txid = job_data.get("penalty_txid")
+        penalty_rawtx = job_data.get("penalty_rawtx")
         appointment_end = job_data.get("appointment_end")
 
-        if any(v is None for v in [locator, dispute_txid, justice_txid, justice_rawtx, appointment_end]):
+        if any(v is None for v in [locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end]):
             raise ValueError("Wrong job data, some fields are missing")
 
         else:
-            job = cls(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
+            job = cls(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
 
         return job
 
@@ -42,8 +42,8 @@ class Job:
         job = {
             "locator": self.locator,
             "dispute_txid": self.dispute_txid,
-            "justice_txid": self.justice_txid,
-            "justice_rawtx": self.justice_rawtx,
+            "penalty_txid": self.penalty_txid,
+            "penalty_rawtx": self.penalty_rawtx,
             "appointment_end": self.appointment_end,
         }
 
@@ -78,20 +78,20 @@ class Responder:
         return synchronized
 
     def add_response(
-        self, uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, block_hash, retry=False
+        self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, block_hash, retry=False
     ):
         if self.asleep:
             logger.info("Waking up")
 
         carrier = Carrier()
-        receipt = carrier.send_transaction(justice_rawtx, justice_txid)
+        receipt = carrier.send_transaction(penalty_rawtx, penalty_txid)
 
         # do_watch can call add_response recursively if a broadcast transaction does not get confirmations
         # retry holds that information. If retry is true the job already exists
         if receipt.delivered:
             if not retry:
                 self.create_job(
-                    uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, receipt.confirmations
+                    uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, receipt.confirmations
                 )
 
         else:
@@ -102,24 +102,24 @@ class Responder:
 
         return receipt
 
-    def create_job(self, uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations=0):
-        job = Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
+    def create_job(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations=0):
+        job = Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
         self.jobs[uuid] = job
 
-        if justice_txid in self.tx_job_map:
-            self.tx_job_map[justice_txid].append(uuid)
+        if penalty_txid in self.tx_job_map:
+            self.tx_job_map[penalty_txid].append(uuid)
 
         else:
-            self.tx_job_map[justice_txid] = [uuid]
+            self.tx_job_map[penalty_txid] = [uuid]
 
-        # In the case we receive two jobs with the same justice txid we only add it to the unconfirmed txs list once
-        if justice_txid not in self.unconfirmed_txs and confirmations == 0:
-            self.unconfirmed_txs.append(justice_txid)
+        # In the case we receive two jobs with the same penalty txid we only add it to the unconfirmed txs list once
+        if penalty_txid not in self.unconfirmed_txs and confirmations == 0:
+            self.unconfirmed_txs.append(penalty_txid)
 
         self.db_manager.store_responder_job(uuid, job.to_json())
 
         logger.info(
-            "New job added.", dispute_txid=dispute_txid, justice_txid=justice_txid, appointment_end=appointment_end
+            "New job added.", dispute_txid=dispute_txid, penalty_txid=penalty_txid, appointment_end=appointment_end
         )
 
         if self.asleep:
@@ -215,8 +215,8 @@ class Responder:
         completed_jobs = []
 
         for uuid, job in self.jobs.items():
-            if job.appointment_end <= height and job.justice_txid not in self.unconfirmed_txs:
-                tx = Carrier.get_transaction(job.justice_txid)
+            if job.appointment_end <= height and job.penalty_txid not in self.unconfirmed_txs:
+                tx = Carrier.get_transaction(job.penalty_txid)
 
                 # FIXME: Should be improved with the librarian
                 if tx is not None:
@@ -243,8 +243,8 @@ class Responder:
                     job.locator,
                     uuid,
                     job.dispute_txid,
-                    job.justice_txid,
-                    job.justice_rawtx,
+                    job.penalty_txid,
+                    job.penalty_rawtx,
                     job.appointment_end,
                     block_hash,
                     retry=True,
@@ -252,7 +252,7 @@ class Responder:
 
                 logger.warning(
                     "Transaction has missed many confirmations. Rebroadcasting.",
-                    justice_txid=job.justice_txid,
+                    penalty_txid=job.penalty_txid,
                     confirmations_missed=CONFIRMATIONS_BEFORE_RETRY,
                 )
 
@@ -269,22 +269,22 @@ class Responder:
             dispute_tx = carrier.get_transaction(job.dispute_txid)
 
             if dispute_tx is not None:
-                # If the dispute is there, we check the justice
-                justice_tx = carrier.get_transaction(job.justice_txid)
+                # If the dispute is there, we check the penalty
+                penalty_tx = carrier.get_transaction(job.penalty_txid)
 
-                if justice_tx is not None:
-                    # If the justice exists we need to check is it's on the blockchain or not so we can update the
+                if penalty_tx is not None:
+                    # If the penalty exists we need to check is it's on the blockchain or not so we can update the
                     # unconfirmed transactions list accordingly.
-                    if justice_tx.get("confirmations") is None:
-                        self.unconfirmed_txs.append(job.justice_txid)
+                    if penalty_tx.get("confirmations") is None:
+                        self.unconfirmed_txs.append(job.penalty_txid)
 
                         logger.info(
-                            "Justice transaction back in mempool. Updating unconfirmed transactions.",
-                            justice_txid=job.justice_txid,
+                            "Penalty transaction back in mempool. Updating unconfirmed transactions.",
+                            penalty_txid=job.penalty_txid,
                         )
 
                 else:
-                    # If the justice transaction is missing, we need to reset the job.
+                    # If the penalty transaction is missing, we need to reset the job.
                     # DISCUSS: Adding job back, should we flag it as retried?
                     # FIXME: Whether we decide to increase the retried counter or not, the current counter should be
                     #        maintained. There is no way of doing so with the current approach. Update if required
@@ -292,17 +292,17 @@ class Responder:
                         job.locator,
                         uuid,
                         job.dispute_txid,
-                        job.justice_txid,
-                        job.justice_rawtx,
+                        job.penalty_txid,
+                        job.penalty_rawtx,
                         job.appointment_end,
                         block_hash,
                     )
 
-                    logger.warning("Justice transaction banished. Resetting the job", justice_tx=job.justice_txid)
+                    logger.warning("Penalty transaction banished. Resetting the job", penalty_tx=job.penalty_txid)
 
             else:
                 # ToDo: #24-properly-handle-reorgs
                 # FIXME: if the dispute is not on chain (either in mempool or not there at all), we need to call the
                 #        reorg manager
-                logger.warning("Dispute and justice transaction missing. Calling the reorg manager.")
+                logger.warning("Dispute and penalty transaction missing. Calling the reorg manager.")
                 logger.error("Reorg manager not yet implemented.")

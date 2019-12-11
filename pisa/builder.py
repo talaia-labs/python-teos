@@ -69,11 +69,11 @@ class Builder:
             job = Job.from_dict(data)
             jobs[uuid] = job
 
-            if job.justice_txid in tx_job_map:
-                tx_job_map[job.justice_txid].append(uuid)
+            if job.penalty_txid in tx_job_map:
+                tx_job_map[job.penalty_txid].append(uuid)
 
             else:
-                tx_job_map[job.justice_txid] = [uuid]
+                tx_job_map[job.penalty_txid] = [uuid]
 
         return jobs, tx_job_map
 

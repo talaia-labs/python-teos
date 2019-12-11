@@ -106,7 +106,15 @@ class Cryptographer:
             return pk
 
         except UnsupportedAlgorithm:
-            raise ValueError("Could not deserialize the public key (unsupported algorithm).")
+            logger.error("Could not deserialize the public key (unsupported algorithm).")
+
+        except ValueError:
+            logger.error("The provided data cannot be deserialized (wrong size or format)")
+
+        except TypeError:
+            logger.error("The provided data cannot be deserialized (wrong type)")
+
+        return None
 
     # Deserialize private key from der data.
     @staticmethod

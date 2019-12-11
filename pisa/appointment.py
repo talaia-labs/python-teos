@@ -12,7 +12,7 @@ class Appointment:
             for the tower to decrypt and broadcast the penalty transaction.
         start_time (int): The block height at which the tower is hired to start watching for breaches.
         end_time (int): The block height at which the tower will stop watching for breaches.
-        dispute_delta (int): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
+        to_self_delay (int): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
             covering.
         encrypted_blob (EncryptedBlob): An :mod:`EncryptedBlob <pisa.encrypted_blob>` object containing an encrypted
             penalty transaction. The tower will decrypt it and broadcast the penalty transaction upon seeing a breach on
@@ -20,11 +20,11 @@ class Appointment:
     """
 
     # DISCUSS: 35-appointment-checks
-    def __init__(self, locator, start_time, end_time, dispute_delta, encrypted_blob):
+    def __init__(self, locator, start_time, end_time, to_self_delay, encrypted_blob):
         self.locator = locator
         self.start_time = start_time  # ToDo: #4-standardize-appointment-fields
         self.end_time = end_time  # ToDo: #4-standardize-appointment-fields
-        self.dispute_delta = dispute_delta
+        self.to_self_delay = to_self_delay
         self.encrypted_blob = EncryptedBlob(encrypted_blob)
 
     @classmethod
@@ -36,7 +36,7 @@ class Appointment:
 
         Args:
             appointment_data (dict): a dictionary containing the following keys:
-                ``{locator, start_time, end_time, dispute_delta, encrypted_blob}``
+                ``{locator, start_time, end_time, to_self_delay, encrypted_blob}``
 
         Returns:
             ``Appointment``: An appointment initialized using the provided data.
@@ -48,14 +48,14 @@ class Appointment:
         locator = appointment_data.get("locator")
         start_time = appointment_data.get("start_time")  # ToDo: #4-standardize-appointment-fields
         end_time = appointment_data.get("end_time")  # ToDo: #4-standardize-appointment-fields
-        dispute_delta = appointment_data.get("dispute_delta")
+        to_self_delay = appointment_data.get("to_self_delay")
         encrypted_blob_data = appointment_data.get("encrypted_blob")
 
-        if any(v is None for v in [locator, start_time, end_time, dispute_delta, encrypted_blob_data]):
+        if any(v is None for v in [locator, start_time, end_time, to_self_delay, encrypted_blob_data]):
             raise ValueError("Wrong appointment data, some fields are missing")
 
         else:
-            appointment = cls(locator, start_time, end_time, dispute_delta, encrypted_blob_data)
+            appointment = cls(locator, start_time, end_time, to_self_delay, encrypted_blob_data)
 
         return appointment
 
@@ -73,7 +73,7 @@ class Appointment:
             "locator": self.locator,
             "start_time": self.start_time,
             "end_time": self.end_time,
-            "dispute_delta": self.dispute_delta,
+            "to_self_delay": self.to_self_delay,
             "encrypted_blob": self.encrypted_blob.data,
         }
 

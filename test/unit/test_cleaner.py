@@ -55,25 +55,25 @@ def set_up_jobs(db_manager, total_jobs):
     for i in range(total_jobs):
         uuid = uuid4().hex
 
-        # We use the same txid for justice and dispute here, it shouldn't matter
-        justice_txid = get_random_value_hex(32)
+        # We use the same txid for penalty and dispute here, it shouldn't matter
+        penalty_txid = get_random_value_hex(32)
         dispute_txid = get_random_value_hex(32)
         locator = dispute_txid[:LOCATOR_LEN_HEX]
 
-        # Assign both justice_txid and dispute_txid the same id (it shouldn't matter)
-        job = Job(locator, dispute_txid, justice_txid, None, None)
+        # Assign both penalty_txid and dispute_txid the same id (it shouldn't matter)
+        job = Job(locator, dispute_txid, penalty_txid, None, None)
         jobs[uuid] = job
-        tx_job_map[justice_txid] = [uuid]
+        tx_job_map[penalty_txid] = [uuid]
 
         db_manager.store_responder_job(uuid, job.to_json())
         db_manager.store_update_locator_map(job.locator, uuid)
 
-        # Each justice_txid can have more than one uuid assigned to it.
+        # Each penalty_txid can have more than one uuid assigned to it.
         if i % 2:
             uuid = uuid4().hex
 
             jobs[uuid] = job
-            tx_job_map[justice_txid].append(uuid)
+            tx_job_map[penalty_txid].append(uuid)
 
             db_manager.store_responder_job(uuid, job.to_json())
             db_manager.store_update_locator_map(job.locator, uuid)
@@ -128,27 +128,27 @@ def test_delete_completed_jobs_no_db_match(db_manager):
         jobs, tx_job_map = set_up_jobs(db_manager, MAX_ITEMS)
         selected_jobs = random.sample(list(jobs.keys()), k=ITEMS)
 
-        # Let's change some uuid's by creating new jobs that are not included in the db and share a justice_txid with
+        # Let's change some uuid's by creating new jobs that are not included in the db and share a penalty_txid with
         # another job that is stored in the db.
         for uuid in selected_jobs[: ITEMS // 2]:
-            justice_txid = jobs[uuid].justice_txid
+            penalty_txid = jobs[uuid].penalty_txid
             dispute_txid = get_random_value_hex(32)
             locator = dispute_txid[:LOCATOR_LEN_HEX]
             new_uuid = uuid4().hex
 
-            jobs[new_uuid] = Job(locator, dispute_txid, justice_txid, None, None)
-            tx_job_map[justice_txid].append(new_uuid)
+            jobs[new_uuid] = Job(locator, dispute_txid, penalty_txid, None, None)
+            tx_job_map[penalty_txid].append(new_uuid)
             selected_jobs.append(new_uuid)
 
         # Let's add some random data
         for i in range(ITEMS // 2):
             uuid = uuid4().hex
-            justice_txid = get_random_value_hex(32)
+            penalty_txid = get_random_value_hex(32)
             dispute_txid = get_random_value_hex(32)
             locator = dispute_txid[:LOCATOR_LEN_HEX]
 
-            jobs[uuid] = Job(locator, dispute_txid, justice_txid, None, None)
-            tx_job_map[justice_txid] = [uuid]
+            jobs[uuid] = Job(locator, dispute_txid, penalty_txid, None, None)
+            tx_job_map[penalty_txid] = [uuid]
             selected_jobs.append(uuid)
 
         completed_jobs = [(job, 6) for job in selected_jobs]

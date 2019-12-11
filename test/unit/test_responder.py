@@ -38,15 +38,15 @@ def temp_db_manager():
     rmtree(db_name)
 
 
-def create_dummy_job_data(random_txid=False, justice_rawtx=None):
+def create_dummy_job_data(random_txid=False, penalty_rawtx=None):
     # The following transaction data corresponds to a valid transaction. For some test it may be interesting to have
-    # some valid data, but for others we may need multiple different justice_txids.
+    # some valid data, but for others we may need multiple different penalty_txids.
 
     dispute_txid = "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
-    justice_txid = "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+    penalty_txid = "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
 
-    if justice_rawtx is None:
-        justice_rawtx = (
+    if penalty_rawtx is None:
+        penalty_rawtx = (
             "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402"
             "204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4"
             "acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b"
@@ -56,32 +56,32 @@ def create_dummy_job_data(random_txid=False, justice_rawtx=None):
         )
 
     else:
-        justice_txid = sha256d(justice_rawtx)
+        penalty_txid = sha256d(penalty_rawtx)
 
     if random_txid is True:
-        justice_txid = get_random_value_hex(32)
+        penalty_txid = get_random_value_hex(32)
 
     appointment_end = bitcoin_cli().getblockcount() + 2
     locator = dispute_txid[:LOCATOR_LEN_HEX]
 
-    return locator, dispute_txid, justice_txid, justice_rawtx, appointment_end
+    return locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end
 
 
-def create_dummy_job(random_txid=False, justice_rawtx=None):
-    locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
-        random_txid, justice_rawtx
+def create_dummy_job(random_txid=False, penalty_rawtx=None):
+    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(
+        random_txid, penalty_rawtx
     )
-    return Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
+    return Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
 
 
 def test_job_init(run_bitcoind):
-    locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data()
-    job = Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
+    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data()
+    job = Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
 
     assert (
         job.dispute_txid == dispute_txid
-        and job.justice_txid == justice_txid
-        and job.justice_rawtx == justice_rawtx
+        and job.penalty_txid == penalty_txid
+        and job.penalty_rawtx == penalty_rawtx
         and job.appointment_end == appointment_end
     )
 
@@ -109,7 +109,7 @@ def test_job_to_dict():
 
     assert (
         job.locator == job_dict["locator"]
-        and job.justice_rawtx == job_dict["justice_rawtx"]
+        and job.penalty_rawtx == job_dict["penalty_rawtx"]
         and job.appointment_end == job_dict["appointment_end"]
     )
 
@@ -120,7 +120,7 @@ def test_job_to_json():
 
     assert (
         job.locator == job_dict["locator"]
-        and job.justice_rawtx == job_dict["justice_rawtx"]
+        and job.penalty_rawtx == job_dict["penalty_rawtx"]
         and job.appointment_end == job_dict["appointment_end"]
     )
 
@@ -135,7 +135,7 @@ def test_job_from_dict():
 def test_job_from_dict_invalid_data():
     job_dict = create_dummy_job().to_dict()
 
-    for value in ["dispute_txid", "justice_txid", "justice_rawtx", "appointment_end"]:
+    for value in ["dispute_txid", "penalty_txid", "penalty_rawtx", "appointment_end"]:
         job_dict_copy = deepcopy(job_dict)
         job_dict_copy[value] = None
 
@@ -167,8 +167,8 @@ def test_add_response(db_manager):
         job.locator,
         uuid,
         job.dispute_txid,
-        job.justice_txid,
-        job.justice_rawtx,
+        job.penalty_txid,
+        job.penalty_rawtx,
         job.appointment_end,
         block_hash=get_random_value_hex(32),
     )
@@ -191,15 +191,15 @@ def test_add_bad_response(responder):
     responder.asleep = False
 
     # A txid instead of a rawtx should be enough for unit tests using the bitcoind mock, better tests are needed though.
-    job.justice_rawtx = job.justice_txid
+    job.penalty_rawtx = job.penalty_txid
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
     receipt = responder.add_response(
         job.locator,
         uuid,
         job.dispute_txid,
-        job.justice_txid,
-        job.justice_rawtx,
+        job.penalty_txid,
+        job.penalty_rawtx,
         job.appointment_end,
         block_hash=get_random_value_hex(32),
     )
@@ -213,52 +213,52 @@ def test_create_job(responder):
     for _ in range(20):
         uuid = uuid4().hex
         confirmations = 0
-        locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
+        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
 
         # Check the job is not within the responder jobs before adding it
         assert uuid not in responder.jobs
-        assert justice_txid not in responder.tx_job_map
-        assert justice_txid not in responder.unconfirmed_txs
+        assert penalty_txid not in responder.tx_job_map
+        assert penalty_txid not in responder.unconfirmed_txs
 
         # And that it is afterwards
-        responder.create_job(uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+        responder.create_job(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
         assert uuid in responder.jobs
-        assert justice_txid in responder.tx_job_map
-        assert justice_txid in responder.unconfirmed_txs
+        assert penalty_txid in responder.tx_job_map
+        assert penalty_txid in responder.unconfirmed_txs
 
         # Check that the rest of job data also matches
         job = responder.jobs[uuid]
         assert (
             job.dispute_txid == dispute_txid
-            and job.justice_txid == justice_txid
-            and job.justice_rawtx == justice_rawtx
+            and job.penalty_txid == penalty_txid
+            and job.penalty_rawtx == penalty_rawtx
             and job.appointment_end == appointment_end
             and job.appointment_end == appointment_end
         )
 
 
-def test_create_job_same_justice_txid(responder):
+def test_create_job_same_penalty_txid(responder):
     # Create the same job using two different uuids
     confirmations = 0
-    locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
+    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
     uuid_1 = uuid4().hex
     uuid_2 = uuid4().hex
 
-    responder.create_job(uuid_1, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
-    responder.create_job(uuid_2, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+    responder.create_job(uuid_1, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+    responder.create_job(uuid_2, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
 
     # Check that both jobs have been added
     assert uuid_1 in responder.jobs and uuid_2 in responder.jobs
-    assert justice_txid in responder.tx_job_map
-    assert justice_txid in responder.unconfirmed_txs
+    assert penalty_txid in responder.tx_job_map
+    assert penalty_txid in responder.unconfirmed_txs
 
     # Check that the rest of job data also matches
     for uuid in [uuid_1, uuid_2]:
         job = responder.jobs[uuid]
         assert (
             job.dispute_txid == dispute_txid
-            and job.justice_txid == justice_txid
-            and job.justice_rawtx == justice_rawtx
+            and job.penalty_txid == penalty_txid
+            and job.penalty_rawtx == penalty_rawtx
             and job.appointment_end == appointment_end
             and job.appointment_end == appointment_end
         )
@@ -270,13 +270,13 @@ def test_create_job_already_confirmed(responder):
     for i in range(20):
         uuid = uuid4().hex
         confirmations = i + 1
-        locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
-            justice_rawtx=TX.create_dummy_transaction()
+        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(
+            penalty_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.create_job(uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+        responder.create_job(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
 
-        assert justice_txid not in responder.unconfirmed_txs
+        assert penalty_txid not in responder.unconfirmed_txs
 
 
 def test_do_subscribe(responder):
@@ -303,16 +303,16 @@ def test_do_watch(temp_db_manager):
     zmq_thread.daemon = True
     zmq_thread.start()
 
-    jobs = [create_dummy_job(justice_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
+    jobs = [create_dummy_job(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
 
     # Let's set up the jobs first
     for job in jobs:
         uuid = uuid4().hex
 
         responder.jobs[uuid] = job
-        responder.tx_job_map[job.justice_txid] = [uuid]
-        responder.missed_confirmations[job.justice_txid] = 0
-        responder.unconfirmed_txs.append(job.justice_txid)
+        responder.tx_job_map[job.penalty_txid] = [uuid]
+        responder.missed_confirmations[job.penalty_txid] = 0
+        responder.unconfirmed_txs.append(job.penalty_txid)
 
     # Let's start to watch
     watch_thread = Thread(target=responder.do_watch)
@@ -322,8 +322,8 @@ def test_do_watch(temp_db_manager):
     # And broadcast some of the transactions
     broadcast_txs = []
     for job in jobs[:5]:
-        bitcoin_cli().sendrawtransaction(job.justice_rawtx)
-        broadcast_txs.append(job.justice_txid)
+        bitcoin_cli().sendrawtransaction(job.penalty_rawtx)
+        broadcast_txs.append(job.penalty_txid)
 
     # Mine a block
     generate_block()
@@ -341,8 +341,8 @@ def test_do_watch(temp_db_manager):
     # Do the rest
     broadcast_txs = []
     for job in jobs[5:]:
-        bitcoin_cli().sendrawtransaction(job.justice_rawtx)
-        broadcast_txs.append(job.justice_txid)
+        bitcoin_cli().sendrawtransaction(job.penalty_rawtx)
+        broadcast_txs.append(job.penalty_txid)
 
     # Mine a block
     generate_blocks(6)
@@ -359,7 +359,7 @@ def test_check_confirmations(temp_db_manager):
     zmq_thread.daemon = True
     zmq_thread.start()
 
-    # check_confirmations checks, given a list of transaction for a block, what of the known justice transaction have
+    # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
     # been confirmed. To test this we need to create a list of transactions and the state of the responder
     txs = [get_random_value_hex(32) for _ in range(20)]
 
@@ -418,17 +418,17 @@ def test_get_completed_jobs(db_manager):
 
     # A complete job is a job that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
-    jobs_end_conf = {uuid4().hex: create_dummy_job(justice_rawtx=TX.create_dummy_transaction()) for _ in range(10)}
+    jobs_end_conf = {uuid4().hex: create_dummy_job(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(10)}
 
     jobs_end_no_conf = {}
     for _ in range(10):
-        job = create_dummy_job(justice_rawtx=TX.create_dummy_transaction())
-        responder.unconfirmed_txs.append(job.justice_txid)
+        job = create_dummy_job(penalty_rawtx=TX.create_dummy_transaction())
+        responder.unconfirmed_txs.append(job.penalty_txid)
         jobs_end_no_conf[uuid4().hex] = job
 
     jobs_no_end = {}
     for _ in range(10):
-        job = create_dummy_job(justice_rawtx=TX.create_dummy_transaction())
+        job = create_dummy_job(penalty_rawtx=TX.create_dummy_transaction())
         job.appointment_end += 10
         jobs_no_end[uuid4().hex] = job
 
@@ -438,7 +438,7 @@ def test_get_completed_jobs(db_manager):
     responder.jobs.update(jobs_no_end)
 
     for uuid, job in responder.jobs.items():
-        bitcoin_cli().sendrawtransaction(job.justice_rawtx)
+        bitcoin_cli().sendrawtransaction(job.penalty_rawtx)
 
     # The dummy appointments have a end_appointment time of current + 2, but jobs need at least 6 confs by default
     generate_blocks(6)
@@ -468,17 +468,17 @@ def test_rebroadcast(db_manager):
     # Rebroadcast calls add_response with retry=True. The job data is already in jobs.
     for i in range(20):
         uuid = uuid4().hex
-        locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
-            justice_rawtx=TX.create_dummy_transaction()
+        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(
+            penalty_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.jobs[uuid] = Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
-        responder.tx_job_map[justice_txid] = [uuid]
-        responder.unconfirmed_txs.append(justice_txid)
+        responder.jobs[uuid] = Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+        responder.tx_job_map[penalty_txid] = [uuid]
+        responder.unconfirmed_txs.append(penalty_txid)
 
         # Let's add some of the txs in the rebroadcast list
         if (i % 2) == 0:
-            txs_to_rebroadcast.append(justice_txid)
+            txs_to_rebroadcast.append(penalty_txid)
 
     # The block_hash passed to rebroadcast does not matter much now. It will in the future to deal with errors
     receipts = responder.rebroadcast(txs_to_rebroadcast, get_random_value_hex(32))

@@ -117,11 +117,11 @@ class Watcher:
                 filtered_matches = self.filter_valid_matches(self.get_matches(txids))
 
                 for uuid, filtered_match in filtered_matches.items():
-                    # Errors decrypting the Blob will result in a None justice_txid
+                    # Errors decrypting the Blob will result in a None penalty_txid
                     if filtered_match["valid_match"] is True:
                         logger.info(
                             "Notifying responder and deleting appointment.",
-                            justice_txid=filtered_match["justice_txid"],
+                            penalty_txid=filtered_match["penalty_txid"],
                             locator=filtered_match["locator"],
                             uuid=uuid,
                         )
@@ -130,8 +130,8 @@ class Watcher:
                             uuid,
                             filtered_match["locator"],
                             filtered_match["dispute_txid"],
-                            filtered_match["justice_txid"],
-                            filtered_match["justice_rawtx"],
+                            filtered_match["penalty_txid"],
+                            filtered_match["penalty_rawtx"],
                             self.appointments[uuid].end_time,
                             block_hash,
                         )
@@ -173,28 +173,28 @@ class Watcher:
             for uuid in self.locator_uuid_map[locator]:
 
                 try:
-                    justice_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
+                    penalty_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
 
                 except ValueError:
-                    justice_rawtx = None
+                    penalty_rawtx = None
 
-                justice_tx = BlockProcessor.decode_raw_transaction(justice_rawtx)
+                penalty_tx = BlockProcessor.decode_raw_transaction(penalty_rawtx)
 
-                if justice_tx is not None:
-                    justice_txid = justice_tx.get("txid")
+                if penalty_tx is not None:
+                    penalty_txid = penalty_tx.get("txid")
                     valid_match = True
 
-                    logger.info("Match found for locator.", locator=locator, uuid=uuid, justice_txid=justice_txid)
+                    logger.info("Match found for locator.", locator=locator, uuid=uuid, penalty_txid=penalty_txid)
 
                 else:
-                    justice_txid = None
+                    penalty_txid = None
                     valid_match = False
 
                 filtered_matches[uuid] = {
                     "locator": locator,
                     "dispute_txid": dispute_txid,
-                    "justice_txid": justice_txid,
-                    "justice_rawtx": justice_rawtx,
+                    "penalty_txid": penalty_txid,
+                    "penalty_rawtx": penalty_rawtx,
                     "valid_match": valid_match,
                 }
 
