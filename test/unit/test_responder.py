@@ -9,7 +9,7 @@ from queue import Queue, Empty
 
 from pisa import c_logger
 from pisa.db_manager import DBManager
-from pisa.responder import Responder, Job
+from pisa.responder import Responder, TransactionTracker
 from pisa.block_processor import BlockProcessor
 from pisa.tools import bitcoin_cli
 
@@ -38,7 +38,7 @@ def temp_db_manager():
     rmtree(db_name)
 
 
-def create_dummy_job_data(random_txid=False, penalty_rawtx=None):
+def create_dummy_tracker_data(random_txid=False, penalty_rawtx=None):
     # The following transaction data corresponds to a valid transaction. For some test it may be interesting to have
     # some valid data, but for others we may need multiple different penalty_txids.
 
@@ -67,22 +67,22 @@ def create_dummy_job_data(random_txid=False, penalty_rawtx=None):
     return locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end
 
 
-def create_dummy_job(random_txid=False, penalty_rawtx=None):
-    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(
+def create_dummy_tracker(random_txid=False, penalty_rawtx=None):
+    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
         random_txid, penalty_rawtx
     )
-    return Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+    return TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
 
 
-def test_job_init(run_bitcoind):
-    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data()
-    job = Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+def test_tracker_init(run_bitcoind):
+    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data()
+    tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
 
     assert (
-        job.dispute_txid == dispute_txid
-        and job.penalty_txid == penalty_txid
-        and job.penalty_rawtx == penalty_rawtx
-        and job.appointment_end == appointment_end
+        tracker.dispute_txid == dispute_txid
+        and tracker.penalty_txid == penalty_txid
+        and tracker.penalty_rawtx == penalty_rawtx
+        and tracker.appointment_end == appointment_end
     )
 
 
@@ -103,44 +103,44 @@ def test_on_sync_fail(responder):
     assert Responder.on_sync(chain_tip) is False
 
 
-def test_job_to_dict():
-    job = create_dummy_job()
-    job_dict = job.to_dict()
+def test_tracker_to_dict():
+    tracker = create_dummy_tracker()
+    tracker_dict = tracker.to_dict()
 
     assert (
-        job.locator == job_dict["locator"]
-        and job.penalty_rawtx == job_dict["penalty_rawtx"]
-        and job.appointment_end == job_dict["appointment_end"]
+        tracker.locator == tracker_dict["locator"]
+        and tracker.penalty_rawtx == tracker_dict["penalty_rawtx"]
+        and tracker.appointment_end == tracker_dict["appointment_end"]
     )
 
 
-def test_job_to_json():
-    job = create_dummy_job()
-    job_dict = json.loads(job.to_json())
+def test_tracker_to_json():
+    tracker = create_dummy_tracker()
+    tracker_dict = json.loads(tracker.to_json())
 
     assert (
-        job.locator == job_dict["locator"]
-        and job.penalty_rawtx == job_dict["penalty_rawtx"]
-        and job.appointment_end == job_dict["appointment_end"]
+        tracker.locator == tracker_dict["locator"]
+        and tracker.penalty_rawtx == tracker_dict["penalty_rawtx"]
+        and tracker.appointment_end == tracker_dict["appointment_end"]
     )
 
 
-def test_job_from_dict():
-    job_dict = create_dummy_job().to_dict()
-    new_job = Job.from_dict(job_dict)
+def test_tracker_from_dict():
+    tracker_dict = create_dummy_tracker().to_dict()
+    new_tracker = TransactionTracker.from_dict(tracker_dict)
 
-    assert job_dict == new_job.to_dict()
+    assert tracker_dict == new_tracker.to_dict()
 
 
-def test_job_from_dict_invalid_data():
-    job_dict = create_dummy_job().to_dict()
+def test_tracker_from_dict_invalid_data():
+    tracker_dict = create_dummy_tracker().to_dict()
 
     for value in ["dispute_txid", "penalty_txid", "penalty_rawtx", "appointment_end"]:
-        job_dict_copy = deepcopy(job_dict)
-        job_dict_copy[value] = None
+        tracker_dict_copy = deepcopy(tracker_dict)
+        tracker_dict_copy[value] = None
 
         try:
-            Job.from_dict(job_dict_copy)
+            TransactionTracker.from_dict(tracker_dict_copy)
             assert False
 
         except ValueError:
@@ -148,8 +148,8 @@ def test_job_from_dict_invalid_data():
 
 
 def test_init_responder(responder):
-    assert type(responder.jobs) is dict and len(responder.jobs) == 0
-    assert type(responder.tx_job_map) is dict and len(responder.tx_job_map) == 0
+    assert type(responder.trackers) is dict and len(responder.trackers) == 0
+    assert type(responder.tx_tracker_map) is dict and len(responder.tx_tracker_map) == 0
     assert type(responder.unconfirmed_txs) is list and len(responder.unconfirmed_txs) == 0
     assert type(responder.missed_confirmations) is dict and len(responder.missed_confirmations) == 0
     assert responder.block_queue.empty()
@@ -157,124 +157,126 @@ def test_init_responder(responder):
     assert responder.zmq_subscriber is None
 
 
-def test_add_response(db_manager):
+def test_handle_breach(db_manager):
     responder = Responder(db_manager)
     uuid = uuid4().hex
-    job = create_dummy_job()
+    tracker = create_dummy_tracker()
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
-    receipt = responder.add_response(
-        job.locator,
+    receipt = responder.handle_breach(
+        tracker.locator,
         uuid,
-        job.dispute_txid,
-        job.penalty_txid,
-        job.penalty_rawtx,
-        job.appointment_end,
+        tracker.dispute_txid,
+        tracker.penalty_txid,
+        tracker.penalty_rawtx,
+        tracker.appointment_end,
         block_hash=get_random_value_hex(32),
     )
 
     assert receipt.delivered is True
 
-    # The responder automatically fires create_job on adding a job if it is asleep. We need to stop the processes now.
-    # To do so we delete all the jobs, stop the zmq and create a new fake block to unblock the queue.get method
-    responder.jobs = dict()
+    # The responder automatically fires add_tracker on adding a tracker if it is asleep. We need to stop the processes now.
+    # To do so we delete all the trackers, stop the zmq and create a new fake block to unblock the queue.get method
+    responder.trackers = dict()
     responder.zmq_subscriber.terminate = True
     responder.block_queue.put(get_random_value_hex(32))
 
 
 def test_add_bad_response(responder):
     uuid = uuid4().hex
-    job = create_dummy_job()
+    tracker = create_dummy_tracker()
 
     # Now that the asleep / awake functionality has been tested we can avoid manually killing the responder by setting
     # to awake. That will prevent the zmq thread to be launched again.
     responder.asleep = False
 
     # A txid instead of a rawtx should be enough for unit tests using the bitcoind mock, better tests are needed though.
-    job.penalty_rawtx = job.penalty_txid
+    tracker.penalty_rawtx = tracker.penalty_txid
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
-    receipt = responder.add_response(
-        job.locator,
+    receipt = responder.handle_breach(
+        tracker.locator,
         uuid,
-        job.dispute_txid,
-        job.penalty_txid,
-        job.penalty_rawtx,
-        job.appointment_end,
+        tracker.dispute_txid,
+        tracker.penalty_txid,
+        tracker.penalty_rawtx,
+        tracker.appointment_end,
         block_hash=get_random_value_hex(32),
     )
 
     assert receipt.delivered is False
 
 
-def test_create_job(responder):
+def test_add_tracker(responder):
     responder.asleep = False
 
     for _ in range(20):
         uuid = uuid4().hex
         confirmations = 0
-        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
+        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
+            random_txid=True
+        )
 
-        # Check the job is not within the responder jobs before adding it
-        assert uuid not in responder.jobs
-        assert penalty_txid not in responder.tx_job_map
+        # Check the tracker is not within the responder trackers before adding it
+        assert uuid not in responder.trackers
+        assert penalty_txid not in responder.tx_tracker_map
         assert penalty_txid not in responder.unconfirmed_txs
 
         # And that it is afterwards
-        responder.create_job(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
-        assert uuid in responder.jobs
-        assert penalty_txid in responder.tx_job_map
+        responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+        assert uuid in responder.trackers
+        assert penalty_txid in responder.tx_tracker_map
         assert penalty_txid in responder.unconfirmed_txs
 
-        # Check that the rest of job data also matches
-        job = responder.jobs[uuid]
+        # Check that the rest of tracker data also matches
+        tracker = responder.trackers[uuid]
         assert (
-            job.dispute_txid == dispute_txid
-            and job.penalty_txid == penalty_txid
-            and job.penalty_rawtx == penalty_rawtx
-            and job.appointment_end == appointment_end
-            and job.appointment_end == appointment_end
+            tracker.dispute_txid == dispute_txid
+            and tracker.penalty_txid == penalty_txid
+            and tracker.penalty_rawtx == penalty_rawtx
+            and tracker.appointment_end == appointment_end
+            and tracker.appointment_end == appointment_end
         )
 
 
-def test_create_job_same_penalty_txid(responder):
-    # Create the same job using two different uuids
+def test_add_tracker_same_penalty_txid(responder):
+    # Create the same tracker using two different uuids
     confirmations = 0
-    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
+    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(random_txid=True)
     uuid_1 = uuid4().hex
     uuid_2 = uuid4().hex
 
-    responder.create_job(uuid_1, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
-    responder.create_job(uuid_2, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+    responder.add_tracker(uuid_1, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+    responder.add_tracker(uuid_2, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
 
-    # Check that both jobs have been added
-    assert uuid_1 in responder.jobs and uuid_2 in responder.jobs
-    assert penalty_txid in responder.tx_job_map
+    # Check that both trackers have been added
+    assert uuid_1 in responder.trackers and uuid_2 in responder.trackers
+    assert penalty_txid in responder.tx_tracker_map
     assert penalty_txid in responder.unconfirmed_txs
 
-    # Check that the rest of job data also matches
+    # Check that the rest of tracker data also matches
     for uuid in [uuid_1, uuid_2]:
-        job = responder.jobs[uuid]
+        tracker = responder.trackers[uuid]
         assert (
-            job.dispute_txid == dispute_txid
-            and job.penalty_txid == penalty_txid
-            and job.penalty_rawtx == penalty_rawtx
-            and job.appointment_end == appointment_end
-            and job.appointment_end == appointment_end
+            tracker.dispute_txid == dispute_txid
+            and tracker.penalty_txid == penalty_txid
+            and tracker.penalty_rawtx == penalty_rawtx
+            and tracker.appointment_end == appointment_end
+            and tracker.appointment_end == appointment_end
         )
 
 
-def test_create_job_already_confirmed(responder):
+def test_add_tracker_already_confirmed(responder):
     responder.asleep = False
 
     for i in range(20):
         uuid = uuid4().hex
         confirmations = i + 1
-        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(
+        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
             penalty_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.create_job(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+        responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
 
         assert penalty_txid not in responder.unconfirmed_txs
 
@@ -303,16 +305,16 @@ def test_do_watch(temp_db_manager):
     zmq_thread.daemon = True
     zmq_thread.start()
 
-    jobs = [create_dummy_job(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
+    trackers = [create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
 
-    # Let's set up the jobs first
-    for job in jobs:
+    # Let's set up the trackers first
+    for tracker in trackers:
         uuid = uuid4().hex
 
-        responder.jobs[uuid] = job
-        responder.tx_job_map[job.penalty_txid] = [uuid]
-        responder.missed_confirmations[job.penalty_txid] = 0
-        responder.unconfirmed_txs.append(job.penalty_txid)
+        responder.trackers[uuid] = tracker
+        responder.tx_tracker_map[tracker.penalty_txid] = [uuid]
+        responder.missed_confirmations[tracker.penalty_txid] = 0
+        responder.unconfirmed_txs.append(tracker.penalty_txid)
 
     # Let's start to watch
     watch_thread = Thread(target=responder.do_watch)
@@ -321,9 +323,9 @@ def test_do_watch(temp_db_manager):
 
     # And broadcast some of the transactions
     broadcast_txs = []
-    for job in jobs[:5]:
-        bitcoin_cli().sendrawtransaction(job.penalty_rawtx)
-        broadcast_txs.append(job.penalty_txid)
+    for tracker in trackers[:5]:
+        bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
+        broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
     generate_block()
@@ -333,21 +335,21 @@ def test_do_watch(temp_db_manager):
 
     # TODO: test that reorgs can be detected once data persistence is merged (new version of the simulator)
 
-    # Generating 5 additional blocks should complete the 5 jobs
+    # Generating 5 additional blocks should complete the 5 trackers
     generate_blocks(5)
 
-    assert not set(broadcast_txs).issubset(responder.tx_job_map)
+    assert not set(broadcast_txs).issubset(responder.tx_tracker_map)
 
     # Do the rest
     broadcast_txs = []
-    for job in jobs[5:]:
-        bitcoin_cli().sendrawtransaction(job.penalty_rawtx)
-        broadcast_txs.append(job.penalty_txid)
+    for tracker in trackers[5:]:
+        bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
+        broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
     generate_blocks(6)
 
-    assert len(responder.tx_job_map) == 0
+    assert len(responder.tx_tracker_map) == 0
     assert responder.asleep is True
 
 
@@ -368,9 +370,9 @@ def test_check_confirmations(temp_db_manager):
     txs_subset = random.sample(txs, k=10)
     responder.unconfirmed_txs.extend(txs_subset)
 
-    # We also need to add them to the tx_job_map since they would be there in normal conditions
-    responder.tx_job_map = {
-        txid: Job(txid[:LOCATOR_LEN_HEX], txid, None, None, None) for txid in responder.unconfirmed_txs
+    # We also need to add them to the tx_tracker_map since they would be there in normal conditions
+    responder.tx_tracker_map = {
+        txid: TransactionTracker(txid[:LOCATOR_LEN_HEX], txid, None, None, None) for txid in responder.unconfirmed_txs
     }
 
     # Let's make sure that there are no txs with missed confirmations yet
@@ -387,6 +389,7 @@ def test_check_confirmations(temp_db_manager):
         assert responder.missed_confirmations[tx] == 1
 
 
+# WIP: Check this properly, a bug pass unnoticed!
 def test_get_txs_to_rebroadcast(responder):
     # Let's create a few fake txids and assign at least 6 missing confirmations to each
     txs_missing_too_many_conf = {get_random_value_hex(32): 6 + i for i in range(10)}
@@ -396,67 +399,69 @@ def test_get_txs_to_rebroadcast(responder):
 
     # All the txs in the first dict should be flagged as to_rebroadcast
     responder.missed_confirmations = txs_missing_too_many_conf
-    txs_to_rebroadcast = responder.get_txs_to_rebroadcast(txs_missing_too_many_conf)
+    txs_to_rebroadcast = responder.get_txs_to_rebroadcast()
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
     # Non of the txs in the second dict should be flagged
     responder.missed_confirmations = txs_missing_some_conf
-    txs_to_rebroadcast = responder.get_txs_to_rebroadcast(txs_missing_some_conf)
+    txs_to_rebroadcast = responder.get_txs_to_rebroadcast()
     assert txs_to_rebroadcast == []
 
     # Let's check that it also works with a mixed dict
     responder.missed_confirmations.update(txs_missing_too_many_conf)
-    txs_to_rebroadcast = responder.get_txs_to_rebroadcast(txs_missing_some_conf)
+    txs_to_rebroadcast = responder.get_txs_to_rebroadcast()
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_jobs(db_manager):
+def test_get_completed_trackers(db_manager):
     initial_height = bitcoin_cli().getblockcount()
 
     # Let's use a fresh responder for this to make it easier to compare the results
     responder = Responder(db_manager)
 
-    # A complete job is a job that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
+    # A complete tracker is a tracker that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
-    jobs_end_conf = {uuid4().hex: create_dummy_job(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(10)}
+    trackers_end_conf = {
+        uuid4().hex: create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(10)
+    }
 
-    jobs_end_no_conf = {}
+    trackers_end_no_conf = {}
     for _ in range(10):
-        job = create_dummy_job(penalty_rawtx=TX.create_dummy_transaction())
-        responder.unconfirmed_txs.append(job.penalty_txid)
-        jobs_end_no_conf[uuid4().hex] = job
+        tracker = create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction())
+        responder.unconfirmed_txs.append(tracker.penalty_txid)
+        trackers_end_no_conf[uuid4().hex] = tracker
 
-    jobs_no_end = {}
+    trackers_no_end = {}
     for _ in range(10):
-        job = create_dummy_job(penalty_rawtx=TX.create_dummy_transaction())
-        job.appointment_end += 10
-        jobs_no_end[uuid4().hex] = job
+        tracker = create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction())
+        tracker.appointment_end += 10
+        trackers_no_end[uuid4().hex] = tracker
 
     # Let's add all to the  responder
-    responder.jobs.update(jobs_end_conf)
-    responder.jobs.update(jobs_end_no_conf)
-    responder.jobs.update(jobs_no_end)
+    responder.trackers.update(trackers_end_conf)
+    responder.trackers.update(trackers_end_no_conf)
+    responder.trackers.update(trackers_no_end)
 
-    for uuid, job in responder.jobs.items():
-        bitcoin_cli().sendrawtransaction(job.penalty_rawtx)
+    for uuid, tracker in responder.trackers.items():
+        bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
 
-    # The dummy appointments have a end_appointment time of current + 2, but jobs need at least 6 confs by default
+    # The dummy appointments have a end_appointment time of current + 2, but trackers need at least 6 confs by default
     generate_blocks(6)
 
     # And now let's check
-    completed_jobs = responder.get_completed_jobs(initial_height + 6)
-    completed_jobs_ids = [job_id for job_id, confirmations in completed_jobs]
-    ended_jobs_keys = list(jobs_end_conf.keys())
-    assert set(completed_jobs_ids) == set(ended_jobs_keys)
+    completed_trackers = responder.get_completed_trackers(initial_height + 6)
+    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers]
+    ended_trackers_keys = list(trackers_end_conf.keys())
+    assert set(completed_trackers_ids) == set(ended_trackers_keys)
 
-    # Generating 6 additional blocks should also confirm jobs_no_end
+    # Generating 6 additional blocks should also confirm trackers_no_end
     generate_blocks(6)
 
-    completed_jobs = responder.get_completed_jobs(initial_height + 12)
-    completed_jobs_ids = [job_id for job_id, confirmations in completed_jobs]
-    ended_jobs_keys.extend(list(jobs_no_end.keys()))
+    completed_trackers = responder.get_completed_trackers(initial_height + 12)
+    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers]
+    ended_trackers_keys.extend(list(trackers_no_end.keys()))
 
-    assert set(completed_jobs_ids) == set(ended_jobs_keys)
+    assert set(completed_trackers_ids) == set(ended_trackers_keys)
 
 
 def test_rebroadcast(db_manager):
@@ -465,15 +470,17 @@ def test_rebroadcast(db_manager):
 
     txs_to_rebroadcast = []
 
-    # Rebroadcast calls add_response with retry=True. The job data is already in jobs.
+    # Rebroadcast calls add_response with retry=True. The tracker data is already in trackers.
     for i in range(20):
         uuid = uuid4().hex
-        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_job_data(
+        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
             penalty_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.jobs[uuid] = Job(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
-        responder.tx_job_map[penalty_txid] = [uuid]
+        responder.trackers[uuid] = TransactionTracker(
+            locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end
+        )
+        responder.tx_tracker_map[penalty_txid] = [uuid]
         responder.unconfirmed_txs.append(penalty_txid)
 
         # Let's add some of the txs in the rebroadcast list
@@ -481,7 +488,7 @@ def test_rebroadcast(db_manager):
             txs_to_rebroadcast.append(penalty_txid)
 
     # The block_hash passed to rebroadcast does not matter much now. It will in the future to deal with errors
-    receipts = responder.rebroadcast(txs_to_rebroadcast, get_random_value_hex(32))
+    receipts = responder.rebroadcast(txs_to_rebroadcast)
 
     # All txs should have been delivered and the missed confirmation reset
     for txid, receipt in receipts:
