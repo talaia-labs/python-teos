@@ -20,7 +20,7 @@ class DBManager:
     The database is split in five prefixes:
 
         - ``WATCHER_PREFIX``, defined as ``b'w``, is used to store :mod:`Watcher <pisa.watcher>` appointments.
-        - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :mod:`Responder <pisa.responder>` jobs.
+        - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :mod:`Responder <pisa.responder>` trackers.
         - ``WATCHER_LAST_BLOCK_KEY``, defined as ``b'bw``, is used to store the last block hash known by the :mod:`Watcher <pisa.watcher>`.
         - ``RESPONDER_LAST_BLOCK_KEY``, defined as ``b'br``, is used to store the last block hash known by the :mod:`Responder <pisa.responder>`.
         - ``LOCATOR_MAP_PREFIX``, defined as ``b'm``, is used to store the ``locator:uuid`` maps.
@@ -51,7 +51,7 @@ class DBManager:
             prefix (str): the prefix of the data to load.
 
         Returns:
-            (``dict``): A dictionary containing the requested data (appointments or jobs) indexed by ``uuid``.
+            (``dict``): A dictionary containing the requested data (appointments or trackers) indexed by ``uuid``.
 
             Returns an empty dictionary if no data is found.
         """
@@ -108,7 +108,7 @@ class DBManager:
             key (str): the key that identifies the entry to be loaded.
 
         Returns:
-            (``dict`` or ``None``): A dictionary containing the requested data (an appointment or a job).
+            (``dict`` or ``None``): A dictionary containing the requested data (an appointment or a tracker).
 
             Returns ``None`` if the entry is not found.
         """
@@ -145,12 +145,12 @@ class DBManager:
 
         return self.load_entry(WATCHER_PREFIX + key)
 
-    def load_responder_job(self, key):
+    def load_responder_tracker(self, key):
         """
-        Loads a job from the database using ``RESPONDER_PREFIX`` as a prefix to the given ``key``.
+        Loads a tracker from the database using ``RESPONDER_PREFIX`` as a prefix to the given ``key``.
 
         Returns:
-            (``dict``): A dictionary containing the job data if they ``key`` is found.
+            (``dict``): A dictionary containing the tracker data if they ``key`` is found.
 
             Returns ``None`` otherwise.
         """
@@ -179,12 +179,12 @@ class DBManager:
 
         return appointments
 
-    def load_responder_jobs(self):
+    def load_responder_trackers(self):
         """
-        Loads all the jobs from the database (all entries with the ``RESPONDER_PREFIX`` prefix).
+        Loads all the trackers from the database (all entries with the ``RESPONDER_PREFIX`` prefix).
 
         Returns:
-            (``dict``): A dictionary with all the jobs stored in the database. An empty dictionary is there are
+            (``dict``): A dictionary with all the trackers stored in the database. An empty dictionary is there are
             none.
         """
 
@@ -198,12 +198,12 @@ class DBManager:
         self.create_entry(uuid, appointment, prefix=WATCHER_PREFIX)
         logger.info("Adding appointment to Watchers's db", uuid=uuid)
 
-    def store_responder_job(self, uuid, job):
+    def store_responder_tracker(self, uuid, tracker):
         """
-        Stores a job in the database using the ``RESPONDER_PREFIX`` prefix.
+        Stores a tracker in the database using the ``RESPONDER_PREFIX`` prefix.
         """
 
-        self.create_entry(uuid, job, prefix=RESPONDER_PREFIX)
+        self.create_entry(uuid, tracker, prefix=RESPONDER_PREFIX)
         logger.info("Adding appointment to Responder's db", uuid=uuid)
 
     def load_locator_map(self, locator):
@@ -280,12 +280,12 @@ class DBManager:
         self.delete_entry(uuid, prefix=WATCHER_PREFIX)
         logger.info("Deleting appointment from Watcher's db", uuid=uuid)
 
-    def delete_responder_job(self, uuid):
+    def delete_responder_tracker(self, uuid):
         """
-        Deletes a job from the database.
+        Deletes a tracker from the database.
 
         Args:
-           uuid (str): a 16-byte hex-encoded string identifying the job to be deleted.
+           uuid (str): a 16-byte hex-encoded string identifying the tracker to be deleted.
         """
 
         self.delete_entry(uuid, prefix=RESPONDER_PREFIX)

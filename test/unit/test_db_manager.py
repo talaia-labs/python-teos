@@ -18,7 +18,7 @@ def watcher_appointments():
 
 
 @pytest.fixture(scope="module")
-def responder_jobs():
+def responder_trackers():
     return {get_random_value_hex(16): get_random_value_hex(32) for _ in range(10)}
 
 
@@ -158,8 +158,8 @@ def test_load_watcher_appointments_empty(db_manager):
     assert len(db_manager.load_watcher_appointments()) == 0
 
 
-def test_load_responder_jobs_empty(db_manager):
-    assert len(db_manager.load_responder_jobs()) == 0
+def test_load_responder_trackers_empty(db_manager):
+    assert len(db_manager.load_responder_trackers()) == 0
 
 
 def test_load_locator_map_empty(db_manager):
@@ -228,16 +228,16 @@ def test_store_load_triggered_appointment(db_manager):
     assert uuid in db_manager.load_watcher_appointments(include_triggered=True)
 
 
-def test_store_load_responder_jobs(db_manager, responder_jobs):
-    for key, value in responder_jobs.items():
-        db_manager.store_responder_job(key, json.dumps({"value": value}))
+def test_store_load_responder_trackers(db_manager, responder_trackers):
+    for key, value in responder_trackers.items():
+        db_manager.store_responder_tracker(key, json.dumps({"value": value}))
 
-    db_responder_jobs = db_manager.load_responder_jobs()
+    db_responder_trackers = db_manager.load_responder_trackers()
 
-    values = [job["value"] for job in db_responder_jobs.values()]
+    values = [tracker["value"] for tracker in db_responder_trackers.values()]
 
-    assert responder_jobs.keys() == db_responder_jobs.keys()
-    assert set(responder_jobs.values()) == set(values) and len(responder_jobs) == len(values)
+    assert responder_trackers.keys() == db_responder_trackers.keys()
+    assert set(responder_trackers.values()) == set(values) and len(responder_trackers) == len(values)
 
 
 def test_delete_watcher_appointment(db_manager, watcher_appointments):
@@ -252,16 +252,16 @@ def test_delete_watcher_appointment(db_manager, watcher_appointments):
     assert len(db_watcher_appointments) == 0
 
 
-def test_delete_responder_job(db_manager, responder_jobs):
+def test_delete_responder_tracker(db_manager, responder_trackers):
     # Same for the responder
-    db_responder_jobs = db_manager.load_responder_jobs()
-    assert len(db_responder_jobs) != 0
+    db_responder_trackers = db_manager.load_responder_trackers()
+    assert len(db_responder_trackers) != 0
 
-    for key in responder_jobs.keys():
-        db_manager.delete_responder_job(key)
+    for key in responder_trackers.keys():
+        db_manager.delete_responder_tracker(key)
 
-    db_responder_jobs = db_manager.load_responder_jobs()
-    assert len(db_responder_jobs) == 0
+    db_responder_trackers = db_manager.load_responder_trackers()
+    assert len(db_responder_trackers) == 0
 
 
 def test_store_load_last_block_hash_watcher(db_manager):

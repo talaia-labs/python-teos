@@ -74,7 +74,7 @@ class Carrier:
             elif errno == RPC_VERIFY_ALREADY_IN_CHAIN:
                 logger.info("Transaction is already in the blockchain. Getting confirmation count", txid=txid)
 
-                # If the transaction is already in the chain, we get the number of confirmations and watch the job
+                # If the transaction is already in the chain, we get the number of confirmations and watch the tracker
                 # until the end of the appointment
                 tx_info = self.get_transaction(txid)
 
@@ -122,7 +122,7 @@ class Carrier:
             tx_info = None
             # While it's quite unlikely, the transaction that was already in the blockchain could have been
             # reorged while we were querying bitcoind to get the confirmation count. In such a case we just
-            # restart the job
+            # restart the tracker
             if e.error.get("code") == RPC_INVALID_ADDRESS_OR_KEY:
                 logger.info("Transaction not found in mempool nor blockchain", txid=txid)
 

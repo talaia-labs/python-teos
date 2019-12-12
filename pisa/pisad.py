@@ -47,11 +47,11 @@ if __name__ == "__main__":
             db_manager = DBManager(DB_PATH)
 
             watcher_appointments_data = db_manager.load_watcher_appointments()
-            responder_jobs_data = db_manager.load_responder_jobs()
+            responder_trackers_data = db_manager.load_responder_trackers()
 
             watcher = Watcher(db_manager)
 
-            if len(watcher_appointments_data) == 0 and len(responder_jobs_data) == 0:
+            if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
 
             else:
@@ -69,7 +69,7 @@ if __name__ == "__main__":
                 )
 
                 responder = Responder(db_manager)
-                responder.jobs, responder.tx_job_map = Builder.build_jobs(responder_jobs_data)
+                responder.trackers, responder.tx_tracker_map = Builder.build_trackers(responder_trackers_data)
                 responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
 
                 watcher.responder = responder

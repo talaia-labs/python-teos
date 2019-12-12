@@ -67,42 +67,42 @@ class Cleaner:
         db_manager.store_watcher_appointment(uuid, appointment.to_json(triggered=True))
 
     @staticmethod
-    def delete_completed_jobs(completed_jobs, height, jobs, tx_job_map, db_manager):
+    def delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager):
         """
-        Deletes a completed job both from memory (:mod:`Responder <pisa.responder>`) and disk (from the
+        Deletes a completed tracker both from memory (:mod:`Responder <pisa.responder>`) and disk (from the
         :mod:`Responder <pisa.responder>` and :mod:`Watcher <pisa.watcher>` databases).
 
         Args:
-            jobs (dict): a dictionary containing all the :mod:`Responder <pisa.responder>` jobs.
-            tx_job_map (dict): a ``penalty_txid:uuid`` map for the :mod:`Responder <pisa.responder>` jobs.
-            completed_jobs (list): a list of completed jobs to be deleted.
-            height (int): the block height at which the jobs were completed.
+            trackers (dict): a dictionary containing all the :mod:`Responder <pisa.responder>` trackers.
+            tx_tracker_map (dict): a ``penalty_txid:uuid`` map for the :mod:`Responder <pisa.responder>` trackers.
+            completed_trackers (list): a list of completed trackers to be deleted.
+            height (int): the block height at which the trackers were completed.
             db_manager (DBManager): a :mod:`DBManager <pisa.db_manager>` instance to interact with the database.
         """
 
-        for uuid, confirmations in completed_jobs:
+        for uuid, confirmations in completed_trackers:
             logger.info(
-                "Job completed. Appointment ended after reaching enough confirmations.",
+                "Appointment completed. Appointment ended after reaching enough confirmations.",
                 uuid=uuid,
                 height=height,
                 confirmations=confirmations,
             )
 
-            penalty_txid = jobs[uuid].penalty_txid
-            locator = jobs[uuid].locator
-            jobs.pop(uuid)
+            penalty_txid = trackers[uuid].penalty_txid
+            locator = trackers[uuid].locator
+            trackers.pop(uuid)
 
-            if len(tx_job_map[penalty_txid]) == 1:
-                tx_job_map.pop(penalty_txid)
+            if len(tx_tracker_map[penalty_txid]) == 1:
+                tx_tracker_map.pop(penalty_txid)
 
-                logger.info("No more jobs for penalty transaction.", penalty_txid=penalty_txid)
+                logger.info("No more trackers for penalty transaction.", penalty_txid=penalty_txid)
 
             else:
-                tx_job_map[penalty_txid].remove(uuid)
+                tx_tracker_map[penalty_txid].remove(uuid)
 
             # Delete appointment from the db (both watchers's and responder's)
             db_manager.delete_watcher_appointment(uuid)
-            db_manager.delete_responder_job(uuid)
+            db_manager.delete_responder_tracker(uuid)
 
             # Update / delete the locator map
             locator_map = db_manager.load_locator_map(locator)

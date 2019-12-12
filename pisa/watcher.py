@@ -9,7 +9,7 @@ from pisa.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
-from pisa.utils.zmq_subscriber import ZMQHandler
+from pisa.utils.zmq_subscriber import ZMQSubscriber
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
 
 logger = Logger("Watcher")
@@ -89,7 +89,7 @@ class Watcher:
         return appointment_added, signature
 
     def do_subscribe(self):
-        self.zmq_subscriber = ZMQHandler(parent="Watcher")
+        self.zmq_subscriber = ZMQSubscriber(parent="Watcher")
         self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
@@ -126,7 +126,7 @@ class Watcher:
                             uuid=uuid,
                         )
 
-                        self.responder.add_response(
+                        self.responder.handle_breach(
                             uuid,
                             filtered_match["locator"],
                             filtered_match["dispute_txid"],

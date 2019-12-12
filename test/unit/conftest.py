@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
 from apps.cli.blob import Blob
-from pisa.responder import Job
+from pisa.responder import TransactionTracker
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
@@ -126,13 +126,13 @@ def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_o
     return Appointment.from_dict(appointment_data["appointment"]), dispute_tx
 
 
-def generate_dummy_job():
+def generate_dummy_tracker():
     dispute_txid = get_random_value_hex(32)
     penalty_txid = get_random_value_hex(32)
     penalty_rawtx = get_random_value_hex(100)
     locator = dispute_txid[:LOCATOR_LEN_HEX]
 
-    job_data = dict(
+    tracker_data = dict(
         locator=locator,
         dispute_txid=dispute_txid,
         penalty_txid=penalty_txid,
@@ -140,4 +140,4 @@ def generate_dummy_job():
         appointment_end=100,
     )
 
-    return Job.from_dict(job_data)
+    return TransactionTracker.from_dict(tracker_data)

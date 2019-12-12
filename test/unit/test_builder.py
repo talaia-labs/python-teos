@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from pisa.builder import Builder
-from test.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_job
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_tracker
 
 
 def test_build_appointments():
@@ -33,33 +33,33 @@ def test_build_appointments():
         assert uuid in locator_uuid_map[appointment.locator]
 
 
-def test_build_jobs():
-    jobs_data = {}
+def test_build_trackers():
+    trackers_data = {}
 
-    # Create some jobs data
+    # Create some trackers data
     for i in range(10):
-        job = generate_dummy_job()
+        tracker = generate_dummy_tracker()
 
-        jobs_data[uuid4().hex] = job.to_dict()
+        trackers_data[uuid4().hex] = tracker.to_dict()
 
-        # Add some additional jobs that share the same locator to test all the builder's cases
+        # Add some additional trackers that share the same locator to test all the builder's cases
         if i % 2 == 0:
-            penalty_txid = job.penalty_txid
-            job = generate_dummy_job()
-            job.penalty_txid = penalty_txid
+            penalty_txid = tracker.penalty_txid
+            tracker = generate_dummy_tracker()
+            tracker.penalty_txid = penalty_txid
 
-            jobs_data[uuid4().hex] = job.to_dict()
+            trackers_data[uuid4().hex] = tracker.to_dict()
 
-    jobs, tx_job_map = Builder.build_jobs(jobs_data)
+    trackers, tx_tracker_map = Builder.build_trackers(trackers_data)
 
-    # Check that the built jobs match the data
-    for uuid, job in jobs.items():
-        assert uuid in jobs_data.keys()
-        job_dict = job.to_dict()
+    # Check that the built trackers match the data
+    for uuid, tracker in trackers.items():
+        assert uuid in trackers_data.keys()
+        tracker_dict = tracker.to_dict()
 
-        # The locator is not part of the job_data found in the database (for now)
-        assert jobs_data[uuid] == job_dict
-        assert uuid in tx_job_map[job.penalty_txid]
+        # The locator is not part of the tracker_data found in the database (for now)
+        assert trackers_data[uuid] == tracker_dict
+        assert uuid in tx_tracker_map[tracker.penalty_txid]
 
 
 def test_build_block_queue():

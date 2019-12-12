@@ -1,6 +1,6 @@
 from queue import Queue
 
-from pisa.responder import Job
+from pisa.responder import TransactionTracker
 from pisa.appointment import Appointment
 
 
@@ -44,38 +44,38 @@ class Builder:
         return appointments, locator_uuid_map
 
     @staticmethod
-    def build_jobs(jobs_data):
+    def build_trackers(tracker_data):
         """
-        Builds a jobs dictionary (``uuid: Jobs``) and a tx_job_map (``penalty_txid: uuid``) given a dictionary of jobs
-        from the database.
+        Builds a tracker dictionary (``uuid: TransactionTracker``) and a tx_tracker_map (``penalty_txid: uuid``) given
+        a dictionary of trackers from the database.
 
         Args:
-            jobs_data (dict): a dictionary of dictionaries representing all the :mod:`Responder <pisa.responder>` jobs
-                stored in the database. The structure is as follows:
+            tracker_data (dict): a dictionary of dictionaries representing all the :mod:`Responder <pisa.responder>`
+                trackers stored in the database. The structure is as follows:
 
                     ``{uuid: {locator: str, dispute_txid: str, ...}, uuid: {locator:...}}``
 
         Returns:
-            ``tuple``: A tuple with two dictionaries. ``jobs`` containing the jobs information in
-            :class:`Job <pisa.responder>` objects and a ``tx_job_map`` containing the map of jobs
-            (``penalty_txid: uuid``).
+            ``tuple``: A tuple with two dictionaries. ``trackers`` containing the trackers' information in
+            :class:`TransactionTracker <pisa.responder.TransactionTracker>` objects and a ``tx_tracker_map`` containing
+            the map of trackers (``penalty_txid: uuid``).
 
         """
 
-        jobs = {}
-        tx_job_map = {}
+        trackers = {}
+        tx_tracker_map = {}
 
-        for uuid, data in jobs_data.items():
-            job = Job.from_dict(data)
-            jobs[uuid] = job
+        for uuid, data in tracker_data.items():
+            tracker = TransactionTracker.from_dict(data)
+            trackers[uuid] = tracker
 
-            if job.penalty_txid in tx_job_map:
-                tx_job_map[job.penalty_txid].append(uuid)
+            if tracker.penalty_txid in tx_tracker_map:
+                tx_tracker_map[tracker.penalty_txid].append(uuid)
 
             else:
-                tx_job_map[job.penalty_txid] = [uuid]
+                tx_tracker_map[tracker.penalty_txid] = [uuid]
 
-        return jobs, tx_job_map
+        return trackers, tx_tracker_map
 
     @staticmethod
     def build_block_queue(missed_blocks):

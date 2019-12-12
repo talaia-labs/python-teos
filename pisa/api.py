@@ -121,11 +121,11 @@ def get_appointment():
                 appointment_data["status"] = "being_watched"
                 response.append(appointment_data)
 
-            job_data = watcher.db_manager.load_responder_job(uuid)
+            tracker_data = watcher.db_manager.load_responder_tracker(uuid)
 
-            if job_data is not None:
-                job_data["status"] = "dispute_responded"
-                response.append(job_data)
+            if tracker_data is not None:
+                tracker_data["status"] = "dispute_responded"
+                response.append(tracker_data)
 
     else:
         response.append({"locator": locator, "status": "not_found"})
@@ -144,7 +144,7 @@ def get_all_appointments():
 
     Returns:
         ``dict``: A json formatted dictionary containing all the appointments hold by the :mod:`Watcher <pisa.watcher>`
-        (``watcher_appointments``) and by the :mod:`Responder <pisa.responder>` (``responder_jobs``).
+        (``watcher_appointments``) and by the :mod:`Responder <pisa.responder>` (``responder_trackers``).
 
     """
 
@@ -153,9 +153,9 @@ def get_all_appointments():
 
     if request.remote_addr in request.host or request.remote_addr == "127.0.0.1":
         watcher_appointments = watcher.db_manager.load_watcher_appointments()
-        responder_jobs = watcher.db_manager.load_responder_jobs()
+        responder_trackers = watcher.db_manager.load_responder_trackers()
 
-        response = jsonify({"watcher_appointments": watcher_appointments, "responder_jobs": responder_jobs})
+        response = jsonify({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
 
     else:
         abort(404)

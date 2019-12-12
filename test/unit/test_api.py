@@ -109,7 +109,7 @@ def test_get_all_appointments_watcher():
     local_locators = [appointment["locator"] for appointment in appointments]
 
     assert set(watcher_locators) == set(local_locators)
-    assert len(received_appointments["responder_jobs"]) == 0
+    assert len(received_appointments["responder_trackers"]) == 0
 
 
 def test_get_all_appointments_responder():
@@ -127,10 +127,10 @@ def test_get_all_appointments_responder():
     received_appointments = json.loads(r.content)
 
     # Make sure there is not pending locator in the watcher
-    responder_jobs = [v["locator"] for k, v in received_appointments["responder_jobs"].items()]
+    responder_trackers = [v["locator"] for k, v in received_appointments["responder_trackers"].items()]
     local_locators = [appointment["locator"] for appointment in appointments]
 
-    assert set(responder_jobs) == set(local_locators)
+    assert set(responder_trackers) == set(local_locators)
     assert len(received_appointments["watcher_appointments"]) == 0
 
 
