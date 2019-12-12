@@ -5,7 +5,7 @@ from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 
 
 # ToDo: #7-add-async-back-to-zmq
-class ZMQHandler:
+class ZMQSubscriber:
     """ Adapted from https://github.com/bitcoin/bitcoin/blob/master/contrib/zmq/zmq_sub.py"""
 
     def __init__(self, parent):
@@ -14,7 +14,7 @@ class ZMQHandler:
         self.zmqSubSocket.setsockopt(zmq.RCVHWM, 0)
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
         self.zmqSubSocket.connect("%s://%s:%s" % (FEED_PROTOCOL, FEED_ADDR, FEED_PORT))
-        self.logger = Logger("ZMQHandler-{}".format(parent))
+        self.logger = Logger("ZMQSubscriber-{}".format(parent))
 
         self.terminate = False
 
