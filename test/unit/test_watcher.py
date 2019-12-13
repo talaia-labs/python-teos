@@ -164,29 +164,29 @@ def test_do_watch(watcher):
     assert watcher.asleep is True
 
 
-def test_get_matches(watcher, txids, locator_uuid_map):
+def test_get_breaches(watcher, txids, locator_uuid_map):
     watcher.locator_uuid_map = locator_uuid_map
-    potential_matches = watcher.get_matches(txids)
+    potential_breaches = watcher.get_breaches(txids)
 
-    # All the txids must match
-    assert locator_uuid_map.keys() == potential_matches.keys()
+    # All the txids must breach
+    assert locator_uuid_map.keys() == potential_breaches.keys()
 
 
-def test_get_matches_random_data(watcher, locator_uuid_map):
-    # The likelihood of finding a potential match with random data should be negligible
+def test_get_breaches_random_data(watcher, locator_uuid_map):
+    # The likelihood of finding a potential breach with random data should be negligible
     watcher.locator_uuid_map = locator_uuid_map
     txids = [get_random_value_hex(32) for _ in range(TEST_SET_SIZE)]
 
-    potential_matches = watcher.get_matches(txids)
+    potential_breaches = watcher.get_breaches(txids)
 
-    # None of the txids should match
-    assert len(potential_matches) == 0
+    # None of the txids should breach
+    assert len(potential_breaches) == 0
 
 
-def test_filter_valid_matches_random_data(watcher):
+def test_filter_valid_breaches_random_data(watcher):
     appointments = {}
     locator_uuid_map = {}
-    matches = {}
+    breaches = {}
 
     for i in range(TEST_SET_SIZE):
         dummy_appointment, _ = generate_dummy_appointment()
@@ -197,17 +197,17 @@ def test_filter_valid_matches_random_data(watcher):
 
         if i % 2:
             dispute_txid = get_random_value_hex(32)
-            matches[dummy_appointment.locator] = dispute_txid
+            breaches[dummy_appointment.locator] = dispute_txid
 
     watcher.locator_uuid_map = locator_uuid_map
     watcher.appointments = appointments
 
-    filtered_valid_matches = watcher.filter_valid_matches(matches)
+    filtered_valid_breaches = watcher.filter_valid_breaches(breaches)
 
-    assert not any([fil_match["valid_match"] for uuid, fil_match in filtered_valid_matches.items()])
+    assert not any([fil_breach["valid_breach"] for uuid, fil_breach in filtered_valid_breaches.items()])
 
 
-def test_filter_valid_matches(watcher):
+def test_filter_valid_breaches(watcher):
     dispute_txid = "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
     encrypted_blob = (
         "a62aa9bb3c8591e4d5de10f1bd49db92432ce2341af55762cdc9242c08662f97f5f47da0a1aa88373508cd6e67e87eefddeca0cee98c1"
@@ -225,11 +225,11 @@ def test_filter_valid_matches(watcher):
 
     appointments = {uuid: dummy_appointment}
     locator_uuid_map = {dummy_appointment.locator: [uuid]}
-    matches = {dummy_appointment.locator: dispute_txid}
+    breaches = {dummy_appointment.locator: dispute_txid}
 
     watcher.appointments = appointments
     watcher.locator_uuid_map = locator_uuid_map
 
-    filtered_valid_matches = watcher.filter_valid_matches(matches)
+    filtered_valid_breaches = watcher.filter_valid_breaches(breaches)
 
-    assert all([fil_match["valid_match"] for uuid, fil_match in filtered_valid_matches.items()])
+    assert all([fil_breach["valid_breach"] for uuid, fil_breach in filtered_valid_breaches.items()])
