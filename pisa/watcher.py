@@ -115,8 +115,9 @@ class Watcher:
         Returns:
             :obj:`tuple`: A tuple signaling if the appointment has been added or not (based on ``max_appointments``).
             The structure looks as follows:
-                - ``(True, signature)`` if the appointment has been accepted.
-                - ``(False, None)`` otherwise.
+
+            - ``(True, signature)`` if the appointment has been accepted.
+            - ``(False, None)`` otherwise.
 
         """
 
@@ -271,7 +272,8 @@ class Watcher:
         Returns:
             :obj:`dict`: A dictionary containing all the breaches flagged either as valid or invalid.
             The structure is as follows:
-                ``{locator, dispute_txid, penalty_txid, penalty_rawtx, valid_breach}``
+
+            ``{locator, dispute_txid, penalty_txid, penalty_rawtx, valid_breach}``
         """
 
         filtered_breaches = {}
