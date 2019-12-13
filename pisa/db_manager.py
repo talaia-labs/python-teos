@@ -14,19 +14,19 @@ LOCATOR_MAP_PREFIX = "m"
 
 class DBManager:
     """
-    The ``DBManager`` is the class in charge of interacting with the appointments database (``LevelDB``).
+    The :class:`DBManager` is the class in charge of interacting with the appointments database (``LevelDB``).
     Keys and values are stored as bytes in the database but processed as strings by the manager.
 
     The database is split in five prefixes:
 
-        - ``WATCHER_PREFIX``, defined as ``b'w``, is used to store :mod:`Watcher <pisa.watcher>` appointments.
-        - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :mod:`Responder <pisa.responder>` trackers.
-        - ``WATCHER_LAST_BLOCK_KEY``, defined as ``b'bw``, is used to store the last block hash known by the :mod:`Watcher <pisa.watcher>`.
-        - ``RESPONDER_LAST_BLOCK_KEY``, defined as ``b'br``, is used to store the last block hash known by the :mod:`Responder <pisa.responder>`.
+        - ``WATCHER_PREFIX``, defined as ``b'w``, is used to store :obj:`Watcher <pisa.watcher.Watcher>` appointments.
+        - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :obj:`Responder <pisa.responder.Responder>` trackers.
+        - ``WATCHER_LAST_BLOCK_KEY``, defined as ``b'bw``, is used to store the last block hash known by the :obj:`Watcher <pisa.watcher.Watcher>`.
+        - ``RESPONDER_LAST_BLOCK_KEY``, defined as ``b'br``, is used to store the last block hash known by the :obj:`Responder <pisa.responder.Responder>`.
         - ``LOCATOR_MAP_PREFIX``, defined as ``b'm``, is used to store the ``locator:uuid`` maps.
 
     Args:
-        db_path (str): the path (relative or absolute) to the system folder containing the database. A fresh new
+        db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
             database will be create if the specified path does not contain one.
     """
 
@@ -48,10 +48,10 @@ class DBManager:
         ``RESPONDER_PREFIX``.
 
         Args:
-            prefix (str): the prefix of the data to load.
+            prefix (:obj:`str`): the prefix of the data to load.
 
         Returns:
-            (``dict``): A dictionary containing the requested data (appointments or trackers) indexed by ``uuid``.
+            :obj:`dict`: A dictionary containing the requested data (appointments or trackers) indexed by ``uuid``.
 
             Returns an empty dictionary if no data is found.
         """
@@ -70,7 +70,7 @@ class DBManager:
         Loads the last known block given a key (either ``WATCHER_LAST_BLOCK_KEY`` or ``RESPONDER_LAST_BLOCK_KEY``).
 
         Returns:
-            (``str`` or ``None``): A 16-byte hex-encoded str representing the last known block hash.
+            :obj:`str` or :obj:`None`: A 16-byte hex-encoded str representing the last known block hash.
 
             Returns ``None`` if the entry is not found.
         """
@@ -87,9 +87,9 @@ class DBManager:
         Creates a new entry in the database.
 
         Args:
-            key (str): the key of the new entry, used to identify it.
-            value (str): the data stored under the given ``key``.
-            prefix (str): an optional prefix added to the ``key``.
+            key (:obj:`str`): the key of the new entry, used to identify it.
+            value (:obj:`str`): the data stored under the given ``key``.
+            prefix (:obj:`str`): an optional prefix added to the ``key``.
         """
 
         if isinstance(prefix, str):
@@ -105,10 +105,10 @@ class DBManager:
         Loads an entry from the database given a ``key``.
 
         Args:
-            key (str): the key that identifies the entry to be loaded.
+            key (:obj:`str`): the key that identifies the entry to be loaded.
 
         Returns:
-            (``dict`` or ``None``): A dictionary containing the requested data (an appointment or a tracker).
+            :obj:`dict` or :obj:`None`: A dictionary containing the requested data (an appointment or a tracker).
 
             Returns ``None`` if the entry is not found.
         """
@@ -122,8 +122,8 @@ class DBManager:
         Deletes an entry from the database given an ``key`` (and optionally a ``prefix``)
 
         Args:
-            key (str): the key that identifies the data to be deleted.
-            prefix (str): an optional prefix to be prepended to the ``key``.
+            key (:obj:`str`): the key that identifies the data to be deleted.
+            prefix (:obj:`str`): an optional prefix to be prepended to the ``key``.
         """
 
         if isinstance(prefix, str):
@@ -138,7 +138,7 @@ class DBManager:
         Loads an appointment from the database using ``WATCHER_PREFIX`` as prefix to the given ``key``.
 
         Returns:
-            (``dict``): A dictionary containing the appointment data if they ``key`` is found.
+            :obj:`dict`: A dictionary containing the appointment data if they ``key`` is found.
 
             Returns ``None`` otherwise.
         """
@@ -150,7 +150,7 @@ class DBManager:
         Loads a tracker from the database using ``RESPONDER_PREFIX`` as a prefix to the given ``key``.
 
         Returns:
-            (``dict``): A dictionary containing the tracker data if they ``key`` is found.
+            :obj:`dict`: A dictionary containing the tracker data if they ``key`` is found.
 
             Returns ``None`` otherwise.
         """
@@ -162,12 +162,12 @@ class DBManager:
         Loads all the appointments from the database (all entries with the ``WATCHER_PREFIX`` prefix).
 
         Args:
-            include_triggered (bool): Whether to include the appointments flagged as triggered or not. ``False`` by
-            default.
+            include_triggered (:obj:`bool`): Whether to include the appointments flagged as triggered or not. ``False`` by
+                default.
 
         Returns:
-            (``dict``): A dictionary with all the appointments stored in the database. An empty dictionary is there are
-            none.
+            :obj:`dict`: A dictionary with all the appointments stored in the database. An empty dictionary is there
+            are none.
         """
 
         appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
@@ -184,7 +184,7 @@ class DBManager:
         Loads all the trackers from the database (all entries with the ``RESPONDER_PREFIX`` prefix).
 
         Returns:
-            (``dict``): A dictionary with all the trackers stored in the database. An empty dictionary is there are
+            :obj:`dict`: A dictionary with all the trackers stored in the database. An empty dictionary is there are
             none.
         """
 
@@ -211,10 +211,10 @@ class DBManager:
         Loads the ``locator:uuid`` map of a given ``locator`` from the database.
 
         Args:
-            locator (str): a 16-byte hex-encoded string representing the appointment locator.
+            locator (:obj:`str`): a 16-byte hex-encoded string representing the appointment locator.
 
         Returns:
-            (``dict`` or ``None``): The requested ``locator:uuid`` map if found.
+            :obj:`dict` or :obj:`None`: The requested ``locator:uuid`` map if found.
 
             Returns ``None`` otherwise.
         """
@@ -237,8 +237,8 @@ class DBManager:
         If the map already exists, the new ``uuid`` is appended to the existing ones (if it is not already there).
 
         Args:
-            locator (str): a 16-byte hex-encoded string used as the key of the map.
-            uuid (str): a 16-byte hex-encoded unique id to create (or add to) the map.
+            locator (:obj:`str`): a 16-byte hex-encoded string used as the key of the map.
+            uuid (:obj:`str`): a 16-byte hex-encoded unique id to create (or add to) the map.
         """
 
         locator_map = self.load_locator_map(locator)
@@ -263,7 +263,7 @@ class DBManager:
         Deletes a ``locator:uuid`` map.
 
         Args:
-            locator (str): a 16-byte hex-encoded string identifying the map to delete.
+            locator (:obj:`str`): a 16-byte hex-encoded string identifying the map to delete.
         """
 
         self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
@@ -274,7 +274,7 @@ class DBManager:
         Deletes an appointment from the database.
 
         Args:
-           uuid (str): a 16-byte hex-encoded string identifying the appointment to be deleted.
+           uuid (:obj:`str`): a 16-byte hex-encoded string identifying the appointment to be deleted.
         """
 
         self.delete_entry(uuid, prefix=WATCHER_PREFIX)
@@ -285,7 +285,7 @@ class DBManager:
         Deletes a tracker from the database.
 
         Args:
-           uuid (str): a 16-byte hex-encoded string identifying the tracker to be deleted.
+           uuid (:obj:`str`): a 16-byte hex-encoded string identifying the tracker to be deleted.
         """
 
         self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
@@ -293,10 +293,10 @@ class DBManager:
 
     def load_last_block_hash_watcher(self):
         """
-        Loads the last known block hash of the :mod:`Watcher <pisa.watcher>` from the database.
+        Loads the last known block hash of the :obj:`Watcher <pisa.watcher.Watcher>` from the database.
 
         Returns:
-            (``str`` or ``None``): A 32-byte hex-encoded string representing the last known block hash if found.
+            :obj:`str` or :obj:`None`: A 32-byte hex-encoded string representing the last known block hash if found.
 
             Returns ``None`` otherwise.
         """
@@ -304,10 +304,10 @@ class DBManager:
 
     def load_last_block_hash_responder(self):
         """
-        Loads the last known block hash of the :mod:`Responder <pisa.responder>` from the database.
+        Loads the last known block hash of the :obj:`Responder <pisa.responder.Responder>` from the database.
 
         Returns:
-            (``str`` or ``None``): A 32-byte hex-encoded string representing the last known block hash if found.
+            :obj:`str` or :obj:`None`: A 32-byte hex-encoded string representing the last known block hash if found.
 
             Returns ``None`` otherwise.
         """
@@ -315,20 +315,20 @@ class DBManager:
 
     def store_last_block_hash_watcher(self, block_hash):
         """
-        Stores a block hash as the last known block of the :mod:`Watcher <pisa.watcher>`.
+        Stores a block hash as the last known block of the :obj:`Watcher <pisa.watcher.Watcher>`.
 
         Args:
-            block_hash (str): the block hash to be stored (32-byte hex-encoded)
+            block_hash (:obj:`str`): the block hash to be stored (32-byte hex-encoded)
         """
 
         self.create_entry(WATCHER_LAST_BLOCK_KEY, block_hash)
 
     def store_last_block_hash_responder(self, block_hash):
         """
-        Stores a block hash as the last known block of the :mod:`Responder <pisa.responder>`.
+        Stores a block hash as the last known block of the :obj:`Responder <pisa.responder.Responder>`.
 
         Args:
-            block_hash (str): the block hash to be stored (32-byte hex-encoded)
+            block_hash (:obj:`str`): the block hash to be stored (32-byte hex-encoded)
         """
 
         self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)

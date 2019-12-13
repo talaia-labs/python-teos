@@ -16,20 +16,21 @@ logger = Logger("Responder")
 
 class TransactionTracker:
     """
-    A ``TransactionTracker`` is used to monitor a ``penalty_tx``. Once the dispute is  seen by the
-    :mod:`Watcher <pisa.watcher>` the penalty transaction is decrypted and the relevant appointment data is  passed
-    along to the ``Responder``.
+    A :class:`TransactionTracker` is used to monitor a ``penalty_tx``. Once the dispute is  seen by the
+    :obj:`Watcher <pisa.watcher.Watcher>` the penalty transaction is decrypted and the relevant appointment data is
+    passed along to the :obj:`Responder`.
 
-    Once the ``Responder`` has succeeded on broadcasting the penalty transaction it will create a ``TransactionTracker``
-    and monitor the blockchain until the end of the appointment.
+    Once the :obj:`Responder` has succeeded on broadcasting the penalty transaction it will create a
+    :obj:`TransactionTracker` and monitor the blockchain until the end of the appointment.
 
     Args:
-        locator (str): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
-            for the tower to decrypt and broadcast the penalty transaction.
-        dispute_txid (str): the id of the transaction that created the channel breach and triggered the penalty.
-        penalty_txid (str): the id of the transaction that was encrypted under ``dispute_txid``.
-        penalty_rawtx (str): the raw transaction that was broadcast as a consequence of the channel breach.
-        appointment_end (int): the block at which the tower will stop monitoring the blockchain for this appointment.
+        locator (:obj:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
+            trigger for the tower to decrypt and broadcast the penalty transaction.
+        dispute_txid (:obj:`str`): the id of the transaction that created the channel breach and triggered the penalty.
+        penalty_txid (:obj:`str`): the id of the transaction that was encrypted under ``dispute_txid``.
+        penalty_rawtx (:obj:`str`): the raw transaction that was broadcast as a consequence of the channel breach.
+        appointment_end (:obj:`int`): the block at which the tower will stop monitoring the blockchain for this
+            appointment.
     """
 
     def __init__(self, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end):
@@ -42,17 +43,17 @@ class TransactionTracker:
     @classmethod
     def from_dict(cls, tx_tracker_data):
         """
-        Constructs a ``TransactionTracker`` instance from a dictionary. Requires that all the fields are populated
+        Constructs a :obj:`TransactionTracker` instance from a dictionary. Requires that all the fields are populated
         (``not None``).
 
         Useful to load data from the database.
 
         Args:
-            tx_tracker_data (dict): a dictionary with an entry per each field required to create the
-            ``TransactionTracker``.
+            tx_tracker_data (:obj:`dict`): a dictionary with an entry per each field required to create the
+                :obj:`TransactionTracker`.
 
         Returns:
-            ``TransactionTracker``: A ``TransactionTracker`` instantiated with the provided data.
+            :obj:`TransactionTracker`: A ``TransactionTracker`` instantiated with the provided data.
 
         Raises:
             ValueError: if any of the required fields is missing.
@@ -74,10 +75,10 @@ class TransactionTracker:
 
     def to_dict(self):
         """
-        Exports a ``TransactionTracker`` as a dictionary.
+        Exports a :obj:`TransactionTracker` as a dictionary.
 
         Returns:
-            ``dict``: A dictionary containing the ``TransactionTracker`` data.
+            :obj:`dict`: A dictionary containing the :obj:`TransactionTracker` data.
         """
 
         tx_tracker = {
@@ -92,10 +93,10 @@ class TransactionTracker:
 
     def to_json(self):
         """
-        Exports a ``TransactionTracker`` as a json-encoded dictionary.
+        Exports a :obj:`TransactionTracker` as a json-encoded dictionary.
 
         Returns:
-            ``str``: A json-encoded dictionary containing the ``TransactionTracker`` data.
+            :obj:`str`: A json-encoded dictionary containing the :obj:`TransactionTracker` data.
         """
 
         return json.dumps(self.to_dict())
@@ -103,29 +104,34 @@ class TransactionTracker:
 
 class Responder:
     """
-    The ``Responder`` is the class in charge of ensuring that channel breaches are dealt with. It does so handling the
-    decrypted ``penalty_txs`` handed by the :mod:`Watcher <pisa.watcher>` and ensuring the they make it to the
-    blockchain.
+    The :class:`Responder` is the class in charge of ensuring that channel breaches are dealt with. It does so handling
+    the decrypted ``penalty_txs`` handed by the :obj:`Watcher <pisa.watcher.Watcher>` and ensuring the they make it to
+    the blockchain.
 
-    The ``Responder`` can be in two states:
+    The :class:`Responder` can be in two states:
+
     - Asleep (``self.asleep = True)`` when there are no trackers to take care of (``self.trackers`` is empty).
     - Awake (``self.asleep = False)`` when there are trackers to take care of (actively monitoring the blockchain).
 
     Args:
-        db_manager (DBManager): a :mod:`DBManager <pisa.db_manager>` instance to interact with the database.
+        db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
+            database.
 
     Attributes:
-        trackers (``dict``): A dictionary containing all the ``TransactionTrackers`` handled by the ``Responder``.
-            Each entry is identified by a ``uuid``.
-        tx_tracker_map (``dict``): A ``penalty_txid:uuid`` map used to allow the ``Responder`` to deal with several
-            trackers triggered by the same ``penalty_txid``.
-        unconfirmed_txs (``list``): A list that keeps track of all unconfirmed ``penalty_txs``.
-        missed_confirmations (``dict``): a dictionary that keeps count of how many confirmations each ``penalty_tx`` has
-            missed. Used to trigger rebroadcast if needed.
-        asleep (``bool``): A flag that signals whether the ``Responder`` is asleep or awake.
-        block_queue (``Queue``): A queue used by the ``Responder`` to receive block hashes from ``bitcoind``. It is
-            populated by the ``ZMQSubscriber``.
-        db_manager (``DBManager``): A :mod:`DBManager <pisa.db_manager>` instance to interact with the database.
+        trackers (:obj:`dict`): A dictionary containing all the :obj:`TransactionTracker` handled by the
+            :obj:`Responder`. Each entry is identified by a ``uuid``.
+        tx_tracker_map (:obj:`dict`): A ``penalty_txid:uuid`` map used to allow the :obj:`Responder` to deal with
+            several trackers triggered by the same ``penalty_txid``.
+        unconfirmed_txs (:obj:`list`): A list that keeps track of all unconfirmed ``penalty_txs``.
+        missed_confirmations (:obj:`dict`): A dictionary that keeps count of how many confirmations each ``penalty_tx``
+            has missed. Used to trigger rebroadcast if needed.
+        asleep (:obj:`bool`): A flag that signals whether the :obj:`Responder` is asleep or awake.
+        block_queue (:obj:`Queue`): A queue used by the :obj:`Responder` to receive block hashes from ``bitcoind``. It
+            is populated by the :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`.
+        zmq_subscriber (:obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`): a ``ZMQSubscriber`` instance
+            used to receive new block notifications from ``bitcoind``.
+        db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): A ``DBManager`` instance to interact with the
+            database.
 
     """
 
@@ -142,22 +148,22 @@ class Responder:
     @staticmethod
     def on_sync(block_hash):
         """
-        Whether the ``Responder`` is on sync with ``bitcoind`` or not. Used when recovering from a crash.
+        Whether the :obj:`Responder` is on sync with ``bitcoind`` or not. Used when recovering from a crash.
 
         The Watchtower can be instantiated with fresh or with backed up data. In the later,  some triggers may have been
-        missed. In order to go back on sync both the ``Watcher`` and the ``Responder`` need to perform the state
-        transitions until they catch up.
+        missed. In order to go back on sync both the :obj:`Watcher <pisa.watcher.Watcher>` and the :obj:`Responder`
+        need to perform the state transitions until they catch up.
 
-        If a transaction is broadcast by the ``Responder`` and it is rejected (due to a double-spending for example)
-        and the ``Responder`` is off-sync then the ``TransactionTracker`` is abandoned.
+        If a transaction is broadcast by the :obj:`Responder` and it is rejected (due to a double-spending for example)
+        and the :obj:`Responder` is off-sync then the :obj:`TransactionTracker` is abandoned.
 
         This method helps making that decision.
 
         Args:
-            block_hash (str): the block hash passed to the ``Responder`` in the ``handle_breach`` request.
+            block_hash (:obj:`str`): the block hash passed to the :obj:`Responder` in the ``handle_breach`` request.
 
         Returns:
-            ``bool``: Whether or not the ``Responder`` and ``bitcoind`` are on sync.
+            :obj:`bool`: Whether or not the :obj:`Responder` and ``bitcoind`` are on sync.
         """
 
         block_processor = BlockProcessor()
@@ -173,20 +179,20 @@ class Responder:
 
     def handle_breach(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, block_hash):
         """
-        Requests the ``Responder`` to handle a channel breach. This is the entry point of the ``Responder``.
+        Requests the :obj:`Responder` to handle a channel breach. This is the entry point of the :obj:`Responder`.
 
         Args:
-            uuid (str): a unique identifier for the appointment.
-            locator (str): the appointment locator provided by the user (16-byte hex-encoded).
-            dispute_txid (str): the id of the transaction that created the channel breach.
-            penalty_txid (str): the id of the decrypted transaction included in the appointment.
-            penalty_rawtx (str): the raw transaction to be broadcast in response of the breach.
-            appointment_end (int): the block height at which the ``Responder`` will stop monitoring for this penalty
-                transaction.
-            block_hash (str): the block hash at which the breach was seen (used to see if we are on sync).
+            uuid (:obj:`str`): a unique identifier for the appointment.
+            locator (:obj:`str`): the appointment locator provided by the user (16-byte hex-encoded).
+            dispute_txid (:obj:`str`): the id of the transaction that created the channel breach.
+            penalty_txid (:obj:`str`): the id of the decrypted transaction included in the appointment.
+            penalty_rawtx (:obj:`str`): the raw transaction to be broadcast in response of the breach.
+            appointment_end (:obj:`int`): the block height at which the :obj:`Responder` will stop monitoring for this
+                penalty transaction.
+            block_hash (:obj:`str`): the block hash at which the breach was seen (used to see if we are on sync).
 
         Returns:
-            ``Receipt``: A :mod:`Receipt <pisa.carrier.Receipt>` indicating whether or not the ``penalty_tx`` made it
+            :obj:`Receipt <pisa.carrier.Receipt>`: A ``Receipt`` indicating whether or not the ``penalty_tx`` made it
             into the blockchain.
         """
 
@@ -213,22 +219,24 @@ class Responder:
 
     def add_tracker(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations=0):
         """
-        Creates a ``TransactionTracker`` after successfully broadcasting a ``penalty_tx``.
+        Creates a :obj:`TransactionTracker` after successfully broadcasting a ``penalty_tx``.
 
-        The ``TransactionTracker`` is stored in ``trackers`` and ``tx_tracker_map`` and the ``penalty_txid`` added to
+        The :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the ``penalty_txid`` added to
         ``unconfirmed_txs`` if ``confirmations=0``. Finally, the data is also stored in the database.
 
-        ``add_tracker`` awakes the ``Responder`` and creates a connection with the ``ZMQSubscriber`` if he is asleep.
+        ``add_tracker`` awakes the :obj:`Responder` and creates a connection with the
+        :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` if he is asleep.
 
         Args:
-            uuid (str): a unique identifier for the appointment.
-            locator (str): the appointment locator provided by the user (16-byte hex-encoded).
-            dispute_txid (str): the id of the transaction that created the channel breach.
-            penalty_txid (str): the id of the decrypted transaction included in the appointment.
-            penalty_rawtx (str): the raw transaction to be broadcast.
-            appointment_end (int): the block height at which the ``Responder`` will stop monitoring for the tracker.
-            confirmations (int): the confirmation count of the ``penalty_tx``. In normal conditions it will be zero, but
-                if the transaction is already on the blockchain this won't be the case.
+            uuid (:obj:`str`): a unique identifier for the appointment.
+            locator (:obj:`str`): the appointment locator provided by the user (16-byte hex-encoded).
+            dispute_txid (:obj:`str`): the id of the transaction that created the channel breach.
+            penalty_txid (:obj:`str`): the id of the decrypted transaction included in the appointment.
+            penalty_rawtx (:obj:`str`): the raw transaction to be broadcast.
+            appointment_end (:obj:`int`): the block height at which the :obj:`Responder` will stop monitoring for the
+                tracker.
+            confirmations (:obj:`int`): the confirmation count of the ``penalty_tx``. In normal conditions it will be
+                zero, but if the transaction is already on the blockchain this won't be the case.
         """
 
         tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
@@ -259,8 +267,8 @@ class Responder:
 
     def do_subscribe(self):
         """
-        Initializes a ``ZMQSubscriber`` instance to listen to new blocks from ``bitcoind``. Block ids are received
-        trough the ``block_queue``.
+        Initializes a :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` instance to listen to new blocks
+        from ``bitcoind``. Block ids are received trough the ``block_queue``.
         """
 
         self.zmq_subscriber = ZMQSubscriber(parent="Responder")
@@ -270,7 +278,8 @@ class Responder:
         """
         Monitors the blockchain whilst there are pending trackers.
 
-        This is the main method of the ``Responder`` and triggers tracker cleaning, rebroadcasting, reorg managing, etc.
+        This is the main method of the :obj:`Responder` and triggers tracker cleaning, rebroadcasting, reorg managing,
+        etc.
         """
 
         # ToDo: change prev_block_hash to the last known tip when bootstrapping
@@ -316,7 +325,7 @@ class Responder:
 
                 prev_block_hash = block.get("hash")
 
-        # Go back to sleep if there are no more pendong trackers
+        # Go back to sleep if there are no more pending trackers
         self.asleep = True
         self.zmq_subscriber.terminate = True
         self.block_queue = Queue()
@@ -330,7 +339,8 @@ class Responder:
         This method manages ``unconfirmed_txs`` and ``missed_confirmations``.
 
         Args:
-            txs (list): A list of confirmed tx ids (the list of transactions included in the last received block).
+            txs (:obj:`list`): A list of confirmed tx ids (the list of transactions included in the last received
+                block).
         """
 
         # If a new confirmed tx matches a tx we are watching, then we remove it from the unconfirmed txs map
@@ -356,7 +366,7 @@ class Responder:
         Gets the transactions to be rebroadcast based on their ``missed_confirmation`` count.
 
         Returns:
-            ``list``: A list with all the ids of the transaction that have to be rebroadcast.
+            :obj:`list`: A list with all the ids of the transaction that have to be rebroadcast.
         """
 
         txs_to_rebroadcast = []
@@ -374,10 +384,10 @@ class Responder:
         minimum confirmation count).
 
         Args:
-            height (int): the height of the last received block.
+            height (:obj:`int`): the height of the last received block.
 
         Returns:
-            ``list``: a list of tuples ``uuid:confirmations`` for the completed trackers.
+            :obj:`list`: a list of tuples ``uuid:confirmations`` for the completed trackers.
         """
 
         completed_trackers = []
@@ -402,14 +412,14 @@ class Responder:
         forever si the transaction keeps not getting it.
 
         Potentially the fees could be bumped here if the transaction has some tower dedicated outputs (or allows it
-        trough ``ANYONECANSPEND`` or something similar).
+        trough ``ANYONECANPAY`` or something similar).
 
         Args:
-            txs_to_rebroadcast (list): a list of transactions to be rebroadcast.
+            txs_to_rebroadcast (:obj:`list`): a list of transactions to be rebroadcast.
 
         Returns:
-            ``list``: A list of ``Receipts`` with information about whether or not every transaction made it trough the
-            network.
+            :obj:`list`: A list of :obj:`Receipts <pisa.carrier.Receipt>` with information about whether or not every
+            transaction made it trough the network.
         """
 
         # DISCUSS: #22-discuss-confirmations-before-retry
@@ -442,10 +452,10 @@ class Responder:
     def handle_reorgs(self, block_hash):
         """
         Basic reorg handle. It deals with situations where a reorg has been found but the ``dispute_tx`` is still
-        on the chain. If the ``dispute_tx`` is reverted, it need to call the ``ReorgManager`` (not implemented yet).
+        on the chain. If the ``dispute_tx`` is reverted, it need to call the :obj:`ReorgManager` (Soon TM).
 
         Args:
-            block_hash (str): the hash of the last block received (which triggered the reorg).
+            block_hash (:obj:`str`): the hash of the last block received (which triggered the reorg).
 
         """
         carrier = Carrier()

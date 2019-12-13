@@ -7,8 +7,8 @@ logger = Logger("BlockProcessor")
 
 class BlockProcessor:
     """
-    The ``BlockProcessor`` contains methods related to the blockchain. Most of its methods required communication with
-    ``bitcoind``.
+    The :class:`BlockProcessor` contains methods related to the blockchain. Most of its methods require communication
+    with ``bitcoind``.
     """
 
     @staticmethod
@@ -17,10 +17,10 @@ class BlockProcessor:
         Gives a block given a block hash by querying ``bitcoind``.
 
         Args:
-            block_hash (str): The block hash to be queried.
+            block_hash (:obj:`str`): The block hash to be queried.
 
         Returns:
-            ``dict`` or ``None``: A dictionary containing the requested block data if the block is found.
+            :obj:`dict` or :obj:`None`: A dictionary containing the requested block data if the block is found.
 
             Returns ``None`` otherwise.
         """
@@ -40,7 +40,7 @@ class BlockProcessor:
         Returns the hash of the current best chain tip.
 
         Returns:
-            ``str`` or ``None``: The hash of the block if it can be found.
+            :obj:`str` or :obj:`None`: The hash of the block if it can be found.
 
             Returns ``None`` otherwise (not even sure this can actually happen).
         """
@@ -60,7 +60,7 @@ class BlockProcessor:
         Returns the block height of the best chain.
 
         Returns:
-            ``int`` or ``None``: The block height if it can be computed.
+            :obj:`int` or :obj:`None`: The block height if it can be computed.
 
             Returns ``None`` otherwise (not even sure this can actually happen).
         """
@@ -81,10 +81,10 @@ class BlockProcessor:
         associated metadata given by ``bitcoind`` (e.g. confirmation count).
 
         Args:
-            raw_tx (str): The hex representation of the transaction.
+            raw_tx (:obj:`str`): The hex representation of the transaction.
 
         Returns:
-            ``dict`` or ``None``: The decoding of the given ``raw_tx`` if the transaction is well formatted.
+            :obj:`dict` or :obj:`None`: The decoding of the given ``raw_tx`` if the transaction is well formatted.
 
             Returns ``None`` otherwise.
         """
@@ -105,15 +105,15 @@ class BlockProcessor:
         This method is used to fetch all the missed information when recovering from a crash. Note that if the two
         blocks are not part of the same chain, it would return all the blocks up to genesis.
 
-        FIXME: This needs to be integrated with the ChainMaester (soon TM) to allow dealing with forks.
-
         Args:
-            last_know_block_hash (hex): the hash of the last known block.
+            last_know_block_hash (:obj:`str`): the hash of the last known block.
 
         Returns:
-            ``list``: A list of blocks between the last given block and the current best chain tip, starting from the
+            :obj:`list`: A list of blocks between the last given block and the current best chain tip, starting from the
             child of ``last_know_block_hash``.
         """
+
+        # FIXME: This needs to be integrated with the ChainMaester (soon TM) to allow dealing with forks.
 
         current_block_hash = self.get_best_block_hash()
         missed_blocks = []
@@ -131,11 +131,11 @@ class BlockProcessor:
         Compute the distance between a given block hash and the best chain tip.
 
         Args:
-            target_block_hash (str): the hash of the target block (the one to compute the distance form the tip).
+            target_block_hash (:obj:`str`): the hash of the target block (the one to compute the distance form the tip).
 
         Returns:
-            ``int`` or ``None``: The distance between the target and the best chain tip is the target block can be found
-            on the blockchain.
+            :obj:`int` or :obj:`None`: The distance between the target and the best chain tip is the target block can be
+            found on the blockchain.
 
             Returns ``None`` otherwise.
         """

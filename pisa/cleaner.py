@@ -5,7 +5,7 @@ logger = Logger("Cleaner")
 
 class Cleaner:
     """
-    The ``Cleaner`` is the class in charge of removing expired / completed data from the tower.
+    The :class:`Cleaner` is the class in charge of removing expired/completed data from the tower.
 
     Mutable objects (like dicts) are passed-by-reference in Python, so no return is needed for the Cleaner.
     """
@@ -14,13 +14,16 @@ class Cleaner:
     def delete_expired_appointment(expired_appointments, appointments, locator_uuid_map, db_manager):
         """
         Deletes appointments which ``end_time`` has been reached (with no trigger) both from memory
-        (:mod:`Watcher <pisa.watcher>`) and disk.
+        (:obj:`Watcher <pisa.watcher.Watcher>`) and disk.
 
         Args:
-            expired_appointments (list): a list of appointments to be deleted.
-            appointments (dict): a dictionary containing all the :mod:`Watcher <pisa.watcher>` appointments.
-            locator_uuid_map (dict): a ``locator:uuid`` map for the :mod:`Watcher <pisa.watcher>` appointments.
-            db_manager (DBManager): a :mod:`DBManager <pisa.db_manager>` instance to interact with the database.
+            expired_appointments (:obj:`list`): a list of appointments to be deleted.
+            appointments (:obj:`dict`): a dictionary containing all the :mod:`Watcher <pisa.watcher.Watcher>`
+                appointments.
+            locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <pisa.watcher.Watcher>`
+                appointments.
+            db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
+                database.
         """
 
         for uuid in expired_appointments:
@@ -34,7 +37,7 @@ class Cleaner:
             else:
                 locator_uuid_map[locator].remove(uuid)
 
-            logger.info("End time reached with no match. Deleting appointment.", locator=locator, uuid=uuid)
+            logger.info("End time reached with no breach. Deleting appointment.", locator=locator, uuid=uuid)
 
             # Delete appointment from the db
             db_manager.delete_watcher_appointment(uuid)
@@ -42,13 +45,17 @@ class Cleaner:
     @staticmethod
     def delete_completed_appointment(uuid, appointments, locator_uuid_map, db_manager):
         """
-        Deletes a triggered appointment from memory (:mod:`Watcher <pisa.watcher>`) and flags it as triggered in disk.
+        Deletes a triggered appointment from memory (:obj:`Watcher <pisa.watcher.Watcher>`) and flags it as triggered in
+        disk.
 
         Args:
-            uuid (str): a unique 16-byte hex-encoded str that identifies the appointment.
-            appointments (dict): a dictionary containing all the :mod:`Watcher <pisa.watcher>` appointments.
-            locator_uuid_map (dict): a ``locator:uuid`` map for the :mod:`Watcher <pisa.watcher>` appointments.
-            db_manager (DBManager): a :mod:`DBManager <pisa.db_manager>` instance to interact with the database.
+            uuid (:obj:`str`): a unique 16-byte hex-encoded str that identifies the appointment.
+            appointments (:obj:`dict`): a dictionary containing all the :obj:`Watcher <pisa.watcher.Watcher>`
+                appointments.
+            locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <pisa.watcher.Watcher>`
+                appointments.
+            db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
+                database.
         """
 
         # Delete the appointment
@@ -69,15 +76,18 @@ class Cleaner:
     @staticmethod
     def delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager):
         """
-        Deletes a completed tracker both from memory (:mod:`Responder <pisa.responder>`) and disk (from the
-        :mod:`Responder <pisa.responder>` and :mod:`Watcher <pisa.watcher>` databases).
+        Deletes a completed tracker both from memory (:obj:`Responder <pisa.responder.Responder>`) and disk (from the
+        Responder's and Watcher's databases).
 
         Args:
-            trackers (dict): a dictionary containing all the :mod:`Responder <pisa.responder>` trackers.
-            tx_tracker_map (dict): a ``penalty_txid:uuid`` map for the :mod:`Responder <pisa.responder>` trackers.
-            completed_trackers (list): a list of completed trackers to be deleted.
-            height (int): the block height at which the trackers were completed.
-            db_manager (DBManager): a :mod:`DBManager <pisa.db_manager>` instance to interact with the database.
+            trackers (:obj:`dict`): a dictionary containing all the :obj:`Responder <pisa.responder.Responder>`
+                trackers.
+            tx_tracker_map (:obj:`dict`): a ``penalty_txid:uuid`` map for the :obj:`Responder
+                <pisa.responder.Responder>` trackers.
+            completed_trackers (:obj:`list`): a list of completed trackers to be deleted.
+            height (:obj:`int`): the block height at which the trackers were completed.
+            db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
+                database.
         """
 
         for uuid, confirmations in completed_trackers:

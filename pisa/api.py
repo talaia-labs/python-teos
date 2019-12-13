@@ -26,9 +26,9 @@ def add_appointment():
     encoded and contain an ``appointment`` field and optionally a ``signature`` and ``public_key`` fields.
 
     Returns:
-        ``tuple``: A tuple containing the response (``json``) and response code (``int``). For accepted appointments, the
-        ``rcode`` is always 0 and the response contains the signed receipt. For rejected appointments, the ``rcode`` is
-        a negative value and the response contains the error message. Error messages can be found at
+        :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted appointments,
+        the ``rcode`` is always 0 and the response contains the signed receipt. For rejected appointments, the ``rcode``
+        is a negative value and the response contains the error message. Error messages can be found at
         :mod:`Errors <pisa.errors>`.
     """
 
@@ -90,13 +90,13 @@ def get_appointment():
     The information is requested by ``locator``.
 
     Returns:
-        ``dict``: A json formatted dictionary containing information about the requested appointment.
+        :obj:`dict`: A json formatted dictionary containing information about the requested appointment.
 
-        A ``status`` flag is added to the data provided by either the :mod:`Watcher <pisa.watcher>` or the
-        :mod:`Responder <pisa.responder>` that signals the status of the appointment.
+        A ``status`` flag is added to the data provided by either the :obj:`Watcher <pisa.watcher.Watcher>` or the
+        :obj:`Responder <pisa.responder.Responder>` that signals the status of the appointment.
 
-        - Appointments hold by the :mod:`Watcher <pisa.watcher>` are flagged as ``being_watched``.
-        - Appointments hold by the :mod:`Responder <pisa.responder>` are flagged as ``dispute_triggered``.
+        - Appointments hold by the :obj:`Watcher <pisa.watcher.Watcher>` are flagged as ``being_watched``.
+        - Appointments hold by the :obj:`Responder <pisa.responder.Responder>` are flagged as ``dispute_triggered``.
         - Unknown appointments are flagged as ``not_found``.
     """
 
@@ -143,8 +143,9 @@ def get_all_appointments():
     This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
 
     Returns:
-        ``dict``: A json formatted dictionary containing all the appointments hold by the :mod:`Watcher <pisa.watcher>`
-        (``watcher_appointments``) and by the :mod:`Responder <pisa.responder>` (``responder_trackers``).
+        :obj:`dict`: A json formatted dictionary containing all the appointments hold by the
+        :obj:`Watcher <pisa.watcher.Watcher>` (``watcher_appointments``) and by the
+        :obj:`Responder <pisa.responder.Responder>` (``responder_trackers``).
 
     """
 
@@ -172,7 +173,7 @@ def get_block_count():
     testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
 
     Returns:
-        ``dict``: A json encoded dictionary containing the block height.
+        :obj:`dict`: A json encoded dictionary containing the block height.
 
     """
 
@@ -184,7 +185,7 @@ def start_api(w):
     This function starts the Flask server used to run the API.
 
     Args:
-          w (Watcher): A :mod:`Watcher <pisa.watcher>` object.
+          w (:obj:`Watcher <pisa.watcher.Watcher>`): A ``Watcher`` object.
 
     """
 

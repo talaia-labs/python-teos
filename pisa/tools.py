@@ -14,8 +14,8 @@ def bitcoin_cli():
     An ``http`` connection with ``bitcoind`` using the ``json-rpc`` interface.
 
     Returns:
-        ``AuthServiceProxy``: An authenticated service proxy to ``bitcoind`` that can be used to send ``json-rpc``
-        commands.
+        :obj:`AuthServiceProxy <pisa.utils.auth_proxy.AuthServiceProxy>`: An authenticated service proxy to ``bitcoind``
+        that can be used to send ``json-rpc`` commands.
     """
 
     return AuthServiceProxy(
@@ -29,7 +29,7 @@ def can_connect_to_bitcoind():
     Checks if the tower has connection to ``bitcoind``.
 
     Returns:
-        ``bool``: ``True`` if the connection can be established. ``False`` otherwise.
+        :obj:`bool`: ``True`` if the connection can be established. ``False`` otherwise.
     """
 
     can_connect = True
@@ -48,7 +48,7 @@ def in_correct_network(network):
     ``regtest``)
 
     Returns:
-        ``bool``: ``True`` if the network configuration matches. ``False`` otherwise.
+        :obj:`bool`: ``True`` if the network configuration matches. ``False`` otherwise.
     """
 
     mainnet_genesis_block_hash = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"

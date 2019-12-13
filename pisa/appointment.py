@@ -5,18 +5,18 @@ from pisa.encrypted_blob import EncryptedBlob
 
 class Appointment:
     """
-    The ``Appointment`` contains the information regarding an appointment between a client and the Watchtower.
+    The :class:`Appointment` contains the information regarding an appointment between a client and the Watchtower.
 
     Args:
-        locator (str): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
+        locator (:mod:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
             for the tower to decrypt and broadcast the penalty transaction.
-        start_time (int): The block height at which the tower is hired to start watching for breaches.
-        end_time (int): The block height at which the tower will stop watching for breaches.
-        to_self_delay (int): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
+        start_time (:mod:`int`): The block height where the tower is hired to start watching for breaches.
+        end_time (:mod:`int`): The block height where the tower will stop watching for breaches.
+        to_self_delay (:mod:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
             covering.
-        encrypted_blob (EncryptedBlob): An :mod:`EncryptedBlob <pisa.encrypted_blob>` object containing an encrypted
-            penalty transaction. The tower will decrypt it and broadcast the penalty transaction upon seeing a breach on
-            the blockchain.
+        encrypted_blob (:obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>`): An ``EncryptedBlob`` object
+            containing an encrypted penalty transaction. The tower will decrypt it and broadcast the penalty transaction
+            upon seeing a breach on the blockchain.
     """
 
     # DISCUSS: 35-appointment-checks
@@ -35,11 +35,11 @@ class Appointment:
         This method is useful to load data from a database.
 
         Args:
-            appointment_data (dict): a dictionary containing the following keys:
+            appointment_data (:mod:`dict`): a dictionary containing the following keys:
                 ``{locator, start_time, end_time, to_self_delay, encrypted_blob}``
 
         Returns:
-            ``Appointment``: An appointment initialized using the provided data.
+            :obj:`Appointment <pisa.appointment.Appointment>`: An appointment initialized using the provided data.
 
         Raises:
             ValueError: If one of the mandatory keys is missing in ``appointment_data``.
@@ -64,7 +64,7 @@ class Appointment:
         Exports an appointment as a dictionary.
 
         Returns:
-            ``dict``: A dictionary containing the appointment attributes.
+            :obj:`dict`: A dictionary containing the appointment attributes.
 
         """
 
@@ -87,13 +87,13 @@ class Appointment:
         to store appointments in the database.
 
         Args:
-            triggered (bool): Whether the dispute has been triggered or not. When an appointment passes from the
+            triggered (:mod:`bool`): Whether the dispute has been triggered or not. When an appointment passes from the
                 :mod:`Watcher <pisa.watcher>` to the :mod:`Responder <pisa.responder>` it is not deleted straightaway.
                 Instead, the appointment is stored in the DB flagged as ``triggered``. This aims to ease handling block
                 reorgs in the future.
 
         Returns:
-            ``str``: A json-encoded str representing the appointment.
+            :obj:`str`: A json-encoded str representing the appointment.
         """
 
         appointment = self.to_dict()

@@ -16,10 +16,10 @@ class _StructuredMessage:
 
 class Logger:
     """
-    The ``Logger`` is the class in charge of logging events into the log file.
+    The :class:`Logger` is the class in charge of logging events into the log file.
 
     Args:
-        actor (str): the system actor that is logging the event (e.g. ``Watcher``, ``Cryptographer``, ...).
+        actor (:obj:`str`): the system actor that is logging the event (e.g. ``Watcher``, ``Cryptographer``, ...).
     """
 
     def __init__(self, actor=None):
@@ -39,7 +39,7 @@ class Logger:
         Logs an ``INFO`` level message to stdout and file.
 
         Args:
-             msg (str): the message to be logged.
+             msg (:obj:`str`): the message to be logged.
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
@@ -51,7 +51,7 @@ class Logger:
         Logs an ``DEBUG`` level message to stdout and file.
 
         Args:
-             msg (str): the message to be logged.
+             msg (:obj:`str`): the message to be logged.
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
@@ -63,7 +63,7 @@ class Logger:
         Logs an ``ERROR`` level message to stdout and file.
 
         Args:
-             msg (str): the message to be logged.
+             msg (:obj:`str`): the message to be logged.
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
@@ -75,7 +75,7 @@ class Logger:
         Logs an ``WARNING`` level message to stdout and file.
 
         Args:
-             msg (str): the message to be logged.
+             msg (:obj:`str`): the message to be logged.
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 

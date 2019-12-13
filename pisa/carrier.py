@@ -11,18 +11,18 @@ logger = Logger("Carrier")
 
 class Receipt:
     """
-    The ``Receipt`` class represent the interaction between the ``Carrier`` and ``bitcoind`` when broadcasting
+    The :class:`Receipt` class represent the interaction between the :obj:`Carrier` and ``bitcoind`` when broadcasting
     transactions. It is used to signal whether or not a transaction has been successfully broadcast and why.
 
     Args:
-        delivered (bool): whether or not the transaction has been successfully broadcast.
-        confirmations (int): the number of confirmations of the transaction to broadcast. In certain situations the
-            ``Carrier`` may fail to broadcast a transaction because it was already in the blockchain. This attribute
-            signals those situations.
-        reason (int): an error code describing why the transaction broadcast failed.
+        delivered (:obj:`bool`): whether or not the transaction has been successfully broadcast.
+        confirmations (:obj:`int`): the number of confirmations of the transaction to broadcast. In certain situations
+            the :obj:`Carrier` may fail to broadcast a transaction because it was already in the blockchain.
+            This attribute signals those situations.
+        reason (:obj:`int`): an error code describing why the transaction broadcast failed.
 
     Returns:
-         ``Receipt``: A receipt describing whether or not the transaction was delivered. Notice that transactions
+         :obj:`Receipt`: A receipt describing whether or not the transaction was delivered. Notice that transactions
          that are already on chain are flagged as delivered with a ``confirmations > 0`` whereas new transactions are so
          with ``confirmations = 0``.
     """
@@ -35,8 +35,8 @@ class Receipt:
 
 class Carrier:
     """
-    The ``Carrier`` is the class in charge of interacting with ``bitcoind`` to send/get transactions. It uses
-    ``Receipt`` objects to report about sending transactions.
+    The :class:`Carrier` is the class in charge of interacting with ``bitcoind`` to send/get transactions. It uses
+    :obj:`Receipt` objects to report about the sending outcome.
     """
 
     # NOTCOVERED
@@ -45,11 +45,11 @@ class Carrier:
         Tries to send a given raw transaction to the Bitcoin network using ``bitcoind``.
 
         Args:
-            rawtx (str): a (potentially) signed raw transaction ready to be broadcast.
-            txid  (str): the transaction id corresponding to ``rawtx``.
+            rawtx (:obj:`str`): a (potentially) signed raw transaction ready to be broadcast.
+            txid  (:obj:`str`): the transaction id corresponding to ``rawtx``.
 
         Returns:
-            ``Receipt``: A receipt reporting whether the transaction was successfully delivered or not and why.
+            :obj:`Receipt`: A receipt reporting whether the transaction was successfully delivered or not and why.
         """
 
         try:
@@ -108,10 +108,11 @@ class Carrier:
         Queries transaction data to ``bitcoind`` given a transaction id.
 
         Args:
-            txid (str): a 32-byte hex-formatted string representing the transaction id.
+            txid (:obj:`str`): a 32-byte hex-formatted string representing the transaction id.
 
         Returns:
-            ``dict`` or ``None``: A dictionary with the transaction data if the transaction can be found on the chain.
+            :obj:`dict` or :obj:`None`: A dictionary with the transaction data if the transaction can be found on the
+            chain.
             Returns ``None`` otherwise.
         """
 

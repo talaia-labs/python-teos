@@ -20,7 +20,7 @@ logger = Logger("Inspector")
 
 class Inspector:
     """
-    The ``Inspector`` class is in charge of verifying that the appointment data provided by the user is correct.
+    The :class:`Inspector` class is in charge of verifying that the appointment data provided by the user is correct.
     """
 
     def inspect(self, appointment_data, signature, public_key):
@@ -28,16 +28,17 @@ class Inspector:
         Inspects whether the data provided by the user is correct.
 
         Args:
-            appointment_data (dict): a dictionary containing the appointment data.
-            signature (str): the appointment signature provided by the user (hex encoded).
-            public_key (str): the user's public key (hex encoded).
+            appointment_data (:obj:`dict`): a dictionary containing the appointment data.
+            signature (:obj:`str`): the appointment signature provided by the user (hex encoded).
+            public_key (:obj:`str`): the user's public key (hex encoded).
 
         Returns:
-            ``Appointment`` or ``tuple``: An appointment initialized with the provided data if it is correct.
+            :obj:`Appointment <pisa.appointment.Appointment>` or :obj:`tuple`: An appointment initialized with the
+            provided data if it is correct.
 
-            Returns a tuple (`return code`, `message`) describing the error otherwise.
+            Returns a tuple ``(return code, message)`` describing the error otherwise.
 
-            Errors are defined in :mod:`errors <pisa.errors>`.
+            Errors are defined in :mod:`Errors <pisa.errors>`.
         """
 
         block_height = BlockProcessor.get_block_count()
@@ -77,10 +78,10 @@ class Inspector:
         Locators must be 16-byte hex encoded strings.
 
         Args:
-            locator (str): the locator to be checked.
+            locator (:obj:`str`): the locator to be checked.
 
         Returns:
-            ``tuple``: A tuple (return code, message) as follows:
+            :obj:`tuple`: A tuple (return code, message) as follows:
 
             - ``(0, None)`` if the ``locator`` is correct.
             - ``!= (0, None)`` otherwise.
@@ -122,11 +123,11 @@ class Inspector:
         Start times must be ahead the current best chain tip.
 
         Args:
-            start_time (int): the block height at which the tower is requested to start watching for breaches.
-            block_height (int): the chain height.
+            start_time (:obj:`int`): the block height at which the tower is requested to start watching for breaches.
+            block_height (:obj:`int`): the chain height.
 
         Returns:
-            ``tuple``: A tuple (return code, message) as follows:
+            :obj:`tuple`: A tuple (return code, message) as follows:
 
             - ``(0, None)`` if the ``start_time`` is correct.
             - ``!= (0, None)`` otherwise.
@@ -171,12 +172,12 @@ class Inspector:
         End times must be ahead both the ``start_time`` and the current best chain tip.
 
         Args:
-            end_time (int): the block height at which the tower is requested to stop watching for breaches.
-            start_time (int): the block height at which the tower is requested to start watching for breaches.
-            block_height (int): the chain height.
+            end_time (:obj:`int`): the block height at which the tower is requested to stop watching for breaches.
+            start_time (:obj:`int`): the block height at which the tower is requested to start watching for breaches.
+            block_height (:obj:`int`): the chain height.
 
         Returns:
-            ``tuple``: A tuple (return code, message) as follows:
+            :obj:`tuple`: A tuple (return code, message) as follows:
 
             - ``(0, None)`` if the ``end_time`` is correct.
             - ``!= (0, None)`` otherwise.
@@ -228,11 +229,11 @@ class Inspector:
         To self delays must be greater or equal to ``MIN_TO_SELF_DELAY``.
 
         Args:
-            to_self_delay (int): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
-                covering.
+            to_self_delay (:obj:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this
+                appointment is covering.
 
         Returns:
-            ``tuple``: A tuple (return code, message) as follows:
+            :obj:`tuple`: A tuple (return code, message) as follows:
 
             - ``(0, None)`` if the ``to_self_delay`` is correct.
             - ``!= (0, None)`` otherwise.
@@ -271,13 +272,11 @@ class Inspector:
         """
         Checks if the provided ``encrypted_blob`` may be correct.
 
-        FIXME: Currently this only checks format and not empty. It must be improved.
-
         Args:
-            encrypted_blob (str): the encrypted blob to be checked (hex encoded).
+            encrypted_blob (:obj:`str`): the encrypted blob to be checked (hex encoded).
 
         Returns:
-            ``tuple``: A tuple (return code, message) as follows:
+            :obj:`tuple`: A tuple (return code, message) as follows:
 
             - ``(0, None)`` if the ``encrypted_blob`` is correct.
             - ``!= (0, None)`` otherwise.
@@ -315,12 +314,12 @@ class Inspector:
         Checks if the provided user signature is correct.
 
         Args:
-            appointment (dict): the appointment that was signed by the user.
-            signature (str): the user's signature (hex encoded).
-            pk_der (str): the user's public key (hex encoded, DER format).
+            appointment (:obj:`dict`): the appointment that was signed by the user.
+            signature (:obj:`str`): the user's signature (hex encoded).
+            pk_der (:obj:`str`): the user's public key (hex encoded, DER format).
 
         Returns:
-            ``tuple``: A tuple (return code, message) as follows:
+            :obj:`tuple`: A tuple (return code, message) as follows:
 
             - ``(0, None)`` if the ``signature`` is correct.
             - ``!= (0, None)`` otherwise.

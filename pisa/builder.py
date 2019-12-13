@@ -6,8 +6,8 @@ from pisa.appointment import Appointment
 
 class Builder:
     """
-    The ``Builder`` class is in charge or reconstructing data loaded from the database and build the data structures
-    of the :mod:`Watcher <pisa.watcher>` and the :mod:`Responder <pisa.responder>`.
+    The :class:`Builder` class is in charge or reconstructing data loaded from the database and build the data
+    structures of the :obj:`Watcher <pisa.watcher.Watcher>` and the :obj:`Responder <pisa.responder.Responder>`.
     """
 
     @staticmethod
@@ -17,15 +17,15 @@ class Builder:
         dictionary of appointments from the database.
 
         Args:
-            appointments_data (dict): a dictionary of dictionaries representing all the :mod:`Watcher <pisa.watcher>`
-                appointments stored in the database. The structure is as follows:
+            appointments_data (:obj:`dict`): a dictionary of dictionaries representing all the
+                :obj:`Watcher <pisa.watcher.Watcher>` appointments stored in the database. The structure is as follows:
 
                     ``{uuid: {locator: str, start_time: int, ...}, uuid: {locator:...}}``
 
         Returns:
-            ``tuple``: A tuple with two dictionaries. ``appointments`` containing the appointment information in
-            :mod:`Appointment <pisa.appointment>` objects and ``locator_uuid_map`` containing a map of appointment
-            (``uuid:locator``).
+            :obj:`tuple`: A tuple with two dictionaries. ``appointments`` containing the appointment information in
+            :obj:`Appointment <pisa.appointment.Appointment>` objects and ``locator_uuid_map`` containing a map of
+            appointment (``uuid:locator``).
         """
 
         appointments = {}
@@ -50,14 +50,15 @@ class Builder:
         a dictionary of trackers from the database.
 
         Args:
-            tracker_data (dict): a dictionary of dictionaries representing all the :mod:`Responder <pisa.responder>`
-                trackers stored in the database. The structure is as follows:
+            tracker_data (:obj:`dict`): a dictionary of dictionaries representing all the
+                :mod:`Responder <pisa.responder.Responder>` trackers stored in the database.
+                The structure is as follows:
 
                     ``{uuid: {locator: str, dispute_txid: str, ...}, uuid: {locator:...}}``
 
         Returns:
-            ``tuple``: A tuple with two dictionaries. ``trackers`` containing the trackers' information in
-            :class:`TransactionTracker <pisa.responder.TransactionTracker>` objects and a ``tx_tracker_map`` containing
+            :obj:`tuple`: A tuple with two dictionaries. ``trackers`` containing the trackers' information in
+            :obj:`TransactionTracker <pisa.responder.TransactionTracker>` objects and a ``tx_tracker_map`` containing
             the map of trackers (``penalty_txid: uuid``).
 
         """
@@ -80,14 +81,14 @@ class Builder:
     @staticmethod
     def build_block_queue(missed_blocks):
         """
-        Builds a ``Queue`` of block hashes to initialize the :mod:`Watcher <pisa.watcher>` or the
-        :mod:`Responder <pisa.responder>` using backed up data.
+        Builds a ``Queue`` of block hashes to initialize the :mod:`Watcher <pisa.watcher.Watcher>` or the
+        :mod:`Responder <pisa.responder.Responder>` using backed up data.
 
         Args:
-            missed_blocks (list): list of block hashes missed by the Watchtower (do to a crash or shutdown).
+            missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (do to a crash or shutdown).
 
         Returns:
-            ``Queue``: A `Queue` containing all the missed blocks hashes.
+            :obj:`Queue`: A ``Queue`` containing all the missed blocks hashes.
         """
 
         block_queue = Queue()

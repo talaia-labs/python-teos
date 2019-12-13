@@ -17,17 +17,18 @@ logger = Logger("Watcher")
 
 class Watcher:
     """
-    The ``Watcher`` is the class in charge to watch for channel breaches for the appointments accepted by the tower.
+    The :class:`Watcher` is the class in charge to watch for channel breaches for the appointments accepted by the
+    tower.
 
-    The ``Watcher`` keeps track of the accepted appointments in ``appointments`` and, for new received block, checks
-    if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
-    :mod:`EncryptedBlob <pisa.encrypted_blob>` of the corresponding appointment is decrypted and the data is passed
-    to the :mod:`Responder <pisa.responder>`.
+    The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
+    checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
+    :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the data
+    is passed to the :obj:`Responder <pisa.responder.Responder>`.
 
     If an appointment reaches its end with no breach, the data is simply deleted.
 
-    The ``Watcher`` receives information about new received blocks via the ``block_queue`` that is populated by the
-    :mod:`ZMQSubscriber <pisa.utils.zmq_subscriber>`.
+    The :class:`Watcher` receives information about new received blocks via the ``block_queue`` that is populated by the
+    :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber>`.
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
@@ -99,8 +100,8 @@ class Watcher:
         It will go back to sleep once there are no more pending appointments.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
-        :mod:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob` and pass the information to the
-        :mod:`Responder <pisa.responder.Responder>`.
+        :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` and pass the information to the
+        :obj:`Responder <pisa.responder.Responder>`.
 
         The tower may store multiple appointments with the same ``locator`` to avoid DoS attacks based on data
         rewriting. `locators`` should be derived from the ``dispute_txid``, but that task is performed by the user, and
