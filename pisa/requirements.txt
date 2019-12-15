@@ -2,3 +2,5 @@ zmq
 flask
 cryptography
 requests
+plyvel
+pytest
