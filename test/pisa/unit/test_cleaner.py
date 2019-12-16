@@ -7,7 +7,7 @@ from pisa.cleaner import Cleaner
 from pisa.appointment import Appointment
 from pisa.db_manager import WATCHER_PREFIX
 
-from test.unit.conftest import get_random_value_hex
+from test.pisa.unit.conftest import get_random_value_hex
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 

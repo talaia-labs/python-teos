@@ -9,7 +9,7 @@ from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LO
 
 from common.constants import LOCATOR_LEN_BYTES
 
-from test.unit.conftest import get_random_value_hex, generate_dummy_appointment
+from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appointment
 
 
 @pytest.fixture(scope="module")

@@ -8,7 +8,7 @@ from pisa import c_logger
 from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
-from test.unit.conftest import (
+from test.pisa.unit.conftest import (
     generate_block,
     generate_blocks,
     generate_dummy_appointment,

@@ -1,6 +1,6 @@
 from pisa import c_logger
 from pisa.encrypted_blob import EncryptedBlob
-from test.unit.conftest import get_random_value_hex
+from test.pisa.unit.conftest import get_random_value_hex
 
 c_logger.disabled = True
 

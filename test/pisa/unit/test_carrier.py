@@ -4,7 +4,7 @@ from pisa import c_logger
 from pisa.carrier import Carrier
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
-from test.unit.conftest import generate_blocks, generate_block, get_random_value_hex
+from test.pisa.unit.conftest import generate_blocks, get_random_value_hex
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
 c_logger.disabled = True

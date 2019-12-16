@@ -5,7 +5,7 @@ from pisa import c_logger
 from pisa.appointment import Appointment
 from pisa.encrypted_blob import EncryptedBlob
 
-from test.unit.conftest import get_random_value_hex
+from test.pisa.unit.conftest import get_random_value_hex
 
 from common.constants import LOCATOR_LEN_BYTES
 

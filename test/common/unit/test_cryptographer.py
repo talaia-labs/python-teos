@@ -3,7 +3,7 @@ import binascii
 from apps.cli.blob import Blob
 from common.cryptographer import Cryptographer
 from pisa.encrypted_blob import EncryptedBlob
-from test.unit.conftest import get_random_value_hex
+from test.common.unit.conftest import get_random_value_hex
 
 data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
 key = "b2e984a570f6f49bc38ace178e09147b0aa296cbb7c92eb01412f7e2d07b5659"
