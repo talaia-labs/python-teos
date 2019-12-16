@@ -51,7 +51,7 @@ class Cryptographer:
         return True
 
     @staticmethod
-    def encrypt(blob, secret, rtype=str):
+    def encrypt(blob, secret, rtype="str"):
         """
         Encrypts a given :mod:`Blob <apps.cli.blob.Blob>` data using ``CHACHA20POLY1305``.
 
@@ -60,17 +60,17 @@ class Cryptographer:
         Args:
               blob (:mod:`Blob <apps.cli.blob.Blob>`): a ``Blob`` object containing a raw penalty transaction.
               secret (:mod:`str`): a value to used to derive the encryption key. Should be the dispute txid.
-              rtype: the return type for the encrypted value. Can be either ``str`` or ``bytes``.
+              rtype(:mod:`str`): the return type for the encrypted value. Can be either ``'str'`` or ``'bytes'``.
 
         Returns:
               :obj:`str` or :obj:`bytes`: The encrypted data in ``str`` or ``bytes``, depending on ``rtype``.
 
         Raises:
-            ValueError: if ``rtype`` is not ``str`` or ``bytes``
+            ValueError: if ``rtype`` is not ``'str'`` or ``'bytes'``
         """
 
-        if not (isinstance(str, rtype) or isinstance(bytes, rtype)):
-            raise ValueError("Wrong return type. Return type must be str or bytes")
+        if rtype not in ["str", "bytes"]:
+            raise ValueError("Wrong return type. Return type must be 'str' or 'bytes'")
 
         Cryptographer.check_data_key_format(blob.data, secret)
 
@@ -88,14 +88,14 @@ class Cryptographer:
         cipher = ChaCha20Poly1305(sk)
         encrypted_blob = cipher.encrypt(nonce=nonce, data=tx, associated_data=None)
 
-        if isinstance(str, rtype):
+        if rtype == "str":
             encrypted_blob = hexlify(encrypted_blob).decode("utf8")
 
         return encrypted_blob
 
     @staticmethod
     # ToDo: #20-test-tx-decrypting-edge-cases
-    def decrypt(encrypted_blob, secret, rtype=str):
+    def decrypt(encrypted_blob, secret, rtype="str"):
         """
         Decrypts a given :mod:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` using ``CHACHA20POLY1305``.
 
@@ -105,17 +105,17 @@ class Cryptographer:
               encrypted_blob(:mod:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob`` potentially
                 containing a penalty transaction.
               secret (:mod:`str`): a value to used to derive the decryption key. Should be the dispute txid.
-              rtype: the return type for the encrypted value. Can be either ``str`` or ``bytes``.
+              rtype(:mod:`str`): the return type for the decrypted value. Can be either ``'str'`` or ``'bytes'``.
 
         Returns:
               :obj:`str` or :obj:`bytes`: The decrypted data in ``str`` or ``bytes``, depending on ``rtype``.
 
         Raises:
-            ValueError: if ``rtype`` is not ``str`` or ``bytes``
+            ValueError: if ``rtype`` is not ``'str'`` or ``'bytes'``
         """
 
-        if not (isinstance(str, rtype) or isinstance(bytes, rtype)):
-            raise ValueError("Wrong return type. Return type must be 'hex' or 'bytes'")
+        if rtype not in ["str", "bytes"]:
+            raise ValueError("Wrong return type. Return type must be 'str' or 'bytes'")
 
         Cryptographer.check_data_key_format(encrypted_blob.data, secret)
 
@@ -138,7 +138,7 @@ class Cryptographer:
             blob = cipher.decrypt(nonce=nonce, data=data, associated_data=None)
 
             # Change the blob encoding to hex depending on the rtype (default)
-            if isinstance(str, rtype):
+            if rtype == "str":
                 blob = hexlify(blob).decode("utf8")
 
         except InvalidTag:
@@ -226,24 +226,24 @@ class Cryptographer:
             logger.error("The provided data cannot be deserialized (wrong type).")
 
     @staticmethod
-    def sign(data, sk, rtype=str):
+    def sign(data, sk, rtype="str"):
         """
         Signs a given data using a given secret key using ECDSA.
 
         Args:
             data(:mod:`str`): the data to be signed.
             sk(:mod:`EllipticCurvePrivateKey`): the ECDSA secret key used to signed the data.
-            rtype: the return type for the encrypted value. Can be either ``str`` or ``bytes``.
+            rtype: the return type for the encrypted value. Can be either ``'str'`` or ``'bytes'``.
 
         Returns:
            :obj:`str` or :obj:`bytes`: The data signature in ``str`` or ``bytes``, depending on ``rtype``.
 
         Raises:
-            ValueError: if ``rtype`` is not ``str`` or ``bytes``
+            ValueError: if ``rtype`` is not ``'str'`` or ``'bytes'``
         """
 
-        if not (isinstance(str, rtype) or isinstance(bytes, rtype)):
-            raise ValueError("Wrong return type. Return type must be str or bytes")
+        if rtype not in ["str", "bytes"]:
+            raise ValueError("Wrong return type. Return type must be 'str' or 'bytes'")
 
         if not isinstance(sk, ec.EllipticCurvePrivateKey):
             logger.error("Wrong public key.")
@@ -252,7 +252,7 @@ class Cryptographer:
         else:
             signature = sk.sign(data, ec.ECDSA(hashes.SHA256()))
 
-            if rtype == "hex":
+            if rtype == "str":
                 signature = hexlify(signature).decode("utf-8")
 
             return signature
