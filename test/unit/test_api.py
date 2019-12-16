@@ -3,6 +3,7 @@ import pytest
 import requests
 from time import sleep
 from threading import Thread
+from cryptography.hazmat.primitives import serialization
 
 from pisa.api import start_api
 from pisa.watcher import Watcher
@@ -10,7 +11,13 @@ from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT, c_logger
 from pisa.conf import MAX_APPOINTMENTS
 
-from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex, generate_dummy_appointment_data
+from test.unit.conftest import (
+    generate_block,
+    generate_blocks,
+    get_random_value_hex,
+    generate_dummy_appointment_data,
+    generate_keypair,
+)
 
 from common.constants import LOCATOR_LEN_BYTES
 
@@ -25,7 +32,13 @@ locator_dispute_tx_map = {}
 
 @pytest.fixture(scope="module")
 def run_api(db_manager):
-    watcher = Watcher(db_manager)
+    sk, pk = generate_keypair()
+    sk_der = sk.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    watcher = Watcher(db_manager, sk_der)
 
     api_thread = Thread(target=start_api, args=[watcher])
     api_thread.daemon = True

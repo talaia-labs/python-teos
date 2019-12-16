@@ -7,7 +7,7 @@ from pisa.logger import Logger
 from pisa.api import start_api
 from pisa.watcher import Watcher
 from pisa.builder import Builder
-from pisa.conf import BTC_NETWORK
+from pisa.conf import BTC_NETWORK, PISA_SECRET_KEY
 from pisa.responder import Responder
 from pisa.db_manager import DBManager
 from pisa.block_processor import BlockProcessor
@@ -49,7 +49,10 @@ if __name__ == "__main__":
             watcher_appointments_data = db_manager.load_watcher_appointments()
             responder_trackers_data = db_manager.load_responder_trackers()
 
-            watcher = Watcher(db_manager)
+            with open(PISA_SECRET_KEY, "rb") as key_file:
+                secret_key_der = key_file.read()
+
+            watcher = Watcher(db_manager, secret_key_der)
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")

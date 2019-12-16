@@ -2,13 +2,20 @@ import pytest
 from uuid import uuid4
 from threading import Thread
 from queue import Queue, Empty
+from cryptography.hazmat.primitives import serialization
 
 from pisa import c_logger
 from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
-from test.unit.conftest import generate_block, generate_blocks, generate_dummy_appointment, get_random_value_hex
-from pisa.conf import EXPIRY_DELTA, PISA_SECRET_KEY, MAX_APPOINTMENTS
+from test.unit.conftest import (
+    generate_block,
+    generate_blocks,
+    generate_dummy_appointment,
+    get_random_value_hex,
+    generate_keypair,
+)
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
 from common.tools import check_sha256_hex_format
 from common.cryptographer import Cryptographer
@@ -20,15 +27,18 @@ START_TIME_OFFSET = 1
 END_TIME_OFFSET = 1
 TEST_SET_SIZE = 200
 
-with open(PISA_SECRET_KEY, "rb") as key_file_der:
-    sk_der = key_file_der.read()
-    signing_key = Cryptographer.load_private_key_der(sk_der)
-    public_key = signing_key.public_key()
+
+signing_key, public_key = generate_keypair()
+sk_der = signing_key.private_bytes(
+    encoding=serialization.Encoding.DER,
+    format=serialization.PrivateFormat.TraditionalOpenSSL,
+    encryption_algorithm=serialization.NoEncryption(),
+)
 
 
 @pytest.fixture(scope="module")
 def watcher(db_manager):
-    return Watcher(db_manager)
+    return Watcher(db_manager, sk_der)
 
 
 @pytest.fixture(scope="module")
@@ -67,15 +77,6 @@ def test_init(watcher):
     assert watcher.max_appointments == MAX_APPOINTMENTS
     assert watcher.zmq_subscriber is None
     assert type(watcher.responder) is Responder
-
-
-def test_init_no_key(db_manager):
-    try:
-        Watcher(db_manager, pisa_sk_file=None)
-        assert False
-
-    except ValueError:
-        assert True
 
 
 def test_add_appointment(run_bitcoind, watcher):

@@ -10,7 +10,7 @@ from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQSubscriber
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS, PISA_SECRET_KEY
+from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
 logger = Logger("Watcher")
 
@@ -32,7 +32,7 @@ class Watcher:
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
-        pisa_sk_file (:obj:`str`): a path to the private key used to sign appointment receipts (signaling acceptance).
+        sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
         responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance. If ``None`` is passed, a new
             instance is created. Populated instances are useful when bootstrapping the system from backed-up data.
         max_appointments(:obj:`int`): the maximum amount of appointments that the :obj:`Watcher` will keep at any given
@@ -58,7 +58,7 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, pisa_sk_file=PISA_SECRET_KEY, responder=None, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, sk_der, responder=None, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
@@ -66,16 +66,10 @@ class Watcher:
         self.max_appointments = max_appointments
         self.zmq_subscriber = None
         self.db_manager = db_manager
+        self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
         if not isinstance(responder, Responder):
             self.responder = Responder(db_manager)
-
-        if pisa_sk_file is None:
-            raise ValueError("No signing key provided. Please fix your pisa.conf")
-        else:
-            with open(PISA_SECRET_KEY, "rb") as key_file:
-                secret_key_der = key_file.read()
-                self.signing_key = Cryptographer.load_private_key_der(secret_key_der)
 
     @staticmethod
     def compute_locator(tx_id):
