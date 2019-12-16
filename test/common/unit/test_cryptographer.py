@@ -1,4 +1,7 @@
 import binascii
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
 
 from apps.cli.blob import Blob
 from common.cryptographer import Cryptographer
@@ -8,6 +11,38 @@ from test.common.unit.conftest import get_random_value_hex
 data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
 key = "b2e984a570f6f49bc38ace178e09147b0aa296cbb7c92eb01412f7e2d07b5659"
 encrypted_data = "8f31028097a8bf12a92e088caab5cf3fcddf0d35ed2b72c24b12269373efcdea04f9d2a820adafe830c20ff132d89810"
+
+
+WRONG_TYPES = [None, 2134, 14.56, str(), list(), dict()]
+
+
+def generate_keypair():
+    sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+    pk = sk.public_key()
+
+    sk_der = sk.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    return sk, pk
+
+
+def generate_keypair_der():
+    sk, pk = generate_keypair()
+
+    sk_der = sk.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    pk_der = pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return sk_der, pk_der
 
 
 def test_check_data_key_format_wrong_data():
@@ -144,3 +179,95 @@ def test_decrypt_wrong_return():
 
     except ValueError:
         assert True
+
+
+def test_load_public_key_der():
+    # load_public_key_der expects a byte encoded data. Any other should fail and return None
+    for wtype in WRONG_TYPES:
+        assert Cryptographer.load_public_key_der(wtype) is None
+
+    # On the other hand, any random formatter byte array would also fail (zeros for example)
+    assert Cryptographer.load_public_key_der(bytes(32)) is None
+
+    # A proper formatted key should load
+    _, pk_der = generate_keypair_der()
+    assert Cryptographer.load_public_key_der(pk_der) is not None
+
+
+def test_load_private_key_der():
+    # load_private_key_der expects a byte encoded data. Any other should fail and return None
+    for wtype in WRONG_TYPES:
+        assert Cryptographer.load_private_key_der(wtype) is None
+
+    # On the other hand, any random formatter byte array would also fail (zeros for example)
+    assert Cryptographer.load_private_key_der(bytes(32)) is None
+
+    # A proper formatted key should load
+    sk_der, _ = generate_keypair_der()
+    assert Cryptographer.load_private_key_der(sk_der) is not None
+
+
+def test_sign_wrong_rtype():
+    # Calling sign with an rtype different than 'str' or 'bytes' should fail
+    for wtype in WRONG_TYPES:
+        try:
+            Cryptographer.sign("", "", rtype=wtype)
+            assert False
+
+        except ValueError:
+            assert True
+
+
+def test_sign_wrong_sk():
+    # If a sk is not passed, sign will return None
+    for wtype in WRONG_TYPES:
+        assert Cryptographer.sign("", wtype) is None
+
+
+# FIXME: signature_format is not covered, so we are not covering cases where the message is not in the proper format
+#   at the moment (related to #68, happens in multiple tests from here on)
+def test_sign():
+    # Otherwise we should get a signature
+    sk, _ = generate_keypair()
+
+    assert Cryptographer.sign(Cryptographer.signature_format(""), sk) is not None
+
+    # Check that the returns work
+    assert isinstance(Cryptographer.sign(Cryptographer.signature_format(""), sk, rtype="str"), str)
+    assert isinstance(Cryptographer.sign(Cryptographer.signature_format(""), sk, rtype="bytes"), bytes)
+
+
+def test_verify_wrong_pk():
+    # If a pk is not passed, verify will return None
+    for wtype in WRONG_TYPES:
+        assert Cryptographer.sign("", wtype) is None
+
+
+def test_verify_random_values():
+    # Random values shouldn't verify
+    sk, pk = generate_keypair()
+
+    message = get_random_value_hex(32)
+    signature = get_random_value_hex(32)
+
+    assert Cryptographer.verify(Cryptographer.signature_format(message), signature, pk) is False
+
+
+def test_verify_wrong_pair():
+    # Verifying with a wrong keypair must fail
+    sk, _ = generate_keypair()
+    _, pk = generate_keypair()
+
+    message = get_random_value_hex(32)
+    signature = get_random_value_hex(32)
+
+    assert Cryptographer.verify(Cryptographer.signature_format(message), signature, pk) is False
+
+
+def test_verify():
+    # A properly generated signature should verify
+    sk, pk = generate_keypair()
+    message = get_random_value_hex(32)
+    signature = Cryptographer.sign(Cryptographer.signature_format(message), sk)
+
+    assert Cryptographer.verify(Cryptographer.signature_format(message), signature, pk) is True
