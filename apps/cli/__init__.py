@@ -28,6 +28,6 @@ c_logger.setLevel(logging.INFO)
 
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
-ch_formatter = logging.Formatter("%(asctime)s %(message)s", "%Y-%m-%d %H:%M:%S")
+ch_formatter = logging.Formatter("%(asctime)s %(message)s.", "%Y-%m-%d %H:%M:%S")
 ch.setFormatter(ch_formatter)
 c_logger.addHandler(ch)

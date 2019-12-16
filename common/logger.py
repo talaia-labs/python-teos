@@ -1,5 +1,5 @@
-import time
 import json
+from datetime import datetime
 
 from pisa import f_logger, c_logger
 
@@ -7,10 +7,10 @@ from pisa import f_logger, c_logger
 class _StructuredMessage:
     def __init__(self, message, **kwargs):
         self.message = message
-        self.time = time.asctime()
+        self.time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         self.kwargs = kwargs
 
-    def __str__(self):
+    def to_dict(self):
         return {**self.kwargs, "message": self.message, "time": self.time}
 
 
@@ -26,13 +26,24 @@ class Logger:
         self.actor = actor
 
     def _add_prefix(self, msg):
-        return msg if self.actor is None else "[{}] {}".format(self.actor, msg)
+        return msg if self.actor is None else "[{}]: {}".format(self.actor, msg)
 
     def _create_console_message(self, msg, **kwargs):
-        return _StructuredMessage(self._add_prefix(msg), actor=self.actor, **kwargs).message
+        s_message = _StructuredMessage(self._add_prefix(msg), **kwargs).to_dict()
+        message = "{} {}".format(s_message["time"], s_message["message"])
 
-    def _create_file_message(self, msg, **kwargs):
-        return json.dumps(_StructuredMessage(msg, actor=self.actor, **kwargs).__str__())
+        # s_message will always have at least two items (message and time).
+        if len(s_message) > 2:
+            params = "".join("{}={}, ".format(k, v) for k, v in s_message.items() if k not in ["message", "time"])
+
+            # Remove the extra 2 characters (space and comma) and add all data to the final message.
+            message += " ({})".format(params[:-2])
+
+        return message
+
+    @staticmethod
+    def _create_file_message(msg, **kwargs):
+        return json.dumps(_StructuredMessage(msg, **kwargs).to_dict())
 
     def info(self, msg, **kwargs):
         """
