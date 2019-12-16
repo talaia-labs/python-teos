@@ -124,7 +124,7 @@ class Cryptographer:
             raise ValueError("Wrong return type. Return type must be 'hex' or 'bytes'")
 
         if not isinstance(sk, ec.EllipticCurvePrivateKey):
-            logger.error("Wrong public key.")
+            logger.error("The value passed as sk is not a private key (EllipticCurvePrivateKey).")
             return None
 
         else:
@@ -138,7 +138,7 @@ class Cryptographer:
     @staticmethod
     def verify(message, signature, pk):
         if not isinstance(pk, ec.EllipticCurvePublicKey):
-            logger.error("Wrong public key.")
+            logger.error("The value passed as pk is not a public key (EllipticCurvePublicKey).")
             return False
 
         if isinstance(signature, str):
