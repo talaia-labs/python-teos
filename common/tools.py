@@ -9,6 +9,6 @@ def check_sha256_hex_format(value):
         value(:mod:`str`): the value to be checked.
 
     Returns:
-        :mod:`bool`: Wether or not the value matches the format.
+        :mod:`bool`: Whether or not the value matches the format.
     """
     return isinstance(value, str) and re.match(r"^[0-9A-Fa-f]{64}$", value) is not None
