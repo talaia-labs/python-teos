@@ -49,13 +49,7 @@ jobs:
           command: cp pisa/sample_conf.py pisa/conf.py
 
       - run:
-          name: create keypair
-          command: |
-            . venv/bin/activate
-            python apps/generate_key.py      
-
-      - run:
-          name: run tests
+          name: run pisa tests
           command: |
             . venv/bin/activate
             pytest test/unit
