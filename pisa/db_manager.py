@@ -1,7 +1,7 @@
 import json
 import plyvel
 
-from pisa.logger import Logger
+from common.logger import Logger
 
 logger = Logger("DBManager")
 

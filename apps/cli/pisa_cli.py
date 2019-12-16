@@ -17,15 +17,16 @@ from apps.cli import (
     CLI_PRIVATE_KEY,
     PISA_PUBLIC_KEY,
     APPOINTMENTS_FOLDER_NAME,
-    logger,
 )
 
+from common.logger import Logger
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 from common.tools import check_sha256_hex_format
 
 
 HTTP_OK = 200
+logger = Logger("Client")
 
 
 # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION

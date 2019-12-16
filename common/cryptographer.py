@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key, lo
 from cryptography.exceptions import InvalidSignature
 from common.tools import check_sha256_hex_format
 
-from pisa.logger import Logger
+from common.logger import Logger
 
 logger = Logger("Cryptographer")
 

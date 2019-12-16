@@ -1,5 +1,4 @@
 import logging
-from apps.cli.logger import Logger
 
 # PISA-SERVER
 DEFAULT_PISA_API_SERVER = "btc.pisa.watch"
@@ -13,9 +12,22 @@ CLI_PUBLIC_KEY = "cli_pk.der"
 CLI_PRIVATE_KEY = "cli_sk.der"
 PISA_PUBLIC_KEY = "pisa_pk.der"
 
-# Configure logging
-logging.basicConfig(
-    format="%(message)s", level=logging.INFO, handlers=[logging.FileHandler(CLIENT_LOG_FILE), logging.StreamHandler()]
-)
+# Create the file logger
+f_logger = logging.getLogger("cli_file_log")
+f_logger.setLevel(logging.INFO)
 
-logger = Logger("Client")
+fh = logging.FileHandler(CLIENT_LOG_FILE)
+fh.setLevel(logging.INFO)
+fh_formatter = logging.Formatter("%(message)s")
+fh.setFormatter(fh_formatter)
+f_logger.addHandler(fh)
+
+# Create the console logger
+c_logger = logging.getLogger("cli_console_log")
+c_logger.setLevel(logging.INFO)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch_formatter = logging.Formatter("%(asctime)s %(message)s", "%Y-%m-%d %H:%M:%S")
+ch.setFormatter(ch_formatter)
+c_logger.addHandler(ch)

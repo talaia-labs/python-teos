@@ -5,7 +5,7 @@ from threading import Thread
 from common.cryptographer import Cryptographer
 from common.constants import LOCATOR_LEN_HEX
 
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor

@@ -2,7 +2,7 @@ import json
 from queue import Queue
 from threading import Thread
 
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.block_processor import BlockProcessor

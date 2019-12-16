@@ -1,4 +1,4 @@
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.tools import bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 

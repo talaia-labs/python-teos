@@ -6,7 +6,7 @@ from common.cryptographer import Cryptographer
 
 from pisa import errors
 import pisa.conf as conf
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 

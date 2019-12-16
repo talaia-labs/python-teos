@@ -3,7 +3,7 @@ import json
 from flask import Flask, request, abort, jsonify
 
 from pisa import HOST, PORT, logging
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
