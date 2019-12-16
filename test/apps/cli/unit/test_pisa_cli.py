@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
 import apps.cli.pisa_cli as pisa_cli
-from test.unit.conftest import get_random_value_hex
+from test.apps.cli.unit.conftest import get_random_value_hex
 
 # TODO: should find a way of doing without this
 from apps.cli.pisa_cli import build_appointment

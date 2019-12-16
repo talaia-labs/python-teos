@@ -11,7 +11,7 @@ from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 from pisa.conf import MIN_TO_SELF_DELAY
 
-from test.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair
+from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer

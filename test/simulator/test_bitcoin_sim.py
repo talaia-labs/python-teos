@@ -4,7 +4,7 @@ from time import sleep
 from threading import Thread
 
 from test.simulator.transaction import TX
-from test.unit.conftest import get_random_value_hex
+from test.pisa.unit import get_random_value_hex
 from test.simulator.bitcoind_sim import run_simulator
 from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 from pisa.conf import BTC_RPC_USER, BTC_RPC_PASSWD, BTC_RPC_HOST, BTC_RPC_PORT

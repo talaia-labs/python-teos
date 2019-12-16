@@ -11,7 +11,7 @@ from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT, c_logger
 from pisa.conf import MAX_APPOINTMENTS
 
-from test.unit.conftest import (
+from test.pisa.unit.conftest import (
     generate_block,
     generate_blocks,
     get_random_value_hex,

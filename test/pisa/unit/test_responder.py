@@ -18,7 +18,7 @@ from common.tools import check_sha256_hex_format
 
 from test.simulator.utils import sha256d
 from test.simulator.bitcoind_sim import TX
-from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex
+from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_value_hex
 
 c_logger.disabled = True
 

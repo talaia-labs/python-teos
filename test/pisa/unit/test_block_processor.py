@@ -2,7 +2,7 @@ import pytest
 
 from pisa import c_logger
 from pisa.block_processor import BlockProcessor
-from test.unit.conftest import get_random_value_hex, generate_block, generate_blocks
+from test.pisa.unit.conftest import get_random_value_hex, generate_block, generate_blocks
 
 c_logger.disabled = True
 
