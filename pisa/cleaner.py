@@ -53,7 +53,6 @@ class Cleaner:
                 confirmations=confirmations,
             )
 
-            # ToDo: #9-add-data-persistence
             justice_txid = jobs[uuid].justice_txid
             locator = jobs[uuid].locator
             jobs.pop(uuid)

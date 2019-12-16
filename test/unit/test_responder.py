@@ -9,11 +9,15 @@ from queue import Queue, Empty
 
 from pisa import c_logger
 from pisa.db_manager import DBManager
-from test.simulator.utils import sha256d
 from pisa.responder import Responder, Job
-from test.simulator.bitcoind_sim import TX
 from pisa.block_processor import BlockProcessor
-from pisa.tools import check_txid_format, bitcoin_cli
+from pisa.tools import bitcoin_cli
+
+from common.constants import LOCATOR_LEN_HEX
+from common.tools import check_sha256_hex_format
+
+from test.simulator.utils import sha256d
+from test.simulator.bitcoind_sim import TX
 from test.unit.conftest import generate_block, generate_blocks, get_random_value_hex
 
 c_logger.disabled = True
@@ -58,18 +62,21 @@ def create_dummy_job_data(random_txid=False, justice_rawtx=None):
         justice_txid = get_random_value_hex(32)
 
     appointment_end = bitcoin_cli().getblockcount() + 2
+    locator = dispute_txid[:LOCATOR_LEN_HEX]
 
-    return dispute_txid, justice_txid, justice_rawtx, appointment_end
+    return locator, dispute_txid, justice_txid, justice_rawtx, appointment_end
 
 
 def create_dummy_job(random_txid=False, justice_rawtx=None):
-    dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid, justice_rawtx)
-    return Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+    locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
+        random_txid, justice_rawtx
+    )
+    return Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
 
 
 def test_job_init(run_bitcoind):
-    dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data()
-    job = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+    locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data()
+    job = Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
 
     assert (
         job.dispute_txid == dispute_txid
@@ -157,6 +164,7 @@ def test_add_response(db_manager):
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
     receipt = responder.add_response(
+        job.locator,
         uuid,
         job.dispute_txid,
         job.justice_txid,
@@ -187,6 +195,7 @@ def test_add_bad_response(responder):
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
     receipt = responder.add_response(
+        job.locator,
         uuid,
         job.dispute_txid,
         job.justice_txid,
@@ -204,7 +213,7 @@ def test_create_job(responder):
     for _ in range(20):
         uuid = uuid4().hex
         confirmations = 0
-        dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
+        locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
 
         # Check the job is not within the responder jobs before adding it
         assert uuid not in responder.jobs
@@ -212,7 +221,7 @@ def test_create_job(responder):
         assert justice_txid not in responder.unconfirmed_txs
 
         # And that it is afterwards
-        responder.create_job(uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+        responder.create_job(uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
         assert uuid in responder.jobs
         assert justice_txid in responder.tx_job_map
         assert justice_txid in responder.unconfirmed_txs
@@ -231,12 +240,12 @@ def test_create_job(responder):
 def test_create_job_same_justice_txid(responder):
     # Create the same job using two different uuids
     confirmations = 0
-    dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
+    locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(random_txid=True)
     uuid_1 = uuid4().hex
     uuid_2 = uuid4().hex
 
-    responder.create_job(uuid_1, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
-    responder.create_job(uuid_2, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+    responder.create_job(uuid_1, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+    responder.create_job(uuid_2, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
 
     # Check that both jobs have been added
     assert uuid_1 in responder.jobs and uuid_2 in responder.jobs
@@ -261,11 +270,11 @@ def test_create_job_already_confirmed(responder):
     for i in range(20):
         uuid = uuid4().hex
         confirmations = i + 1
-        dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
+        locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
             justice_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.create_job(uuid, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
+        responder.create_job(uuid, locator, dispute_txid, justice_txid, justice_rawtx, appointment_end, confirmations)
 
         assert justice_txid not in responder.unconfirmed_txs
 
@@ -280,7 +289,7 @@ def test_do_subscribe(responder):
     try:
         generate_block()
         block_hash = responder.block_queue.get()
-        assert check_txid_format(block_hash)
+        assert check_sha256_hex_format(block_hash)
 
     except Empty:
         assert False
@@ -360,7 +369,9 @@ def test_check_confirmations(temp_db_manager):
     responder.unconfirmed_txs.extend(txs_subset)
 
     # We also need to add them to the tx_job_map since they would be there in normal conditions
-    responder.tx_job_map = {txid: Job(txid, None, None, None) for txid in responder.unconfirmed_txs}
+    responder.tx_job_map = {
+        txid: Job(txid[:LOCATOR_LEN_HEX], txid, None, None, None) for txid in responder.unconfirmed_txs
+    }
 
     # Let's make sure that there are no txs with missed confirmations yet
     assert len(responder.missed_confirmations) == 0
@@ -457,11 +468,11 @@ def test_rebroadcast(db_manager):
     # Rebroadcast calls add_response with retry=True. The job data is already in jobs.
     for i in range(20):
         uuid = uuid4().hex
-        dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
+        locator, dispute_txid, justice_txid, justice_rawtx, appointment_end = create_dummy_job_data(
             justice_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.jobs[uuid] = Job(dispute_txid, justice_txid, justice_rawtx, appointment_end)
+        responder.jobs[uuid] = Job(locator, dispute_txid, justice_txid, justice_rawtx, appointment_end)
         responder.tx_job_map[justice_txid] = [uuid]
         responder.unconfirmed_txs.append(justice_txid)
 

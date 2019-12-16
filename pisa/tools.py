@@ -39,8 +39,3 @@ def in_correct_network(network):
         correct_network = True
 
     return correct_network
-
-
-def check_txid_format(txid):
-    # TODO: #12-check-txid-regexp
-    return isinstance(txid, str) and re.search(r"^[0-9A-Fa-f]{64}$", txid) is not None

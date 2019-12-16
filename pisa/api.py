@@ -1,7 +1,6 @@
 import os
 import json
 from flask import Flask, request, abort, jsonify
-from binascii import hexlify
 
 from pisa import HOST, PORT, logging
 from pisa.logger import Logger
@@ -9,16 +8,12 @@ from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
+from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
+
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
-
-HTTP_OK = 200
-HTTP_BAD_REQUEST = 400
-HTTP_SERVICE_UNAVAILABLE = 503
-
 logger = Logger("API")
-
 watcher = None
 
 
@@ -44,7 +39,7 @@ def add_appointment():
 
         if appointment_added:
             rcode = HTTP_OK
-            response = {"locator": appointment.locator, "signature": hexlify(signature).decode("utf-8")}
+            response = {"locator": appointment.locator, "signature": signature}
         else:
             rcode = HTTP_SERVICE_UNAVAILABLE
             error = "appointment rejected"
@@ -79,7 +74,7 @@ def get_appointment():
     response = []
 
     # ToDo: #15-add-system-monitor
-    if not isinstance(locator, str) or len(locator) != 64:
+    if not isinstance(locator, str) or len(locator) != LOCATOR_LEN_HEX:
         response.append({"locator": locator, "status": "not_found"})
         return jsonify(response)
 

@@ -6,16 +6,12 @@ from pisa.encrypted_blob import EncryptedBlob
 # Basic appointment structure
 class Appointment:
     # DISCUSS: 35-appointment-checks
-    def __init__(
-        self, locator, start_time, end_time, dispute_delta, encrypted_blob, cipher, hash_function, triggered=False
-    ):
+    def __init__(self, locator, start_time, end_time, dispute_delta, encrypted_blob, triggered=False):
         self.locator = locator
         self.start_time = start_time  # ToDo: #4-standardize-appointment-fields
         self.end_time = end_time  # ToDo: #4-standardize-appointment-fields
         self.dispute_delta = dispute_delta
         self.encrypted_blob = EncryptedBlob(encrypted_blob)
-        self.cipher = cipher
-        self.hash_function = hash_function
         self.triggered = triggered
 
     @classmethod
@@ -25,34 +21,18 @@ class Appointment:
         end_time = appointment_data.get("end_time")  # ToDo: #4-standardize-appointment-fields
         dispute_delta = appointment_data.get("dispute_delta")
         encrypted_blob_data = appointment_data.get("encrypted_blob")
-        cipher = appointment_data.get("cipher")
-        hash_function = appointment_data.get("hash_function")
 
         triggered = True if appointment_data.get("triggered") is True else False
 
-        if any(
-            v is None
-            for v in [
-                locator,
-                start_time,
-                end_time,
-                dispute_delta,
-                encrypted_blob_data,
-                cipher,
-                hash_function,
-                triggered,
-            ]
-        ):
+        if any(v is None for v in [locator, start_time, end_time, dispute_delta, encrypted_blob_data, triggered]):
             raise ValueError("Wrong appointment data, some fields are missing")
 
         else:
-            appointment = cls(
-                locator, start_time, end_time, dispute_delta, encrypted_blob_data, cipher, hash_function, triggered
-            )
+            appointment = cls(locator, start_time, end_time, dispute_delta, encrypted_blob_data, triggered)
 
         return appointment
 
-    def to_dict(self):
+    def to_dict(self, include_triggered=True):
         # ToDO: #3-improve-appointment-structure
         appointment = {
             "locator": self.locator,
@@ -60,17 +40,12 @@ class Appointment:
             "end_time": self.end_time,
             "dispute_delta": self.dispute_delta,
             "encrypted_blob": self.encrypted_blob.data,
-            "cipher": self.cipher,
-            "hash_function": self.hash_function,
-            "triggered": self.triggered,
         }
+
+        if include_triggered:
+            appointment["triggered"] = self.triggered
 
         return appointment
 
     def to_json(self):
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
-
-    def serialize(self):
-        data = self.to_dict()
-        data.pop("triggered")
-        return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")

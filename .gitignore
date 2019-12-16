@@ -13,6 +13,6 @@ test.py
 *.pyc
 .cache
 .pytest_cache/
-*.pem
+*.der
 .coverage
 htmlcov

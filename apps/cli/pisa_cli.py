@@ -1,21 +1,12 @@
-import re
 import os
 import sys
 import json
 import requests
 import time
 from sys import argv
-from hashlib import sha256
-from binascii import hexlify, unhexlify
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from uuid import uuid4
-
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
 from apps.cli.blob import Blob
 from apps.cli.help import help_add_appointment, help_get_appointment
@@ -28,6 +19,10 @@ from apps.cli import (
     APPOINTMENTS_FOLDER_NAME,
     logger,
 )
+
+from common.constants import LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
+from common.tools import check_sha256_hex_format
 
 
 HTTP_OK = 200
@@ -55,52 +50,19 @@ def generate_dummy_appointment():
     print("\nData stored in dummy_appointment_data.json")
 
 
-def sign_appointment(sk, appointment):
-    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
-
-
 # Loads and returns Pisa keys from disk
 def load_key_file_data(file_name):
     try:
-        with open(file_name, "r") as key_file:
-            key_pem = key_file.read().encode("utf-8")
-        return key_pem
+        with open(file_name, "rb") as key_file:
+            key = key_file.read()
+        return key
 
     except FileNotFoundError:
         raise FileNotFoundError("File not found.")
 
 
-# Deserialize public key from pem data.
-def load_public_key(pk_pem):
-    try:
-        pisa_pk = load_pem_public_key(pk_pem, backend=default_backend())
-        return pisa_pk
-
-    except UnsupportedAlgorithm:
-        raise ValueError("Could not deserialize the public key (unsupported algorithm).")
-
-
-# Deserialize private key from pem data.
-def load_private_key(sk_pem):
-    try:
-        cli_sk = load_pem_private_key(sk_pem, None, backend=default_backend())
-        return cli_sk
-
-    except UnsupportedAlgorithm:
-        raise ValueError("Could not deserialize the private key (unsupported algorithm).")
-
-
-# returning True or False accordingly.
-def is_appointment_signature_valid(appointment, signature, pk):
-    try:
-        sig_bytes = unhexlify(signature.encode("utf-8"))
-        data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        pk.verify(sig_bytes, data, ec.ECDSA(hashes.SHA256()))
-        return True
-
-    except InvalidSignature:
-        return False
+def compute_locator(tx_id):
+    return tx_id[:LOCATOR_LEN_HEX]
 
 
 # Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
@@ -157,7 +119,7 @@ def add_appointment(args):
         logger.error("The provided JSON is empty.")
         return False
 
-    valid_locator = check_txid_format(appointment_data.get("tx_id"))
+    valid_locator = check_sha256_hex_format(appointment_data.get("tx_id"))
 
     if not valid_locator:
         logger.error("The provided locator is not valid.")
@@ -173,8 +135,8 @@ def add_appointment(args):
     )
 
     try:
-        sk_pem = load_key_file_data(CLI_PRIVATE_KEY)
-        cli_sk = load_private_key(sk_pem)
+        sk_der = load_key_file_data(CLI_PRIVATE_KEY)
+        cli_sk = Cryptographer.load_private_key_der(sk_der)
 
     except ValueError:
         logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
@@ -188,19 +150,20 @@ def add_appointment(args):
         logger.error("I/O error({}): {}".format(e.errno, e.strerror))
         return False
 
-    signature = sign_appointment(cli_sk, appointment)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment), cli_sk)
+
     try:
-        cli_pk_pem = load_key_file_data(CLI_PUBLIC_KEY)
+        cli_pk_der = load_key_file_data(CLI_PUBLIC_KEY)
 
     except FileNotFoundError:
-        logger.error("Client's private key file not found. Please check your settings.")
+        logger.error("Client's public key file not found. Please check your settings.")
         return False
 
     except IOError as e:
         logger.error("I/O error({}): {}".format(e.errno, e.strerror))
         return False
 
-    data = {"appointment": appointment, "signature": signature, "public_key": cli_pk_pem.decode("utf-8")}
+    data = {"appointment": appointment, "signature": signature, "public_key": cli_pk_der.decode("utf-8")}
 
     appointment_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
 
@@ -240,9 +203,9 @@ def add_appointment(args):
     signature = response_json["signature"]
     # verify that the returned signature is valid
     try:
-        pk_pem = load_key_file_data(PISA_PUBLIC_KEY)
-        pk = load_public_key(pk_pem)
-        is_sig_valid = is_appointment_signature_valid(appointment, signature, pk)
+        pisa_pk_der = load_key_file_data(PISA_PUBLIC_KEY)
+        pisa_pk = Cryptographer.load_public_key_der(pisa_pk_der)
+        is_sig_valid = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pisa_pk)
 
     except ValueError:
         logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
@@ -283,7 +246,7 @@ def get_appointment(args):
         sys.exit(help_get_appointment())
     else:
         locator = arg_opt
-        valid_locator = check_txid_format(locator)
+        valid_locator = check_sha256_hex_format(locator)
 
     if not valid_locator:
         logger.error("The provided locator is not valid: {}".format(locator))
@@ -308,14 +271,11 @@ def get_appointment(args):
 
 
 def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
-    locator = sha256(unhexlify(tx_id)).hexdigest()
-
-    cipher = "AES-GCM-128"
-    hash_function = "SHA256"
+    locator = compute_locator(tx_id)
 
     # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
-    blob = Blob(tx, cipher, hash_function)
-    encrypted_blob = blob.encrypt(tx_id)
+    blob = Blob(tx)
+    encrypted_blob = Cryptographer.encrypt(blob, tx_id)
 
     appointment = {
         "locator": locator,
@@ -323,19 +283,9 @@ def build_appointment(tx, tx_id, start_time, end_time, dispute_delta):
         "end_time": end_time,
         "dispute_delta": dispute_delta,
         "encrypted_blob": encrypted_blob,
-        "cipher": cipher,
-        "hash_function": hash_function,
     }
 
     return appointment
-
-
-def check_txid_format(txid):
-    if len(txid) != 64:
-        sys.exit("locator does not matches the expected size (32-byte / 64 hex chars).")
-
-    # TODO: #12-check-txid-regexp
-    return re.search(r"^[0-9A-Fa-f]+$", txid) is not None
 
 
 def show_usage():

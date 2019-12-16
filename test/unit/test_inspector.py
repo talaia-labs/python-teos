@@ -1,46 +1,58 @@
-import json
 from binascii import hexlify, unhexlify
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
 
-from apps.cli.pisa_cli import build_appointment
 from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
 from pisa.appointment import Appointment
 from pisa.block_processor import BlockProcessor
-from test.unit.conftest import get_random_value_hex
+from pisa.conf import MIN_DISPUTE_DELTA
 
-from pisa.conf import MIN_DISPUTE_DELTA, SUPPORTED_CIPHERS, SUPPORTED_HASH_FUNCTIONS
+from test.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair
+
+from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
 
 c_logger.disabled = True
 
 inspector = Inspector()
 APPOINTMENT_OK = (0, None)
 
-NO_HEX_STRINGS = ["R" * 64, get_random_value_hex(31) + "PP", "$" * 64, " " * 64]
-WRONG_TYPES = [[], "", get_random_value_hex(32), 3.2, 2.0, (), object, {}, " " * 32, object()]
-WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(32)), 3.2, 2.0, (), object, {}, object()]
-
-
-def sign_appointment(sk, appointment):
-    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
+NO_HEX_STRINGS = [
+    "R" * LOCATOR_LEN_HEX,
+    get_random_value_hex(LOCATOR_LEN_BYTES - 1) + "PP",
+    "$" * LOCATOR_LEN_HEX,
+    " " * LOCATOR_LEN_HEX,
+]
+WRONG_TYPES = [
+    [],
+    "",
+    get_random_value_hex(LOCATOR_LEN_BYTES),
+    3.2,
+    2.0,
+    (),
+    object,
+    {},
+    " " * LOCATOR_LEN_HEX,
+    object(),
+]
+WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
 
 
 def test_check_locator():
     # Right appointment type, size and format
-    locator = get_random_value_hex(32)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     assert Inspector.check_locator(locator) == APPOINTMENT_OK
 
     # Wrong size (too big)
-    locator = get_random_value_hex(33)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES + 1)
     assert Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_SIZE
 
     # Wrong size (too small)
-    locator = get_random_value_hex(31)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES - 1)
     assert Inspector.check_locator(locator)[0] == APPOINTMENT_WRONG_FIELD_SIZE
 
     # Empty
@@ -157,96 +169,51 @@ def test_check_blob():
         assert Inspector.check_blob(encrypted_blob)[0] == APPOINTMENT_WRONG_FIELD_FORMAT
 
 
-def test_check_cipher():
-    # Right format and content (any case combination should be accepted)
-    for cipher in SUPPORTED_CIPHERS:
-        cipher_cases = [cipher, cipher.lower(), cipher.capitalize()]
-        for case in cipher_cases:
-            assert Inspector.check_cipher(case) == APPOINTMENT_OK
+def test_check_appointment_signature():
+    # The inspector receives the public key as hex
+    client_sk, client_pk = generate_keypair()
+    client_pk_der = client_pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    client_pk_hex = hexlify(client_pk_der).decode("utf-8")
 
-    # Wrong type
-    ciphers = WRONG_TYPES_NO_STR
-    for cipher in ciphers:
-        assert Inspector.check_cipher(cipher)[0] == APPOINTMENT_WRONG_FIELD_TYPE
-
-    # Wrong value
-    ciphers = NO_HEX_STRINGS
-    for cipher in ciphers:
-        assert Inspector.check_cipher(cipher)[0] == APPOINTMENT_CIPHER_NOT_SUPPORTED
-
-    # Empty field
-    cipher = None
-    assert Inspector.check_cipher(cipher)[0] == APPOINTMENT_EMPTY_FIELD
-
-
-def test_check_hash_function():
-    # Right format and content (any case combination should be accepted)
-    for hash_function in SUPPORTED_HASH_FUNCTIONS:
-        hash_function_cases = [hash_function, hash_function.lower(), hash_function.capitalize()]
-        for case in hash_function_cases:
-            assert Inspector.check_hash_function(case) == APPOINTMENT_OK
-
-    # Wrong type
-    hash_functions = WRONG_TYPES_NO_STR
-    for hash_function in hash_functions:
-        assert Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_WRONG_FIELD_TYPE
-
-    # Wrong value
-    hash_functions = NO_HEX_STRINGS
-    for hash_function in hash_functions:
-        assert Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_HASH_FUNCTION_NOT_SUPPORTED
-
-    # Empty field
-    hash_function = None
-    assert Inspector.check_hash_function(hash_function)[0] == APPOINTMENT_EMPTY_FIELD
-
-
-def test_check_appointment_signature(generate_keypair):
-    client_sk, client_pk = generate_keypair
-
-    dummy_appointment_request = {
-        "tx": get_random_value_hex(192),
-        "tx_id": get_random_value_hex(32),
-        "start_time": 1500,
-        "end_time": 50000,
-        "dispute_delta": 200,
-    }
-    dummy_appointment = build_appointment(**dummy_appointment_request)
-
-    # Verify that an appointment signed by the client is valid
-    signature = sign_appointment(client_sk, dummy_appointment)
-    assert Inspector.check_appointment_signature(dummy_appointment, signature, client_pk)
+    dummy_appointment_data, _ = generate_dummy_appointment_data(real_height=False)
+    assert Inspector.check_appointment_signature(
+        dummy_appointment_data["appointment"], dummy_appointment_data["signature"], dummy_appointment_data["public_key"]
+    )
 
     fake_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
 
     # Create a bad signature to make sure inspector rejects it
-    bad_signature = sign_appointment(fake_sk, dummy_appointment)
+    bad_signature = Cryptographer.sign(Cryptographer.signature_format(dummy_appointment_data["appointment"]), fake_sk)
     assert (
-        Inspector.check_appointment_signature(dummy_appointment, bad_signature, client_pk)[0]
+        Inspector.check_appointment_signature(dummy_appointment_data["appointment"], bad_signature, client_pk_hex)[0]
         == APPOINTMENT_INVALID_SIGNATURE
     )
 
 
-def test_inspect(run_bitcoind, generate_keypair):
+def test_inspect(run_bitcoind):
     # At this point every single check function has been already tested, let's test inspect with an invalid and a valid
     # appointments.
 
-    client_sk, client_pk = generate_keypair
+    client_sk, client_pk = generate_keypair()
+    client_pk_der = client_pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    client_pk_hex = hexlify(client_pk_der).decode("utf-8")
 
     # Invalid appointment, every field is empty
     appointment_data = dict()
-    signature = sign_appointment(client_sk, appointment_data)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
     appointment = inspector.inspect(appointment_data, signature, client_pk)
     assert type(appointment) == tuple and appointment[0] != 0
 
     # Valid appointment
-    locator = get_random_value_hex(32)
+    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     start_time = BlockProcessor.get_block_count() + 5
     end_time = start_time + 20
     dispute_delta = MIN_DISPUTE_DELTA
     encrypted_blob = get_random_value_hex(64)
-    cipher = SUPPORTED_CIPHERS[0]
-    hash_function = SUPPORTED_HASH_FUNCTIONS[0]
 
     appointment_data = {
         "locator": locator,
@@ -254,13 +221,11 @@ def test_inspect(run_bitcoind, generate_keypair):
         "end_time": end_time,
         "dispute_delta": dispute_delta,
         "encrypted_blob": encrypted_blob,
-        "cipher": cipher,
-        "hash_function": hash_function,
     }
 
-    signature = sign_appointment(client_sk, appointment_data)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
 
-    appointment = inspector.inspect(appointment_data, signature, client_pk)
+    appointment = inspector.inspect(appointment_data, signature, client_pk_hex)
 
     assert (
         type(appointment) == Appointment
@@ -269,6 +234,4 @@ def test_inspect(run_bitcoind, generate_keypair):
         and appointment.end_time == end_time
         and appointment.dispute_delta == dispute_delta
         and appointment.encrypted_blob.data == encrypted_blob
-        and appointment.cipher == cipher
-        and appointment.hash_function == hash_function
     )

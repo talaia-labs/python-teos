@@ -1,26 +1,28 @@
-import json
 import pytest
 import random
 import requests
 from time import sleep
 from shutil import rmtree
 from threading import Thread
-from hashlib import sha256
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
 from apps.cli.blob import Blob
 from pisa.responder import Job
+from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from pisa.appointment import Appointment
+
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
 from test.simulator.bitcoind_sim import run_simulator, HOST, PORT
+
+from common.constants import LOCATOR_LEN_HEX
+from common.cryptographer import Cryptographer
 
 
 @pytest.fixture(scope="session")
@@ -38,18 +40,6 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope="module")
-def generate_keypair():
-    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    client_pk = (
-        client_sk.public_key()
-        .public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
-        .decode("utf-8")
-    )
-
-    return client_sk, client_pk
-
-
 @pytest.fixture(scope="session")
 def db_manager():
     manager = DBManager("test_db")
@@ -57,6 +47,13 @@ def db_manager():
 
     manager.db.close()
     rmtree("test_db")
+
+
+def generate_keypair():
+    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+    client_pk = client_sk.public_key()
+
+    return client_sk, client_pk
 
 
 def get_random_value_hex(nbytes):
@@ -73,11 +70,6 @@ def generate_block():
 def generate_blocks(n):
     for _ in range(n):
         generate_block()
-
-
-def sign_appointment(sk, appointment):
-    data = json.dumps(appointment, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hexlify(sk.sign(data, ec.ECDSA(hashes.SHA256()))).decode("utf-8")
 
 
 def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
@@ -99,21 +91,16 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "dispute_delta": 20,
     }
 
-    cipher = "AES-GCM-128"
-    hash_function = "SHA256"
-
     # dummy keys for this test
-    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    client_pk = (
-        client_sk.public_key()
-        .public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
-        .decode("utf-8")
+    client_sk, client_pk = generate_keypair()
+    client_pk_der = client_pk.public_bytes(
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
-    locator = sha256(unhexlify(dispute_txid)).hexdigest()
-    blob = Blob(dummy_appointment_data.get("tx"), cipher, hash_function)
+    locator = Watcher.compute_locator(dispute_txid)
+    blob = Blob(dummy_appointment_data.get("tx"))
 
-    encrypted_blob = blob.encrypt((dummy_appointment_data.get("tx_id")))
+    encrypted_blob = Cryptographer.encrypt(blob, dummy_appointment_data.get("tx_id"))
 
     appointment_data = {
         "locator": locator,
@@ -121,13 +108,12 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "end_time": dummy_appointment_data.get("end_time"),
         "dispute_delta": dummy_appointment_data.get("dispute_delta"),
         "encrypted_blob": encrypted_blob,
-        "cipher": cipher,
-        "hash_function": hash_function,
     }
 
-    signature = sign_appointment(client_sk, appointment_data)
+    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
+    pk_hex = hexlify(client_pk_der).decode("utf-8")
 
-    data = {"appointment": appointment_data, "signature": signature, "public_key": client_pk}
+    data = {"appointment": appointment_data, "signature": signature, "public_key": pk_hex}
 
     return data, dispute_tx
 
@@ -144,9 +130,14 @@ def generate_dummy_job():
     dispute_txid = get_random_value_hex(32)
     justice_txid = get_random_value_hex(32)
     justice_rawtx = get_random_value_hex(100)
+    locator = dispute_txid[:LOCATOR_LEN_HEX]
 
     job_data = dict(
-        dispute_txid=dispute_txid, justice_txid=justice_txid, justice_rawtx=justice_rawtx, appointment_end=100
+        locator=locator,
+        dispute_txid=dispute_txid,
+        justice_txid=justice_txid,
+        justice_rawtx=justice_rawtx,
+        appointment_end=100,
     )
 
     return Job.from_dict(job_data)
