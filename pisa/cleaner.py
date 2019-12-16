@@ -37,7 +37,7 @@ class Cleaner:
             else:
                 locator_uuid_map[locator].remove(uuid)
 
-            logger.info("End time reached with no breach. Deleting appointment.", locator=locator, uuid=uuid)
+            logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
 
             # Delete appointment from the db
             db_manager.delete_watcher_appointment(uuid)
@@ -92,7 +92,7 @@ class Cleaner:
 
         for uuid, confirmations in completed_trackers:
             logger.info(
-                "Appointment completed. Appointment ended after reaching enough confirmations.",
+                "Appointment completed. Appointment ended after reaching enough confirmations",
                 uuid=uuid,
                 height=height,
                 confirmations=confirmations,
@@ -105,7 +105,7 @@ class Cleaner:
             if len(tx_tracker_map[penalty_txid]) == 1:
                 tx_tracker_map.pop(penalty_txid)
 
-                logger.info("No more trackers for penalty transaction.", penalty_txid=penalty_txid)
+                logger.info("No more trackers for penalty transaction", penalty_txid=penalty_txid)
 
             else:
                 tx_tracker_map[penalty_txid].remove(uuid)
@@ -126,7 +126,7 @@ class Cleaner:
                         db_manager.store_update_locator_map(locator, locator_map)
 
                 else:
-                    logger.error("UUID not found in the db.", uuid=uuid)
+                    logger.error("UUID not found in the db", uuid=uuid)
 
             else:
-                logger.error("Locator not found in the db.", uuid=uuid)
+                logger.error("Locator not found in the db", uuid=uuid)
