@@ -1,7 +1,10 @@
 from uuid import uuid4
 
+from pisa import c_logger
 from pisa.builder import Builder
 from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_tracker
+
+c_logger.disabled = True
 
 
 def test_build_appointments():
