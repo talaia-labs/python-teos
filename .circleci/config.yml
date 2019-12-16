@@ -49,10 +49,22 @@ jobs:
           command: cp pisa/sample_conf.py pisa/conf.py
 
       - run:
-          name: run pisa tests
+          name: run pisa unit tests
           command: |
             . venv/bin/activate
-            pytest test/unit
+            pytest test/pisa/unit/
+
+      - run:
+          name: run common unit tests
+          command: |
+            . venv/bin/activate
+            pytest test/common/unit
+
+#      - run:
+#          name: run cli unit tests
+#          command: |
+#            . venv/bin/activate
+#            pytest test/apps/cli/unit
 
       # - store_artifacts:
       #    path: test-reports
