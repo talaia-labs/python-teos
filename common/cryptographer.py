@@ -132,7 +132,7 @@ class Cryptographer:
 
         # Decrypt
         cipher = ChaCha20Poly1305(sk)
-        data = unhexlify(encrypted_blob.data.encode())
+        data = unhexlify(encrypted_blob.data)
 
         try:
             blob = cipher.decrypt(nonce=nonce, data=data, associated_data=None)
@@ -278,7 +278,7 @@ class Cryptographer:
             return False
 
         if isinstance(signature, str):
-            signature = unhexlify(signature.encode("utf-8"))
+            signature = unhexlify(signature)
 
         try:
             pk.verify(signature, message, ec.ECDSA(hashes.SHA256()))

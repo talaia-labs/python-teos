@@ -28,7 +28,7 @@ class ZMQSubscriber:
                 body = msg[1]
 
                 if topic == b"hashblock":
-                    block_hash = binascii.hexlify(body).decode("UTF-8")
+                    block_hash = binascii.hexlify(body).decode("utf-8")
                     block_queue.put(block_hash)
 
                     self.logger.info("New block received via ZMQ", block_hash=block_hash)
