@@ -3,6 +3,7 @@ import sys
 import json
 import requests
 import time
+import binascii
 from sys import argv
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
@@ -17,15 +18,16 @@ from apps.cli import (
     CLI_PRIVATE_KEY,
     PISA_PUBLIC_KEY,
     APPOINTMENTS_FOLDER_NAME,
-    logger,
 )
 
+from common.logger import Logger
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 from common.tools import check_sha256_hex_format
 
 
 HTTP_OK = 200
+logger = Logger("Client")
 
 
 # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
@@ -83,7 +85,7 @@ def save_signed_appointment(appointment, signature):
 
 def add_appointment(args):
     appointment_data = None
-    use_help = "Use 'help add_appointment' for help of how to use the command."
+    use_help = "Use 'help add_appointment' for help of how to use the command"
 
     if not args:
         logger.error("No appointment data provided. " + use_help)
@@ -98,7 +100,7 @@ def add_appointment(args):
         if arg_opt in ["-f", "--file"]:
             fin = args.pop(0)
             if not os.path.isfile(fin):
-                logger.error("Can't find file " + fin)
+                logger.error("Can't find file", filename=fin)
                 return False
 
             try:
@@ -106,7 +108,7 @@ def add_appointment(args):
                     appointment_data = json.load(f)
 
             except IOError as e:
-                logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+                logger.error("I/O error", errno=e.errno, error=e.strerror)
                 return False
         else:
             appointment_data = json.loads(arg_opt)
@@ -116,13 +118,13 @@ def add_appointment(args):
         return False
 
     if not appointment_data:
-        logger.error("The provided JSON is empty.")
+        logger.error("The provided JSON is empty")
         return False
 
     valid_locator = check_sha256_hex_format(appointment_data.get("tx_id"))
 
     if not valid_locator:
-        logger.error("The provided locator is not valid.")
+        logger.error("The provided locator is not valid")
         return False
 
     add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
@@ -139,31 +141,34 @@ def add_appointment(args):
         cli_sk = Cryptographer.load_private_key_der(sk_der)
 
     except ValueError:
-        logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+        logger.error("Failed to deserialize the public key. It might be in an unsupported format")
         return False
 
     except FileNotFoundError:
-        logger.error("Client's private key file not found. Please check your settings.")
+        logger.error("Client's private key file not found. Please check your settings")
         return False
 
     except IOError as e:
-        logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+        logger.error("I/O error", errno=e.errno, error=e.strerror)
         return False
 
     signature = Cryptographer.sign(Cryptographer.signature_format(appointment), cli_sk)
 
     try:
         cli_pk_der = load_key_file_data(CLI_PUBLIC_KEY)
+        hex_pk_der = binascii.hexlify(cli_pk_der)
 
     except FileNotFoundError:
-        logger.error("Client's public key file not found. Please check your settings.")
+        logger.error("Client's public key file not found. Please check your settings")
         return False
 
     except IOError as e:
-        logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+        logger.error("I/O error", errno=e.errno, error=e.strerror)
         return False
 
-    data = {"appointment": appointment, "signature": signature, "public_key": cli_pk_der.decode("utf-8")}
+    # FIXME: Exceptions for hexlify need to be covered
+
+    data = {"appointment": appointment, "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     appointment_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
 
@@ -175,29 +180,31 @@ def add_appointment(args):
         response_json = r.json()
 
     except json.JSONDecodeError:
-        logger.error("The response was not valid JSON.")
+        logger.error("The response was not valid JSON")
         return False
 
     except ConnectTimeout:
-        logger.error("Can't connect to pisa API. Connection timeout.")
+        logger.error("Can't connect to pisa API. Connection timeout")
         return False
 
     except ConnectionError:
-        logger.error("Can't connect to pisa API. Server cannot be reached.")
+        logger.error("Can't connect to pisa API. Server cannot be reached")
         return False
 
     if r.status_code != HTTP_OK:
         if "error" not in response_json:
-            logger.error("The server returned status code {}, but no error description.".format(r.status_code))
+            logger.error("The server returned an error status code but no error description", status_code=r.status_code)
         else:
             error = response_json["error"]
             logger.error(
-                "The server returned status code {}, and the following error: {}.".format(r.status_code, error)
+                "The server returned an error status code with an error description",
+                status_code=r.status_code,
+                description=error,
             )
         return False
 
     if "signature" not in response_json:
-        logger.error("The response does not contain the signature of the appointment.")
+        logger.error("The response does not contain the signature of the appointment")
         return False
 
     signature = response_json["signature"]
@@ -207,30 +214,30 @@ def add_appointment(args):
         pisa_pk = Cryptographer.load_public_key_der(pisa_pk_der)
 
         if pisa_pk is None:
-            logger.error("Failed to deserialize the public key. It might be in an unsupported format.")
+            logger.error("Failed to deserialize the public key. It might be in an unsupported format")
             return False
 
         is_sig_valid = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pisa_pk)
 
     except FileNotFoundError:
-        logger.error("Pisa's public key file not found. Please check your settings.")
+        logger.error("Pisa's public key file not found. Please check your settings")
         return False
 
     except IOError as e:
-        logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+        logger.error("I/O error", errno=e.errno, error=e.strerror)
         return False
 
     if not is_sig_valid:
-        logger.error("The returned appointment's signature is invalid.")
+        logger.error("The returned appointment's signature is invalid")
         return False
 
-    logger.info("Appointment accepted and signed by Pisa.")
+    logger.info("Appointment accepted and signed by Pisa")
     # all good, store appointment and signature
     try:
         save_signed_appointment(appointment, signature)
 
     except OSError as e:
-        logger.error("There was an error while saving the appointment: {}".format(e))
+        logger.error("There was an error while saving the appointment", error=e)
         return False
 
     return True
@@ -238,7 +245,7 @@ def add_appointment(args):
 
 def get_appointment(args):
     if not args:
-        logger.error("No arguments were given.")
+        logger.error("No arguments were given")
         return False
 
     arg_opt = args.pop(0)
@@ -250,7 +257,7 @@ def get_appointment(args):
         valid_locator = check_sha256_hex_format(locator)
 
     if not valid_locator:
-        logger.error("The provided locator is not valid: {}".format(locator))
+        logger.error("The provided locator is not valid", locator=locator)
         return False
 
     get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
@@ -261,11 +268,11 @@ def get_appointment(args):
 
         print(json.dumps(r.json(), indent=4, sort_keys=True))
     except ConnectTimeout:
-        logger.error("Can't connect to pisa API. Connection timeout.")
+        logger.error("Can't connect to pisa API. Connection timeout")
         return False
 
     except ConnectionError:
-        logger.error("Can't connect to pisa API. Server cannot be reached.")
+        logger.error("Can't connect to pisa API. Server cannot be reached")
         return False
 
     return True
@@ -362,10 +369,10 @@ if __name__ == "__main__":
                 logger.error("Unknown command. Use help to check the list of available commands")
 
         else:
-            logger.error("No command provided. Use help to check the list of available commands.")
+            logger.error("No command provided. Use help to check the list of available commands")
 
     except GetoptError as e:
         logger.error("{}".format(e))
 
     except json.JSONDecodeError as e:
-        logger.error("Non-JSON encoded appointment passed as parameter.")
+        logger.error("Non-JSON encoded appointment passed as parameter")

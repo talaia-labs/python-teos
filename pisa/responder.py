@@ -2,7 +2,7 @@ import json
 from queue import Queue
 from threading import Thread
 
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.block_processor import BlockProcessor
@@ -211,7 +211,7 @@ class Responder:
             # TODO: Add the missing reasons (e.g. RPC_VERIFY_REJECTED)
             # TODO: Use self.on_sync(block_hash) to check whether or not we failed because we are out of sync
             logger.warning(
-                "Tracker cannot be created.", reason=receipt.reason, uuid=uuid, on_sync=self.on_sync(block_hash)
+                "Tracker cannot be created", reason=receipt.reason, uuid=uuid, on_sync=self.on_sync(block_hash)
             )
             pass
 
@@ -255,7 +255,7 @@ class Responder:
         self.db_manager.store_responder_tracker(uuid, tracker.to_json())
 
         logger.info(
-            "New tracker added.", dispute_txid=dispute_txid, penalty_txid=penalty_txid, appointment_end=appointment_end
+            "New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, appointment_end=appointment_end
         )
 
         if self.asleep:
@@ -436,7 +436,7 @@ class Responder:
             for uuid in self.tx_tracker_map[txid]:
                 tracker = self.trackers[uuid]
                 logger.warning(
-                    "Transaction has missed many confirmations. Rebroadcasting.", penalty_txid=tracker.penalty_txid
+                    "Transaction has missed many confirmations. Rebroadcasting", penalty_txid=tracker.penalty_txid
                 )
 
                 receipt = carrier.send_transaction(tracker.penalty_rawtx, tracker.penalty_txid)
@@ -444,7 +444,7 @@ class Responder:
 
                 if not receipt.delivered:
                     # FIXME: Can this actually happen?
-                    logger.warning("Transaction failed.", penalty_txid=tracker.penalty_txid)
+                    logger.warning("Transaction failed", penalty_txid=tracker.penalty_txid)
 
         return receipts
 
@@ -475,7 +475,7 @@ class Responder:
                         self.unconfirmed_txs.append(tracker.penalty_txid)
 
                         logger.info(
-                            "Penalty transaction back in mempool. Updating unconfirmed transactions.",
+                            "Penalty transaction back in mempool. Updating unconfirmed transactions",
                             penalty_txid=tracker.penalty_txid,
                         )
 
@@ -502,5 +502,5 @@ class Responder:
                 # ToDo: #24-properly-handle-reorgs
                 # FIXME: if the dispute is not on chain (either in mempool or not there at all), we need to call the
                 #        reorg manager
-                logger.warning("Dispute and penalty transaction missing. Calling the reorg manager.")
-                logger.error("Reorg manager not yet implemented.")
+                logger.warning("Dispute and penalty transaction missing. Calling the reorg manager")
+                logger.error("Reorg manager not yet implemented")

@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key, lo
 from cryptography.exceptions import InvalidSignature
 from common.tools import check_sha256_hex_format
 
-from pisa.logger import Logger
+from common.logger import Logger
 
 logger = Logger("Cryptographer")
 
@@ -39,12 +39,12 @@ class Cryptographer:
         """
 
         if len(data) % 2:
-            error = "Incorrect (Odd-length) value."
+            error = "Incorrect (Odd-length) value"
             logger.error(error, data=data)
             raise ValueError(error)
 
         if not check_sha256_hex_format(secret):
-            error = "Secret must be a 32-byte hex value (64 hex chars)."
+            error = "Secret must be a 32-byte hex value (64 hex chars)"
             logger.error(error, secret=secret)
             raise ValueError(error)
 
@@ -82,7 +82,7 @@ class Cryptographer:
         sk = sha256(unhexlify(secret)).digest()
         nonce = bytearray(12)
 
-        logger.info("Encrypting blob.", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
+        logger.info("Encrypting blob", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
 
         # Encrypt the data
         cipher = ChaCha20Poly1305(sk)
@@ -124,7 +124,7 @@ class Cryptographer:
         nonce = bytearray(12)
 
         logger.info(
-            "Decrypting Blob.",
+            "Decrypting Blob",
             sk=hexlify(sk).decode(),
             nonce=hexlify(nonce).decode(),
             encrypted_blob=encrypted_blob.data,
@@ -185,13 +185,13 @@ class Cryptographer:
             return pk
 
         except UnsupportedAlgorithm:
-            logger.error("Could not deserialize the public key (unsupported algorithm).")
+            logger.error("Could not deserialize the public key (unsupported algorithm)")
 
         except ValueError:
-            logger.error("The provided data cannot be deserialized (wrong size or format).")
+            logger.error("The provided data cannot be deserialized (wrong size or format)")
 
         except TypeError:
-            logger.error("The provided data cannot be deserialized (wrong type).")
+            logger.error("The provided data cannot be deserialized (wrong type)")
 
         return None
 
@@ -220,10 +220,10 @@ class Cryptographer:
             raise ValueError("Could not deserialize the private key (unsupported algorithm).")
 
         except ValueError:
-            logger.error("The provided data cannot be deserialized (wrong size or format).")
+            logger.error("The provided data cannot be deserialized (wrong size or format)")
 
         except TypeError:
-            logger.error("The provided data cannot be deserialized (wrong type).")
+            logger.error("The provided data cannot be deserialized (wrong type)")
 
     @staticmethod
     def sign(data, sk, rtype="str"):
@@ -246,7 +246,7 @@ class Cryptographer:
             raise ValueError("Wrong return type. Return type must be 'str' or 'bytes'")
 
         if not isinstance(sk, ec.EllipticCurvePrivateKey):
-            logger.error("The value passed as sk is not a private key (EllipticCurvePrivateKey).")
+            logger.error("The value passed as sk is not a private key (EllipticCurvePrivateKey)")
             return None
 
         else:
@@ -274,7 +274,7 @@ class Cryptographer:
         """
 
         if not isinstance(pk, ec.EllipticCurvePublicKey):
-            logger.error("The value passed as pk is not a public key (EllipticCurvePublicKey).")
+            logger.error("The value passed as pk is not a public key (EllipticCurvePublicKey)")
             return False
 
         if isinstance(signature, str):

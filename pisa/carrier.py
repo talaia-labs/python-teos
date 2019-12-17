@@ -1,5 +1,5 @@
 from pisa.rpc_errors import *
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.tools import bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
@@ -97,7 +97,7 @@ class Carrier:
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", method="Carrier.send_transaction", error=e.error)
+                logger.error("JSONRPCException", method="Carrier.send_transaction", error=e.error)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         return receipt
@@ -129,6 +129,6 @@ class Carrier:
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException.", method="Carrier.get_transaction", error=e.error)
+                logger.error("JSONRPCException", method="Carrier.get_transaction", error=e.error)
 
         return tx_info

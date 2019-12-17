@@ -5,7 +5,7 @@ from threading import Thread
 from common.cryptographer import Cryptographer
 from common.constants import LOCATOR_LEN_HEX
 
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
@@ -139,7 +139,7 @@ class Watcher:
 
             appointment_added = True
 
-            logger.info("New appointment accepted.", locator=appointment.locator)
+            logger.info("New appointment accepted", locator=appointment.locator)
 
             signature = Cryptographer.sign(Cryptographer.signature_format(appointment.to_dict()), self.signing_key)
 
@@ -147,7 +147,7 @@ class Watcher:
             appointment_added = False
             signature = None
 
-            logger.info("Maximum appointments reached, appointment rejected.", locator=appointment.locator)
+            logger.info("Maximum appointments reached, appointment rejected", locator=appointment.locator)
 
         return appointment_added, signature
 
@@ -177,7 +177,7 @@ class Watcher:
             if block is not None:
                 txids = block.get("tx")
 
-                logger.info("List of transactions.", txids=txids)
+                logger.info("List of transactions", txids=txids)
 
                 expired_appointments = [
                     uuid
@@ -195,7 +195,7 @@ class Watcher:
                     # Errors decrypting the Blob will result in a None penalty_txid
                     if filtered_breach["valid_breach"] is True:
                         logger.info(
-                            "Notifying responder and deleting appointment.",
+                            "Notifying responder and deleting appointment",
                             penalty_txid=filtered_breach["penalty_txid"],
                             locator=filtered_breach["locator"],
                             uuid=uuid,
@@ -287,7 +287,7 @@ class Watcher:
                     penalty_txid = penalty_tx.get("txid")
                     valid_breach = True
 
-                    logger.info("Breach found for locator.", locator=locator, uuid=uuid, penalty_txid=penalty_txid)
+                    logger.info("Breach found for locator", locator=locator, uuid=uuid, penalty_txid=penalty_txid)
 
                 else:
                     penalty_txid = None

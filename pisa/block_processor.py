@@ -1,4 +1,4 @@
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.tools import bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 
@@ -30,7 +30,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block = None
-            logger.error("Couldn't get block from bitcoind.", error=e.error)
+            logger.error("Couldn't get block from bitcoind", error=e.error)
 
         return block
 
@@ -50,7 +50,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block_hash = None
-            logger.error("Couldn't get block hash.", error=e.error)
+            logger.error("Couldn't get block hash", error=e.error)
 
         return block_hash
 
@@ -94,7 +94,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             tx = None
-            logger.error("Can't build transaction from decoded data.", error=e.error)
+            logger.error("Can't build transaction from decoded data", error=e.error)
 
         return tx
 

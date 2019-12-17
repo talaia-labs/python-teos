@@ -3,7 +3,7 @@ from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from pisa.conf import DB_PATH
-from pisa.logger import Logger
+from common.logger import Logger
 from pisa.api import start_api
 from pisa.watcher import Watcher
 from pisa.builder import Builder
