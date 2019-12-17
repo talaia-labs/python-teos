@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives import serialization
 from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
-from pisa import HOST, PORT, c_logger
+from pisa import HOST, PORT
 from pisa.conf import MAX_APPOINTMENTS
 
 from test.pisa.unit.conftest import (
@@ -21,7 +21,6 @@ from test.pisa.unit.conftest import (
 
 from common.constants import LOCATOR_LEN_BYTES
 
-c_logger.disabled = True
 
 PISA_API = "http://{}:{}".format(HOST, PORT)
 MULTIPLE_APPOINTMENTS = 10
