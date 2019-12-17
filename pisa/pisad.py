@@ -4,7 +4,7 @@ from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from pisa.conf import DB_PATH
 from common.logger import Logger
-from pisa.api import start_api
+from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
 from pisa.conf import BTC_NETWORK, PISA_SECRET_KEY
@@ -79,8 +79,8 @@ if __name__ == "__main__":
                 watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(watcher_appointments_data)
                 watcher.block_queue = Builder.build_block_queue(missed_blocks_watcher)
 
-            # Create an instance of the Watcher and fire the API
-            start_api(watcher)
+            # Fire the API
+            API(watcher).start()
 
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))

@@ -5,7 +5,7 @@ from time import sleep
 from threading import Thread
 from cryptography.hazmat.primitives import serialization
 
-from pisa.api import start_api
+from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT, c_logger
@@ -40,7 +40,7 @@ def run_api(db_manager):
     )
     watcher = Watcher(db_manager, sk_der)
 
-    api_thread = Thread(target=start_api, args=[watcher])
+    api_thread = Thread(target=API(watcher).start)
     api_thread.daemon = True
     api_thread.start()
 
