@@ -141,7 +141,7 @@ class Watcher:
 
             logger.info("New appointment accepted", locator=appointment.locator)
 
-            signature = Cryptographer.sign(Cryptographer.signature_format(appointment.to_dict()), self.signing_key)
+            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
 
         else:
             appointment_added = False

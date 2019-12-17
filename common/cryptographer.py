@@ -1,4 +1,3 @@
-import json
 from hashlib import sha256
 from binascii import unhexlify, hexlify
 
@@ -146,23 +145,6 @@ class Cryptographer:
 
         return blob
 
-    # NOTCOVERED
-    @staticmethod
-    def signature_format(data):
-        """
-        Serializes a given ``data`` in the right format to be signed.
-
-        Args:
-              data(:mod:`str`): the data to be formatted.
-
-        Returns:
-              :mod:`str`: The serialized data to be signed.
-        """
-
-        # FIXME: This is temporary serialization. A proper one is required. Data need to be unhexlified too (can't atm)
-        return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-    # Deserialize public key from der data.
     @staticmethod
     def load_public_key_der(pk_der):
         """
@@ -195,7 +177,6 @@ class Cryptographer:
 
         return None
 
-    # Deserialize private key from der data.
     @staticmethod
     def load_private_key_der(sk_der):
         """
@@ -231,7 +212,7 @@ class Cryptographer:
         Signs a given data using a given secret key using ECDSA.
 
         Args:
-            data(:mod:`str`): the data to be signed.
+            data(:mod:`bytes`): the data to be signed.
             sk(:mod:`EllipticCurvePrivateKey`): the ECDSA secret key used to signed the data.
             rtype: the return type for the encrypted value. Can be either ``'str'`` or ``'bytes'``.
 
@@ -263,7 +244,7 @@ class Cryptographer:
         Verifies if a signature is valid for a given public key and message.
 
         Args:
-            message(:mod:`str`): the message that is supposed have been signed.
+            message(:mod:`bytes`): the message that is supposed have been signed.
             signature(:mod:`str`): the potential signature of the message.
             pk(:mod:`EllipticCurvePublicKey`): the public key that is used to try to verify the signature.
 

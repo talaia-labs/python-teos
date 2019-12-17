@@ -1,7 +1,7 @@
 from queue import Queue
 
 from pisa.responder import TransactionTracker
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 
 
 class Builder:

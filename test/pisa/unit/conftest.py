@@ -15,7 +15,7 @@ from pisa.responder import TransactionTracker
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 
 from test.simulator.utils import sha256d
 from test.simulator.transaction import TX
@@ -110,7 +110,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "encrypted_blob": encrypted_blob,
     }
 
-    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
+    signature = Cryptographer.sign(Appointment.from_dict(appointment_data).serialize(), client_sk)
     pk_hex = hexlify(client_pk_der).decode("utf-8")
 
     data = {"appointment": appointment_data, "signature": signature, "public_key": pk_hex}

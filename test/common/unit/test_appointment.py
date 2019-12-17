@@ -1,8 +1,10 @@
 import json
+import struct
+import binascii
 from pytest import fixture
 
 from pisa import c_logger
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 from pisa.encrypted_blob import EncryptedBlob
 
 from test.pisa.unit.conftest import get_random_value_hex
@@ -110,3 +112,27 @@ def test_from_dict(appointment_data):
         except ValueError:
             appointment_data[key] = prev_val
             assert True
+
+
+def test_serialize(appointment_data):
+    # From the tower end, appointments are only created if they pass the inspector tests, so not covering weird formats.
+    # Serialize may fail if, from the user end, the user tries to do it with an weird appointment. Not critical.
+
+    appointment = Appointment.from_dict(appointment_data)
+    serialized_appointment = appointment.serialize()
+
+    # Size must be 16 + 4 + 4 + 4 + len(encrypted_blob)
+    assert len(serialized_appointment) >= 28
+    assert isinstance(serialized_appointment, bytes)
+
+    locator = serialized_appointment[:16]
+    start_time = serialized_appointment[16:20]
+    end_time = serialized_appointment[20:24]
+    to_self_delay = serialized_appointment[24:28]
+    encrypted_blob = serialized_appointment[28:]
+
+    assert binascii.hexlify(locator).decode() == appointment.locator
+    assert struct.unpack(">I", start_time)[0] == appointment.start_time
+    assert struct.unpack(">I", end_time)[0] == appointment.end_time
+    assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
+    assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob.data

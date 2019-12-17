@@ -211,7 +211,7 @@ def test_sign_wrong_rtype():
     # Calling sign with an rtype different than 'str' or 'bytes' should fail
     for wtype in WRONG_TYPES:
         try:
-            Cryptographer.sign("", "", rtype=wtype)
+            Cryptographer.sign(b"", "", rtype=wtype)
             assert False
 
         except ValueError:
@@ -221,20 +221,19 @@ def test_sign_wrong_rtype():
 def test_sign_wrong_sk():
     # If a sk is not passed, sign will return None
     for wtype in WRONG_TYPES:
-        assert Cryptographer.sign("", wtype) is None
+        assert Cryptographer.sign(b"", wtype) is None
 
 
-# FIXME: signature_format is not covered, so we are not covering cases where the message is not in the proper format
-#   at the moment (related to #68, happens in multiple tests from here on)
 def test_sign():
     # Otherwise we should get a signature
     sk, _ = generate_keypair()
+    message = b""
 
-    assert Cryptographer.sign(Cryptographer.signature_format(""), sk) is not None
+    assert Cryptographer.sign(message, sk) is not None
 
     # Check that the returns work
-    assert isinstance(Cryptographer.sign(Cryptographer.signature_format(""), sk, rtype="str"), str)
-    assert isinstance(Cryptographer.sign(Cryptographer.signature_format(""), sk, rtype="bytes"), bytes)
+    assert isinstance(Cryptographer.sign(message, sk, rtype="str"), str)
+    assert isinstance(Cryptographer.sign(message, sk, rtype="bytes"), bytes)
 
 
 def test_verify_wrong_pk():
@@ -247,10 +246,10 @@ def test_verify_random_values():
     # Random values shouldn't verify
     sk, pk = generate_keypair()
 
-    message = get_random_value_hex(32)
+    message = binascii.unhexlify(get_random_value_hex(32))
     signature = get_random_value_hex(32)
 
-    assert Cryptographer.verify(Cryptographer.signature_format(message), signature, pk) is False
+    assert Cryptographer.verify(message, signature, pk) is False
 
 
 def test_verify_wrong_pair():
@@ -258,16 +257,28 @@ def test_verify_wrong_pair():
     sk, _ = generate_keypair()
     _, pk = generate_keypair()
 
-    message = get_random_value_hex(32)
+    message = binascii.unhexlify(get_random_value_hex(32))
     signature = get_random_value_hex(32)
 
-    assert Cryptographer.verify(Cryptographer.signature_format(message), signature, pk) is False
+    assert Cryptographer.verify(message, signature, pk) is False
+
+
+def test_verify_wrong_message():
+    # Verifying with a wrong keypair must fail
+    sk, pk = generate_keypair()
+
+    message = binascii.unhexlify(get_random_value_hex(32))
+    signature = Cryptographer.sign(message, sk)
+
+    wrong_message = binascii.unhexlify(get_random_value_hex(32))
+
+    assert Cryptographer.verify(wrong_message, signature, pk) is False
 
 
 def test_verify():
     # A properly generated signature should verify
     sk, pk = generate_keypair()
-    message = get_random_value_hex(32)
-    signature = Cryptographer.sign(Cryptographer.signature_format(message), sk)
+    message = binascii.unhexlify(get_random_value_hex(32))
+    signature = Cryptographer.sign(message, sk)
 
-    assert Cryptographer.verify(Cryptographer.signature_format(message), signature, pk) is True
+    assert Cryptographer.verify(message, signature, pk) is True
