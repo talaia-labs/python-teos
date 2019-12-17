@@ -7,7 +7,6 @@ from copy import deepcopy
 from threading import Thread
 from queue import Queue, Empty
 
-from pisa import c_logger
 from pisa.db_manager import DBManager
 from pisa.responder import Responder, TransactionTracker
 from pisa.block_processor import BlockProcessor
@@ -19,8 +18,6 @@ from common.tools import check_sha256_hex_format
 from test.simulator.utils import sha256d
 from test.simulator.bitcoind_sim import TX
 from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_value_hex
-
-c_logger.disabled = True
 
 
 @pytest.fixture(scope="module")

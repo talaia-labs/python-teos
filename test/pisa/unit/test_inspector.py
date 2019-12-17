@@ -4,7 +4,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
-from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
 from common.appointment import Appointment
@@ -16,7 +15,6 @@ from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appoint
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 
-c_logger.disabled = True
 
 inspector = Inspector()
 APPOINTMENT_OK = (0, None)

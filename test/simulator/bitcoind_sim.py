@@ -242,7 +242,7 @@ def load_data():
     pass
 
 
-def simulate_mining(mode, time_between_blocks):
+def simulate_mining(mode, time_between_blocks, verbose=True):
     global mempool, mined_transactions, blocks, blockchain, mine_new_block, prev_block_hash
 
     mining_simulator = ZMQPublisher(
@@ -281,8 +281,9 @@ def simulate_mining(mode, time_between_blocks):
         blockchain.append(block_hash)
         prev_block_hash = block_hash
 
-        print("New block mined: {}".format(block_hash))
-        print("\tTransactions: {}".format(list(txs_to_mine.keys())))
+        if verbose:
+            print("New block mined: {}".format(block_hash))
+            print("\tTransactions: {}".format(list(txs_to_mine.keys())))
 
         if mode == "time":
             time.sleep(time_between_blocks)
@@ -291,11 +292,11 @@ def simulate_mining(mode, time_between_blocks):
             mine_new_block.clear()
 
 
-def run_simulator(mode="time", time_between_blocks=TIME_BETWEEN_BLOCKS):
+def run_simulator(mode="time", time_between_blocks=TIME_BETWEEN_BLOCKS, verbose=True):
     if mode not in ["time", "event"]:
         raise ValueError("Node must be time or event")
 
-    mining_thread = Thread(target=simulate_mining, args=[mode, time_between_blocks])
+    mining_thread = Thread(target=simulate_mining, args=[mode, time_between_blocks, verbose])
     mining_thread.start()
 
     # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages

@@ -4,7 +4,6 @@ from pisa import c_logger
 from pisa.block_processor import BlockProcessor
 from test.pisa.unit.conftest import get_random_value_hex, generate_block, generate_blocks
 
-c_logger.disabled = True
 
 hex_tx = (
     "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402"

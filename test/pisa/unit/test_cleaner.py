@@ -1,7 +1,6 @@
 import random
 from uuid import uuid4
 
-from pisa import c_logger
 from pisa.responder import TransactionTracker
 from pisa.cleaner import Cleaner
 from common.appointment import Appointment
@@ -15,8 +14,6 @@ CONFIRMATIONS = 6
 ITEMS = 10
 MAX_ITEMS = 100
 ITERATIONS = 10
-
-c_logger.disabled = True
 
 
 # WIP: FIX CLEANER TESTS AFTER ADDING delete_complete_appointment

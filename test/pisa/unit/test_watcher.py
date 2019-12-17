@@ -4,7 +4,6 @@ from threading import Thread
 from queue import Queue, Empty
 from cryptography.hazmat.primitives import serialization
 
-from pisa import c_logger
 from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
@@ -20,7 +19,6 @@ from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 from common.tools import check_sha256_hex_format
 from common.cryptographer import Cryptographer
 
-c_logger.disabled = True
 
 APPOINTMENTS = 5
 START_TIME_OFFSET = 1

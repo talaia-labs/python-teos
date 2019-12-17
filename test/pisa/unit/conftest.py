@@ -27,7 +27,7 @@ from common.cryptographer import Cryptographer
 
 @pytest.fixture(scope="session")
 def run_bitcoind():
-    bitcoind_thread = Thread(target=run_simulator, kwargs={"mode": "event"})
+    bitcoind_thread = Thread(target=run_simulator, kwargs={"mode": "event", "verbose": False})
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
 

@@ -4,15 +4,12 @@ import pytest
 import shutil
 from uuid import uuid4
 
-from pisa import c_logger
 from pisa.db_manager import DBManager
 from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
 
 from common.constants import LOCATOR_LEN_BYTES
 
 from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appointment
-
-c_logger.disabled = True
 
 
 @pytest.fixture(scope="module")

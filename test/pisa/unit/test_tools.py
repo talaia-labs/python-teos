@@ -1,9 +1,6 @@
-from pisa import c_logger
 from pisa.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli
 
 from common.tools import check_sha256_hex_format
-
-c_logger.disabled = True
 
 
 def test_in_correct_network(run_bitcoind):
