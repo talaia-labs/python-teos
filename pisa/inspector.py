@@ -7,7 +7,7 @@ from common.cryptographer import Cryptographer
 from pisa import errors
 import pisa.conf as conf
 from common.logger import Logger
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
 logger = Logger("Inspector")
@@ -309,12 +309,12 @@ class Inspector:
 
     @staticmethod
     # Verifies that the appointment signature is a valid signature with public key
-    def check_appointment_signature(appointment, signature, pk_der):
+    def check_appointment_signature(appointment_data, signature, pk_der):
         """
         Checks if the provided user signature is correct.
 
         Args:
-            appointment (:obj:`dict`): the appointment that was signed by the user.
+            appointment_data (:obj:`dict`): the appointment that was signed by the user.
             signature (:obj:`str`): the user's signature (hex encoded).
             pk_der (:obj:`str`): the user's public key (hex encoded, DER format).
 
@@ -336,7 +336,7 @@ class Inspector:
             message = "empty signature received"
 
         pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
-        valid_sig = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pk)
+        valid_sig = Cryptographer.verify(Appointment.from_dict(appointment_data).serialize(), signature, pk)
 
         if not valid_sig:
             rcode = errors.APPOINTMENT_INVALID_SIGNATURE

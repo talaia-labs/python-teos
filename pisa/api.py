@@ -5,7 +5,7 @@ from flask import Flask, request, abort, jsonify
 from pisa import HOST, PORT, logging
 from common.logger import Logger
 from pisa.inspector import Inspector
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX

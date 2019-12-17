@@ -21,6 +21,7 @@ from apps.cli import (
 )
 
 from common.logger import Logger
+from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 from common.tools import check_sha256_hex_format
@@ -128,13 +129,7 @@ def add_appointment(args):
         return False
 
     add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
-    appointment = build_appointment(
-        appointment_data.get("tx"),
-        appointment_data.get("tx_id"),
-        appointment_data.get("start_time"),
-        appointment_data.get("end_time"),
-        appointment_data.get("to_self_delay"),
-    )
+    appointment = Appointment.from_dict(appointment_data)
 
     try:
         sk_der = load_key_file_data(CLI_PRIVATE_KEY)
@@ -152,7 +147,7 @@ def add_appointment(args):
         logger.error("I/O error", errno=e.errno, error=e.strerror)
         return False
 
-    signature = Cryptographer.sign(Cryptographer.signature_format(appointment), cli_sk)
+    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
 
     try:
         cli_pk_der = load_key_file_data(CLI_PUBLIC_KEY)
@@ -217,7 +212,7 @@ def add_appointment(args):
             logger.error("Failed to deserialize the public key. It might be in an unsupported format")
             return False
 
-        is_sig_valid = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pisa_pk)
+        is_sig_valid = Cryptographer.verify(appointment.serialize(), signature, pisa_pk)
 
     except FileNotFoundError:
         logger.error("Pisa's public key file not found. Please check your settings")
@@ -276,24 +271,6 @@ def get_appointment(args):
         return False
 
     return True
-
-
-def build_appointment(tx, tx_id, start_time, end_time, to_self_delay):
-    locator = compute_locator(tx_id)
-
-    # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
-    blob = Blob(tx)
-    encrypted_blob = Cryptographer.encrypt(blob, tx_id)
-
-    appointment = {
-        "locator": locator,
-        "start_time": start_time,
-        "end_time": end_time,
-        "to_self_delay": to_self_delay,
-        "encrypted_blob": encrypted_blob,
-    }
-
-    return appointment
 
 
 def show_usage():
