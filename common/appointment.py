@@ -1,4 +1,6 @@
 import json
+import struct
+from binascii import unhexlify
 
 from pisa.encrypted_blob import EncryptedBlob
 
@@ -101,3 +103,23 @@ class Appointment:
         appointment["triggered"] = triggered
 
         return json.dumps(appointment, sort_keys=True, separators=(",", ":"))
+
+    def serialize(self):
+        """
+        Serializes an appointment to be signed.
+
+        The serialization follows the same ordering as the fields in the appointment:
+            locator:start_time:end_time:to_self_delay:encrypted_blob
+
+        All values are big endian.
+
+        Returns:
+              :mod:`bytes`: The serialized data to be signed.
+        """
+        return (
+            unhexlify(self.locator)
+            + struct.pack(">I", self.start_time)
+            + struct.pack(">I", self.end_time)
+            + struct.pack(">I", self.to_self_delay)
+            + unhexlify(self.encrypted_blob.data)
+        )

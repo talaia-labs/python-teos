@@ -2,7 +2,7 @@ import json
 from pytest import fixture
 
 from pisa import c_logger
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 from pisa.encrypted_blob import EncryptedBlob
 
 from test.pisa.unit.conftest import get_random_value_hex
