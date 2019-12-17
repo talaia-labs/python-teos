@@ -4,7 +4,7 @@ from uuid import uuid4
 from pisa import c_logger
 from pisa.responder import TransactionTracker
 from pisa.cleaner import Cleaner
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 from pisa.db_manager import WATCHER_PREFIX
 
 from test.pisa.unit.conftest import get_random_value_hex

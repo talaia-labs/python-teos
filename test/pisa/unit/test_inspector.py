@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import serialization
 from pisa import c_logger
 from pisa.errors import *
 from pisa.inspector import Inspector
-from pisa.appointment import Appointment
+from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 from pisa.conf import MIN_TO_SELF_DELAY
 
@@ -185,7 +185,9 @@ def test_check_appointment_signature():
     fake_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
 
     # Create a bad signature to make sure inspector rejects it
-    bad_signature = Cryptographer.sign(Cryptographer.signature_format(dummy_appointment_data["appointment"]), fake_sk)
+    bad_signature = Cryptographer.sign(
+        Appointment.from_dict(dummy_appointment_data["appointment"]).serialize(), fake_sk
+    )
     assert (
         Inspector.check_appointment_signature(dummy_appointment_data["appointment"], bad_signature, client_pk_hex)[0]
         == APPOINTMENT_INVALID_SIGNATURE
@@ -202,12 +204,6 @@ def test_inspect(run_bitcoind):
     )
     client_pk_hex = hexlify(client_pk_der).decode("utf-8")
 
-    # Invalid appointment, every field is empty
-    appointment_data = dict()
-    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
-    appointment = inspector.inspect(appointment_data, signature, client_pk)
-    assert type(appointment) == tuple and appointment[0] != 0
-
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     start_time = BlockProcessor.get_block_count() + 5
@@ -223,7 +219,7 @@ def test_inspect(run_bitcoind):
         "encrypted_blob": encrypted_blob,
     }
 
-    signature = Cryptographer.sign(Cryptographer.signature_format(appointment_data), client_sk)
+    signature = Cryptographer.sign(Appointment.from_dict(appointment_data).serialize(), client_sk)
 
     appointment = inspector.inspect(appointment_data, signature, client_pk_hex)
 

@@ -92,13 +92,13 @@ def test_add_appointment(run_bitcoind, watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert Cryptographer.verify(Cryptographer.signature_format(appointment.to_dict()), sig, public_key)
+        assert Cryptographer.verify(appointment.serialize(), sig, public_key)
 
         # Check that we can also add an already added appointment (same locator)
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert Cryptographer.verify(Cryptographer.signature_format(appointment.to_dict()), sig, public_key)
+        assert Cryptographer.verify(appointment.serialize(), sig, public_key)
 
 
 def test_add_too_many_appointments(watcher):
@@ -112,7 +112,7 @@ def test_add_too_many_appointments(watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert Cryptographer.verify(Cryptographer.signature_format(appointment.to_dict()), sig, public_key)
+        assert Cryptographer.verify(appointment.serialize(), sig, public_key)
 
     appointment, dispute_tx = generate_dummy_appointment(
         start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
