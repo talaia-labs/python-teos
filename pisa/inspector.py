@@ -335,7 +335,7 @@ class Inspector:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty signature received"
 
-        pk = Cryptographer.load_public_key_der(unhexlify(pk_der.encode("utf-8")))
+        pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
         valid_sig = Cryptographer.verify(Cryptographer.signature_format(appointment), signature, pk)
 
         if not valid_sig:
