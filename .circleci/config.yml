@@ -39,6 +39,17 @@ jobs:
             - ./venv
           key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}
 
+      # Get github dependencies (pending to add to PyPi)
+      - run:
+          name: get bitcoind mock
+          command: |
+            git clone git@github.com:sr-gi/bitcoind_mock.git
+            . venv/bin/activate
+            pip install -r bitcoind_mock/requirements.txt
+            cp bitcoind_mock/bitcoind_mock/sample_conf.py bitcoind_mock/bitcoind_mock/conf.py
+            mv bitcoind_mock/bitcoind_mock ~/repo/venv/lib/python3.6/site-packages
+
+
       # run tests!
       # this example uses Django's built-in test-runner
       # other common Python testing frameworks include pytest and nose
