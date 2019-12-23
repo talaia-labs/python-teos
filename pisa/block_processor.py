@@ -98,34 +98,6 @@ class BlockProcessor:
 
         return tx
 
-    def get_missed_blocks(self, last_know_block_hash):
-        """
-        Compute the blocks between the current best chain tip and a given block hash (``last_know_block_hash``).
-
-        This method is used to fetch all the missed information when recovering from a crash. Note that if the two
-        blocks are not part of the same chain, it would return all the blocks up to genesis.
-
-        Args:
-            last_know_block_hash (:obj:`str`): the hash of the last known block.
-
-        Returns:
-            :obj:`list`: A list of blocks between the last given block and the current best chain tip, starting from the
-            child of ``last_know_block_hash``.
-        """
-
-        # FIXME: This needs to be integrated with the ChainMaester (soon TM) to allow dealing with forks.
-
-        current_block_hash = self.get_best_block_hash()
-        missed_blocks = []
-
-        while current_block_hash != last_know_block_hash and current_block_hash is not None:
-            missed_blocks.append(current_block_hash)
-
-            current_block = self.get_block(current_block_hash)
-            current_block_hash = current_block.get("previousblockhash")
-
-        return missed_blocks[::-1]
-
     def get_distance_to_tip(self, target_block_hash):
         """
         Compute the distance between a given block hash and the best chain tip.
@@ -153,3 +125,88 @@ class BlockProcessor:
             distance = chain_tip_height - target_block_height
 
         return distance
+
+    def get_missed_blocks(self, last_know_block_hash):
+        """
+        Compute the blocks between the current best chain tip and a given block hash (``last_know_block_hash``).
+
+        This method is used to fetch all the missed information when recovering from a crash.
+
+        Args:
+            last_know_block_hash (:obj:`str`): the hash of the last known block.
+
+        Returns:
+            :obj:`list`: A list of blocks between the last given block and the current best chain tip, starting from the
+            child of ``last_know_block_hash``.
+        """
+
+        # If last_known_block_hash is on the best chain, this will return last_know_block_hash and and empty list.
+        # Otherwise we will get the last_common_ancestor and a list of dropped transactions.
+        last_common_ancestor, dropped_txs = self.find_last_common_ancestor(last_know_block_hash)
+        # TODO: 32-handle-reorgs-offline
+        #   Dropped txs is not used yet. It is necessary to manage the changes in the Watcher/Responder due to a reorg
+
+        current_block_hash = self.get_best_block_hash()
+        missed_blocks = []
+
+        while current_block_hash != last_common_ancestor and current_block_hash is not None:
+            missed_blocks.append(current_block_hash)
+
+            current_block = self.get_block(current_block_hash)
+            current_block_hash = current_block.get("previousblockhash")
+
+        return missed_blocks[::-1]
+
+    def is_block_in_best_chain(self, block_hash):
+        """
+        Checks whether or not a given block is on the best chain. Blocks are identified by block_hash.
+
+        A block that is not in the best chain will either not exists (block = None) or have a confirmation count of
+        -1 (implying that the block was forked out or the chain never grew from that one).
+
+        Args:
+            block_hash(:obj:`str`): the hash of the block to be checked.
+
+        Returns:
+            :obj:`bool`: ``True`` if the block is on the best chain, ``False`` otherwise.
+
+        Raises:
+            KeyError: If the block cannot be found in the blockchain.
+        """
+
+        block = self.get_block(block_hash)
+
+        if block is None:
+            # This should never happen as long as we are using the same node, since bitcoind never drops orphan blocks
+            # and we have received this block from our node at some point.
+            raise KeyError("Block not found")
+
+        if block.get("confirmations") != -1:
+            return True
+        else:
+            return False
+
+    def find_last_common_ancestor(self, last_known_block_hash):
+        """
+        Finds the last common ancestor between the current best chain tip and the last block known by us (older block).
+
+        This is useful to recover from a chain fork happening while offline (crash/shutdown).
+
+        Args:
+            last_known_block_hash(:obj:`str`): the hash of the last know block.
+
+        Returns:
+            :obj:`tuple`: A tuple (:obj:`str`:, :obj:`list`:) where the first item contains the hash of the last common
+                ancestor and the second item contains the list of transactions from ``last_known_block_hash`` to
+                ``last_common_ancestor``.
+        """
+
+        target_block_hash = last_known_block_hash
+        dropped_txs = []
+
+        while not self.is_block_in_best_chain(target_block_hash):
+            block = self.get_block(target_block_hash)
+            dropped_txs.extend(block.get("tx"))
+            target_block_hash = block.get("previousblockhash")
+
+        return target_block_hash, dropped_txs

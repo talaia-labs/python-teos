@@ -1,8 +1,8 @@
 import pytest
 
-from pisa import c_logger
+from pisa.tools import bitcoin_cli
 from pisa.block_processor import BlockProcessor
-from test.pisa.unit.conftest import get_random_value_hex, generate_block, generate_blocks
+from test.pisa.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork
 
 
 hex_tx = (
@@ -88,3 +88,22 @@ def test_get_distance_to_tip():
 
     # Check if the distance is properly computed
     assert block_processor.get_distance_to_tip(target_block) == target_distance
+
+
+def test_is_block_in_best_chain(run_bitcoind):
+    # bitcoind_sim does not have a proper way of doing forks yet, we can mock this.
+
+    block_processor = BlockProcessor()
+    best_block_hash = bitcoin_cli().getbestblockhash()
+    best_block = bitcoin_cli().getblock(best_block_hash)
+
+    assert block_processor.is_block_in_best_chain(best_block_hash)
+
+    fork(best_block.get("previousblockhash"))
+    generate_blocks(2)
+
+    assert not block_processor.is_block_in_best_chain(best_block_hash)
+
+
+def find_last_common_ancestor(last_known_block_hash):
+    pass
