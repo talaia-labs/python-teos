@@ -10,13 +10,13 @@ from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 from pisa.conf import MIN_TO_SELF_DELAY
 
-from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair
+from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair, get_config
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 
 
-inspector = Inspector()
+inspector = Inspector(get_config())
 APPOINTMENT_OK = (0, None)
 
 NO_HEX_STRINGS = [
@@ -126,21 +126,21 @@ def test_check_to_self_delay():
     # Right value, right format
     to_self_delays = [MIN_TO_SELF_DELAY, MIN_TO_SELF_DELAY + 1, MIN_TO_SELF_DELAY + 1000]
     for to_self_delay in to_self_delays:
-        assert Inspector.check_to_self_delay(to_self_delay) == APPOINTMENT_OK
+        assert inspector.check_to_self_delay(to_self_delay) == APPOINTMENT_OK
 
     # to_self_delay too small
     to_self_delays = [MIN_TO_SELF_DELAY - 1, MIN_TO_SELF_DELAY - 2, 0, -1, -1000]
     for to_self_delay in to_self_delays:
-        assert Inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_FIELD_TOO_SMALL
+        assert inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_FIELD_TOO_SMALL
 
     # Empty field
     to_self_delay = None
-    assert Inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_EMPTY_FIELD
+    assert inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_EMPTY_FIELD
 
     # Wrong data type
     to_self_delays = WRONG_TYPES
     for to_self_delay in to_self_delays:
-        assert Inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_WRONG_FIELD_TYPE
+        assert inspector.check_to_self_delay(to_self_delay)[0] == APPOINTMENT_WRONG_FIELD_TYPE
 
 
 def test_check_blob():

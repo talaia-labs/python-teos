@@ -7,16 +7,7 @@ from common.logger import Logger
 from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
-from pisa.conf import (
-    BTC_NETWORK,
-    FEED_PROTOCOL,
-    FEED_ADDR,
-    FEED_PORT,
-    MAX_APPOINTMENTS,
-    EXPIRY_DELTA,
-    MIN_TO_SELF_DELAY,
-    PISA_SECRET_KEY,
-)
+import pisa.conf as conf
 from pisa.responder import Responder
 from pisa.db_manager import DBManager
 from pisa.block_processor import BlockProcessor
@@ -108,7 +99,7 @@ if __name__ == "__main__":
                     watcher.block_queue = Builder.build_block_queue(missed_blocks_watcher)
 
             # Fire the API
-            API(watcher).start()
+            API(watcher, config=pisa_config).start()
 
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))

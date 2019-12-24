@@ -9,7 +9,6 @@ from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT
-from pisa.conf import MAX_APPOINTMENTS, EXPIRY_DELTA
 
 from test.pisa.unit.conftest import (
     generate_block,
@@ -29,6 +28,8 @@ MULTIPLE_APPOINTMENTS = 10
 appointments = []
 locator_dispute_tx_map = {}
 
+config = get_config()
+
 
 @pytest.fixture(scope="module")
 def run_api(db_manager):
@@ -40,7 +41,7 @@ def run_api(db_manager):
     )
     watcher = Watcher(db_manager, sk_der, get_config())
 
-    api_thread = Thread(target=API(watcher).start)
+    api_thread = Thread(target=API(watcher, config).start)
     api_thread.daemon = True
     api_thread.start()
 
@@ -103,7 +104,7 @@ def test_request_multiple_appointments_same_locator(new_appt_data, n=MULTIPLE_AP
 
 
 def test_add_too_many_appointment(new_appt_data):
-    for _ in range(MAX_APPOINTMENTS - len(appointments)):
+    for _ in range(config.get("MAX_APPOINTMENTS") - len(appointments)):
         r = add_appointment(new_appt_data)
         assert r.status_code == 200
 
