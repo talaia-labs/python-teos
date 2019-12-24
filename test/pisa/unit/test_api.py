@@ -9,7 +9,7 @@ from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT
-from pisa.conf import MAX_APPOINTMENTS
+from pisa.conf import MAX_APPOINTMENTS, EXPIRY_DELTA
 
 from test.pisa.unit.conftest import (
     generate_block,
@@ -17,6 +17,7 @@ from test.pisa.unit.conftest import (
     get_random_value_hex,
     generate_dummy_appointment_data,
     generate_keypair,
+    get_config,
 )
 
 from common.constants import LOCATOR_LEN_BYTES
@@ -37,7 +38,7 @@ def run_api(db_manager):
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    watcher = Watcher(db_manager, sk_der)
+    watcher = Watcher(db_manager, sk_der, get_config())
 
     api_thread = Thread(target=API(watcher).start)
     api_thread.daemon = True

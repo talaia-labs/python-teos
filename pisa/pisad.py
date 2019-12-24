@@ -7,7 +7,16 @@ from common.logger import Logger
 from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
-from pisa.conf import BTC_NETWORK, PISA_SECRET_KEY
+from pisa.conf import (
+    BTC_NETWORK,
+    FEED_PROTOCOL,
+    FEED_ADDR,
+    FEED_PORT,
+    MAX_APPOINTMENTS,
+    EXPIRY_DELTA,
+    MIN_TO_SELF_DELAY,
+    PISA_SECRET_KEY,
+)
 from pisa.responder import Responder
 from pisa.db_manager import DBManager
 from pisa.block_processor import BlockProcessor
@@ -52,7 +61,9 @@ if __name__ == "__main__":
             with open(PISA_SECRET_KEY, "rb") as key_file:
                 secret_key_der = key_file.read()
 
-            watcher = Watcher(db_manager, secret_key_der)
+            pisa_config = load_config(conf)
+
+            watcher = Watcher(db_manager, secret_key_der, config=pisa_config)
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
@@ -65,7 +76,7 @@ if __name__ == "__main__":
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                responder = Responder(db_manager)
+                responder = Responder(db_manager, pisa_config)
                 last_common_ancestor_responder = None
                 missed_blocks_responder = None
 

@@ -8,12 +8,14 @@ from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT
 class ZMQSubscriber:
     """ Adapted from https://github.com/bitcoin/bitcoin/blob/master/contrib/zmq/zmq_sub.py"""
 
-    def __init__(self, parent):
+    def __init__(self, config, parent):
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
         self.zmqSubSocket.setsockopt(zmq.RCVHWM, 0)
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
-        self.zmqSubSocket.connect("%s://%s:%s" % (FEED_PROTOCOL, FEED_ADDR, FEED_PORT))
+        self.zmqSubSocket.connect(
+            "%s://%s:%s" % (config.get("FEED_PROTOCOL"), config.get("FEED_ADDR"), config.get("FEED_PORT"))
+        )
         self.logger = Logger("ZMQSubscriber-{}".format(parent))
 
         self.terminate = False

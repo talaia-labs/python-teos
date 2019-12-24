@@ -10,7 +10,6 @@ from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 from pisa.utils.zmq_subscriber import ZMQSubscriber
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
 logger = Logger("Watcher")
 
@@ -58,18 +57,18 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, sk_der, responder=None, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, sk_der, config, responder=None):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
         self.block_queue = Queue()
-        self.max_appointments = max_appointments
+        self.config = config
         self.zmq_subscriber = None
         self.db_manager = db_manager
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
         if not isinstance(responder, Responder):
-            self.responder = Responder(db_manager)
+            self.responder = Responder(db_manager, self.config)
 
     @staticmethod
     def compute_locator(tx_id):
@@ -115,7 +114,7 @@ class Watcher:
 
         """
 
-        if len(self.appointments) < self.max_appointments:
+        if len(self.appointments) < self.config.get("MAX_APPOINTMENTS"):
             uuid = uuid4().hex
             self.appointments[uuid] = appointment
 
@@ -157,7 +156,7 @@ class Watcher:
         trough the ``block_queue``.
         """
 
-        self.zmq_subscriber = ZMQSubscriber(parent="Watcher")
+        self.zmq_subscriber = ZMQSubscriber(self.config, parent="Watcher")
         self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
@@ -182,7 +181,7 @@ class Watcher:
                 expired_appointments = [
                     uuid
                     for uuid, appointment in self.appointments.items()
-                    if block["height"] > appointment.end_time + EXPIRY_DELTA
+                    if block["height"] > appointment.end_time + self.config.get("EXPIRY_DELTA")
                 ]
 
                 Cleaner.delete_expired_appointment(
