@@ -90,12 +90,10 @@ def test_get_distance_to_tip():
     assert block_processor.get_distance_to_tip(target_block) == target_distance
 
 
-def test_is_block_in_best_chain(run_bitcoind):
-    # bitcoind_sim does not have a proper way of doing forks yet, we can mock this.
-
+def test_is_block_in_best_chain():
     block_processor = BlockProcessor()
-    best_block_hash = bitcoin_cli().getbestblockhash()
-    best_block = bitcoin_cli().getblock(best_block_hash)
+    best_block_hash = block_processor.get_best_block_hash()
+    best_block = block_processor.get_block(best_block_hash)
 
     assert block_processor.is_block_in_best_chain(best_block_hash)
 
@@ -105,5 +103,19 @@ def test_is_block_in_best_chain(run_bitcoind):
     assert not block_processor.is_block_in_best_chain(best_block_hash)
 
 
-def find_last_common_ancestor(last_known_block_hash):
-    pass
+def test_find_last_common_ancestor():
+    block_processor = BlockProcessor()
+    ancestor = block_processor.get_best_block_hash()
+    generate_blocks(3)
+    best_block_hash = block_processor.get_best_block_hash()
+
+    # Create a fork (forking creates a block if the mock is set by events)
+    fork(ancestor)
+
+    # Create another block to make the best tip change (now both chains are at the same height)
+    generate_blocks(5)
+
+    # The last common ancestor between the old best and the new best should be the "ancestor"
+    last_common_ancestor, dropped_txs = block_processor.find_last_common_ancestor(best_block_hash)
+    assert last_common_ancestor == ancestor
+    assert len(dropped_txs) == 3
