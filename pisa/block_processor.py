@@ -142,16 +142,10 @@ class BlockProcessor:
             child of ``last_know_block_hash``.
         """
 
-        # If last_known_block_hash is on the best chain, this will return last_know_block_hash and and empty list.
-        # Otherwise we will get the last_common_ancestor and a list of dropped transactions.
-        last_common_ancestor, dropped_txs = BlockProcessor.find_last_common_ancestor(last_know_block_hash)
-        # TODO: 32-handle-reorgs-offline
-        #   Dropped txs is not used yet. It is necessary to manage the changes in the Watcher/Responder due to a reorg
-
         current_block_hash = BlockProcessor.get_best_block_hash()
         missed_blocks = []
 
-        while current_block_hash != last_common_ancestor and current_block_hash is not None:
+        while current_block_hash != last_know_block_hash and current_block_hash is not None:
             missed_blocks.append(current_block_hash)
 
             current_block = BlockProcessor.get_block(current_block_hash)
