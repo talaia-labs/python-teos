@@ -6,7 +6,6 @@ from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.block_processor import BlockProcessor
-from pisa.utils.zmq_subscriber import ZMQSubscriber
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
@@ -135,14 +134,14 @@ class Responder:
 
     """
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, chain_monitor):
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
         self.asleep = True
         self.block_queue = Queue()
-        self.zmq_subscriber = None
+        self.chain_monitor = chain_monitor
         self.db_manager = db_manager
 
     @staticmethod
@@ -260,19 +259,8 @@ class Responder:
 
         if self.asleep:
             self.asleep = False
-            zmq_thread = Thread(target=self.do_subscribe)
-            responder = Thread(target=self.do_watch)
-            zmq_thread.start()
-            responder.start()
-
-    def do_subscribe(self):
-        """
-        Initializes a :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` instance to listen to new blocks
-        from ``bitcoind``. Block ids are received trough the ``block_queue``.
-        """
-
-        self.zmq_subscriber = ZMQSubscriber(parent="Responder")
-        self.zmq_subscriber.handle(self.block_queue)
+            self.chain_monitor.responder_asleep = False
+            Thread(target=self.do_watch).start()
 
     def do_watch(self):
         """
@@ -327,8 +315,7 @@ class Responder:
 
         # Go back to sleep if there are no more pending trackers
         self.asleep = True
-        self.zmq_subscriber.terminate = True
-        self.block_queue = Queue()
+        self.chain_monitor.responder_asleep = True
 
         logger.info("No more pending trackers, going back to sleep")
 

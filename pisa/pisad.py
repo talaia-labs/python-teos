@@ -10,6 +10,7 @@ from pisa.builder import Builder
 from pisa.conf import BTC_NETWORK, PISA_SECRET_KEY
 from pisa.responder import Responder
 from pisa.db_manager import DBManager
+from pisa.chain_monitor import ChainMonitor
 from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
@@ -46,13 +47,18 @@ if __name__ == "__main__":
         try:
             db_manager = DBManager(DB_PATH)
 
+            # Create the chain monitor and start monitoring the chain
+            chain_monitor = ChainMonitor()
+            chain_monitor.monitor_chain()
+
             watcher_appointments_data = db_manager.load_watcher_appointments()
             responder_trackers_data = db_manager.load_responder_trackers()
 
             with open(PISA_SECRET_KEY, "rb") as key_file:
                 secret_key_der = key_file.read()
 
-            watcher = Watcher(db_manager, secret_key_der)
+            watcher = Watcher(db_manager, chain_monitor, secret_key_der)
+            chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
@@ -65,7 +71,7 @@ if __name__ == "__main__":
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                responder = Responder(db_manager)
+                responder = Responder(db_manager, chain_monitor)
                 last_common_ancestor_responder = None
                 missed_blocks_responder = None
 
@@ -82,6 +88,8 @@ if __name__ == "__main__":
                 # Build Watcher with Responder and backed up data. If the blocks of both match we don't perform the
                 # search twice.
                 watcher.responder = responder
+                chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+
                 if last_block_watcher is not None:
                     if last_block_watcher == last_block_responder:
                         missed_blocks_watcher = missed_blocks_responder

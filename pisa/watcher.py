@@ -9,7 +9,6 @@ from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
-from pisa.utils.zmq_subscriber import ZMQSubscriber
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
 logger = Logger("Watcher")
@@ -58,13 +57,13 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, sk_der, responder=None, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, chain_monitor, sk_der, responder=None, max_appointments=MAX_APPOINTMENTS):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
         self.block_queue = Queue()
         self.max_appointments = max_appointments
-        self.zmq_subscriber = None
+        self.chain_monitor = chain_monitor
         self.db_manager = db_manager
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
@@ -127,10 +126,8 @@ class Watcher:
 
             if self.asleep:
                 self.asleep = False
-                zmq_thread = Thread(target=self.do_subscribe)
-                watcher = Thread(target=self.do_watch)
-                zmq_thread.start()
-                watcher.start()
+                self.chain_monitor.watcher_asleep = False
+                Thread(target=self.do_watch).start()
 
                 logger.info("Waking up")
 
@@ -150,15 +147,6 @@ class Watcher:
             logger.info("Maximum appointments reached, appointment rejected", locator=appointment.locator)
 
         return appointment_added, signature
-
-    def do_subscribe(self):
-        """
-        Initializes a ``ZMQSubscriber`` instance to listen to new blocks from ``bitcoind``. Block ids are received
-        trough the ``block_queue``.
-        """
-
-        self.zmq_subscriber = ZMQSubscriber(parent="Watcher")
-        self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
         """
@@ -221,8 +209,7 @@ class Watcher:
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
-        self.zmq_subscriber.terminate = True
-        self.block_queue = Queue()
+        self.chain_monitor.watcher_asleep = True
 
         logger.info("No more pending appointments, going back to sleep")
 
