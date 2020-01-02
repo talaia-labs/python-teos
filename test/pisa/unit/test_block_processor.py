@@ -1,6 +1,5 @@
 import pytest
 
-from pisa.tools import bitcoin_cli
 from pisa.block_processor import BlockProcessor
 from test.pisa.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork
 
