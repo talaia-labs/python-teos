@@ -57,8 +57,7 @@ def test_decode_raw_transaction_invalid():
 
 
 def test_get_missed_blocks():
-    block_processor = BlockProcessor()
-    target_block = block_processor.get_best_block_hash()
+    target_block = BlockProcessor.get_best_block_hash()
 
     # Generate some blocks and store the hash in a list
     missed_blocks = []
@@ -67,47 +66,44 @@ def test_get_missed_blocks():
         missed_blocks.append(BlockProcessor.get_best_block_hash())
 
     # Check what we've missed
-    assert block_processor.get_missed_blocks(target_block) == missed_blocks
+    assert BlockProcessor.get_missed_blocks(target_block) == missed_blocks
 
     # We can see how it does not work if we replace the target by the first element in the list
     block_tip = missed_blocks[0]
-    assert block_processor.get_missed_blocks(block_tip) != missed_blocks
+    assert BlockProcessor.get_missed_blocks(block_tip) != missed_blocks
 
     # But it does again if we skip that block
-    assert block_processor.get_missed_blocks(block_tip) == missed_blocks[1:]
+    assert BlockProcessor.get_missed_blocks(block_tip) == missed_blocks[1:]
 
 
 def test_get_distance_to_tip():
     target_distance = 5
 
-    block_processor = BlockProcessor()
-    target_block = block_processor.get_best_block_hash()
+    target_block = BlockProcessor.get_best_block_hash()
 
     # Mine some blocks up to the target distance
     generate_blocks(target_distance)
 
     # Check if the distance is properly computed
-    assert block_processor.get_distance_to_tip(target_block) == target_distance
+    assert BlockProcessor.get_distance_to_tip(target_block) == target_distance
 
 
 def test_is_block_in_best_chain():
-    block_processor = BlockProcessor()
-    best_block_hash = block_processor.get_best_block_hash()
-    best_block = block_processor.get_block(best_block_hash)
+    best_block_hash = BlockProcessor.get_best_block_hash()
+    best_block = BlockProcessor.get_block(best_block_hash)
 
-    assert block_processor.is_block_in_best_chain(best_block_hash)
+    assert BlockProcessor.is_block_in_best_chain(best_block_hash)
 
     fork(best_block.get("previousblockhash"))
     generate_blocks(2)
 
-    assert not block_processor.is_block_in_best_chain(best_block_hash)
+    assert not BlockProcessor.is_block_in_best_chain(best_block_hash)
 
 
 def test_find_last_common_ancestor():
-    block_processor = BlockProcessor()
-    ancestor = block_processor.get_best_block_hash()
+    ancestor = BlockProcessor.get_best_block_hash()
     generate_blocks(3)
-    best_block_hash = block_processor.get_best_block_hash()
+    best_block_hash = BlockProcessor.get_best_block_hash()
 
     # Create a fork (forking creates a block if the mock is set by events)
     fork(ancestor)
@@ -116,6 +112,6 @@ def test_find_last_common_ancestor():
     generate_blocks(5)
 
     # The last common ancestor between the old best and the new best should be the "ancestor"
-    last_common_ancestor, dropped_txs = block_processor.find_last_common_ancestor(best_block_hash)
+    last_common_ancestor, dropped_txs = BlockProcessor.find_last_common_ancestor(best_block_hash)
     assert last_common_ancestor == ancestor
     assert len(dropped_txs) == 3
