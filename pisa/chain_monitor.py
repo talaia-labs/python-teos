@@ -53,11 +53,11 @@ class ChainMonitor:
 
     def monitor_chain(self):
         self.best_tip = BlockProcessor.get_best_block_hash()
-        Thread(target=self.monitor_chain_polling).start()
-        Thread(target=self.monitor_chain_zmq).start()
+        Thread(target=self.monitor_chain_polling, daemon=True).start()
+        Thread(target=self.monitor_chain_zmq, daemon=True).start()
 
     def monitor_chain_polling(self):
-        while self.terminate:
+        while not self.terminate:
             self.check_tip.wait(timeout=60)
 
             # Terminate could have been set wile the thread was blocked in wait

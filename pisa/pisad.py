@@ -59,6 +59,7 @@ if __name__ == "__main__":
 
             watcher = Watcher(db_manager, chain_monitor, secret_key_der)
             chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
+            chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
@@ -87,8 +88,6 @@ if __name__ == "__main__":
                     watcher.responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
 
                 # Build Watcher. If the blocks of both match we don't perform the search twice.
-                chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
-
                 if last_block_watcher is not None:
                     if last_block_watcher == last_block_responder:
                         missed_blocks_watcher = missed_blocks_responder
