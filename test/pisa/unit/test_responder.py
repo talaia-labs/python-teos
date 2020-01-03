@@ -5,15 +5,14 @@ from uuid import uuid4
 from shutil import rmtree
 from copy import deepcopy
 from threading import Thread
-from queue import Queue, Empty
 
 from pisa.db_manager import DBManager
 from pisa.responder import Responder, TransactionTracker
 from pisa.block_processor import BlockProcessor
+from pisa.chain_monitor import ChainMonitor
 from pisa.tools import bitcoin_cli
 
 from common.constants import LOCATOR_LEN_HEX
-from common.tools import check_sha256_hex_format
 
 from bitcoind_mock.utils import sha256d
 from bitcoind_mock.transaction import TX
@@ -21,8 +20,19 @@ from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_
 
 
 @pytest.fixture(scope="module")
-def responder(db_manager):
-    return Responder(db_manager)
+def chain_monitor():
+    chain_monitor = ChainMonitor()
+    chain_monitor.monitor_chain()
+
+    return chain_monitor
+
+
+@pytest.fixture(scope="module")
+def responder(db_manager, chain_monitor):
+    responder = Responder(db_manager, chain_monitor)
+    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+
+    return responder
 
 
 @pytest.fixture()
@@ -145,17 +155,19 @@ def test_tracker_from_dict_invalid_data():
 
 
 def test_init_responder(responder):
-    assert type(responder.trackers) is dict and len(responder.trackers) == 0
-    assert type(responder.tx_tracker_map) is dict and len(responder.tx_tracker_map) == 0
-    assert type(responder.unconfirmed_txs) is list and len(responder.unconfirmed_txs) == 0
-    assert type(responder.missed_confirmations) is dict and len(responder.missed_confirmations) == 0
+    assert isinstance(responder.trackers, dict) and len(responder.trackers) == 0
+    assert isinstance(responder.tx_tracker_map, dict) and len(responder.tx_tracker_map) == 0
+    assert isinstance(responder.unconfirmed_txs, list) and len(responder.unconfirmed_txs) == 0
+    assert isinstance(responder.missed_confirmations, dict) and len(responder.missed_confirmations) == 0
+    assert isinstance(responder.chain_monitor, ChainMonitor)
     assert responder.block_queue.empty()
     assert responder.asleep is True
-    assert responder.zmq_subscriber is None
 
 
-def test_handle_breach(db_manager):
-    responder = Responder(db_manager)
+def test_handle_breach(db_manager, chain_monitor):
+    responder = Responder(db_manager, chain_monitor)
+    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
 
@@ -172,11 +184,10 @@ def test_handle_breach(db_manager):
 
     assert receipt.delivered is True
 
-    # The responder automatically fires add_tracker on adding a tracker if it is asleep. We need to stop the processes now.
-    # To do so we delete all the trackers, stop the zmq and create a new fake block to unblock the queue.get method
+    # The responder automatically fires add_tracker on adding a tracker if it is asleep. We need to stop the processes
+    # now. To do so we delete all the trackers, and generate a new block.
     responder.trackers = dict()
-    responder.zmq_subscriber.terminate = True
-    responder.block_queue.put(get_random_value_hex(32))
+    generate_block()
 
 
 def test_add_bad_response(responder):
@@ -205,7 +216,7 @@ def test_add_bad_response(responder):
 
 
 def test_add_tracker(responder):
-    responder.asleep = False
+    # Responder is asleep
 
     for _ in range(20):
         uuid = uuid4().hex
@@ -237,7 +248,8 @@ def test_add_tracker(responder):
 
 
 def test_add_tracker_same_penalty_txid(responder):
-    # Create the same tracker using two different uuids
+    # Responder is asleep
+
     confirmations = 0
     locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(random_txid=True)
     uuid_1 = uuid4().hex
@@ -264,7 +276,7 @@ def test_add_tracker_same_penalty_txid(responder):
 
 
 def test_add_tracker_already_confirmed(responder):
-    responder.asleep = False
+    # Responder is asleep
 
     for i in range(20):
         uuid = uuid4().hex
@@ -278,29 +290,10 @@ def test_add_tracker_already_confirmed(responder):
         assert penalty_txid not in responder.unconfirmed_txs
 
 
-def test_do_subscribe(responder):
-    responder.block_queue = Queue()
-
-    zmq_thread = Thread(target=responder.do_subscribe)
-    zmq_thread.daemon = True
-    zmq_thread.start()
-
-    try:
-        generate_block()
-        block_hash = responder.block_queue.get()
-        assert check_sha256_hex_format(block_hash)
-
-    except Empty:
-        assert False
-
-
-def test_do_watch(temp_db_manager):
-    responder = Responder(temp_db_manager)
-    responder.block_queue = Queue()
-
-    zmq_thread = Thread(target=responder.do_subscribe)
-    zmq_thread.daemon = True
-    zmq_thread.start()
+def test_do_watch(temp_db_manager, chain_monitor):
+    # Create a fresh responder to simplify the test
+    responder = Responder(temp_db_manager, chain_monitor)
+    chain_monitor.attach_responder(responder.block_queue, False)
 
     trackers = [create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
 
@@ -314,9 +307,7 @@ def test_do_watch(temp_db_manager):
         responder.unconfirmed_txs.append(tracker.penalty_txid)
 
     # Let's start to watch
-    watch_thread = Thread(target=responder.do_watch)
-    watch_thread.daemon = True
-    watch_thread.start()
+    Thread(target=responder.do_watch, daemon=True).start()
 
     # And broadcast some of the transactions
     broadcast_txs = []
@@ -324,8 +315,10 @@ def test_do_watch(temp_db_manager):
         bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
         broadcast_txs.append(tracker.penalty_txid)
 
+    print(responder.unconfirmed_txs)
     # Mine a block
     generate_block()
+    print(responder.unconfirmed_txs)
 
     # The transactions we sent shouldn't be in the unconfirmed transaction list anymore
     assert not set(broadcast_txs).issubset(responder.unconfirmed_txs)
@@ -350,13 +343,9 @@ def test_do_watch(temp_db_manager):
     assert responder.asleep is True
 
 
-def test_check_confirmations(temp_db_manager):
-    responder = Responder(temp_db_manager)
-    responder.block_queue = Queue()
-
-    zmq_thread = Thread(target=responder.do_subscribe)
-    zmq_thread.daemon = True
-    zmq_thread.start()
+def test_check_confirmations(temp_db_manager, chain_monitor):
+    responder = Responder(temp_db_manager, chain_monitor)
+    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
 
     # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
     # been confirmed. To test this we need to create a list of transactions and the state of the responder
@@ -386,7 +375,7 @@ def test_check_confirmations(temp_db_manager):
         assert responder.missed_confirmations[tx] == 1
 
 
-# WIP: Check this properly, a bug pass unnoticed!
+# TODO: Check this properly, a bug pass unnoticed!
 def test_get_txs_to_rebroadcast(responder):
     # Let's create a few fake txids and assign at least 6 missing confirmations to each
     txs_missing_too_many_conf = {get_random_value_hex(32): 6 + i for i in range(10)}
@@ -410,13 +399,13 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_trackers(db_manager):
+def test_get_completed_trackers(db_manager, chain_monitor):
     initial_height = bitcoin_cli().getblockcount()
 
-    # Let's use a fresh responder for this to make it easier to compare the results
-    responder = Responder(db_manager)
+    responder = Responder(db_manager, chain_monitor)
+    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
 
-    # A complete tracker is a tracker that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
+    # A complete tracker is a tracker that has reached the appointment end with enough confs (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
     trackers_end_conf = {
         uuid4().hex: create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(10)
@@ -461,9 +450,10 @@ def test_get_completed_trackers(db_manager):
     assert set(completed_trackers_ids) == set(ended_trackers_keys)
 
 
-def test_rebroadcast(db_manager):
-    responder = Responder(db_manager)
+def test_rebroadcast(db_manager, chain_monitor):
+    responder = Responder(db_manager, chain_monitor)
     responder.asleep = False
+    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
 
     txs_to_rebroadcast = []
 

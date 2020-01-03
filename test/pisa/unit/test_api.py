@@ -10,6 +10,7 @@ from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT
 from pisa.conf import MAX_APPOINTMENTS
+from pisa.chain_monitor import ChainMonitor
 
 from test.pisa.unit.conftest import (
     generate_block,
@@ -37,7 +38,13 @@ def run_api(db_manager):
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    watcher = Watcher(db_manager, sk_der)
+
+    chain_monitor = ChainMonitor()
+    chain_monitor.monitor_chain()
+
+    watcher = Watcher(db_manager, chain_monitor, sk_der)
+    chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
+    chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
     api_thread = Thread(target=API(watcher).start)
     api_thread.daemon = True
