@@ -68,7 +68,7 @@ class Watcher:
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
         if not isinstance(responder, Responder):
-            self.responder = Responder(db_manager)
+            self.responder = Responder(db_manager, chain_monitor)
 
     @staticmethod
     def compute_locator(tx_id):

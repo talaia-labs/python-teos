@@ -1,6 +1,5 @@
 import zmq
 import binascii
-from queue import Queue
 from threading import Thread, Event, Condition
 
 from common.logger import Logger
@@ -26,8 +25,8 @@ class ChainMonitor:
         self.zmqSubSocket.connect("%s://%s:%s" % (FEED_PROTOCOL, FEED_ADDR, FEED_PORT))
 
         self.watcher_queue = None
-        self.watcher_asleep = True
         self.responder_queue = None
+        self.watcher_asleep = True
         self.responder_asleep = True
 
     def attach_watcher(self, queue, awake):

@@ -71,7 +71,6 @@ if __name__ == "__main__":
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                responder = Responder(db_manager, chain_monitor)
                 last_common_ancestor_responder = None
                 missed_blocks_responder = None
 
@@ -82,13 +81,13 @@ if __name__ == "__main__":
                     )
                     missed_blocks_responder = block_processor.get_missed_blocks(last_common_ancestor_responder)
 
-                    responder.trackers, responder.tx_tracker_map = Builder.build_trackers(responder_trackers_data)
-                    responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
+                    watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
+                        responder_trackers_data
+                    )
+                    watcher.responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
 
-                # Build Watcher with Responder and backed up data. If the blocks of both match we don't perform the
-                # search twice.
-                watcher.responder = responder
-                chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+                # Build Watcher. If the blocks of both match we don't perform the search twice.
+                chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
                 if last_block_watcher is not None:
                     if last_block_watcher == last_block_responder:
