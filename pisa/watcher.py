@@ -27,7 +27,7 @@ class Watcher:
     If an appointment reaches its end with no breach, the data is simply deleted.
 
     The :class:`Watcher` receives information about new received blocks via the ``block_queue`` that is populated by the
-    :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber>`.
+    :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
@@ -45,11 +45,11 @@ class Watcher:
             appointments with the same ``locator``.
         asleep (:obj:`bool`): A flag that signals whether the :obj:`Watcher` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
-            populated by the :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`.
+        populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
         max_appointments(:obj:`int`): the maximum amount of appointments that the :obj:`Watcher` will keep at any given
             time.
-        zmq_subscriber (:obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`): a ZMQSubscriber instance used
-            to receive new block notifications from ``bitcoind``.
+        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
+            new blocks received by ``bitcoind``.
         db_manager (:obj:`DBManager <pisa.db_manager>`): A db manager instance to interact with the database.
 
     Raises:

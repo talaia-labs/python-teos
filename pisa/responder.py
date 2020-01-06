@@ -126,9 +126,9 @@ class Responder:
             has missed. Used to trigger rebroadcast if needed.
         asleep (:obj:`bool`): A flag that signals whether the :obj:`Responder` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Responder` to receive block hashes from ``bitcoind``. It
-            is populated by the :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`.
-        zmq_subscriber (:obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`): a ``ZMQSubscriber`` instance
-            used to receive new block notifications from ``bitcoind``.
+            is populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
+        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
+            new blocks received by ``bitcoind``.
         db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): A ``DBManager`` instance to interact with the
             database.
 
@@ -223,8 +223,7 @@ class Responder:
         The :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the ``penalty_txid`` added to
         ``unconfirmed_txs`` if ``confirmations=0``. Finally, the data is also stored in the database.
 
-        ``add_tracker`` awakes the :obj:`Responder` and creates a connection with the
-        :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` if he is asleep.
+        ``add_tracker`` awakes the :obj:`Responder` if it is asleep.
 
         Args:
             uuid (:obj:`str`): a unique identifier for the appointment.

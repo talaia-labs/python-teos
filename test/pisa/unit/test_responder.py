@@ -195,7 +195,7 @@ def test_add_bad_response(responder):
     tracker = create_dummy_tracker()
 
     # Now that the asleep / awake functionality has been tested we can avoid manually killing the responder by setting
-    # to awake. That will prevent the zmq thread to be launched again.
+    # to awake. That will prevent the chain_monitor thread to be launched again.
     responder.asleep = False
 
     # A txid instead of a rawtx should be enough for unit tests using the bitcoind mock, better tests are needed though.
