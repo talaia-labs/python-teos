@@ -103,13 +103,22 @@ class ChainMonitor:
         Args:
             block_hash (:obj:`block_hash`): the new best tip.
             max_block_window_size (:obj:`int`): the maximum length of the ``last_tips`` list.
+
+        Returns:
+            (:obj:`bool`): ``True`` is the state was successfully updated, ``False`` otherwise.
         """
 
-        self.best_tip = block_hash
-        self.last_tips.append(block_hash)
+        if block_hash != self.best_tip and block_hash not in self.last_tips:
+            self.last_tips.append(self.best_tip)
+            self.best_tip = block_hash
 
-        if len(self.last_tips) > max_block_window_size:
-            self.last_tips.pop(0)
+            if len(self.last_tips) > max_block_window_size:
+                self.last_tips.pop(0)
+
+            return True
+
+        else:
+            return False
 
     def monitor_chain_polling(self, polling_delta=POLLING_DELTA):
         """
@@ -126,8 +135,7 @@ class ChainMonitor:
                 current_tip = BlockProcessor.get_best_block_hash()
 
                 self.lock.acquire()
-                if current_tip != self.best_tip:
-                    self.update_state(current_tip)
+                if self.update_state(current_tip):
                     self.notify_subscribers(current_tip)
                     logger.info("New block received via polling", block_hash=current_tip)
                 self.lock.release()
@@ -151,8 +159,7 @@ class ChainMonitor:
                     block_hash = binascii.hexlify(body).decode("utf-8")
 
                     self.lock.acquire()
-                    if block_hash != self.best_tip and block_hash not in self.last_tips:
-                        self.update_state(block_hash)
+                    if self.update_state(block_hash):
                         self.notify_subscribers(block_hash)
                         logger.info("New block received via zmq", block_hash=block_hash)
                     self.lock.release()
