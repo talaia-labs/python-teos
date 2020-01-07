@@ -10,7 +10,6 @@ from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT
 from pisa.conf import MAX_APPOINTMENTS
-from pisa.chain_monitor import ChainMonitor
 
 from test.pisa.unit.conftest import (
     generate_block,

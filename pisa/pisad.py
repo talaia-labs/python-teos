@@ -8,7 +8,6 @@ from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
 from pisa.conf import BTC_NETWORK, PISA_SECRET_KEY
-from pisa.responder import Responder
 from pisa.db_manager import DBManager
 from pisa.chain_monitor import ChainMonitor
 from pisa.block_processor import BlockProcessor
@@ -20,6 +19,7 @@ logger = Logger("Daemon")
 def handle_signals(signal_received, frame):
     logger.info("Closing connection with appointments db")
     db_manager.db.close()
+    chain_monitor.terminate = True
 
     logger.info("Shutting down PISA")
     exit(0)
