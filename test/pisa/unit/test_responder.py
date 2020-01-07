@@ -20,14 +20,6 @@ from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_
 
 
 @pytest.fixture(scope="module")
-def chain_monitor():
-    chain_monitor = ChainMonitor()
-    chain_monitor.monitor_chain()
-
-    return chain_monitor
-
-
-@pytest.fixture(scope="module")
 def responder(db_manager, chain_monitor):
     responder = Responder(db_manager, chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, responder.asleep)

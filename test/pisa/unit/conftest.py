@@ -15,6 +15,7 @@ from pisa.responder import TransactionTracker
 from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
+from pisa.chain_monitor import ChainMonitor
 from common.appointment import Appointment
 
 from bitcoind_mock.utils import sha256d
@@ -48,6 +49,17 @@ def db_manager():
 
     manager.db.close()
     rmtree("test_db")
+
+
+@pytest.fixture(scope="module")
+def chain_monitor():
+    chain_monitor = ChainMonitor()
+    chain_monitor.monitor_chain()
+
+    yield chain_monitor
+
+    chain_monitor.terminate = True
+    generate_block()
 
 
 def generate_keypair():

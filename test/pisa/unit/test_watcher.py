@@ -28,14 +28,6 @@ sk_der = signing_key.private_bytes(
 
 
 @pytest.fixture(scope="module")
-def chain_monitor():
-    chain_monitor = ChainMonitor()
-    chain_monitor.monitor_chain()
-
-    return chain_monitor
-
-
-@pytest.fixture(scope="module")
 def watcher(db_manager, chain_monitor):
     watcher = Watcher(db_manager, chain_monitor, sk_der)
     chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)

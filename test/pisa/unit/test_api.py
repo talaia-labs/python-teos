@@ -31,16 +31,13 @@ locator_dispute_tx_map = {}
 
 
 @pytest.fixture(scope="module")
-def run_api(db_manager):
+def run_api(db_manager, chain_monitor):
     sk, pk = generate_keypair()
     sk_der = sk.private_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
-
-    chain_monitor = ChainMonitor()
-    chain_monitor.monitor_chain()
 
     watcher = Watcher(db_manager, chain_monitor, sk_der)
     chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
