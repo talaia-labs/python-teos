@@ -15,8 +15,8 @@ from pisa.tools import bitcoin_cli
 from common.constants import LOCATOR_LEN_HEX
 from common.tools import check_sha256_hex_format
 
-from test.simulator.utils import sha256d
-from test.simulator.bitcoind_sim import TX
+from bitcoind_mock.utils import sha256d
+from bitcoind_mock.transaction import TX
 from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_value_hex
 
 

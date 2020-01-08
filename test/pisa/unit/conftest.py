@@ -17,9 +17,10 @@ from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from common.appointment import Appointment
 
-from test.simulator.utils import sha256d
-from test.simulator.transaction import TX
-from test.simulator.bitcoind_sim import run_simulator, HOST, PORT
+from bitcoind_mock.utils import sha256d
+from bitcoind_mock.transaction import TX
+from bitcoind_mock.bitcoind import BitcoindMock
+from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
 
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
@@ -27,7 +28,7 @@ from common.cryptographer import Cryptographer
 
 @pytest.fixture(scope="session")
 def run_bitcoind():
-    bitcoind_thread = Thread(target=run_simulator, kwargs={"mode": "event", "verbose": False})
+    bitcoind_thread = Thread(target=BitcoindMock().run, kwargs={"mode": "event", "verbose": True})
     bitcoind_thread.daemon = True
     bitcoind_thread.start()
 
@@ -63,13 +64,18 @@ def get_random_value_hex(nbytes):
 
 
 def generate_block():
-    requests.post(url="http://{}:{}/generate".format(HOST, PORT), timeout=5)
+    requests.post(url="http://{}:{}/generate".format(BTC_RPC_HOST, BTC_RPC_PORT), timeout=5)
     sleep(0.5)
 
 
 def generate_blocks(n):
     for _ in range(n):
         generate_block()
+
+
+def fork(block_hash):
+    fork_endpoint = "http://{}:{}/fork".format(BTC_RPC_HOST, BTC_RPC_PORT)
+    requests.post(fork_endpoint, json={"parent": block_hash})
 
 
 def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):

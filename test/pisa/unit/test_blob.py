@@ -1,6 +1,5 @@
 from binascii import unhexlify
 
-from pisa import c_logger
 from apps.cli.blob import Blob
 from test.pisa.unit.conftest import get_random_value_hex
 
