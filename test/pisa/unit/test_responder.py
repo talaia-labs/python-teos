@@ -228,11 +228,9 @@ def test_add_tracker(responder):
         # Check that the rest of tracker data also matches
         tracker = responder.trackers[uuid]
         assert (
-            tracker.dispute_txid == dispute_txid
-            and tracker.penalty_txid == penalty_txid
-            and tracker.penalty_rawtx == penalty_rawtx
-            and tracker.appointment_end == appointment_end
-            and tracker.appointment_end == appointment_end
+            tracker.get("penalty_txid") == penalty_txid
+            and tracker.get("locator") == locator
+            and tracker.get("appointment_end") == appointment_end
         )
 
 
@@ -255,11 +253,9 @@ def test_add_tracker_same_penalty_txid(responder):
     for uuid in [uuid_1, uuid_2]:
         tracker = responder.trackers[uuid]
         assert (
-            tracker.dispute_txid == dispute_txid
-            and tracker.penalty_txid == penalty_txid
-            and tracker.penalty_rawtx == penalty_rawtx
-            and tracker.appointment_end == appointment_end
-            and tracker.appointment_end == appointment_end
+            tracker.get("penalty_txid") == penalty_txid
+            and tracker.get("locator") == locator
+            and tracker.get("appointment_end") == appointment_end
         )
 
 
@@ -308,10 +304,18 @@ def test_do_watch(temp_db_manager):
     for tracker in trackers:
         uuid = uuid4().hex
 
-        responder.trackers[uuid] = tracker
+        responder.trackers[uuid] = {
+            "locator": tracker.locator,
+            "penalty_txid": tracker.penalty_txid,
+            "appointment_end": tracker.appointment_end,
+        }
         responder.tx_tracker_map[tracker.penalty_txid] = [uuid]
         responder.missed_confirmations[tracker.penalty_txid] = 0
         responder.unconfirmed_txs.append(tracker.penalty_txid)
+
+        # We also need to store the info in the db
+        responder.db_manager.create_triggered_appointment_flag(uuid)
+        responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
 
     # Let's start to watch
     watch_thread = Thread(target=responder.do_watch)
@@ -434,12 +438,20 @@ def test_get_completed_trackers(db_manager):
         tracker.appointment_end += 10
         trackers_no_end[uuid4().hex] = tracker
 
-    # Let's add all to the  responder
-    responder.trackers.update(trackers_end_conf)
-    responder.trackers.update(trackers_end_no_conf)
-    responder.trackers.update(trackers_no_end)
+    all_trackers = {}
+    all_trackers.update(trackers_end_conf)
+    all_trackers.update(trackers_end_no_conf)
+    all_trackers.update(trackers_no_end)
 
-    for uuid, tracker in responder.trackers.items():
+    # Let's add all to the  responder
+    for uuid, tracker in all_trackers.items():
+        responder.trackers[uuid] = {
+            "locator": tracker.locator,
+            "penalty_txid": tracker.penalty_txid,
+            "appointment_end": tracker.appointment_end,
+        }
+
+    for uuid, tracker in all_trackers.items():
         bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
 
     # The dummy appointments have a end_appointment time of current + 2, but trackers need at least 6 confs by default
@@ -474,9 +486,18 @@ def test_rebroadcast(db_manager):
             penalty_rawtx=TX.create_dummy_transaction()
         )
 
-        responder.trackers[uuid] = TransactionTracker(
-            locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end
-        )
+        tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+
+        responder.trackers[uuid] = {
+            "locator": locator,
+            "penalty_txid": penalty_txid,
+            "appointment_end": appointment_end,
+        }
+
+        # We need to add it to the db too
+        responder.db_manager.create_triggered_appointment_flag(uuid)
+        responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
+
         responder.tx_tracker_map[penalty_txid] = [uuid]
         responder.unconfirmed_txs.append(penalty_txid)
 
