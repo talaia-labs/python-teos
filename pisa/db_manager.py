@@ -10,6 +10,7 @@ WATCHER_LAST_BLOCK_KEY = "bw"
 RESPONDER_PREFIX = "r"
 RESPONDER_LAST_BLOCK_KEY = "br"
 LOCATOR_MAP_PREFIX = "m"
+TRIGGERED_APPOINTMENTS_PREFIX = "ta"
 
 
 class DBManager:
@@ -17,13 +18,14 @@ class DBManager:
     The :class:`DBManager` is the class in charge of interacting with the appointments database (``LevelDB``).
     Keys and values are stored as bytes in the database but processed as strings by the manager.
 
-    The database is split in five prefixes:
+    The database is split in six prefixes:
 
         - ``WATCHER_PREFIX``, defined as ``b'w``, is used to store :obj:`Watcher <pisa.watcher.Watcher>` appointments.
         - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :obj:`Responder <pisa.responder.Responder>` trackers.
         - ``WATCHER_LAST_BLOCK_KEY``, defined as ``b'bw``, is used to store the last block hash known by the :obj:`Watcher <pisa.watcher.Watcher>`.
         - ``RESPONDER_LAST_BLOCK_KEY``, defined as ``b'br``, is used to store the last block hash known by the :obj:`Responder <pisa.responder.Responder>`.
         - ``LOCATOR_MAP_PREFIX``, defined as ``b'm``, is used to store the ``locator:uuid`` maps.
+        - ``TRIGGERED_APPOINTMENTS_PREFIX``, defined as ``b'ta``, is used to stored triggered appointments (appointments that have been handed to the :obj:`Responder <pisa.responder.Responder>`.)
 
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
@@ -160,10 +162,9 @@ class DBManager:
     def load_watcher_appointments(self, include_triggered=False):
         """
         Loads all the appointments from the database (all entries with the ``WATCHER_PREFIX`` prefix).
-
         Args:
-            include_triggered (:obj:`bool`): Whether to include the appointments flagged as triggered or not. ``False`` by
-                default.
+            include_triggered (:obj:`bool`): Whether to include the appointments flagged as triggered or not. ``False``
+                by default.
 
         Returns:
             :obj:`dict`: A dictionary with all the appointments stored in the database. An empty dictionary is there
@@ -171,10 +172,11 @@ class DBManager:
         """
 
         appointments = self.load_appointments_db(prefix=WATCHER_PREFIX)
+        triggered_appointments = self.load_all_triggered_flags()
 
         if not include_triggered:
             appointments = {
-                uuid: appointment for uuid, appointment in appointments.items() if appointment["triggered"] is False
+                uuid: appointment for uuid, appointment in appointments.items() if uuid not in triggered_appointments
             }
 
         return appointments
@@ -332,3 +334,30 @@ class DBManager:
         """
 
         self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)
+
+    def create_triggered_appointment_flag(self, uuid):
+        """
+        Creates a flag that signals that an appointment has been triggered.
+        """
+
+        self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
+
+    def load_all_triggered_flags(self):
+        """
+        Loads all the appointment triggered flags from the database.
+
+        Returns:
+             :obj:`list`: a list of all the uuids of the triggered appointments.
+        """
+
+        return [
+            k.decode()[len(TRIGGERED_APPOINTMENTS_PREFIX) :]
+            for k, v in self.db.iterator(prefix=TRIGGERED_APPOINTMENTS_PREFIX.encode("utf-8"))
+        ]
+
+    def delete_triggered_appointment_flag(self, uuid):
+        """
+        Deletes a flag that signals that an appointment has been triggered.
+        """
+
+        self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
