@@ -118,8 +118,9 @@ class Responder:
             database.
 
     Attributes:
-        trackers (:obj:`dict`): A dictionary containing all the :obj:`TransactionTracker` handled by the
-            :obj:`Responder`. Each entry is identified by a ``uuid``.
+        trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
+            required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``end_time``).
+            Each entry is identified by a ``uuid``.
         tx_tracker_map (:obj:`dict`): A ``penalty_txid:uuid`` map used to allow the :obj:`Responder` to deal with
             several trackers triggered by the same ``penalty_txid``.
         unconfirmed_txs (:obj:`list`): A list that keeps track of all unconfirmed ``penalty_txs``.
@@ -221,8 +222,9 @@ class Responder:
         """
         Creates a :obj:`TransactionTracker` after successfully broadcasting a ``penalty_tx``.
 
-        The :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the ``penalty_txid`` added to
-        ``unconfirmed_txs`` if ``confirmations=0``. Finally, the data is also stored in the database.
+        A reduction of :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the
+        ``penalty_txid`` added to ``unconfirmed_txs`` if ``confirmations=0``. Finally, all the data is stored in the
+        database.
 
         ``add_tracker`` awakes the :obj:`Responder` and creates a connection with the
         :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` if he is asleep.
@@ -240,7 +242,13 @@ class Responder:
         """
 
         tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
-        self.trackers[uuid] = tracker
+
+        # We only store the penalty_txid, locator and appointment_end in memory. The rest is dumped into the db.
+        self.trackers[uuid] = {
+            "penalty_txid": tracker.penalty_txid,
+            "locator": locator,
+            "appointment_end": appointment_end,
+        }
 
         if penalty_txid in self.tx_tracker_map:
             self.tx_tracker_map[penalty_txid].append(uuid)
@@ -392,15 +400,16 @@ class Responder:
 
         completed_trackers = []
 
-        for uuid, tracker in self.trackers.items():
-            if tracker.appointment_end <= height and tracker.penalty_txid not in self.unconfirmed_txs:
-                tx = Carrier.get_transaction(tracker.penalty_txid)
+        for uuid, tracker_data in self.trackers.items():
+            appointment_end = tracker_data.get("appointment_end")
+            penalty_txid = tracker_data.get("penalty_txid")
+            if appointment_end <= height and penalty_txid not in self.unconfirmed_txs:
+                tx = Carrier.get_transaction(penalty_txid)
 
-                # FIXME: Should be improved with the librarian
                 if tx is not None:
                     confirmations = tx.get("confirmations")
 
-                    if confirmations >= MIN_CONFIRMATIONS:
+                    if confirmations is not None and confirmations >= MIN_CONFIRMATIONS:
                         # The end of the appointment has been reached
                         completed_trackers.append((uuid, confirmations))
 
@@ -434,7 +443,7 @@ class Responder:
             # FIXME: This would potentially grab multiple instances of the same transaction and try to send them.
             #   should we do it only once?
             for uuid in self.tx_tracker_map[txid]:
-                tracker = self.trackers[uuid]
+                tracker = TransactionTracker.from_dict(self.db_manager.load_responder_tracker(uuid))
                 logger.warning(
                     "Transaction has missed many confirmations. Rebroadcasting", penalty_txid=tracker.penalty_txid
                 )
@@ -460,7 +469,9 @@ class Responder:
         """
         carrier = Carrier()
 
-        for uuid, tracker in self.trackers.items():
+        for uuid in self.trackers.keys():
+            tracker = TransactionTracker.from_dict(self.db_manager.load_responder_tracker(uuid))
+
             # First we check if the dispute transaction is known (exists either in mempool or blockchain)
             dispute_tx = carrier.get_transaction(tracker.dispute_txid)
 

@@ -1,4 +1,5 @@
 from common.logger import Logger
+from common.appointment import Appointment
 
 logger = Logger("Cleaner")
 
@@ -27,7 +28,7 @@ class Cleaner:
         """
 
         for uuid in expired_appointments:
-            locator = appointments[uuid].locator
+            locator = appointments[uuid].get("locator")
 
             appointments.pop(uuid)
 
@@ -58,20 +59,21 @@ class Cleaner:
                 database.
         """
 
+        locator = appointments[uuid].get("locator")
+
         # Delete the appointment
-        appointment = appointments.pop(uuid)
+        appointments.pop(uuid)
 
         # If there was only one appointment that matches the locator we can delete the whole list
-        if len(locator_uuid_map[appointment.locator]) == 1:
-            locator_uuid_map.pop(appointment.locator)
+        if len(locator_uuid_map[locator]) == 1:
+            locator_uuid_map.pop(locator)
         else:
             # Otherwise we just delete the appointment that matches locator:appointment_pos
-            locator_uuid_map[appointment.locator].remove(uuid)
+            locator_uuid_map[locator].remove(uuid)
 
         # DISCUSS: instead of deleting the appointment, we will mark it as triggered and delete it from both
         #          the watcher's and responder's db after fulfilled
-        # Update appointment in the db
-        db_manager.store_watcher_appointment(uuid, appointment.to_json(triggered=True))
+        db_manager.create_triggered_appointment_flag(uuid)
 
     @staticmethod
     def delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager):
@@ -98,8 +100,8 @@ class Cleaner:
                 confirmations=confirmations,
             )
 
-            penalty_txid = trackers[uuid].penalty_txid
-            locator = trackers[uuid].locator
+            penalty_txid = trackers[uuid].get("penalty_txid")
+            locator = trackers[uuid].get("locator")
             trackers.pop(uuid)
 
             if len(tx_tracker_map[penalty_txid]) == 1:
@@ -110,9 +112,10 @@ class Cleaner:
             else:
                 tx_tracker_map[penalty_txid].remove(uuid)
 
-            # Delete appointment from the db (both watchers's and responder's)
+            # Delete appointment from the db (from watchers's and responder's db) and remove flag
             db_manager.delete_watcher_appointment(uuid)
             db_manager.delete_responder_tracker(uuid)
+            db_manager.delete_triggered_appointment_flag(uuid)
 
             # Update / delete the locator map
             locator_map = db_manager.load_locator_map(locator)
@@ -120,13 +123,10 @@ class Cleaner:
                 if uuid in locator_map:
                     if len(locator_map) == 1:
                         db_manager.delete_locator_map(locator)
-
                     else:
                         locator_map.remove(uuid)
                         db_manager.store_update_locator_map(locator, locator_map)
-
                 else:
                     logger.error("UUID not found in the db", uuid=uuid)
-
             else:
                 logger.error("Locator not found in the db", uuid=uuid)

@@ -4,8 +4,9 @@ from threading import Thread
 
 from common.cryptographer import Cryptographer
 from common.constants import LOCATOR_LEN_HEX
-
+from common.appointment import Appointment
 from common.logger import Logger
+
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
@@ -40,8 +41,9 @@ class Watcher:
 
 
     Attributes:
-        appointments (:obj:`dict`): a dictionary containing all the appointments (:obj:`Appointment
-            <pisa.appointment.Appointment>` instances) accepted by the tower. It's populated trough ``add_appointment``.
+        appointments (:obj:`dict`): a dictionary containing a simplification of the appointments (:obj:`Appointment
+            <pisa.appointment.Appointment>` instances) accepted by the tower (``locator`` and ``end_time``).
+            It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
         asleep (:obj:`bool`): A flag that signals whether the :obj:`Watcher` is asleep or awake.
@@ -116,8 +118,9 @@ class Watcher:
         """
 
         if len(self.appointments) < self.max_appointments:
+            # Appointments are stored in disk, we only keep the end_time, locator and locator_uuid map in memory
             uuid = uuid4().hex
-            self.appointments[uuid] = appointment
+            self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
 
             if appointment.locator in self.locator_uuid_map:
                 self.locator_uuid_map[appointment.locator].append(uuid)
@@ -138,10 +141,9 @@ class Watcher:
             self.db_manager.store_update_locator_map(appointment.locator, uuid)
 
             appointment_added = True
+            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
 
             logger.info("New appointment accepted", locator=appointment.locator)
-
-            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
 
         else:
             appointment_added = False
@@ -181,8 +183,8 @@ class Watcher:
 
                 expired_appointments = [
                     uuid
-                    for uuid, appointment in self.appointments.items()
-                    if block["height"] > appointment.end_time + EXPIRY_DELTA
+                    for uuid, appointment_data in self.appointments.items()
+                    if block["height"] > appointment_data.get("end_time") + EXPIRY_DELTA
                 ]
 
                 Cleaner.delete_expired_appointment(
@@ -207,7 +209,7 @@ class Watcher:
                             filtered_breach["dispute_txid"],
                             filtered_breach["penalty_txid"],
                             filtered_breach["penalty_rawtx"],
-                            self.appointments[uuid].end_time,
+                            self.appointments[uuid].get("end_time"),
                             block_hash,
                         )
 
@@ -274,9 +276,10 @@ class Watcher:
 
         for locator, dispute_txid in breaches.items():
             for uuid in self.locator_uuid_map[locator]:
+                appointment = Appointment.from_dict(self.db_manager.load_watcher_appointment(uuid))
 
                 try:
-                    penalty_rawtx = Cryptographer.decrypt(self.appointments[uuid].encrypted_blob, dispute_txid)
+                    penalty_rawtx = Cryptographer.decrypt(appointment.encrypted_blob, dispute_txid)
 
                 except ValueError:
                     penalty_rawtx = None
