@@ -5,7 +5,12 @@ import shutil
 from uuid import uuid4
 
 from pisa.db_manager import DBManager
-from pisa.db_manager import WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY, LOCATOR_MAP_PREFIX
+from pisa.db_manager import (
+    WATCHER_LAST_BLOCK_KEY,
+    RESPONDER_LAST_BLOCK_KEY,
+    LOCATOR_MAP_PREFIX,
+    TRIGGERED_APPOINTMENTS_PREFIX,
+)
 
 from common.constants import LOCATOR_LEN_BYTES
 
@@ -221,7 +226,8 @@ def test_store_load_triggered_appointment(db_manager):
     # Create an appointment flagged as triggered
     triggered_appointment, _ = generate_dummy_appointment(real_height=False)
     uuid = uuid4().hex
-    db_manager.store_watcher_appointment(uuid, triggered_appointment.to_json(triggered=True))
+    db_manager.store_watcher_appointment(uuid, triggered_appointment.to_json())
+    db_manager.create_triggered_appointment_flag(uuid)
 
     # The new appointment is grabbed only if we set include_triggered
     assert db_watcher_appointments == db_manager.load_watcher_appointments()
@@ -282,3 +288,40 @@ def test_store_load_last_block_hash_responder(db_manager):
     db_last_block_hash = db_manager.load_last_block_hash_responder()
 
     assert local_last_block_hash == db_last_block_hash
+
+
+def test_create_triggered_appointment_flag(db_manager):
+    # Test that flags are added
+    key = get_random_value_hex(16)
+    db_manager.create_triggered_appointment_flag(key)
+
+    assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + key).encode("utf-8")) is not None
+
+    # Test to get a random one that we haven't added
+    key = get_random_value_hex(16)
+    assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + key).encode("utf-8")) is None
+
+
+def test_load_all_triggered_flags(db_manager):
+    # There should be a some flags in the db from the previous tests. Let's load them
+    flags = db_manager.load_all_triggered_flags()
+
+    # We can add another flag and see that there's two now
+    new_uuid = uuid4().hex
+    db_manager.create_triggered_appointment_flag(new_uuid)
+    flags.append(new_uuid)
+
+    assert set(db_manager.load_all_triggered_flags()) == set(flags)
+
+
+def test_delete_triggered_appointment_flag(db_manager):
+    # Test data is properly deleted.
+    keys = db_manager.load_all_triggered_flags()
+
+    # Delete all entries
+    for k in keys:
+        db_manager.delete_triggered_appointment_flag(k)
+
+    # Try to load them back
+    for k in keys:
+        assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + k).encode("utf-8")) is None
