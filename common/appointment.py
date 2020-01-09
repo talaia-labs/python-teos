@@ -81,28 +81,18 @@ class Appointment:
 
         return appointment
 
-    def to_json(self, triggered=False):
+    def to_json(self):
         """
         Exports an appointment as a deterministic json encoded string.
 
         This method ensures that multiple invocations with the same data yield the same value. This is the format used
         to store appointments in the database.
 
-        Args:
-            triggered (:mod:`bool`): Whether the dispute has been triggered or not. When an appointment passes from the
-                :mod:`Watcher <pisa.watcher>` to the :mod:`Responder <pisa.responder>` it is not deleted straightaway.
-                Instead, the appointment is stored in the DB flagged as ``triggered``. This aims to ease handling block
-                reorgs in the future.
-
         Returns:
             :obj:`str`: A json-encoded str representing the appointment.
         """
 
-        appointment = self.to_dict()
-
-        appointment["triggered"] = triggered
-
-        return json.dumps(appointment, sort_keys=True, separators=(",", ":"))
+        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
     def serialize(self):
         """
