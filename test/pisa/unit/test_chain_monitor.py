@@ -13,7 +13,7 @@ from test.pisa.unit.conftest import get_random_value_hex, generate_block
 def test_init(run_bitcoind):
     # run_bitcoind is started here instead of later on to avoid race conditions while it initializes
 
-    # Not much to test here, just sanity checks to make sure nothings goes south in the future
+    # Not much to test here, just sanity checks to make sure nothing goes south in the future
     chain_monitor = ChainMonitor()
 
     assert chain_monitor.best_tip is None
@@ -70,7 +70,7 @@ def test_notify_subscribers(chain_monitor):
     chain_monitor.responder_asleep = True
     chain_monitor.notify_subscribers(new_block)
 
-    # And remain empty afterwards since both subscribers where asleep
+    # And remain empty afterwards since both subscribers were asleep
     assert chain_monitor.watcher_queue.empty()
     assert chain_monitor.responder_queue.empty()
 
@@ -115,7 +115,7 @@ def test_monitor_chain_polling():
     polling_thread = Thread(target=chain_monitor.monitor_chain_polling, kwargs={"polling_delta": 0.1}, daemon=True)
     polling_thread.start()
 
-    # Check that nothings changes as long as a block is not generated
+    # Check that nothing changes as long as a block is not generated
     for _ in range(5):
         assert chain_monitor.watcher_queue.empty()
         time.sleep(0.1)

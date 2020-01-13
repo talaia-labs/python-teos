@@ -20,9 +20,9 @@ class ChainMonitor:
 
     Attributes:
         best_tip (:obj:`str`): a block hash representing the current best tip.
-        last_tips (:obj:`list`): a list of last chain tips. Used as an sliding window to avoid notifying about old tips.
+        last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         terminate (:obj:`bool`): a flag to signal the termination of the :class:`ChainMonitor` (shutdown the tower).
-        check_tip (:obj:`Event`): an event that it's triggered at fixed time intervals and controls the polling thread.
+        check_tip (:obj:`Event`): an event that's triggered at fixed time intervals and controls the polling thread.
         lock (:obj:`Condition`): a lock used to protect concurrent access to the queues and ``best_tip`` by the zmq and
             polling threads.
         zmqSubSocket (:obj:`socket`): a socket to connect to ``bitcoind`` via ``zmq``.
@@ -130,7 +130,7 @@ class ChainMonitor:
         while not self.terminate:
             self.check_tip.wait(timeout=polling_delta)
 
-            # Terminate could have been set wile the thread was blocked in wait
+            # Terminate could have been set while the thread was blocked in wait
             if not self.terminate:
                 current_tip = BlockProcessor.get_best_block_hash()
 
@@ -150,7 +150,7 @@ class ChainMonitor:
         while not self.terminate:
             msg = self.zmqSubSocket.recv_multipart()
 
-            # Terminate could have been set wile the thread was blocked in recv
+            # Terminate could have been set while the thread was blocked in recv
             if not self.terminate:
                 topic = msg[0]
                 body = msg[1]
