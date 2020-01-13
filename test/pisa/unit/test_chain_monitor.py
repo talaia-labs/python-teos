@@ -97,7 +97,7 @@ def test_update_state(chain_monitor):
     assert chain_monitor.update_state(chain_monitor.best_tip) is False
 
     # The state should be correctly updated with a new block hash, the chain tip should change and the old tip should
-    # has been added to the last_tips
+    # have been added to the last_tips
     another_block_hash = get_random_value_hex(32)
     assert chain_monitor.update_state(another_block_hash) is True
     assert chain_monitor.best_tip == another_block_hash and new_block_hash == chain_monitor.last_tips[-1]
@@ -192,3 +192,34 @@ def test_monitor_chain():
     chain_monitor.terminate = True
     # The zmq thread needs a block generation to release from the recv method.
     generate_block()
+
+
+def test_monitor_chain_single_update():
+    # This test tests that if both threads try to add the same block to the queue, only the first one will make it
+    chain_monitor = ChainMonitor()
+
+    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None)
+    responder = Responder(db_manager=None, chain_monitor=chain_monitor)
+    chain_monitor.attach_responder(responder.block_queue, asleep=False)
+    chain_monitor.attach_watcher(watcher.block_queue, asleep=False)
+
+    chain_monitor.best_tip = None
+
+    # We will create a block and wait for the polling thread. Then check the queues to see that the block hash has only
+    # been added once.
+    chain_monitor.monitor_chain(polling_delta=2)
+    generate_block()
+
+    watcher_block = chain_monitor.watcher_queue.get()
+    responder_block = chain_monitor.responder_queue.get()
+    assert watcher_block == responder_block
+    assert chain_monitor.watcher_queue.empty()
+    assert chain_monitor.responder_queue.empty()
+
+    # The delta for polling is 2 secs, so let's wait and see
+    time.sleep(2)
+    assert chain_monitor.watcher_queue.empty()
+    assert chain_monitor.responder_queue.empty()
+
+    # We can also force an update and see that it won't go through
+    assert chain_monitor.update_state(watcher_block) is False
