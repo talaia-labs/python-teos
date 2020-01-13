@@ -125,6 +125,9 @@ class ChainMonitor:
         Monitors ``bitcoind`` via polling. Once the method is fired, it keeps monitoring as long as ``terminate`` is not
         set. Polling is performed once every ``polling_delta`` seconds. If a new best tip if found, the shared lock is
         acquired, the state is updated and the subscribers are notified, and finally the lock is released.
+
+        Args:
+             polling_delta (:obj:`int`): the time delta between polls.
         """
 
         while not self.terminate:
@@ -164,13 +167,16 @@ class ChainMonitor:
                         logger.info("New block received via zmq", block_hash=block_hash)
                     self.lock.release()
 
-    def monitor_chain(self):
+    def monitor_chain(self, polling_delta=POLLING_DELTA):
         """
         Main :class:`ChainMonitor` method. It initializes the ``best_tip`` to the current one (by querying the
         :obj:`BlockProcessor <pisa.block_processor.BlockProcessor>`) and creates two threads, one per each monitoring
-        approach (``zmq`` and ``polling``)
+        approach (``zmq`` and ``polling``).
+
+        Args:
+             polling_delta (:obj:`int`): the time delta between polls by the ``monitor_chain_polling`` thread.
         """
 
         self.best_tip = BlockProcessor.get_best_block_hash()
-        Thread(target=self.monitor_chain_polling, daemon=True).start()
+        Thread(target=self.monitor_chain_polling, daemon=True, kwargs={"polling_delta": polling_delta}).start()
         Thread(target=self.monitor_chain_zmq, daemon=True).start()
