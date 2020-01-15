@@ -32,14 +32,17 @@ config = get_config()
 
 
 @pytest.fixture(scope="module")
-def run_api(db_manager):
+def run_api(db_manager, chain_monitor):
     sk, pk = generate_keypair()
     sk_der = sk.private_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    watcher = Watcher(db_manager, sk_der, get_config())
+
+    watcher = Watcher(db_manager, chain_monitor, sk_der, get_config())
+    chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
+    chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
     api_thread = Thread(target=API(watcher, config).start)
     api_thread.daemon = True

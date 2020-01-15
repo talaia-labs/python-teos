@@ -7,8 +7,8 @@ from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
 import pisa.conf as conf
-from pisa.responder import Responder
 from pisa.db_manager import DBManager
+from pisa.chain_monitor import ChainMonitor
 from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
@@ -18,6 +18,7 @@ logger = Logger("Daemon")
 def handle_signals(signal_received, frame):
     logger.info("Closing connection with appointments db")
     db_manager.db.close()
+    chain_monitor.terminate = True
 
     logger.info("Shutting down PISA")
     exit(0)
@@ -94,13 +95,19 @@ if __name__ == "__main__":
         try:
             db_manager = DBManager(pisa_config.get("DB_PATH"))
 
+            # Create the chain monitor and start monitoring the chain
+            chain_monitor = ChainMonitor()
+            chain_monitor.monitor_chain()
+
             watcher_appointments_data = db_manager.load_watcher_appointments()
             responder_trackers_data = db_manager.load_responder_trackers()
 
             with open(pisa_config.get("PISA_SECRET_KEY"), "rb") as key_file:
                 secret_key_der = key_file.read()
 
-            watcher = Watcher(db_manager, secret_key_der, config=pisa_config)
+            watcher = Watcher(db_manager, chain_monitor, secret_key_der, pisa_config)
+            chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
+            chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
@@ -113,7 +120,6 @@ if __name__ == "__main__":
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                responder = Responder(db_manager, pisa_config)
                 last_common_ancestor_responder = None
                 missed_blocks_responder = None
 
@@ -124,12 +130,12 @@ if __name__ == "__main__":
                     )
                     missed_blocks_responder = block_processor.get_missed_blocks(last_common_ancestor_responder)
 
-                    responder.trackers, responder.tx_tracker_map = Builder.build_trackers(responder_trackers_data)
-                    responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
+                    watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
+                        responder_trackers_data
+                    )
+                    watcher.responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
 
-                # Build Watcher with Responder and backed up data. If the blocks of both match we don't perform the
-                # search twice.
-                watcher.responder = responder
+                # Build Watcher. If the blocks of both match we don't perform the search twice.
                 if last_block_watcher is not None:
                     if last_block_watcher == last_block_responder:
                         missed_blocks_watcher = missed_blocks_responder
