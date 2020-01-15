@@ -13,9 +13,7 @@ from pisa.chain_monitor import ChainMonitor
 from pisa.tools import bitcoin_cli
 
 from common.constants import LOCATOR_LEN_HEX
-
-from bitcoind_mock.utils import sha256d
-from bitcoind_mock.transaction import TX
+from bitcoind_mock.transaction import create_dummy_transaction, create_tx_from_hex
 from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_value_hex
 
 
@@ -55,7 +53,7 @@ def create_dummy_tracker_data(random_txid=False, penalty_rawtx=None):
         )
 
     else:
-        penalty_txid = sha256d(penalty_rawtx)
+        penalty_txid = create_tx_from_hex(penalty_rawtx).tx_id.hex()
 
     if random_txid is True:
         penalty_txid = get_random_value_hex(32)
@@ -270,7 +268,7 @@ def test_add_tracker_already_confirmed(responder):
         uuid = uuid4().hex
         confirmations = i + 1
         locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
-            penalty_rawtx=TX.create_dummy_transaction()
+            penalty_rawtx=create_dummy_transaction().hex()
         )
 
         responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
@@ -283,7 +281,7 @@ def test_do_watch(temp_db_manager, chain_monitor):
     responder = Responder(temp_db_manager, chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, False)
 
-    trackers = [create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(20)]
+    trackers = [create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(20)]
 
     # Let's set up the trackers first
     for tracker in trackers:
@@ -402,18 +400,18 @@ def test_get_completed_trackers(db_manager, chain_monitor):
     # A complete tracker is a tracker that has reached the appointment end with enough confs (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
     trackers_end_conf = {
-        uuid4().hex: create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction()) for _ in range(10)
+        uuid4().hex: create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(10)
     }
 
     trackers_end_no_conf = {}
     for _ in range(10):
-        tracker = create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction())
+        tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
         responder.unconfirmed_txs.append(tracker.penalty_txid)
         trackers_end_no_conf[uuid4().hex] = tracker
 
     trackers_no_end = {}
     for _ in range(10):
-        tracker = create_dummy_tracker(penalty_rawtx=TX.create_dummy_transaction())
+        tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
         tracker.appointment_end += 10
         trackers_no_end[uuid4().hex] = tracker
 
@@ -463,7 +461,7 @@ def test_rebroadcast(db_manager, chain_monitor):
     for i in range(20):
         uuid = uuid4().hex
         locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
-            penalty_rawtx=TX.create_dummy_transaction()
+            penalty_rawtx=create_dummy_transaction().hex()
         )
 
         tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
