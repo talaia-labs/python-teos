@@ -2,14 +2,13 @@ from getopt import getopt
 from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-from pisa.conf import DB_PATH
 from common.logger import Logger
 from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
-from pisa.conf import BTC_NETWORK, PISA_SECRET_KEY
-from pisa.responder import Responder
+import pisa.conf as conf
 from pisa.db_manager import DBManager
+from pisa.chain_monitor import ChainMonitor
 from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
@@ -19,9 +18,57 @@ logger = Logger("Daemon")
 def handle_signals(signal_received, frame):
     logger.info("Closing connection with appointments db")
     db_manager.db.close()
+    chain_monitor.terminate = True
 
     logger.info("Shutting down PISA")
     exit(0)
+
+
+def load_config(config):
+    """
+    Looks through all of the config options to make sure they contain the right type of data and builds a config
+    dictionary. 
+
+    Args:
+        config (:obj:`module`): It takes in a config module object.
+
+    Returns:
+        :obj:`dict` A dictionary containing the config values.
+    """
+
+    conf_dict = {}
+
+    conf_fields = {
+        "BTC_RPC_USER": {"value": config.BTC_RPC_USER, "type": str},
+        "BTC_RPC_PASSWD": {"value": config.BTC_RPC_PASSWD, "type": str},
+        "BTC_RPC_HOST": {"value": config.BTC_RPC_HOST, "type": str},
+        "BTC_RPC_PORT": {"value": config.BTC_RPC_PORT, "type": int},
+        "BTC_NETWORK": {"value": config.BTC_NETWORK, "type": str},
+        "FEED_PROTOCOL": {"value": config.FEED_PROTOCOL, "type": str},
+        "FEED_ADDR": {"value": config.FEED_ADDR, "type": str},
+        "FEED_PORT": {"value": config.FEED_PORT, "type": int},
+        "MAX_APPOINTMENTS": {"value": config.MAX_APPOINTMENTS, "type": int},
+        "EXPIRY_DELTA": {"value": config.EXPIRY_DELTA, "type": int},
+        "MIN_TO_SELF_DELAY": {"value": config.MIN_TO_SELF_DELAY, "type": int},
+        "SERVER_LOG_FILE": {"value": config.SERVER_LOG_FILE, "type": str},
+        "PISA_SECRET_KEY": {"value": config.PISA_SECRET_KEY, "type": str},
+        "CLIENT_LOG_FILE": {"value": config.CLIENT_LOG_FILE, "type": str},
+        "TEST_LOG_FILE": {"value": config.TEST_LOG_FILE, "type": str},
+        "DB_PATH": {"value": config.DB_PATH, "type": str},
+    }
+
+    for field in conf_fields:
+        value = conf_fields[field]["value"]
+        correct_type = conf_fields[field]["type"]
+
+        if (value is not None) and isinstance(value, correct_type):
+            conf_dict[field] = value
+        else:
+            err_msg = "{} variable in config is of the wrong type".format(field)
+            logger.error(err_msg)
+            raise ValueError(err_msg)
+
+    return conf_dict
 
 
 if __name__ == "__main__":
@@ -36,23 +83,31 @@ if __name__ == "__main__":
         # FIXME: Leaving this here for future option/arguments
         pass
 
+    pisa_config = load_config(conf)
+
     if not can_connect_to_bitcoind():
         logger.error("Can't connect to bitcoind. Shutting down")
 
-    elif not in_correct_network(BTC_NETWORK):
+    elif not in_correct_network(pisa_config.get("BTC_NETWORK")):
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
         try:
-            db_manager = DBManager(DB_PATH)
+            db_manager = DBManager(pisa_config.get("DB_PATH"))
+
+            # Create the chain monitor and start monitoring the chain
+            chain_monitor = ChainMonitor()
+            chain_monitor.monitor_chain()
 
             watcher_appointments_data = db_manager.load_watcher_appointments()
             responder_trackers_data = db_manager.load_responder_trackers()
 
-            with open(PISA_SECRET_KEY, "rb") as key_file:
+            with open(pisa_config.get("PISA_SECRET_KEY"), "rb") as key_file:
                 secret_key_der = key_file.read()
 
-            watcher = Watcher(db_manager, secret_key_der)
+            watcher = Watcher(db_manager, chain_monitor, secret_key_der, pisa_config)
+            chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
+            chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
@@ -65,7 +120,6 @@ if __name__ == "__main__":
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                responder = Responder(db_manager)
                 last_common_ancestor_responder = None
                 missed_blocks_responder = None
 
@@ -76,12 +130,12 @@ if __name__ == "__main__":
                     )
                     missed_blocks_responder = block_processor.get_missed_blocks(last_common_ancestor_responder)
 
-                    responder.trackers, responder.tx_tracker_map = Builder.build_trackers(responder_trackers_data)
-                    responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
+                    watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
+                        responder_trackers_data
+                    )
+                    watcher.responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
 
-                # Build Watcher with Responder and backed up data. If the blocks of both match we don't perform the
-                # search twice.
-                watcher.responder = responder
+                # Build Watcher. If the blocks of both match we don't perform the search twice.
                 if last_block_watcher is not None:
                     if last_block_watcher == last_block_responder:
                         missed_blocks_watcher = missed_blocks_responder
@@ -97,7 +151,7 @@ if __name__ == "__main__":
                     watcher.block_queue = Builder.build_block_queue(missed_blocks_watcher)
 
             # Fire the API
-            API(watcher).start()
+            API(watcher, config=pisa_config).start()
 
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))

@@ -12,10 +12,11 @@ from cryptography.hazmat.primitives import serialization
 
 from apps.cli.blob import Blob
 from pisa.responder import TransactionTracker
-from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
+from pisa.chain_monitor import ChainMonitor
 from common.appointment import Appointment
+from common.tools import compute_locator
 
 from bitcoind_mock.utils import sha256d
 from bitcoind_mock.transaction import TX
@@ -48,6 +49,17 @@ def db_manager():
 
     manager.db.close()
     rmtree("test_db")
+
+
+@pytest.fixture(scope="module")
+def chain_monitor():
+    chain_monitor = ChainMonitor()
+    chain_monitor.monitor_chain()
+
+    yield chain_monitor
+
+    chain_monitor.terminate = True
+    generate_block()
 
 
 def generate_keypair():
@@ -103,7 +115,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
-    locator = Watcher.compute_locator(dispute_txid)
+    locator = compute_locator(dispute_txid)
     blob = Blob(dummy_appointment_data.get("tx"))
 
     encrypted_blob = Cryptographer.encrypt(blob, dummy_appointment_data.get("tx_id"))
@@ -147,3 +159,26 @@ def generate_dummy_tracker():
     )
 
     return TransactionTracker.from_dict(tracker_data)
+
+
+def get_config():
+    config = {
+        "BTC_RPC_USER": "username",
+        "BTC_RPC_PASSWD": "password",
+        "BTC_RPC_HOST": "localhost",
+        "BTC_RPC_PORT": 8332,
+        "BTC_NETWORK": "regtest",
+        "FEED_PROTOCOL": "tcp",
+        "FEED_ADDR": "127.0.0.1",
+        "FEED_PORT": 28332,
+        "MAX_APPOINTMENTS": 100,
+        "EXPIRY_DELTA": 6,
+        "MIN_TO_SELF_DELAY": 20,
+        "SERVER_LOG_FILE": "pisa.log",
+        "PISA_SECRET_KEY": "pisa_sk.der",
+        "CLIENT_LOG_FILE": "pisa.log",
+        "TEST_LOG_FILE": "test.log",
+        "DB_PATH": "appointments",
+    }
+
+    return config

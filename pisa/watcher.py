@@ -3,15 +3,14 @@ from queue import Queue
 from threading import Thread
 
 from common.cryptographer import Cryptographer
-from common.constants import LOCATOR_LEN_HEX
 from common.appointment import Appointment
+from common.tools import compute_locator
+
 from common.logger import Logger
 
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
-from pisa.utils.zmq_subscriber import ZMQSubscriber
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
 logger = Logger("Watcher")
 
@@ -29,15 +28,17 @@ class Watcher:
     If an appointment reaches its end with no breach, the data is simply deleted.
 
     The :class:`Watcher` receives information about new received blocks via the ``block_queue`` that is populated by the
-    :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber>`.
+    :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
+        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
+            new blocks received by ``bitcoind``.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
+        config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
+            ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance. If ``None`` is passed, a new
             instance is created. Populated instances are useful when bootstrapping the system from backed-up data.
-        max_appointments(:obj:`int`): the maximum amount of appointments that the :obj:`Watcher` will keep at any given
-            time. Defaults to ``MAX_APPOINTMENTS``.
 
 
     Attributes:
@@ -48,44 +49,31 @@ class Watcher:
             appointments with the same ``locator``.
         asleep (:obj:`bool`): A flag that signals whether the :obj:`Watcher` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
-            populated by the :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`.
-        max_appointments(:obj:`int`): the maximum amount of appointments that the :obj:`Watcher` will keep at any given
-            time.
-        zmq_subscriber (:obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`): a ZMQSubscriber instance used
-            to receive new block notifications from ``bitcoind``.
+        populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
+        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
+            new blocks received by ``bitcoind``.
+        config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
+            ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         db_manager (:obj:`DBManager <pisa.db_manager>`): A db manager instance to interact with the database.
+        signing_key (:mod:`EllipticCurvePrivateKey`): a private key used to sign accepted appointments.
 
     Raises:
         ValueError: if `pisa_sk_file` is not found.
 
     """
 
-    def __init__(self, db_manager, sk_der, responder=None, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, chain_monitor, sk_der, config, responder=None):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
         self.block_queue = Queue()
-        self.max_appointments = max_appointments
-        self.zmq_subscriber = None
+        self.chain_monitor = chain_monitor
+        self.config = config
         self.db_manager = db_manager
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
         if not isinstance(responder, Responder):
-            self.responder = Responder(db_manager)
-
-    @staticmethod
-    def compute_locator(tx_id):
-        """
-        Computes an appointment locator given a transaction id.
-
-        Args:
-            tx_id (:obj:`str`): the transaction id used to compute the locator.
-
-        Returns:
-           (:obj:`str`): The computed locator.
-        """
-
-        return tx_id[:LOCATOR_LEN_HEX]
+            self.responder = Responder(db_manager, chain_monitor)
 
     def add_appointment(self, appointment):
         """
@@ -117,8 +105,8 @@ class Watcher:
 
         """
 
-        if len(self.appointments) < self.max_appointments:
-            # Appointments are stored in disk, we only keep the end_time, locator and locator_uuid map in memory
+        if len(self.appointments) < self.config.get("MAX_APPOINTMENTS"):
+
             uuid = uuid4().hex
             self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
 
@@ -130,10 +118,8 @@ class Watcher:
 
             if self.asleep:
                 self.asleep = False
-                zmq_thread = Thread(target=self.do_subscribe)
-                watcher = Thread(target=self.do_watch)
-                zmq_thread.start()
-                watcher.start()
+                self.chain_monitor.watcher_asleep = False
+                Thread(target=self.do_watch).start()
 
                 logger.info("Waking up")
 
@@ -152,15 +138,6 @@ class Watcher:
             logger.info("Maximum appointments reached, appointment rejected", locator=appointment.locator)
 
         return appointment_added, signature
-
-    def do_subscribe(self):
-        """
-        Initializes a ``ZMQSubscriber`` instance to listen to new blocks from ``bitcoind``. Block ids are received
-        trough the ``block_queue``.
-        """
-
-        self.zmq_subscriber = ZMQSubscriber(parent="Watcher")
-        self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):
         """
@@ -184,7 +161,7 @@ class Watcher:
                 expired_appointments = [
                     uuid
                     for uuid, appointment_data in self.appointments.items()
-                    if block["height"] > appointment_data.get("end_time") + EXPIRY_DELTA
+                    if block["height"] > appointment_data.get("end_time") + self.config.get("EXPIRY_DELTA")
                 ]
 
                 Cleaner.delete_expired_appointment(
@@ -223,8 +200,7 @@ class Watcher:
 
         # Go back to sleep if there are no more appointments
         self.asleep = True
-        self.zmq_subscriber.terminate = True
-        self.block_queue = Queue()
+        self.chain_monitor.watcher_asleep = True
 
         logger.info("No more pending appointments, going back to sleep")
 
@@ -240,7 +216,7 @@ class Watcher:
             found.
         """
 
-        potential_locators = {Watcher.compute_locator(txid): txid for txid in txids}
+        potential_locators = {compute_locator(txid): txid for txid in txids}
 
         # Check is any of the tx_ids in the received block is an actual match
         intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())

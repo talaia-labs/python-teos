@@ -1,22 +1,24 @@
 import pytest
 from uuid import uuid4
 from threading import Thread
-from queue import Queue, Empty
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
 from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
+from pisa.chain_monitor import ChainMonitor
+
 from test.pisa.unit.conftest import (
-    generate_block,
     generate_blocks,
     generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
+    get_config,
 )
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
-from common.tools import check_sha256_hex_format
+from common.tools import compute_locator
 from common.cryptographer import Cryptographer
 
 
@@ -35,8 +37,12 @@ sk_der = signing_key.private_bytes(
 
 
 @pytest.fixture(scope="module")
-def watcher(db_manager):
-    return Watcher(db_manager, sk_der)
+def watcher(db_manager, chain_monitor):
+    watcher = Watcher(db_manager, chain_monitor, sk_der, get_config())
+    chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
+    chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
+
+    return watcher
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +52,7 @@ def txids():
 
 @pytest.fixture(scope="module")
 def locator_uuid_map(txids):
-    return {Watcher.compute_locator(txid): uuid4().hex for txid in txids}
+    return {compute_locator(txid): uuid4().hex for txid in txids}
 
 
 def create_appointments(n):
@@ -67,17 +73,18 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
-def test_init(watcher):
-    assert type(watcher.appointments) is dict and len(watcher.appointments) == 0
-    assert type(watcher.locator_uuid_map) is dict and len(watcher.locator_uuid_map) == 0
-    assert watcher.block_queue.empty()
+def test_init(run_bitcoind, watcher):
+    assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
+    assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.asleep is True
-    assert watcher.max_appointments == MAX_APPOINTMENTS
-    assert watcher.zmq_subscriber is None
-    assert type(watcher.responder) is Responder
+    assert watcher.block_queue.empty()
+    assert isinstance(watcher.chain_monitor, ChainMonitor)
+    assert isinstance(watcher.config, dict)
+    assert isinstance(watcher.signing_key, ec.EllipticCurvePrivateKey)
+    assert isinstance(watcher.responder, Responder)
 
 
-def test_add_appointment(run_bitcoind, watcher):
+def test_add_appointment(watcher):
     # The watcher automatically fires do_watch and do_subscribe on adding an appointment if it is asleep (initial state)
     # Avoid this by setting the state to awake.
     watcher.asleep = False
@@ -121,25 +128,10 @@ def test_add_too_many_appointments(watcher):
     assert sig is None
 
 
-def test_do_subscribe(watcher):
-    watcher.block_queue = Queue()
-
-    zmq_thread = Thread(target=watcher.do_subscribe)
-    zmq_thread.daemon = True
-    zmq_thread.start()
-
-    try:
-        generate_block()
-        block_hash = watcher.block_queue.get()
-        assert check_sha256_hex_format(block_hash)
-
-    except Empty:
-        assert False
-
-
 def test_do_watch(watcher):
     # We will wipe all the previous data and add 5 appointments
     appointments, locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
+    watcher.chain_monitor.watcher_asleep = False
 
     # Set the data into the Watcher and in the db
     watcher.locator_uuid_map = locator_uuid_map
@@ -150,16 +142,13 @@ def test_do_watch(watcher):
         watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
         watcher.db_manager.store_update_locator_map(appointment.locator, uuid)
 
-    watch_thread = Thread(target=watcher.do_watch)
-    watch_thread.daemon = True
-    watch_thread.start()
+    Thread(target=watcher.do_watch, daemon=True).start()
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
         bitcoin_cli().sendrawtransaction(dispute_tx)
 
-    # After leaving some time for the block to be mined and processed, the number of appointments should have reduced
-    # by two
+    # After generating enough blocks, the number of appointments should have reduced by two
     generate_blocks(START_TIME_OFFSET + END_TIME_OFFSET)
 
     assert len(watcher.appointments) == APPOINTMENTS - 2
@@ -230,7 +219,7 @@ def test_filter_valid_breaches(watcher):
 
     dummy_appointment, _ = generate_dummy_appointment()
     dummy_appointment.encrypted_blob.data = encrypted_blob
-    dummy_appointment.locator = Watcher.compute_locator(dispute_txid)
+    dummy_appointment.locator = compute_locator(dispute_txid)
     uuid = uuid4().hex
 
     appointments = {uuid: dummy_appointment}

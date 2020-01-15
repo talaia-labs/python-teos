@@ -5,7 +5,6 @@ from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 
 from pisa import errors
-import pisa.conf as conf
 from common.logger import Logger
 from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
@@ -22,6 +21,9 @@ class Inspector:
     """
     The :class:`Inspector` class is in charge of verifying that the appointment data provided by the user is correct.
     """
+
+    def __init__(self, config):
+        self.config = config
 
     def inspect(self, appointment_data, signature, public_key):
         """
@@ -221,8 +223,7 @@ class Inspector:
 
         return rcode, message
 
-    @staticmethod
-    def check_to_self_delay(to_self_delay):
+    def check_to_self_delay(self, to_self_delay):
         """
         Checks if the provided ``to_self_delay`` is correct.
 
@@ -255,10 +256,10 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong to_self_delay data type ({})".format(t)
 
-        elif to_self_delay < conf.MIN_TO_SELF_DELAY:
+        elif to_self_delay < self.config.get("MIN_TO_SELF_DELAY"):
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = "to_self_delay too small. The to_self_delay should be at least {} (current: {})".format(
-                conf.MIN_TO_SELF_DELAY, to_self_delay
+                self.config.get("MIN_TO_SELF_DELAY"), to_self_delay
             )
 
         if message is not None:

@@ -6,7 +6,6 @@ from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
 from pisa.block_processor import BlockProcessor
-from pisa.utils.zmq_subscriber import ZMQSubscriber
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
@@ -128,22 +127,22 @@ class Responder:
             has missed. Used to trigger rebroadcast if needed.
         asleep (:obj:`bool`): A flag that signals whether the :obj:`Responder` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Responder` to receive block hashes from ``bitcoind``. It
-            is populated by the :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`.
-        zmq_subscriber (:obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>`): a ``ZMQSubscriber`` instance
-            used to receive new block notifications from ``bitcoind``.
+            is populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
+        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
+            new blocks received by ``bitcoind``.
         db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): A ``DBManager`` instance to interact with the
             database.
 
     """
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, chain_monitor):
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
         self.asleep = True
         self.block_queue = Queue()
-        self.zmq_subscriber = None
+        self.chain_monitor = chain_monitor
         self.db_manager = db_manager
 
     @staticmethod
@@ -226,8 +225,7 @@ class Responder:
         ``penalty_txid`` added to ``unconfirmed_txs`` if ``confirmations=0``. Finally, all the data is stored in the
         database.
 
-        ``add_tracker`` awakes the :obj:`Responder` and creates a connection with the
-        :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` if he is asleep.
+        ``add_tracker`` awakes the :obj:`Responder` if it is asleep.
 
         Args:
             uuid (:obj:`str`): a unique identifier for the appointment.
@@ -268,19 +266,8 @@ class Responder:
 
         if self.asleep:
             self.asleep = False
-            zmq_thread = Thread(target=self.do_subscribe)
-            responder = Thread(target=self.do_watch)
-            zmq_thread.start()
-            responder.start()
-
-    def do_subscribe(self):
-        """
-        Initializes a :obj:`ZMQSubscriber <pisa.utils.zmq_subscriber.ZMQSubscriber>` instance to listen to new blocks
-        from ``bitcoind``. Block ids are received trough the ``block_queue``.
-        """
-
-        self.zmq_subscriber = ZMQSubscriber(parent="Responder")
-        self.zmq_subscriber.handle(self.block_queue)
+            self.chain_monitor.responder_asleep = False
+            Thread(target=self.do_watch).start()
 
     def do_watch(self):
         """
@@ -335,8 +322,7 @@ class Responder:
 
         # Go back to sleep if there are no more pending trackers
         self.asleep = True
-        self.zmq_subscriber.terminate = True
-        self.block_queue = Queue()
+        self.chain_monitor.responder_asleep = True
 
         logger.info("No more pending trackers, going back to sleep")
 
@@ -492,9 +478,6 @@ class Responder:
 
                 else:
                     # If the penalty transaction is missing, we need to reset the tracker.
-                    # DISCUSS: Adding tracker back, should we flag it as retried?
-                    # FIXME: Whether we decide to increase the retried counter or not, the current counter should be
-                    #        maintained. There is no way of doing so with the current approach. Update if required
                     self.handle_breach(
                         tracker.locator,
                         uuid,
