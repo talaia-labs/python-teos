@@ -130,8 +130,17 @@ def test_add_too_many_appointments(watcher):
 
 def test_do_watch(watcher):
     # We will wipe all the previous data and add 5 appointments
-    watcher.appointments, watcher.locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
+    appointments, locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
     watcher.chain_monitor.watcher_asleep = False
+
+    # Set the data into the Watcher and in the db
+    watcher.locator_uuid_map = locator_uuid_map
+    watcher.appointments = {}
+
+    for uuid, appointment in appointments.items():
+        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
+        watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        watcher.db_manager.store_update_locator_map(appointment.locator, uuid)
 
     Thread(target=watcher.do_watch, daemon=True).start()
 
@@ -179,7 +188,9 @@ def test_filter_valid_breaches_random_data(watcher):
     for i in range(TEST_SET_SIZE):
         dummy_appointment, _ = generate_dummy_appointment()
         uuid = uuid4().hex
-        appointments[uuid] = dummy_appointment
+        appointments[uuid] = {"locator": dummy_appointment.locator, "end_time": dummy_appointment.end_time}
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
+        watcher.db_manager.store_update_locator_map(dummy_appointment.locator, uuid)
 
         locator_uuid_map[dummy_appointment.locator] = [uuid]
 
@@ -215,7 +226,11 @@ def test_filter_valid_breaches(watcher):
     locator_uuid_map = {dummy_appointment.locator: [uuid]}
     breaches = {dummy_appointment.locator: dispute_txid}
 
-    watcher.appointments = appointments
+    for uuid, appointment in appointments.items():
+        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
+        watcher.db_manager.store_update_locator_map(dummy_appointment.locator, uuid)
+
     watcher.locator_uuid_map = locator_uuid_map
 
     filtered_valid_breaches = watcher.filter_valid_breaches(breaches)

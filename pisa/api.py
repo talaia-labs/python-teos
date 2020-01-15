@@ -110,17 +110,16 @@ class API:
             return jsonify(response)
 
         locator_map = self.watcher.db_manager.load_locator_map(locator)
+        triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
 
         if locator_map is not None:
             for uuid in locator_map:
-                appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
+                if uuid not in triggered_appointments:
+                    appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
 
-                if appointment_data is not None and appointment_data["triggered"] is False:
-                    # Triggered is an internal flag
-                    del appointment_data["triggered"]
-
-                    appointment_data["status"] = "being_watched"
-                    response.append(appointment_data)
+                    if appointment_data is not None:
+                        appointment_data["status"] = "being_watched"
+                        response.append(appointment_data)
 
                 tracker_data = self.watcher.db_manager.load_responder_tracker(uuid)
 
