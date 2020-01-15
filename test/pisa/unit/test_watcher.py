@@ -17,7 +17,7 @@ from test.pisa.unit.conftest import (
 )
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
-from common.tools import check_sha256_hex_format
+from common.tools import check_sha256_hex_format, compute_locator
 from common.cryptographer import Cryptographer
 
 
@@ -47,7 +47,7 @@ def txids():
 
 @pytest.fixture(scope="module")
 def locator_uuid_map(txids):
-    return {Watcher.compute_locator(txid): uuid4().hex for txid in txids}
+    return {compute_locator(txid): uuid4().hex for txid in txids}
 
 
 def create_appointments(n):
@@ -220,7 +220,7 @@ def test_filter_valid_breaches(watcher):
 
     dummy_appointment, _ = generate_dummy_appointment()
     dummy_appointment.encrypted_blob.data = encrypted_blob
-    dummy_appointment.locator = Watcher.compute_locator(dispute_txid)
+    dummy_appointment.locator = compute_locator(dispute_txid)
     uuid = uuid4().hex
 
     appointments = {uuid: dummy_appointment}
