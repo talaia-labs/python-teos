@@ -3,4 +3,3 @@ flask
 cryptography
 requests
 plyvel
-pytest
