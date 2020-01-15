@@ -13,6 +13,7 @@ from test.pisa.unit.conftest import (
     generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
+    get_config,
 )
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
@@ -36,7 +37,7 @@ sk_der = signing_key.private_bytes(
 
 @pytest.fixture(scope="module")
 def watcher(db_manager):
-    return Watcher(db_manager, sk_der)
+    return Watcher(db_manager, sk_der, get_config())
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +73,7 @@ def test_init(watcher):
     assert type(watcher.locator_uuid_map) is dict and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
     assert watcher.asleep is True
-    assert watcher.max_appointments == MAX_APPOINTMENTS
+    assert type(watcher.config) is dict
     assert watcher.zmq_subscriber is None
     assert type(watcher.responder) is Responder
 

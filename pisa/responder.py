@@ -135,13 +135,14 @@ class Responder:
 
     """
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, config):
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
         self.asleep = True
         self.block_queue = Queue()
+        self.config = config
         self.zmq_subscriber = None
         self.db_manager = db_manager
 
@@ -271,7 +272,7 @@ class Responder:
         from ``bitcoind``. Block ids are received trough the ``block_queue``.
         """
 
-        self.zmq_subscriber = ZMQSubscriber(parent="Responder")
+        self.zmq_subscriber = ZMQSubscriber(self.config, parent="Responder")
         self.zmq_subscriber.handle(self.block_queue)
 
     def do_watch(self):

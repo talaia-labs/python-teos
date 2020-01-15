@@ -17,12 +17,12 @@ from common.tools import check_sha256_hex_format
 
 from bitcoind_mock.utils import sha256d
 from bitcoind_mock.transaction import TX
-from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_value_hex
+from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_value_hex, get_config
 
 
 @pytest.fixture(scope="module")
 def responder(db_manager):
-    return Responder(db_manager)
+    return Responder(db_manager, get_config())
 
 
 @pytest.fixture()
@@ -151,11 +151,12 @@ def test_init_responder(responder):
     assert type(responder.missed_confirmations) is dict and len(responder.missed_confirmations) == 0
     assert responder.block_queue.empty()
     assert responder.asleep is True
+    assert type(responder.config) is dict
     assert responder.zmq_subscriber is None
 
 
 def test_handle_breach(db_manager):
-    responder = Responder(db_manager)
+    responder = Responder(db_manager, get_config())
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
 
@@ -295,7 +296,7 @@ def test_do_subscribe(responder):
 
 
 def test_do_watch(temp_db_manager):
-    responder = Responder(temp_db_manager)
+    responder = Responder(temp_db_manager, get_config())
     responder.block_queue = Queue()
 
     zmq_thread = Thread(target=responder.do_subscribe)
@@ -351,7 +352,7 @@ def test_do_watch(temp_db_manager):
 
 
 def test_check_confirmations(temp_db_manager):
-    responder = Responder(temp_db_manager)
+    responder = Responder(temp_db_manager, get_config())
     responder.block_queue = Queue()
 
     zmq_thread = Thread(target=responder.do_subscribe)
@@ -414,7 +415,7 @@ def test_get_completed_trackers(db_manager):
     initial_height = bitcoin_cli().getblockcount()
 
     # Let's use a fresh responder for this to make it easier to compare the results
-    responder = Responder(db_manager)
+    responder = Responder(db_manager, get_config())
 
     # A complete tracker is a tracker that has reached the appointment end with enough confirmations (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
@@ -462,7 +463,7 @@ def test_get_completed_trackers(db_manager):
 
 
 def test_rebroadcast(db_manager):
-    responder = Responder(db_manager)
+    responder = Responder(db_manager, get_config())
     responder.asleep = False
 
     txs_to_rebroadcast = []

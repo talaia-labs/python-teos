@@ -148,3 +148,26 @@ def generate_dummy_tracker():
     )
 
     return TransactionTracker.from_dict(tracker_data)
+
+
+def get_config():
+    config = {
+        "BTC_RPC_USER": "username",
+        "BTC_RPC_PASSWD": "password",
+        "BTC_RPC_HOST": "localhost",
+        "BTC_RPC_PORT": 8332,
+        "BTC_NETWORK": "regtest",
+        "FEED_PROTOCOL": "tcp",
+        "FEED_ADDR": "127.0.0.1",
+        "FEED_PORT": 28332,
+        "MAX_APPOINTMENTS": 100,
+        "EXPIRY_DELTA": 6,
+        "MIN_TO_SELF_DELAY": 20,
+        "SERVER_LOG_FILE": "pisa.log",
+        "PISA_SECRET_KEY": "pisa_sk.der",
+        "CLIENT_LOG_FILE": "pisa.log",
+        "TEST_LOG_FILE": "test.log",
+        "DB_PATH": "appointments",
+    }
+
+    return config

@@ -17,8 +17,9 @@ logger = Logger("API")
 
 
 class API:
-    def __init__(self, watcher):
+    def __init__(self, watcher, config):
         self.watcher = watcher
+        self.config = config
 
     def add_appointment(self):
         """
@@ -41,7 +42,7 @@ class API:
 
         # Check content type once if properly defined
         request_data = json.loads(request.get_json())
-        inspector = Inspector()
+        inspector = Inspector(self.config)
         appointment = inspector.inspect(
             request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
         )
