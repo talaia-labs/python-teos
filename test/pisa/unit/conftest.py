@@ -16,6 +16,7 @@ from pisa.watcher import Watcher
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
 from common.appointment import Appointment
+from common.tools import compute_locator
 
 from bitcoind_mock.utils import sha256d
 from bitcoind_mock.transaction import TX
@@ -103,7 +104,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
-    locator = Watcher.compute_locator(dispute_txid)
+    locator = compute_locator(dispute_txid)
     blob = Blob(dummy_appointment_data.get("tx"))
 
     encrypted_blob = Cryptographer.encrypt(blob, dummy_appointment_data.get("tx_id"))

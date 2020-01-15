@@ -1,6 +1,6 @@
-# pisa-cli
+# pisa_cli
 
-`pisa-cli` is a command line interface to interact with the PISA server, written in Python3.
+`pisa_cli` is a command line interface to interact with the PISA server, written in Python3.
 
 ## Dependencies
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
@@ -11,7 +11,7 @@ Refer to [INSTALL.md](INSTALL.md)
 
 ## Usage
 
-	python pisa-cli.py [global options] command [command options] [arguments]
+	python pisa_cli.py [global options] command [command options] [arguments]
 	
 #### Global options
 
@@ -54,7 +54,7 @@ The API will return a `text/plain` HTTP response code `200/OK` if the appointmen
 
 #### Usage
 
-	python pisa-cli add_appointment [command options] <appointment>/<path_to_appointment_file>
+	python pisa_cli add_appointment [command options] <appointment>/<path_to_appointment_file>
 	
 if `-f, --file` **is** specified, then the command expects a path to a json file instead of a json encoded
 	string as parameter.
@@ -100,7 +100,7 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 	
 #### Usage
 
-	python pisa-cli get_appointment <appointment_locator>
+	python pisa_cli get_appointment <appointment_locator>
 	
 
 	
@@ -109,18 +109,18 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 Shows the list of commands or help about how to run a specific command.
 
 #### Usage
-	python pisa-cli help
+	python pisa_cli help
 	
 or
 
-	python pisa-cli help command
+	python pisa_cli help command
 
 ## Example
 
 1. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not corresopond to a valid transaction. However it can be used to interact with the PISA API.
 
     ```
-    python pisa-cli.py generate_dummy_appointment
+    python pisa_cli.py generate_dummy_appointment
     ```
 
     That will create a json file that follows the appointment data structure filled with dummy data and store it in   `dummy_appointment_data.json`.
@@ -128,7 +128,7 @@ or
 2. Send the appointment to the PISA API. Which will then start monitoring for matching transactions.
 
     ```
-    python pisa-cli.py add_appointment -f dummy_appointment_data.json
+    python pisa_cli.py add_appointment -f dummy_appointment_data.json
     ```
 
     This returns a appointment locator that can be used to get updates about this appointment from PISA.
@@ -136,7 +136,7 @@ or
 3. Test that PISA is still watching the appointment by replacing the appointment locator received into the following command:
 
     ```
-    python pisa-cli.py get_appointment <appointment_locator>
+    python pisa_cli.py get_appointment <appointment_locator>
     ```
 
 ## PISA API	
