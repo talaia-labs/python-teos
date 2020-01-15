@@ -3,7 +3,7 @@
 The following is a set of guidelines for contributing to PISA.
 
 ## Code Style Guidelines
-We use [black](https://github.com/psf/black) as our base code formatter with a line length of 12 chars. Before submitting a PR make sure you have properly formatted your code by running:
+We use [black](https://github.com/psf/black) as our base code formatter with a line length of 120 chars. Before submitting a PR make sure you have properly formatted your code by running:
 
 ```bash
 black --line-length=120 {source_file_or_directory}
