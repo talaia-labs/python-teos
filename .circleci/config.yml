@@ -23,7 +23,7 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "pisa/requirements.txt" }}
+            - v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
 
@@ -33,22 +33,12 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             pip install -r pisa/requirements.txt
+            pip install -r pisa/requirements-dev.txt
 
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}
-
-      # Get github dependencies (pending to add to PyPi)
-      - run:
-          name: get bitcoind mock
-          command: |
-            git clone git@github.com:sr-gi/bitcoind_mock.git
-            . venv/bin/activate
-            pip install -r bitcoind_mock/requirements.txt
-            cp bitcoind_mock/bitcoind_mock/sample_conf.py bitcoind_mock/bitcoind_mock/conf.py
-            mv bitcoind_mock/bitcoind_mock ~/repo/venv/lib/python3.6/site-packages
-
+          key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}
 
       # run tests!
       # this example uses Django's built-in test-runner
@@ -71,11 +61,11 @@ jobs:
             . venv/bin/activate
             pytest test/common/unit
 
-#      - run:
-#          name: run cli unit tests
-#          command: |
-#            . venv/bin/activate
-#            pytest test/apps/cli/unit
+      - run:
+          name: run cli unit tests
+          command: |
+            . venv/bin/activate
+            pytest test/apps/cli/unit
 
       # - store_artifacts:
       #    path: test-reports
