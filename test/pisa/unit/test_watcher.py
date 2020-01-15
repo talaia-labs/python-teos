@@ -1,15 +1,24 @@
 import pytest
 from uuid import uuid4
 from threading import Thread
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
 from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
-from test.pisa.unit.conftest import generate_blocks, generate_dummy_appointment, get_random_value_hex, generate_keypair
 from pisa.chain_monitor import ChainMonitor
+
+from test.pisa.unit.conftest import (
+    generate_blocks,
+    generate_dummy_appointment,
+    get_random_value_hex,
+    generate_keypair,
+    get_config,
+)
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
+from common.tools import compute_locator
 from common.cryptographer import Cryptographer
 
 
@@ -29,7 +38,7 @@ sk_der = signing_key.private_bytes(
 
 @pytest.fixture(scope="module")
 def watcher(db_manager, chain_monitor):
-    watcher = Watcher(db_manager, chain_monitor, sk_der)
+    watcher = Watcher(db_manager, chain_monitor, sk_der, get_config())
     chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
     chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
 
@@ -43,7 +52,7 @@ def txids():
 
 @pytest.fixture(scope="module")
 def locator_uuid_map(txids):
-    return {Watcher.compute_locator(txid): uuid4().hex for txid in txids}
+    return {compute_locator(txid): uuid4().hex for txid in txids}
 
 
 def create_appointments(n):
@@ -67,12 +76,12 @@ def create_appointments(n):
 def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
-    assert isinstance(watcher.chain_monitor, ChainMonitor)
-    assert watcher.block_queue.empty()
     assert watcher.asleep is True
-
-    assert watcher.max_appointments == MAX_APPOINTMENTS
-    assert type(watcher.responder) is Responder
+    assert watcher.block_queue.empty()
+    assert isinstance(watcher.chain_monitor, ChainMonitor)
+    assert isinstance(watcher.config, dict)
+    assert isinstance(watcher.signing_key, ec.EllipticCurvePrivateKey)
+    assert isinstance(watcher.responder, Responder)
 
 
 def test_add_appointment(watcher):
@@ -199,7 +208,7 @@ def test_filter_valid_breaches(watcher):
 
     dummy_appointment, _ = generate_dummy_appointment()
     dummy_appointment.encrypted_blob.data = encrypted_blob
-    dummy_appointment.locator = Watcher.compute_locator(dispute_txid)
+    dummy_appointment.locator = compute_locator(dispute_txid)
     uuid = uuid4().hex
 
     appointments = {uuid: dummy_appointment}

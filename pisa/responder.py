@@ -467,9 +467,6 @@ class Responder:
 
                 else:
                     # If the penalty transaction is missing, we need to reset the tracker.
-                    # DISCUSS: Adding tracker back, should we flag it as retried?
-                    # FIXME: Whether we decide to increase the retried counter or not, the current counter should be
-                    #        maintained. There is no way of doing so with the current approach. Update if required
                     self.handle_breach(
                         tracker.locator,
                         uuid,

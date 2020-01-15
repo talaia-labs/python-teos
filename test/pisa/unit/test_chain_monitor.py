@@ -7,7 +7,7 @@ from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 from pisa.chain_monitor import ChainMonitor
 
-from test.pisa.unit.conftest import get_random_value_hex, generate_block
+from test.pisa.unit.conftest import get_random_value_hex, generate_block, get_config
 
 
 def test_init(run_bitcoind):
@@ -30,7 +30,7 @@ def test_init(run_bitcoind):
 
 
 def test_attach_watcher(chain_monitor):
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None)
+    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
     chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
 
     # booleans are not passed as reference in Python, so the flags need to be set separately
@@ -108,7 +108,7 @@ def test_monitor_chain_polling():
     chain_monitor = ChainMonitor()
     chain_monitor.best_tip = BlockProcessor.get_best_block_hash()
 
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None)
+    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
     chain_monitor.attach_watcher(watcher.block_queue, asleep=False)
 
     # monitor_chain_polling runs until terminate if set
@@ -168,7 +168,7 @@ def test_monitor_chain():
     # Not much to test here, this should launch two threads (one per monitor approach) and finish on terminate
     chain_monitor = ChainMonitor()
 
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None)
+    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
     responder = Responder(db_manager=None, chain_monitor=chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, asleep=False)
     chain_monitor.attach_watcher(watcher.block_queue, asleep=False)
@@ -198,7 +198,7 @@ def test_monitor_chain_single_update():
     # This test tests that if both threads try to add the same block to the queue, only the first one will make it
     chain_monitor = ChainMonitor()
 
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None)
+    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
     responder = Responder(db_manager=None, chain_monitor=chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, asleep=False)
     chain_monitor.attach_watcher(watcher.block_queue, asleep=False)

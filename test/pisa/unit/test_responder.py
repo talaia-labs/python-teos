@@ -307,10 +307,8 @@ def test_do_watch(temp_db_manager, chain_monitor):
         bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
         broadcast_txs.append(tracker.penalty_txid)
 
-    print(responder.unconfirmed_txs)
     # Mine a block
     generate_block()
-    print(responder.unconfirmed_txs)
 
     # The transactions we sent shouldn't be in the unconfirmed transaction list anymore
     assert not set(broadcast_txs).issubset(responder.unconfirmed_txs)

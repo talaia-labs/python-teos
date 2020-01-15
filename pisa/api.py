@@ -17,21 +17,22 @@ logger = Logger("API")
 
 
 class API:
-    def __init__(self, watcher):
+    def __init__(self, watcher, config):
         self.watcher = watcher
+        self.config = config
 
     def add_appointment(self):
         """
         Main endpoint of the Watchtower.
 
-        The client sends requests (appointments) to this endpoint to request a job to the Watchtower. Requests must be json
-        encoded and contain an ``appointment`` field and optionally a ``signature`` and ``public_key`` fields.
+        The client sends requests (appointments) to this endpoint to request a job to the Watchtower. Requests must be
+        json encoded and contain an ``appointment`` field and optionally a ``signature`` and ``public_key`` fields.
 
         Returns:
-            :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted appointments,
-            the ``rcode`` is always 0 and the response contains the signed receipt. For rejected appointments, the ``rcode``
-            is a negative value and the response contains the error message. Error messages can be found at
-            :mod:`Errors <pisa.errors>`.
+            :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted
+            appointments, the ``rcode`` is always 0 and the response contains the signed receipt. For rejected
+            appointments, the ``rcode`` is a negative value and the response contains the error message. Error messages
+            can be found at :mod:`Errors <pisa.errors>`.
         """
 
         remote_addr = request.environ.get("REMOTE_ADDR")
@@ -41,7 +42,7 @@ class API:
 
         # Check content type once if properly defined
         request_data = json.loads(request.get_json())
-        inspector = Inspector()
+        inspector = Inspector(self.config)
         appointment = inspector.inspect(
             request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
         )
@@ -166,8 +167,8 @@ class API:
         """
         Provides the block height of the Watchtower.
 
-        This is a testing endpoint that (most likely) will be removed in production. Its purpose is to give information to
-        testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
+        This is a testing endpoint that (most likely) will be removed in production. Its purpose is to give information
+        to testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
 
         Returns:
             :obj:`dict`: A json encoded dictionary containing the block height.

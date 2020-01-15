@@ -3,13 +3,12 @@ from queue import Queue
 from threading import Thread
 
 from common.cryptographer import Cryptographer
-from common.constants import LOCATOR_LEN_HEX
+from common.tools import compute_locator
 
 from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
-from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
 logger = Logger("Watcher")
 
@@ -31,11 +30,13 @@ class Watcher:
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
+        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
+            new blocks received by ``bitcoind``.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
+        config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
+            ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance. If ``None`` is passed, a new
             instance is created. Populated instances are useful when bootstrapping the system from backed-up data.
-        max_appointments(:obj:`int`): the maximum amount of appointments that the :obj:`Watcher` will keep at any given
-            time. Defaults to ``MAX_APPOINTMENTS``.
 
 
     Attributes:
@@ -46,43 +47,30 @@ class Watcher:
         asleep (:obj:`bool`): A flag that signals whether the :obj:`Watcher` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
         populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
-        max_appointments(:obj:`int`): the maximum amount of appointments that the :obj:`Watcher` will keep at any given
-            time.
         chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
             new blocks received by ``bitcoind``.
+        config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
+            ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         db_manager (:obj:`DBManager <pisa.db_manager>`): A db manager instance to interact with the database.
+        signing_key (:mod:`EllipticCurvePrivateKey`): a private key used to sign accepted appointments.
 
     Raises:
         ValueError: if `pisa_sk_file` is not found.
 
     """
 
-    def __init__(self, db_manager, chain_monitor, sk_der, responder=None, max_appointments=MAX_APPOINTMENTS):
+    def __init__(self, db_manager, chain_monitor, sk_der, config, responder=None):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.asleep = True
         self.block_queue = Queue()
-        self.max_appointments = max_appointments
         self.chain_monitor = chain_monitor
+        self.config = config
         self.db_manager = db_manager
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
         if not isinstance(responder, Responder):
             self.responder = Responder(db_manager, chain_monitor)
-
-    @staticmethod
-    def compute_locator(tx_id):
-        """
-        Computes an appointment locator given a transaction id.
-
-        Args:
-            tx_id (:obj:`str`): the transaction id used to compute the locator.
-
-        Returns:
-           (:obj:`str`): The computed locator.
-        """
-
-        return tx_id[:LOCATOR_LEN_HEX]
 
     def add_appointment(self, appointment):
         """
@@ -114,7 +102,7 @@ class Watcher:
 
         """
 
-        if len(self.appointments) < self.max_appointments:
+        if len(self.appointments) < self.config.get("MAX_APPOINTMENTS"):
             uuid = uuid4().hex
             self.appointments[uuid] = appointment
 
@@ -170,7 +158,7 @@ class Watcher:
                 expired_appointments = [
                     uuid
                     for uuid, appointment in self.appointments.items()
-                    if block["height"] > appointment.end_time + EXPIRY_DELTA
+                    if block["height"] > appointment.end_time + self.config.get("EXPIRY_DELTA")
                 ]
 
                 Cleaner.delete_expired_appointment(
@@ -225,7 +213,7 @@ class Watcher:
             found.
         """
 
-        potential_locators = {Watcher.compute_locator(txid): txid for txid in txids}
+        potential_locators = {compute_locator(txid): txid for txid in txids}
 
         # Check is any of the tx_ids in the received block is an actual match
         intersection = set(self.locator_uuid_map.keys()).intersection(potential_locators.keys())
