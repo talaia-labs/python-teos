@@ -18,8 +18,7 @@ from pisa.chain_monitor import ChainMonitor
 from common.appointment import Appointment
 from common.tools import compute_locator
 
-from bitcoind_mock.utils import sha256d
-from bitcoind_mock.transaction import TX
+from bitcoind_mock.transaction import create_dummy_transaction
 from bitcoind_mock.bitcoind import BitcoindMock
 from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
 
@@ -97,12 +96,12 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
     else:
         current_height = 10
 
-    dispute_tx = TX.create_dummy_transaction()
-    dispute_txid = sha256d(dispute_tx)
-    penalty_tx = TX.create_dummy_transaction(dispute_txid)
+    dispute_tx = create_dummy_transaction()
+    dispute_txid = dispute_tx.tx_id.hex()
+    penalty_tx = create_dummy_transaction(dispute_txid)
 
     dummy_appointment_data = {
-        "tx": penalty_tx,
+        "tx": penalty_tx.hex(),
         "tx_id": dispute_txid,
         "start_time": current_height + start_time_offset,
         "end_time": current_height + end_time_offset,
@@ -133,7 +132,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
 
     data = {"appointment": appointment_data, "signature": signature, "public_key": pk_hex}
 
-    return data, dispute_tx
+    return data, dispute_tx.hex()
 
 
 def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_offset=30):

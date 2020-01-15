@@ -1,8 +1,7 @@
 import pytest
 
 from pisa.carrier import Carrier
-from bitcoind_mock.utils import sha256d
-from bitcoind_mock.transaction import TX
+from bitcoind_mock.transaction import create_dummy_transaction
 from test.pisa.unit.conftest import generate_blocks, get_random_value_hex
 from pisa.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
@@ -21,27 +20,26 @@ def carrier():
 
 
 def test_send_transaction(run_bitcoind, carrier):
-    tx = TX.create_dummy_transaction()
-    txid = sha256d(tx)
+    tx = create_dummy_transaction()
 
-    receipt = carrier.send_transaction(tx, txid)
+    receipt = carrier.send_transaction(tx.hex(), tx.tx_id.hex())
 
     assert receipt.delivered is True
 
 
 def test_send_double_spending_transaction(carrier):
     # We can test what happens if the same transaction is sent twice
-    tx = TX.create_dummy_transaction()
-    txid = sha256d(tx)
+    tx = create_dummy_transaction()
+    txid = tx.tx_id.hex()
 
-    receipt = carrier.send_transaction(tx, txid)
+    receipt = carrier.send_transaction(tx.hex(), txid)
     sent_txs.append(txid)
 
     # Wait for a block to be mined
     generate_blocks(2)
 
     # Try to send it again
-    receipt2 = carrier.send_transaction(tx, txid)
+    receipt2 = carrier.send_transaction(tx.hex(), txid)
 
     # The carrier should report delivered True for both, but in the second case the transaction was already delivered
     # (either by himself or someone else)
@@ -51,8 +49,7 @@ def test_send_double_spending_transaction(carrier):
 
 def test_send_transaction_invalid_format(carrier):
     # Test sending a transaction that does not fits the format
-    tx = TX.create_dummy_transaction()
-    txid = sha256d(tx)
+    txid = create_dummy_transaction().tx_id.hex()
     receipt = carrier.send_transaction(txid, txid)
 
     assert receipt.delivered is False and receipt.reason == RPC_DESERIALIZATION_ERROR
