@@ -15,6 +15,19 @@ def check_sha256_hex_format(value):
     return isinstance(value, str) and re.match(r"^[0-9A-Fa-f]{64}$", value) is not None
 
 
+def check_locator_format(value):
+    """
+    Checks if a given value is a 16-byte hex encoded string.
+
+    Args:
+        value(:mod:`str`): the value to be checked.
+
+    Returns:
+        :mod:`bool`: Whether or not the value matches the format.
+    """
+    return isinstance(value, str) and re.match(r"^[0-9A-Fa-f]{32}$", value) is not None
+
+
 def compute_locator(tx_id):
     """
     Computes an appointment locator given a transaction id.

@@ -23,7 +23,7 @@ from apps.cli import (
 from common.logger import Logger
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
-from common.tools import check_sha256_hex_format, compute_locator
+from common.tools import check_sha256_hex_format, check_locator_format, compute_locator
 
 
 HTTP_OK = 200
@@ -256,7 +256,7 @@ def check_signature(signature, appointment):
 def get_appointment(args):
     if not args:
         logger.error("No arguments were given")
-        return False
+        return None
 
     arg_opt = args.pop(0)
 
@@ -264,27 +264,27 @@ def get_appointment(args):
         sys.exit(help_get_appointment())
     else:
         locator = arg_opt
-        valid_locator = check_sha256_hex_format(locator)
+        valid_locator = check_locator_format(locator)
 
     if not valid_locator:
         logger.error("The provided locator is not valid", locator=locator)
-        return False
+        return None
 
     get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
     parameters = "?locator={}".format(locator)
 
     try:
         r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
-        logger.info("Appointment response returned from server: " + str(r))
-        return True
+        logger.info("Appointment response returned from server: {}".format(r.json()))
+        return r.json()
 
     except ConnectTimeout:
         logger.error("Can't connect to pisa API. Connection timeout")
-        return False
+        return None
 
     except ConnectionError:
         logger.error("Can't connect to pisa API. Server cannot be reached")
-        return False
+        return None
 
 
 def get_appointment_signature(appointment):
