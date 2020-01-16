@@ -53,7 +53,7 @@ dummy_appointment_request = {
 
 # This is the format appointment turns into once it hits "add_appointment"
 dummy_appointment_full = {
-    "locator": get_random_value_hex(32),
+    "locator": get_random_value_hex(16),
     "start_time": 1500,
     "end_time": 50000,
     "to_self_delay": 200,
@@ -244,7 +244,7 @@ def test_get_appointment():
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == request_url
 
-    assert result
+    assert result.get("locator") == response.get("locator")
 
 
 @responses.activate
