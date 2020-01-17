@@ -213,7 +213,11 @@ class Responder:
             logger.warning(
                 "Tracker cannot be created", reason=receipt.reason, uuid=uuid, on_sync=self.on_sync(block_hash)
             )
-            pass
+
+            # FIXME: This is only necessary because of the triggered appointment approach. Remove if it changes.
+            self.db_manager.delete_watcher_appointment(uuid)
+            self.db_manager.delete_triggered_appointment_flag(uuid)
+            Cleaner.update_delete_locator_map(locator, uuid, self.db_manager)
 
         return receipt
 
