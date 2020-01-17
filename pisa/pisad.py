@@ -84,6 +84,7 @@ if __name__ == "__main__":
         pass
 
     pisa_config = load_config(conf)
+    db_manager = DBManager(pisa_config.get("DB_PATH"))
 
     if not can_connect_to_bitcoind():
         logger.error("Can't connect to bitcoind. Shutting down")
@@ -93,8 +94,6 @@ if __name__ == "__main__":
 
     else:
         try:
-            db_manager = DBManager(pisa_config.get("DB_PATH"))
-
             # Create the chain monitor and start monitoring the chain
             chain_monitor = ChainMonitor()
             chain_monitor.monitor_chain()
