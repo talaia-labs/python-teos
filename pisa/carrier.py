@@ -63,8 +63,8 @@ class Carrier:
             # Since we're pushing a raw transaction to the network we can face several rejections
             if errno == RPC_VERIFY_REJECTED:
                 # DISCUSS: 37-transaction-rejection
-                # TODO: UNKNOWN_JSON_RPC_EXCEPTION is not the proper exception here. This is long due.
-                receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
+                receipt = Receipt(delivered=False, reason=RPC_VERIFY_REJECTED)
+                logger.error("Transaction couldn't be broadcast", error=e.error)
 
             elif errno == RPC_VERIFY_ERROR:
                 # DISCUSS: 37-transaction-rejection
