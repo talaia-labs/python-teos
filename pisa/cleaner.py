@@ -118,15 +118,19 @@ class Cleaner:
             db_manager.delete_triggered_appointment_flag(uuid)
 
             # Update / delete the locator map
-            locator_map = db_manager.load_locator_map(locator)
-            if locator_map is not None:
-                if uuid in locator_map:
-                    if len(locator_map) == 1:
-                        db_manager.delete_locator_map(locator)
-                    else:
-                        locator_map.remove(uuid)
-                        db_manager.store_update_locator_map(locator, locator_map)
+            Cleaner.update_delete_locator_map(locator, uuid, db_manager)
+
+    @staticmethod
+    def update_delete_locator_map(locator, uuid, db_manager):
+        locator_map = db_manager.load_locator_map(locator)
+        if locator_map is not None:
+            if uuid in locator_map:
+                if len(locator_map) == 1:
+                    db_manager.delete_locator_map(locator)
                 else:
-                    logger.error("UUID not found in the db", uuid=uuid)
+                    locator_map.remove(uuid)
+                    db_manager.store_update_locator_map(locator, locator_map)
             else:
-                logger.error("Locator not found in the db", uuid=uuid)
+                logger.error("UUID not found in the db", uuid=uuid)
+        else:
+            logger.error("Locator not found in the db", uuid=uuid)
