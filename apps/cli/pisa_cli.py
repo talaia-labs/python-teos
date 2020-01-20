@@ -61,13 +61,13 @@ def load_key_file_data(file_name):
             key = key_file.read()
         return key
 
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         logger.error("Client's key file not found. Please check your settings.")
-        return False
+        raise e
 
     except IOError as e:
         logger.error("I/O error({}): {}".format(e.errno, e.strerror))
-        return False
+        raise e
 
 
 # Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
