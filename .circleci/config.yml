@@ -53,6 +53,7 @@ jobs:
           command: |
             cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
             cp test/pisa/e2e/conf.py bitcoin_sandbox/bitcoin_sandbox/
+            cp bitcoin_sandbox/docker/Dockerfile_ubuntu_no_ln bitcoin_sandbox/Dockerfile
             . venv/bin/activate
             cd bitcoin_sandbox && python -m bitcoin_sandbox.run_scenarios
 
