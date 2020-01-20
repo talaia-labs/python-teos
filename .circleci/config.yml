@@ -52,7 +52,7 @@ jobs:
           name: Build bitcoin_sandbox
           command: |
             cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
-            cp test/pisa/e2e/conf.py bitcoin_sandbox/bitcoin_sandbox/
+            cp test/pisa/e2e/sandbox-conf.py bitcoin_sandbox/bitcoin_sandbox/conf.py
             cp bitcoin_sandbox/docker/Dockerfile_ubuntu_no_ln bitcoin_sandbox/Dockerfile
             . venv/bin/activate
             cd bitcoin_sandbox && python -m bitcoin_sandbox.run_scenarios
@@ -80,6 +80,25 @@ jobs:
           command: |
             . venv/bin/activate
             pytest test/apps/cli/unit
+
+      # Setup pisa for E2E testing
+      - run:
+          name: Setup pisa
+          command: |
+            . venv/bin/activate
+            cp test/pisa/e2e/pisa-conf.py pisa/conf.py
+            cd apps/
+            python3 -m generate_key
+            python3 -m generate_key -n cli
+
+
+      # Run E2E tests
+      - run:
+          name: Run e2e tests
+          command: |
+            . venv/bin/activate
+            python3 -m pisa.pisad &
+            pytest test/pisa/e2e/
 
       # - store_artifacts:
       #    path: test-reports
