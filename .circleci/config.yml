@@ -32,7 +32,8 @@ jobs:
           command: |
             python3 -m venv venv
             . venv/bin/activate
-            pip install -r pisa/requirements.txt  
+            sudo pip install --upgrade pip
+            pip install -r pisa/requirements.txt
             pip install -r pisa/requirements-dev.txt
             pip install -r apps/cli/requirements-dev.txt
 
@@ -41,11 +42,20 @@ jobs:
             - ./venv
           key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}
 
-      # run tests!
-      # this example uses Django's built-in test-runner
-      # other common Python testing frameworks include pytest and nose
-      # https://pytest.org
-      # https://nose.readthedocs.io
+      # Build docker env for E2E testing
+      - run:
+          name: build bitcoin_sandbox
+          command: |
+            git clone --single-branch --branch ln https://github.com/sr-gi/bitcoin_sandbox.git
+            . venv/bin/activate
+            pip install -r bitcoin_sandbox/requirements.txt
+            cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
+            cp test/pisa/e2e/conf.py bitcoin_sandbox/bitcoin_sandbox/
+            mv bitcoin_sandbox/bitcoin_sandbox venv/lib/python3.6/site-packages
+            python venv/lib/python3.6/site-packages/bitcoin_sandbox/run_scenarios.py
+
+
+      # Run unit tests
       - run:
           name: create config
           command: cp pisa/sample_conf.py pisa/conf.py
