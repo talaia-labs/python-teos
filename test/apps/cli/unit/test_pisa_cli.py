@@ -1,3 +1,4 @@
+import pytest
 import responses
 import json
 import os
@@ -150,8 +151,8 @@ def test_load_key_file_data():
     os.remove("key_test_file")
 
     # If file doesn't exist, function should fail.
-    appt_data = pisa_cli.load_key_file_data("nonexistent_file")
-    assert not appt_data
+    with pytest.raises(FileNotFoundError):
+        assert pisa_cli.load_key_file_data("nonexistent_file")
 
 
 def test_save_signed_appointment(monkeypatch):
