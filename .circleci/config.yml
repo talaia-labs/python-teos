@@ -5,10 +5,8 @@
 version: 2
 jobs:
   build:
-    docker:
-      # specify the version you desire here
-      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
-      - image: circleci/python:3.6.1
+    machine:
+      image: ubuntu-1604:201903-01
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
@@ -30,6 +28,7 @@ jobs:
       - run:
           name: install dependencies
           command: |
+            pyenv local 3.7.0
             python3 -m venv venv
             . venv/bin/activate
             sudo pip install --upgrade pip
@@ -51,8 +50,8 @@ jobs:
             pip install -r bitcoin_sandbox/requirements.txt
             cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
             cp test/pisa/e2e/conf.py bitcoin_sandbox/bitcoin_sandbox/
-            mv bitcoin_sandbox/bitcoin_sandbox venv/lib/python3.6/site-packages
-            python venv/lib/python3.6/site-packages/bitcoin_sandbox/run_scenarios.py
+            mv bitcoin_sandbox/bitcoin_sandbox venv/lib/python3.7/site-packages
+            python venv/lib/python3.7/site-packages/bitcoin_sandbox/run_scenarios.py
 
 
       # Run unit tests
