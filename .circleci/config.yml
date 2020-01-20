@@ -20,7 +20,7 @@ jobs:
 
       # Get bitcoin_sandbox
       - run:
-          name: get bitcoin_sandbox
+          name: Get bitcoin_sandbox
           command: git clone --single-branch --branch ln https://github.com/sr-gi/bitcoin_sandbox.git
 
       # Download and cache dependencies
@@ -31,7 +31,7 @@ jobs:
             - v2-dependencies-
 
       - run:
-          name: install dependencies
+          name: Install dependencies
           command: |
             pyenv local 3.7.0
             python3 -m venv venv
@@ -49,7 +49,7 @@ jobs:
 
       # Build docker env for E2E testing
       - run:
-          name: build bitcoin_sandbox
+          name: Build bitcoin_sandbox
           command: |
             cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
             cp test/pisa/e2e/conf.py bitcoin_sandbox/bitcoin_sandbox/
@@ -60,23 +60,23 @@ jobs:
 
       # Run unit tests
       - run:
-          name: create config
+          name: Create pisa config
           command: cp pisa/sample_conf.py pisa/conf.py
 
       - run:
-          name: run pisa unit tests
+          name: Run pisa unit tests
           command: |
             . venv/bin/activate
             pytest test/pisa/unit/
 
       - run:
-          name: run common unit tests
+          name: Run common unit tests
           command: |
             . venv/bin/activate
             pytest test/common/unit
 
       - run:
-          name: run cli unit tests
+          name: Run cli unit tests
           command: |
             . venv/bin/activate
             pytest test/apps/cli/unit
