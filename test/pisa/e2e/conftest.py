@@ -18,6 +18,7 @@ def bitcoin_cli():
 
 @pytest.fixture()
 def create_txs(bitcoin_cli):
+    set_up_node(bitcoin_cli)
     utxos = bitcoin_cli.listunspent()
 
     if len(utxos) == 0:
@@ -52,6 +53,12 @@ def create_txs(bitcoin_cli):
         raise ValueError("Couldn't sign orphan transaction. {}".format(signed_commitment_tx))
 
     return signed_commitment_tx.get("hex"), signed_penalty_tx.get("hex")
+
+
+def set_up_node(bitcoin_cli):
+    # This method will create a new address a mine bitcoin so the node can be used for testing
+    new_addr = bitcoin_cli.getnewaddress()
+    bitcoin_cli.generatetoaddress(101, new_addr)
 
 
 def build_appointment_data(bitcoin_cli, commitment_tx, penalty_tx):
