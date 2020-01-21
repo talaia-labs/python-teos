@@ -171,23 +171,68 @@ def test_load_locator_map_empty(db_manager):
     assert db_manager.load_locator_map(get_random_value_hex(LOCATOR_LEN_BYTES)) is None
 
 
-def test_store_update_locator_map_empty(db_manager):
+def test_create_append_locator_map(db_manager):
     uuid = uuid4().hex
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-    db_manager.store_update_locator_map(locator, uuid)
+    db_manager.create_append_locator_map(locator, uuid)
 
     # Check that the locator map has been properly stored
     assert db_manager.load_locator_map(locator) == [uuid]
 
     # If we try to add the same uuid again the list shouldn't change
-    db_manager.store_update_locator_map(locator, uuid)
+    db_manager.create_append_locator_map(locator, uuid)
     assert db_manager.load_locator_map(locator) == [uuid]
 
     # Add another uuid to the same locator and check that it also works
     uuid2 = uuid4().hex
-    db_manager.store_update_locator_map(locator, uuid2)
+    db_manager.create_append_locator_map(locator, uuid2)
 
     assert set(db_manager.load_locator_map(locator)) == set([uuid, uuid2])
+
+
+def test_update_locator_map(db_manager):
+    # Let's create a couple of appointments with the same locator
+    locator = get_random_value_hex(32)
+    uuid1 = uuid4().hex
+    uuid2 = uuid4().hex
+    db_manager.create_append_locator_map(locator, uuid1)
+    db_manager.create_append_locator_map(locator, uuid2)
+
+    locator_map = db_manager.load_locator_map(locator)
+    assert uuid1 in locator_map
+
+    locator_map.remove(uuid1)
+    db_manager.update_locator_map(locator, locator_map)
+
+    locator_map_after = db_manager.load_locator_map(locator)
+    assert uuid1 not in locator_map_after and uuid2 in locator_map_after and len(locator_map_after) == 1
+
+
+def test_update_locator_map_wong_data(db_manager):
+    # Let's try to update the locator map with a different list of uuids
+    locator = get_random_value_hex(32)
+    db_manager.create_append_locator_map(locator, uuid4().hex)
+    db_manager.create_append_locator_map(locator, uuid4().hex)
+
+    locator_map = db_manager.load_locator_map(locator)
+    wrong_map_update = [uuid4().hex]
+    db_manager.update_locator_map(locator, wrong_map_update)
+    locator_map_after = db_manager.load_locator_map(locator)
+
+    assert locator_map_after == locator_map
+
+
+def test_update_locator_map_empty(db_manager):
+    # We shouldn't be able to update a map with an empty list
+    locator = get_random_value_hex(32)
+    db_manager.create_append_locator_map(locator, uuid4().hex)
+    db_manager.create_append_locator_map(locator, uuid4().hex)
+
+    locator_map = db_manager.load_locator_map(locator)
+    db_manager.update_locator_map(locator, [])
+    locator_map_after = db_manager.load_locator_map(locator)
+
+    assert locator_map_after == locator_map
 
 
 def test_delete_locator_map(db_manager):

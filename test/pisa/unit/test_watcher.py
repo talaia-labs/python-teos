@@ -140,7 +140,7 @@ def test_do_watch(watcher):
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
         watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
-        watcher.db_manager.store_update_locator_map(appointment.locator, uuid)
+        watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
     Thread(target=watcher.do_watch, daemon=True).start()
 
@@ -190,7 +190,7 @@ def test_filter_valid_breaches_random_data(watcher):
         uuid = uuid4().hex
         appointments[uuid] = {"locator": dummy_appointment.locator, "end_time": dummy_appointment.end_time}
         watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
-        watcher.db_manager.store_update_locator_map(dummy_appointment.locator, uuid)
+        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
         locator_uuid_map[dummy_appointment.locator] = [uuid]
 
@@ -201,9 +201,10 @@ def test_filter_valid_breaches_random_data(watcher):
     watcher.locator_uuid_map = locator_uuid_map
     watcher.appointments = appointments
 
-    filtered_valid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
 
-    assert not any([fil_breach["valid_breach"] for uuid, fil_breach in filtered_valid_breaches.items()])
+    # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
+    assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
 
 
 def test_filter_valid_breaches(watcher):
@@ -229,10 +230,11 @@ def test_filter_valid_breaches(watcher):
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
         watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
-        watcher.db_manager.store_update_locator_map(dummy_appointment.locator, uuid)
+        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
     watcher.locator_uuid_map = locator_uuid_map
 
-    filtered_valid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
 
-    assert all([fil_breach["valid_breach"] for uuid, fil_breach in filtered_valid_breaches.items()])
+    # We have "triggered" a single breach and it was valid.
+    assert len(invalid_breaches) == 0 and len(valid_breaches) == 1

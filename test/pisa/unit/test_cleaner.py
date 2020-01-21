@@ -4,7 +4,6 @@ from uuid import uuid4
 from pisa.responder import TransactionTracker
 from pisa.cleaner import Cleaner
 from common.appointment import Appointment
-from pisa.db_manager import WATCHER_PREFIX, TRIGGERED_APPOINTMENTS_PREFIX
 
 from test.pisa.unit.conftest import get_random_value_hex
 
@@ -16,7 +15,6 @@ MAX_ITEMS = 100
 ITERATIONS = 10
 
 
-# WIP: FIX CLEANER TESTS AFTER ADDING delete_complete_appointment
 def set_up_appointments(db_manager, total_appointments):
     appointments = dict()
     locator_uuid_map = dict()
@@ -30,7 +28,7 @@ def set_up_appointments(db_manager, total_appointments):
         locator_uuid_map[locator] = [uuid]
 
         db_manager.store_watcher_appointment(uuid, appointment.to_json())
-        db_manager.store_update_locator_map(locator, uuid)
+        db_manager.create_append_locator_map(locator, uuid)
 
         # Each locator can have more than one uuid assigned to it.
         if i % 2:
@@ -40,7 +38,7 @@ def set_up_appointments(db_manager, total_appointments):
             locator_uuid_map[locator].append(uuid)
 
             db_manager.store_watcher_appointment(uuid, appointment.to_json())
-            db_manager.store_update_locator_map(locator, uuid)
+            db_manager.create_append_locator_map(locator, uuid)
 
     return appointments, locator_uuid_map
 
@@ -63,7 +61,7 @@ def set_up_trackers(db_manager, total_trackers):
         tx_tracker_map[penalty_txid] = [uuid]
 
         db_manager.store_responder_tracker(uuid, tracker.to_json())
-        db_manager.store_update_locator_map(tracker.locator, uuid)
+        db_manager.create_append_locator_map(tracker.locator, uuid)
 
         # Each penalty_txid can have more than one uuid assigned to it.
         if i % 2:
@@ -73,9 +71,47 @@ def set_up_trackers(db_manager, total_trackers):
             tx_tracker_map[penalty_txid].append(uuid)
 
             db_manager.store_responder_tracker(uuid, tracker.to_json())
-            db_manager.store_update_locator_map(tracker.locator, uuid)
+            db_manager.create_append_locator_map(tracker.locator, uuid)
 
     return trackers, tx_tracker_map
+
+
+def test_delete_appointment_from_memory(db_manager):
+    appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
+
+    for uuid in list(appointments.keys()):
+        Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
+
+        # The appointment should have been deleted from memory, but not from the db
+        assert uuid not in appointments
+        assert db_manager.load_watcher_appointment(uuid) is not None
+
+
+def test_delete_appointment_from_db(db_manager):
+    appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
+
+    for uuid in list(appointments.keys()):
+        Cleaner.delete_appointment_from_db(uuid, db_manager)
+
+        # The appointment should have been deleted from memory, but not from the db
+        assert uuid in appointments
+        assert db_manager.load_watcher_appointment(uuid) is None
+
+
+def test_update_delete_db_locator_map(db_manager):
+    appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
+
+    for uuid, appointment in appointments.items():
+        locator = appointment.get("locator")
+        locator_map_before = db_manager.load_locator_map(locator)
+        Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
+        locator_map_after = db_manager.load_locator_map(locator)
+
+        if locator_map_after is None:
+            assert locator_map_before is not None
+
+        else:
+            assert uuid in locator_map_before and uuid not in locator_map_after
 
 
 def test_delete_expired_appointment(db_manager):
@@ -83,24 +119,41 @@ def test_delete_expired_appointment(db_manager):
         appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
         expired_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-        Cleaner.delete_expired_appointment(expired_appointments, appointments, locator_uuid_map, db_manager)
+        Cleaner.delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager)
 
         assert not set(expired_appointments).issubset(appointments.keys())
 
 
 def test_delete_completed_appointments(db_manager):
-    appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
-    uuids = list(appointments.keys())
+    for _ in range(ITERATIONS):
+        appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
+        completed_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-    for uuid in uuids:
-        Cleaner.delete_completed_appointment(uuid, appointments, locator_uuid_map, db_manager)
+        len_before_clean = len(appointments)
+        Cleaner.delete_completed_appointments(completed_appointments, appointments, locator_uuid_map, db_manager)
 
-    # All appointments should have been deleted
-    assert len(appointments) == 0
+        # ITEMS appointments should have been deleted from memory
+        assert len(appointments) == len_before_clean - ITEMS
 
-    # Make sure that all appointments are flagged as triggered in the db
-    for uuid in uuids:
-        assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8")) is not None
+        # Make sure they are not in the db either
+        db_appointments = db_manager.load_watcher_appointments(include_triggered=True)
+        assert not set(completed_appointments).issubset(db_appointments)
+
+
+def test_flag_triggered_appointments(db_manager):
+    for _ in range(ITERATIONS):
+        appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
+        triggered_appointments = random.sample(list(appointments.keys()), k=ITEMS)
+
+        len_before_clean = len(appointments)
+        Cleaner.flag_triggered_appointments(triggered_appointments, appointments, locator_uuid_map, db_manager)
+
+        # ITEMS appointments should have been deleted from memory
+        assert len(appointments) == len_before_clean - ITEMS
+
+        # Make sure that all appointments are flagged as triggered in the db
+        db_appointments = db_manager.load_all_triggered_flags()
+        assert set(triggered_appointments).issubset(db_appointments)
 
 
 def test_delete_completed_trackers_db_match(db_manager):
