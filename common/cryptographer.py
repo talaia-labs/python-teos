@@ -123,7 +123,7 @@ class Cryptographer:
         nonce = bytearray(12)
 
         logger.info(
-            "Decrypting Blob",
+            "Decrypting blob",
             sk=hexlify(sk).decode(),
             nonce=hexlify(nonce).decode(),
             encrypted_blob=encrypted_blob.data,
@@ -142,6 +142,7 @@ class Cryptographer:
 
         except InvalidTag:
             blob = None
+            logger.error("Can't decrypt blob with the provided key")
 
         return blob
 
