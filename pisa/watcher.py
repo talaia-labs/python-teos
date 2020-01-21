@@ -124,7 +124,7 @@ class Watcher:
                 logger.info("Waking up")
 
             self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
-            self.db_manager.store_update_locator_map(appointment.locator, uuid)
+            self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
             appointment_added = True
             signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
@@ -164,36 +164,37 @@ class Watcher:
                     if block["height"] > appointment_data.get("end_time") + self.config.get("EXPIRY_DELTA")
                 ]
 
-                Cleaner.delete_expired_appointment(
+                Cleaner.delete_expired_appointments(
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                filtered_breaches = self.filter_valid_breaches(self.get_breaches(txids))
+                valid_breaches, invalid_breaches = self.filter_valid_breaches(self.get_breaches(txids))
 
-                for uuid, filtered_breach in filtered_breaches.items():
-                    # Errors decrypting the Blob will result in a None penalty_txid
-                    if filtered_breach["valid_breach"] is True:
-                        logger.info(
-                            "Notifying responder and deleting appointment",
-                            penalty_txid=filtered_breach["penalty_txid"],
-                            locator=filtered_breach["locator"],
-                            uuid=uuid,
-                        )
-
-                        self.responder.handle_breach(
-                            uuid,
-                            filtered_breach["locator"],
-                            filtered_breach["dispute_txid"],
-                            filtered_breach["penalty_txid"],
-                            filtered_breach["penalty_rawtx"],
-                            self.appointments[uuid].get("end_time"),
-                            block_hash,
-                        )
-
-                    # Delete the appointment and update db
-                    Cleaner.delete_completed_appointment(
-                        uuid, self.appointments, self.locator_uuid_map, self.db_manager
+                for uuid, breach in valid_breaches.items():
+                    logger.info(
+                        "Notifying responder and deleting appointment",
+                        penalty_txid=breach["penalty_txid"],
+                        locator=breach["locator"],
+                        uuid=uuid,
                     )
+
+                    self.responder.handle_breach(
+                        uuid,
+                        breach["locator"],
+                        breach["dispute_txid"],
+                        breach["penalty_txid"],
+                        breach["penalty_rawtx"],
+                        self.appointments[uuid].get("end_time"),
+                        block_hash,
+                    )
+
+                Cleaner.flag_triggered_appointments(
+                    list(valid_breaches.keys()), self.appointments, self.locator_uuid_map, self.db_manager
+                )
+
+                Cleaner.delete_completed_appointments(
+                    invalid_breaches, self.appointments, self.locator_uuid_map, self.db_manager
+                )
 
                 # Register the last processed block for the watcher
                 self.db_manager.store_last_block_hash_watcher(block_hash)
@@ -248,7 +249,8 @@ class Watcher:
             ``{locator, dispute_txid, penalty_txid, penalty_rawtx, valid_breach}``
         """
 
-        filtered_breaches = {}
+        valid_breaches = {}
+        invalid_breaches = []
 
         for locator, dispute_txid in breaches.items():
             for uuid in self.locator_uuid_map[locator]:
@@ -263,21 +265,18 @@ class Watcher:
                 penalty_tx = BlockProcessor.decode_raw_transaction(penalty_rawtx)
 
                 if penalty_tx is not None:
-                    penalty_txid = penalty_tx.get("txid")
-                    valid_breach = True
+                    valid_breaches[uuid] = {
+                        "locator": locator,
+                        "dispute_txid": dispute_txid,
+                        "penalty_txid": penalty_tx.get("txid"),
+                        "penalty_rawtx": penalty_rawtx,
+                    }
 
-                    logger.info("Breach found for locator", locator=locator, uuid=uuid, penalty_txid=penalty_txid)
+                    logger.info(
+                        "Breach found for locator", locator=locator, uuid=uuid, penalty_txid=penalty_tx.get("txid")
+                    )
 
                 else:
-                    penalty_txid = None
-                    valid_breach = False
+                    invalid_breaches.append(uuid)
 
-                filtered_breaches[uuid] = {
-                    "locator": locator,
-                    "dispute_txid": dispute_txid,
-                    "penalty_txid": penalty_txid,
-                    "penalty_rawtx": penalty_rawtx,
-                    "valid_breach": valid_breach,
-                }
-
-        return filtered_breaches
+        return valid_breaches, invalid_breaches
