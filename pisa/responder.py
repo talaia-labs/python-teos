@@ -215,9 +215,8 @@ class Responder:
             )
 
             # FIXME: This is only necessary because of the triggered appointment approach. Remove if it changes.
-            self.db_manager.delete_watcher_appointment(uuid)
-            self.db_manager.delete_triggered_appointment_flag(uuid)
-            Cleaner.update_delete_locator_map(locator, uuid, self.db_manager)
+            Cleaner.delete_appointment_from_db(uuid, self.db_manager)
+            Cleaner.update_delete_db_locator_map(uuid, locator, self.db_manager)
 
         return receipt
 
