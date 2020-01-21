@@ -121,11 +121,8 @@ def add_appointment(args):
 
     data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
-    appointment_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
-
     # Send appointment to the server.
-    add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
-    response_json = post_data_to_add_appointment_endpoint(add_appointment_endpoint, appointment_json)
+    response_json = post_data_to_add_appointment_endpoint(data)
 
     if response_json is None:
         return False
@@ -193,11 +190,12 @@ def parse_add_appointment_args(args):
 
 
 # Sends appointment data to add_appointment endpoint to be processed by the server.
-def post_data_to_add_appointment_endpoint(add_appointment_endpoint, appointment_json):
+def post_data_to_add_appointment_endpoint(data):
     logger.info("Sending appointment to PISA")
 
     try:
-        r = requests.post(url=add_appointment_endpoint, json=appointment_json, timeout=5)
+        add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
+        r = requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
 
         response_json = r.json()
 
