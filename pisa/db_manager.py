@@ -195,6 +195,10 @@ class DBManager:
     def store_watcher_appointment(self, uuid, appointment):
         """
         Stores an appointment in the database using the ``WATCHER_PREFIX`` prefix.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the appointment to be stored.
+            appointment (:obj: `str`): the json encoded appointment to be stored as data.
         """
 
         self.create_entry(uuid, appointment, prefix=WATCHER_PREFIX)
@@ -203,6 +207,10 @@ class DBManager:
     def store_responder_tracker(self, uuid, tracker):
         """
         Stores a tracker in the database using the ``RESPONDER_PREFIX`` prefix.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the appointment to be stored.
+            tracker (:obj: `str`): the json encoded tracker to be stored as data.
         """
 
         self.create_entry(uuid, tracker, prefix=RESPONDER_PREFIX)
@@ -232,9 +240,9 @@ class DBManager:
 
         return locator_map
 
-    def store_update_locator_map(self, locator, uuid):
+    def create_append_locator_map(self, locator, uuid):
         """
-        Stores (or updates if already exists) a ``locator:uuid`` map.
+        Creates (or appends to if already exists) a ``locator:uuid`` map.
 
         If the map already exists, the new ``uuid`` is appended to the existing ones (if it is not already there).
 
@@ -259,6 +267,25 @@ class DBManager:
 
         key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
         self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+
+    def update_locator_map(self, locator, locator_map):
+        """
+        Updates a ``locator:uuid`` map in the database by deleting one of it's uuid. It will only work as long as
+        the given ``locator_map`` is a subset of the current one and it's not empty.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex-encoded string used as the key of the map.
+            locator_map (:obj:`list`): a list of uuids to replace the current one on the db.
+        """
+
+        current_locator_map = self.load_locator_map(locator)
+
+        if set(locator_map).issubset(current_locator_map) and len(locator_map) is not 0:
+            key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
+            self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+
+        else:
+            logger.error("Trying to update a locator_map with completely different, or empty, data")
 
     def delete_locator_map(self, locator):
         """
@@ -338,6 +365,9 @@ class DBManager:
     def create_triggered_appointment_flag(self, uuid):
         """
         Creates a flag that signals that an appointment has been triggered.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the flag to be created.
         """
 
         self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
@@ -358,6 +388,9 @@ class DBManager:
     def delete_triggered_appointment_flag(self, uuid):
         """
         Deletes a flag that signals that an appointment has been triggered.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the flag to be removed.
         """
 
         self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
