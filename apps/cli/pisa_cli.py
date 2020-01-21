@@ -62,7 +62,7 @@ def load_key_file_data(file_name):
         return key
 
     except FileNotFoundError as e:
-        logger.error("Client's key file not found. Please check your settings.")
+        logger.error("Client's key file not found. Please check your settings")
         raise e
 
     except IOError as e:
@@ -108,7 +108,7 @@ def add_appointment(args):
         appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(tx), tx_id)
 
     else:
-        logger.error("Appointment data is missing some fields.")
+        logger.error("Appointment data is missing some fields")
         return False
 
     appointment = Appointment.from_dict(appointment_data)
@@ -130,7 +130,7 @@ def add_appointment(args):
     signature = response_json.get("signature")
     # Check that the server signed the appointment as it should.
     if signature is None:
-        logger.error("The response does not contain the signature of the appointment.")
+        logger.error("The response does not contain the signature of the appointment")
         return False
 
     valid = check_signature(signature, appointment)
