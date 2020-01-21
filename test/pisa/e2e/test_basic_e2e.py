@@ -4,9 +4,12 @@ from riemann.tx import Tx
 
 from pisa import HOST, PORT
 from apps.cli import pisa_cli
-from pisa.utils.auth_proxy import JSONRPCException
+from apps.cli.blob import Blob
 from common.tools import compute_locator
-from test.pisa.e2e.conftest import END_TIME_DELTA, build_appointment_data
+from common.appointment import Appointment
+from common.cryptographer import Cryptographer
+from pisa.utils.auth_proxy import JSONRPCException
+from test.pisa.e2e.conftest import END_TIME_DELTA, build_appointment_data, get_random_value_hex
 
 # We'll use pisa_cli to add appointments. The expected input format is a list of arguments with a json-encoded
 # appointment
@@ -28,7 +31,8 @@ def get_appointment_info(locator):
 
 def test_appointment_life_cycle(bitcoin_cli, create_txs):
     commitment_tx, penalty_tx = create_txs
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx, penalty_tx)
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(appointment_data.get("tx_id"))
 
     assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
@@ -73,7 +77,8 @@ def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
     tx_in = mod_penalty_tx.tx_ins[0].copy(redeem_script=b"")
     mod_penalty_tx = mod_penalty_tx.copy(tx_ins=[tx_in])
 
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx, mod_penalty_tx.hex())
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, mod_penalty_tx.hex())
     locator = compute_locator(appointment_data.get("tx_id"))
 
     assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
@@ -85,6 +90,47 @@ def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
     # The appointment should have been removed since the penalty_tx was malformed.
     sleep(1)
     appointment_info = get_appointment_info(locator)
+
+    assert appointment_info is not None
+    assert len(appointment_info) == 1
+    assert appointment_info[0].get("status") == "not_found"
+
+
+def test_appointment_wrong_key(bitcoin_cli, create_txs):
+    # This tests an appointment encrypted with a key that has not been derived from the same source as the locator.
+    # Therefore the tower won't be able to decrypt the blob once the appointment is triggered.
+    commitment_tx, penalty_tx = create_txs
+
+    # The appointment data is built using a random 32-byte value.
+    appointment_data = build_appointment_data(bitcoin_cli, get_random_value_hex(32), penalty_tx)
+
+    # We can't use pisa_cli.add_appointment here since it computes the locator internally, so let's do it manually.
+    # We will encrypt the blob using the random value and derive the locator from the commitment tx.
+    appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), appointment_data.get("tx_id"))
+    appointment = Appointment.from_dict(appointment_data)
+
+    signature = pisa_cli.get_appointment_signature(appointment)
+    hex_pk_der = pisa_cli.get_pk()
+
+    data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
+
+    # Send appointment to the server.
+    response_json = pisa_cli.post_data_to_add_appointment_endpoint(data)
+
+    # Check that the server has accepted the appointment
+    signature = response_json.get("signature")
+    assert signature is not None
+    assert pisa_cli.check_signature(signature, appointment) is True
+    assert response_json.get("locator") == appointment.locator
+
+    # Trigger the appointment
+    new_addr = bitcoin_cli.getnewaddress()
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
+
+    # The appointment should have been removed since the decryption failed.
+    sleep(1)
+    appointment_info = get_appointment_info(appointment.locator)
 
     assert appointment_info is not None
     assert len(appointment_info) == 1
