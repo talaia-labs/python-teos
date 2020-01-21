@@ -42,7 +42,7 @@ pisa_cli.pisa_public_key = pisa_pk
 # Replace endpoint with dummy one
 pisa_cli.pisa_api_server = "dummy.com"
 pisa_cli.pisa_api_port = 12345
-pisa_endpoint = pisa_cli.pisa_api_server + ":" + str(pisa_cli.pisa_api_port)
+pisa_endpoint = "http://{}:{}/".format(pisa_cli.pisa_api_server, pisa_cli.pisa_api_port)
 
 dummy_appointment_request = {
     "tx": get_random_value_hex(192),
@@ -106,13 +106,12 @@ def test_add_appointment(monkeypatch):
 
     response = {"locator": dummy_appointment.to_dict()["locator"], "signature": get_dummy_signature()}
 
-    request_url = "http://{}/".format(pisa_endpoint)
-    responses.add(responses.POST, request_url, json=response, status=200)
+    responses.add(responses.POST, pisa_endpoint, json=response, status=200)
 
     result = pisa_cli.add_appointment([json.dumps(dummy_appointment_request)])
 
     assert len(responses.calls) == 1
-    assert responses.calls[0].request.url == request_url
+    assert responses.calls[0].request.url == pisa_endpoint
 
     assert result
 
@@ -132,8 +131,7 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
         "signature": get_bad_signature(),  # Sign with a bad key
     }
 
-    request_url = "http://{}/".format(pisa_endpoint)
-    responses.add(responses.POST, request_url, json=response, status=200)
+    responses.add(responses.POST, pisa_endpoint, json=response, status=200)
 
     result = pisa_cli.add_appointment([json.dumps(dummy_appointment_request)])
 
@@ -207,13 +205,12 @@ def test_post_data_to_add_appointment_endpoint():
         "signature": Cryptographer.sign(dummy_appointment.serialize(), pisa_sk),
     }
 
-    request_url = "http://{}/".format(pisa_endpoint)
-    responses.add(responses.POST, request_url, json=response, status=200)
+    responses.add(responses.POST, pisa_endpoint, json=response, status=200)
 
-    response = pisa_cli.post_data_to_add_appointment_endpoint(request_url, json.dumps(dummy_appointment_request))
+    response = pisa_cli.post_data_to_add_appointment_endpoint(json.dumps(dummy_appointment_request))
 
     assert len(responses.calls) == 1
-    assert responses.calls[0].request.url == request_url
+    assert responses.calls[0].request.url == pisa_endpoint
 
     assert response
 
@@ -237,7 +234,7 @@ def test_get_appointment():
     dummy_appointment_full["status"] = "being_watched"
     response = dummy_appointment_full
 
-    request_url = "http://{}/".format(pisa_endpoint) + "get_appointment?locator={}".format(response.get("locator"))
+    request_url = "{}get_appointment?locator={}".format(pisa_endpoint, response.get("locator"))
     responses.add(responses.GET, request_url, json=response, status=200)
 
     result = pisa_cli.get_appointment([response.get("locator")])
@@ -253,7 +250,7 @@ def test_get_appointment_err():
     locator = get_random_value_hex(32)
 
     # Test that get_appointment handles a connection error appropriately.
-    request_url = "http://{}/".format(pisa_endpoint) + "get_appointment?locator=".format(locator)
+    request_url = "{}get_appointment?locator=".format(pisa_endpoint, locator)
     responses.add(responses.GET, request_url, body=ConnectionError())
 
     assert not pisa_cli.get_appointment([locator])
