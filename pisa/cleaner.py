@@ -127,8 +127,8 @@ class Cleaner:
                 "Appointment cannot be completed, it contains invalid data. Deleting", locator=locator, uuid=uuid
             )
 
+            db_manager.delete_watcher_appointment(uuid)
             Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
-            Cleaner.delete_appointment_from_db(uuid, db_manager)
             Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
 
     @staticmethod
@@ -190,7 +190,8 @@ class Cleaner:
 
             # Delete appointment from the db (from watchers's and responder's db) and remove flag
             db_manager.delete_responder_tracker(uuid)
-            Cleaner.delete_appointment_from_db(uuid, db_manager)
+            db_manager.delete_watcher_appointment(uuid)
+            db_manager.delete_triggered_appointment_flag(uuid)
 
             # Update / delete the locator map
             Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
