@@ -9,7 +9,7 @@ getcontext().prec = 10
 END_TIME_DELTA = 10
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def bitcoin_cli():
     # return AuthServiceProxy("http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST, 18444))
     return AuthServiceProxy(
@@ -22,15 +22,15 @@ def prng_seed():
     random.seed(0)
 
 
-def get_random_value_hex(nbytes):
-    pseudo_random_value = random.getrandbits(8 * nbytes)
-    prv_hex = "{:x}".format(pseudo_random_value)
-    return prv_hex.zfill(2 * nbytes)
+@pytest.fixture(scope="session", autouse=True)
+def setup_node(bitcoin_cli):
+    # This method will create a new address a mine bitcoin so the node can be used for testing
+    new_addr = bitcoin_cli.getnewaddress()
+    bitcoin_cli.generatetoaddress(101, new_addr)
 
 
 @pytest.fixture()
 def create_txs(bitcoin_cli):
-    set_up_node(bitcoin_cli)
     utxos = bitcoin_cli.listunspent()
 
     if len(utxos) == 0:
@@ -40,8 +40,27 @@ def create_txs(bitcoin_cli):
     while utxo.get("amount") < Decimal(2 / pow(10, 5)):
         utxo = utxos.pop(0)
 
+    signed_commitment_tx = create_commitment_tx(bitcoin_cli, utxo)
+    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx)
+
+    signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
+
+    return signed_commitment_tx, signed_penalty_tx
+
+
+def get_random_value_hex(nbytes):
+    pseudo_random_value = random.getrandbits(8 * nbytes)
+    prv_hex = "{:x}".format(pseudo_random_value)
+    return prv_hex.zfill(2 * nbytes)
+
+
+def create_commitment_tx(bitcoin_cli, utxo, destination=None):
+    # We will set the recipient to ourselves is destination is None
+    if destination is None:
+        destination = utxo.get("address")
+
     commitment_tx_ins = {"txid": utxo.get("txid"), "vout": utxo.get("vout")}
-    commitment_tx_outs = {utxo.get("address"): utxo.get("amount") - Decimal(1 / pow(10, 5))}
+    commitment_tx_outs = {destination: utxo.get("amount") - Decimal(1 / pow(10, 5))}
 
     raw_commitment_tx = bitcoin_cli.createrawtransaction([commitment_tx_ins], commitment_tx_outs)
     signed_commitment_tx = bitcoin_cli.signrawtransactionwithwallet(raw_commitment_tx)
@@ -49,11 +68,16 @@ def create_txs(bitcoin_cli):
     if not signed_commitment_tx.get("complete"):
         raise ValueError("Couldn't sign transaction. {}".format(signed_commitment_tx))
 
-    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx.get("hex"))
+    return signed_commitment_tx.get("hex")
+
+
+def create_penalty_tx(bitcoin_cli, decoded_commitment_tx, destination=None):
+    # We will set the recipient to ourselves is destination is None
+    if destination is None:
+        destination = decoded_commitment_tx.get("vout")[0].get("scriptPubKey").get("addresses")[0]
 
     penalty_tx_ins = {"txid": decoded_commitment_tx.get("txid"), "vout": 0}
-    address = decoded_commitment_tx.get("vout")[0].get("scriptPubKey").get("addresses")[0]
-    penalty_tx_outs = {address: decoded_commitment_tx.get("vout")[0].get("value") - Decimal(1 / pow(10, 5))}
+    penalty_tx_outs = {destination: decoded_commitment_tx.get("vout")[0].get("value") - Decimal(1 / pow(10, 5))}
 
     orphan_info = {
         "txid": decoded_commitment_tx.get("txid"),
@@ -66,15 +90,9 @@ def create_txs(bitcoin_cli):
     signed_penalty_tx = bitcoin_cli.signrawtransactionwithwallet(raw_penalty_tx, [orphan_info])
 
     if not signed_penalty_tx.get("complete"):
-        raise ValueError("Couldn't sign orphan transaction. {}".format(signed_commitment_tx))
+        raise ValueError("Couldn't sign orphan transaction. {}".format(signed_penalty_tx))
 
-    return signed_commitment_tx.get("hex"), signed_penalty_tx.get("hex")
-
-
-def set_up_node(bitcoin_cli):
-    # This method will create a new address a mine bitcoin so the node can be used for testing
-    new_addr = bitcoin_cli.getnewaddress()
-    bitcoin_cli.generatetoaddress(101, new_addr)
+    return signed_penalty_tx.get("hex")
 
 
 def build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx):
