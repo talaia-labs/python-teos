@@ -148,7 +148,6 @@ class Cleaner:
         """
 
         for uuid in triggered_appointments:
-            logger.info("Flagging appointment as triggered", locator=appointments[uuid].get("locator"), uuid=uuid)
             Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
             db_manager.create_triggered_appointment_flag(uuid)
 

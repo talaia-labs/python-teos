@@ -30,6 +30,10 @@ class DBManager:
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
             database will be create if the specified path does not contain one.
+
+    Raises:
+        ValueError: If the provided ``db_path`` is not a string.
+        plyvel.Error: If the db is currently unavailable (being used by another process).
     """
 
     def __init__(self, db_path):
@@ -43,6 +47,10 @@ class DBManager:
             if "create_if_missing is false" in str(e):
                 logger.info("No db found. Creating a fresh one")
                 self.db = plyvel.DB(db_path, create_if_missing=True)
+
+            elif "LOCK: Resource temporarily unavailable" in str(e):
+                logger.info("The db is already being used by another process (LOCK)")
+                raise e
 
     def load_appointments_db(self, prefix):
         """
@@ -371,6 +379,7 @@ class DBManager:
         """
 
         self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
+        logger.info("Flagging appointment as triggered", uuid=uuid)
 
     def load_all_triggered_flags(self):
         """
@@ -394,3 +403,4 @@ class DBManager:
         """
 
         self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
+        logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
