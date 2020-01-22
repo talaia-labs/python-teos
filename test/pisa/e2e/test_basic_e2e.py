@@ -9,7 +9,7 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 from pisa.utils.auth_proxy import JSONRPCException
-from test.pisa.e2e.conftest import END_TIME_DELTA, build_appointment_data, get_random_value_hex
+from test.pisa.e2e.conftest import END_TIME_DELTA, build_appointment_data, get_random_value_hex, create_penalty_tx
 
 # We'll use pisa_cli to add appointments. The expected input format is a list of arguments with a json-encoded
 # appointment
@@ -33,7 +33,7 @@ def test_appointment_life_cycle(bitcoin_cli, create_txs):
     commitment_tx, penalty_tx = create_txs
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
-    locator = compute_locator(appointment_data.get("tx_id"))
+    locator = compute_locator(commitment_tx_id)
 
     assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
 
@@ -79,7 +79,7 @@ def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
 
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, mod_penalty_tx.hex())
-    locator = compute_locator(appointment_data.get("tx_id"))
+    locator = compute_locator(commitment_tx_id)
 
     assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
 
@@ -135,3 +135,68 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     assert appointment_info is not None
     assert len(appointment_info) == 1
     assert appointment_info[0].get("status") == "not_found"
+
+
+def test_two_identical_appointments(bitcoin_cli, create_txs):
+    # Tests sending two identical appointments to the tower.
+    # At the moment there are no checks for identical appointments, so both will be accepted, decrypted and kept until
+    # the end.
+    # TODO: 34-exact-duplicate-appointment
+    # This tests sending an appointment with two valid transaction with the same locator.
+    commitment_tx, penalty_tx = create_txs
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+
+    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    locator = compute_locator(commitment_tx_id)
+
+    # Send the appointment twice
+    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+
+    # Broadcast the commitment transaction and mine a block
+    new_addr = bitcoin_cli.getnewaddress()
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
+
+    # The first appointment should have made it to the Responder, and the second one should have been dropped for
+    # double-spending
+    sleep(1)
+    appointment_info = get_appointment_info(locator)
+
+    assert appointment_info is not None
+    assert len(appointment_info) == 2
+
+    for info in appointment_info:
+        assert info.get("status") == "dispute_responded"
+        assert info.get("penalty_rawtx") == penalty_tx
+
+
+def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs):
+    # This tests sending an appointment with two valid transaction with the same locator.
+    commitment_tx, penalty_tx1 = create_txs
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+
+    # We need to create a second penalty spending from the same commitment
+    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(commitment_tx)
+    new_addr = bitcoin_cli.getnewaddress()
+    penalty_tx2 = create_penalty_tx(bitcoin_cli, decoded_commitment_tx, new_addr)
+
+    appointment1_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx1)
+    appointment2_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx2)
+    locator = compute_locator(commitment_tx_id)
+
+    assert pisa_cli.add_appointment([json.dumps(appointment1_data)]) is True
+    assert pisa_cli.add_appointment([json.dumps(appointment2_data)]) is True
+
+    # Broadcast the commitment transaction and mine a block
+    new_addr = bitcoin_cli.getnewaddress()
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
+
+    # The first appointment should have made it to the Responder, and the second one should have been dropped for
+    # double-spending
+    sleep(1)
+    appointment_info = get_appointment_info(locator)
+
+    assert appointment_info is not None
+    assert len(appointment_info) == 1
+    assert appointment_info[0].get("status") == "dispute_responded"
+    assert appointment_info[0].get("penalty_rawtx") == penalty_tx1
