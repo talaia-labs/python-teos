@@ -178,7 +178,7 @@ class Watcher:
                         uuid=uuid,
                     )
 
-                    self.responder.handle_breach(
+                    receipt = self.responder.handle_breach(
                         uuid,
                         breach["locator"],
                         breach["dispute_txid"],
@@ -188,9 +188,16 @@ class Watcher:
                         block_hash,
                     )
 
-                Cleaner.flag_triggered_appointments(
-                    list(valid_breaches.keys()), self.appointments, self.locator_uuid_map, self.db_manager
-                )
+                    Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
+
+                    # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
+                    # FIXME: This is only necessary because of the triggered appointment approach. Fix if it changes.
+                    if receipt.delivered:
+                        self.db_manager.create_triggered_appointment_flag(uuid)
+
+                    else:
+                        self.db_manager.delete_watcher_appointment(uuid)
+                        Cleaner.update_delete_db_locator_map(uuid, breach["locator"], self.db_manager)
 
                 Cleaner.delete_completed_appointments(
                     invalid_breaches, self.appointments, self.locator_uuid_map, self.db_manager

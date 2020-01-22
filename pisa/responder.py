@@ -214,10 +214,6 @@ class Responder:
                 "Tracker cannot be created", reason=receipt.reason, uuid=uuid, on_sync=self.on_sync(block_hash)
             )
 
-            # FIXME: This is only necessary because of the triggered appointment approach. Remove if it changes.
-            Cleaner.delete_appointment_from_db(uuid, self.db_manager)
-            Cleaner.update_delete_db_locator_map(uuid, locator, self.db_manager)
-
         return receipt
 
     def add_tracker(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations=0):
