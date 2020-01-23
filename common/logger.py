@@ -1,7 +1,6 @@
 import json
+import logging
 from datetime import datetime
-
-from pisa import f_logger, c_logger
 
 
 class _StructuredMessage:
@@ -22,8 +21,10 @@ class Logger:
         actor (:obj:`str`): the system actor that is logging the event (e.g. ``Watcher``, ``Cryptographer``, ...).
     """
 
-    def __init__(self, actor=None):
+    def __init__(self, log_name_prefix, actor=None):
         self.actor = actor
+        self.f_logger = logging.getLogger("{}_file_log".format(log_name_prefix))
+        self.c_logger = logging.getLogger("{}_console_log".format(log_name_prefix))
 
     def _add_prefix(self, msg):
         return msg if self.actor is None else "[{}]: {}".format(self.actor, msg)
@@ -54,8 +55,8 @@ class Logger:
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
-        f_logger.info(self._create_file_message(msg, **kwargs))
-        c_logger.info(self._create_console_message(msg, **kwargs))
+        self.f_logger.info(self._create_file_message(msg, **kwargs))
+        self.c_logger.info(self._create_console_message(msg, **kwargs))
 
     def debug(self, msg, **kwargs):
         """
@@ -66,8 +67,8 @@ class Logger:
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
-        f_logger.debug(self._create_file_message(msg, **kwargs))
-        c_logger.debug(self._create_console_message(msg, **kwargs))
+        self.f_logger.debug(self._create_file_message(msg, **kwargs))
+        self.c_logger.debug(self._create_console_message(msg, **kwargs))
 
     def error(self, msg, **kwargs):
         """
@@ -78,8 +79,8 @@ class Logger:
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
-        f_logger.error(self._create_file_message(msg, **kwargs))
-        c_logger.error(self._create_console_message(msg, **kwargs))
+        self.f_logger.error(self._create_file_message(msg, **kwargs))
+        self.c_logger.error(self._create_console_message(msg, **kwargs))
 
     def warning(self, msg, **kwargs):
         """
@@ -90,5 +91,5 @@ class Logger:
              kwargs: a ``key:value`` collection parameters to be added to the output.
         """
 
-        f_logger.warning(self._create_file_message(msg, **kwargs))
-        c_logger.warning(self._create_console_message(msg, **kwargs))
+        self.f_logger.warning(self._create_file_message(msg, **kwargs))
+        self.c_logger.warning(self._create_console_message(msg, **kwargs))
