@@ -1,8 +1,10 @@
 import pytest
 import random
+from multiprocessing import Process
 from decimal import Decimal, getcontext
 
 import pisa.conf as conf
+from pisa.pisad import main
 from pisa.utils.auth_proxy import AuthServiceProxy
 
 getcontext().prec = 10
@@ -46,6 +48,13 @@ def create_txs(bitcoin_cli):
     signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
 
     return signed_commitment_tx, signed_penalty_tx
+
+
+def run_pisad():
+    pisad_process = Process(target=main, daemon=True)
+    pisad_process.start()
+
+    return pisad_process
 
 
 def get_random_value_hex(nbytes):
