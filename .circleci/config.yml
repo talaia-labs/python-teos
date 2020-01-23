@@ -60,8 +60,10 @@ jobs:
 
       # Run unit tests
       - run:
-          name: Create pisa config
-          command: cp pisa/sample_conf.py pisa/conf.py
+          name: Creates config files
+          command: |
+            cp pisa/sample_conf.py pisa/conf.py
+            cp apps/cli/sample_conf.py apps/cli/conf.py
 
       - run:
           name: Run pisa unit tests
