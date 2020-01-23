@@ -89,9 +89,8 @@ jobs:
           command: |
             . venv/bin/activate
             cp test/pisa/e2e/pisa-conf.py pisa/conf.py
-            cd apps/
-            python3 -m generate_key
-            python3 -m generate_key -n cli
+            python3 -m apps.generate_key -d ~/.pisa_btc/
+            python3 -m apps.generate_key -n cli -d ~/.pisa_btc/
 
 
       # Run E2E tests
