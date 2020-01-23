@@ -30,14 +30,21 @@ def save_pk(pk, filename):
 
 if __name__ == "__main__":
     name = "pisa"
+    output_dir = "."
 
-    opts, _ = getopt(argv[1:], "n:", ["name"])
+    opts, _ = getopt(argv[1:], "n:d:", ["name", "dir"])
     for opt, arg in opts:
         if opt in ["-n", "--name"]:
             name = arg
 
-    SK_FILE_NAME = "../{}_sk.der".format(name)
-    PK_FILE_NAME = "../{}_pk.der".format(name)
+        if opt in ["-d", "--dir"]:
+            output_dir = arg
+
+    if output_dir.endswith("/"):
+        output_dir = output_dir[:-1]
+
+    SK_FILE_NAME = "{}/{}_sk.der".format(output_dir, name)
+    PK_FILE_NAME = "{}/{}_pk.der".format(output_dir, name)
 
     if os.path.exists(SK_FILE_NAME):
         print('A key with name "{}" already exists. Aborting.'.format(SK_FILE_NAME))
