@@ -2,11 +2,12 @@ import zmq
 import binascii
 from threading import Thread, Event, Condition
 
+from pisa import LOG_PREFIX
 from common.logger import Logger
 from pisa.conf import FEED_PROTOCOL, FEED_ADDR, FEED_PORT, POLLING_DELTA, BLOCK_WINDOW_SIZE
 from pisa.block_processor import BlockProcessor
 
-logger = Logger("ChainMonitor")
+logger = Logger(actor="ChainMonitor", log_name_prefix=LOG_PREFIX)
 
 
 class ChainMonitor:

@@ -1,8 +1,10 @@
 from common.logger import Logger
+
+from pisa import LOG_PREFIX
 from pisa.tools import bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 
-logger = Logger("BlockProcessor")
+logger = Logger(actor="BlockProcessor", log_name_prefix=LOG_PREFIX)
 
 
 class BlockProcessor:

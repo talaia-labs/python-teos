@@ -1,8 +1,9 @@
 import os
 import json
+import logging
 from flask import Flask, request, abort, jsonify
 
-from pisa import HOST, PORT, logging
+from pisa import HOST, PORT, LOG_PREFIX
 from common.logger import Logger
 from pisa.inspector import Inspector
 from common.appointment import Appointment
@@ -13,7 +14,7 @@ from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
-logger = Logger("API")
+logger = Logger(actor="API", log_name_prefix=LOG_PREFIX)
 
 
 class API:
