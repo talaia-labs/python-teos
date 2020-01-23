@@ -16,7 +16,7 @@ from apps.cli.blob import Blob
 from common.logger import Logger
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
-from common.tools import check_sha256_hex_format, check_locator_format, compute_locator, setup_data_folder
+from common.tools import check_sha256_hex_format, check_locator_format, compute_locator
 
 
 HTTP_OK = 200
@@ -342,9 +342,6 @@ if __name__ == "__main__":
     pisa_api_port = config.get("DEFAULT_PISA_API_PORT")
     commands = ["add_appointment", "get_appointment", "help"]
     testing_commands = ["generate_dummy_appointment"]
-
-    # Create user folder if missing
-    setup_data_folder(config.get("DATA_FOLDER"), logger)
 
     try:
         opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])

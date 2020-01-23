@@ -1,6 +1,6 @@
 import os
 import pisa.conf as conf
-from common.tools import check_conf_fields, setup_logging, extend_paths
+from common.tools import check_conf_fields, setup_logging, extend_paths, setup_data_folder
 from pisa.utils.auth_proxy import AuthServiceProxy
 
 HOST = "localhost"
@@ -34,4 +34,5 @@ conf_fields = extend_paths(conf_fields["DATA_FOLDER"]["value"], conf_fields)
 # Sanity check fields and build config dictionary
 config = check_conf_fields(conf_fields)
 
+setup_data_folder(config.get("DATA_FOLDER"))
 setup_logging(config.get("SERVER_LOG_FILE"), LOG_PREFIX)

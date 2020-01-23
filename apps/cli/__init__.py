@@ -1,6 +1,6 @@
 import os
 import apps.cli.conf as conf
-from common.tools import extend_paths, check_conf_fields, setup_logging
+from common.tools import extend_paths, check_conf_fields, setup_logging, setup_data_folder
 
 LOG_PREFIX = "cli"
 
@@ -24,4 +24,5 @@ conf_fields = extend_paths(conf_fields["DATA_FOLDER"]["value"], conf_fields)
 # Sanity check fields and build config dictionary
 config = check_conf_fields(conf_fields)
 
+setup_data_folder(config.get("DATA_FOLDER"))
 setup_logging(config.get("CLIENT_LOG_FILE"), LOG_PREFIX)

@@ -3,7 +3,6 @@ from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from common.logger import Logger
-from common.tools import setup_data_folder
 
 from pisa import config, LOG_PREFIX
 from pisa.api import API
@@ -34,8 +33,6 @@ def main():
     signal(SIGQUIT, handle_signals)
 
     logger.info("Starting PISA")
-
-    setup_data_folder(config.get("DATA_FOLDER"), logger)
     db_manager = DBManager(config.get("DB_PATH"))
 
     if not can_connect_to_bitcoind():

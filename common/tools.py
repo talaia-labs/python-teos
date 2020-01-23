@@ -42,17 +42,15 @@ def compute_locator(tx_id):
     return tx_id[:LOCATOR_LEN_HEX]
 
 
-def setup_data_folder(data_folder, logger):
+def setup_data_folder(data_folder):
     """
     Create a data folder for either the client or the server side if the folder does not exists.
 
     Args:
         data_folder (:obj:`str`): the path of the folder
-        logger (:obj: `Logger <common.logger.Logger>`): a logger instance to notify about the folder creation.
     """
 
     if not os.path.isdir(data_folder):
-        logger.info("Data folder not found. Creating it")
         os.makedirs(data_folder, exist_ok=True)
 
 
