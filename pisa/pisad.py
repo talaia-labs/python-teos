@@ -1,8 +1,11 @@
+import os
 from getopt import getopt
 from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from common.logger import Logger
+from common.tools import check_conf_fields, setup_data_folder
+
 from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
@@ -38,6 +41,12 @@ def load_config(config):
 
     conf_dict = {}
 
+    data_folder = config.DATA_FOLDER
+    if isinstance(data_folder, str):
+        data_folder = os.path.expanduser(data_folder)
+    else:
+        raise ValueError("The provided user folder is invalid.")
+
     conf_fields = {
         "BTC_RPC_USER": {"value": config.BTC_RPC_USER, "type": str},
         "BTC_RPC_PASSWD": {"value": config.BTC_RPC_PASSWD, "type": str},
@@ -47,43 +56,31 @@ def load_config(config):
         "FEED_PROTOCOL": {"value": config.FEED_PROTOCOL, "type": str},
         "FEED_ADDR": {"value": config.FEED_ADDR, "type": str},
         "FEED_PORT": {"value": config.FEED_PORT, "type": int},
+        "DATA_FOLDER": {"value": data_folder, "type": str},
         "MAX_APPOINTMENTS": {"value": config.MAX_APPOINTMENTS, "type": int},
         "EXPIRY_DELTA": {"value": config.EXPIRY_DELTA, "type": int},
         "MIN_TO_SELF_DELAY": {"value": config.MIN_TO_SELF_DELAY, "type": int},
-        "SERVER_LOG_FILE": {"value": config.SERVER_LOG_FILE, "type": str},
-        "PISA_SECRET_KEY": {"value": config.PISA_SECRET_KEY, "type": str},
-        "CLIENT_LOG_FILE": {"value": config.CLIENT_LOG_FILE, "type": str},
-        "TEST_LOG_FILE": {"value": config.TEST_LOG_FILE, "type": str},
-        "DB_PATH": {"value": config.DB_PATH, "type": str},
+        "SERVER_LOG_FILE": {"value": data_folder, "type": str},
+        "PISA_SECRET_KEY": {"value": data_folder + config.PISA_SECRET_KEY, "type": str},
+        "DB_PATH": {"value": data_folder + config.DB_PATH, "type": str},
     }
 
-    for field in conf_fields:
-        value = conf_fields[field]["value"]
-        correct_type = conf_fields[field]["type"]
-
-        if (value is not None) and isinstance(value, correct_type):
-            conf_dict[field] = value
-        else:
-            err_msg = "{} variable in config is of the wrong type".format(field)
-            logger.error(err_msg)
-            raise ValueError(err_msg)
+    check_conf_fields(conf_fields, logger)
 
     return conf_dict
 
 
-if __name__ == "__main__":
-    logger.info("Starting PISA")
+def main():
+    global db_manager, chain_monitor
 
     signal(SIGINT, handle_signals)
     signal(SIGTERM, handle_signals)
     signal(SIGQUIT, handle_signals)
 
-    opts, _ = getopt(argv[1:], "", [""])
-    for opt, arg in opts:
-        # FIXME: Leaving this here for future option/arguments
-        pass
-
     pisa_config = load_config(conf)
+    logger.info("Starting PISA")
+
+    setup_data_folder(pisa_config.get("DATA_FOLDER"), logger)
     db_manager = DBManager(pisa_config.get("DB_PATH"))
 
     if not can_connect_to_bitcoind():
@@ -155,3 +152,12 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
+
+
+if __name__ == "__main__":
+    opts, _ = getopt(argv[1:], "", [""])
+    for opt, arg in opts:
+        # FIXME: Leaving this here for future option/arguments
+        pass
+
+    main()
