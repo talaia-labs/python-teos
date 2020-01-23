@@ -1,4 +1,5 @@
 import re
+import os
 from common.constants import LOCATOR_LEN_HEX
 
 
@@ -38,3 +39,33 @@ def compute_locator(tx_id):
     """
 
     return tx_id[:LOCATOR_LEN_HEX]
+
+
+def setup_data_folder(data_folder, logger):
+    if not os.path.isdir(data_folder):
+        logger.info("Data folder not found. Creating it")
+        os.makedirs(data_folder, exist_ok=True)
+
+
+def check_conf_fields(conf_fields):
+    conf_dict = {}
+
+    for field in conf_fields:
+        value = conf_fields[field]["value"]
+        correct_type = conf_fields[field]["type"]
+
+        if (value is not None) and isinstance(value, correct_type):
+            conf_dict[field] = value
+        else:
+            err_msg = "{} variable in config is of the wrong type".format(field)
+            raise ValueError(err_msg)
+
+    return conf_dict
+
+
+def extend_paths(base_path, config_fields):
+    for key, field in config_fields.items():
+        if field.get("path"):
+            config_fields[key]["value"] = base_path + config_fields[key]["value"]
+
+    return config_fields
