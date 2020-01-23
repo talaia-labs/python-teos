@@ -1,6 +1,8 @@
+from pisa import LOG_PREFIX
+
 from common.logger import Logger
 
-logger = Logger("Cleaner")
+logger = Logger(actor="Cleaner", log_name_prefix=LOG_PREFIX)
 
 
 class Cleaner:

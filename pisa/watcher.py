@@ -8,11 +8,12 @@ from common.tools import compute_locator
 
 from common.logger import Logger
 
+from pisa import LOG_PREFIX
 from pisa.cleaner import Cleaner
 from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 
-logger = Logger("Watcher")
+logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
 
 
 class Watcher:

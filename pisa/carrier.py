@@ -1,10 +1,11 @@
+from pisa import LOG_PREFIX
 from pisa.rpc_errors import *
 from common.logger import Logger
 from pisa.tools import bitcoin_cli
 from pisa.utils.auth_proxy import JSONRPCException
 from pisa.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
 
-logger = Logger("Carrier")
+logger = Logger(actor="Carrier", log_name_prefix=LOG_PREFIX)
 
 # FIXME: This class is not fully covered by unit tests
 
