@@ -1,5 +1,6 @@
 import re
 import os
+import logging
 from common.constants import LOCATOR_LEN_HEX
 
 
@@ -69,3 +70,32 @@ def extend_paths(base_path, config_fields):
             config_fields[key]["value"] = base_path + config_fields[key]["value"]
 
     return config_fields
+
+
+def setup_logging(log_file_path, log_name_prefix):
+    if not isinstance(log_file_path, str):
+        print(log_file_path)
+        raise ValueError("Wrong log file path.")
+
+    if not isinstance(log_name_prefix, str):
+        raise ValueError("Wrong log file name.")
+
+    # Create the file logger
+    f_logger = logging.getLogger("{}_file_log".format(log_name_prefix))
+    f_logger.setLevel(logging.INFO)
+
+    fh = logging.FileHandler(log_file_path)
+    fh.setLevel(logging.INFO)
+    fh_formatter = logging.Formatter("%(message)s")
+    fh.setFormatter(fh_formatter)
+    f_logger.addHandler(fh)
+
+    # Create the console logger
+    c_logger = logging.getLogger("{}_console_log".format(log_name_prefix))
+    c_logger.setLevel(logging.INFO)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch_formatter = logging.Formatter("%(message)s.", "%Y-%m-%d %H:%M:%S")
+    ch.setFormatter(ch_formatter)
+    c_logger.addHandler(ch)
