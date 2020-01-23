@@ -154,12 +154,13 @@ def test_load_key_file_data():
 
 
 def test_save_signed_appointment(monkeypatch):
-    monkeypatch.setattr(pisa_cli, "APPOINTMENTS_FOLDER_NAME", "test_appointments")
+    appointments_folder = "test_appointments_receipts"
+    pisa_cli.config["APPOINTMENTS_FOLDER_NAME"] = appointments_folder
 
     pisa_cli.save_signed_appointment(dummy_appointment.to_dict(), get_dummy_signature())
 
     # In folder "Appointments," grab all files and print them.
-    files = os.listdir("test_appointments")
+    files = os.listdir(appointments_folder)
 
     found = False
     for f in files:
@@ -169,10 +170,10 @@ def test_save_signed_appointment(monkeypatch):
     assert found
 
     # If "appointments" directory doesn't exist, function should create it.
-    assert os.path.exists("test_appointments")
+    assert os.path.exists(appointments_folder)
 
     # Delete test directory once we're done.
-    shutil.rmtree("test_appointments")
+    shutil.rmtree(appointments_folder)
 
 
 def test_parse_add_appointment_args():
