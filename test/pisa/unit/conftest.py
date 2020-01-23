@@ -1,3 +1,4 @@
+import os
 import pytest
 import random
 import requests
@@ -161,6 +162,7 @@ def generate_dummy_tracker():
 
 
 def get_config():
+    data_folder = os.path.expanduser("~/.pisa_btc")
     config = {
         "BTC_RPC_USER": "username",
         "BTC_RPC_PASSWD": "password",
@@ -170,13 +172,12 @@ def get_config():
         "FEED_PROTOCOL": "tcp",
         "FEED_ADDR": "127.0.0.1",
         "FEED_PORT": 28332,
+        "DATA_FOLDER": data_folder,
         "MAX_APPOINTMENTS": 100,
         "EXPIRY_DELTA": 6,
         "MIN_TO_SELF_DELAY": 20,
-        "SERVER_LOG_FILE": "pisa.log",
-        "PISA_SECRET_KEY": "pisa_sk.der",
-        "CLIENT_LOG_FILE": "pisa.log",
-        "TEST_LOG_FILE": "test.log",
+        "SERVER_LOG_FILE": data_folder + "pisa.log",
+        "PISA_SECRET_KEY": data_folder + "pisa_sk.der",
         "DB_PATH": "appointments",
     }
 
