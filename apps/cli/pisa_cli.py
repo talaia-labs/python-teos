@@ -9,24 +9,18 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from uuid import uuid4
 
+from apps.cli import config, LOG_PREFIX
 from apps.cli.help import help_add_appointment, help_get_appointment
 from apps.cli.blob import Blob
-import apps.cli.conf as conf
 
 from common.logger import Logger
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
-from common.tools import (
-    check_sha256_hex_format,
-    check_locator_format,
-    compute_locator,
-    check_conf_fields,
-    setup_data_folder,
-)
+from common.tools import check_sha256_hex_format, check_locator_format, compute_locator, setup_data_folder
 
 
 HTTP_OK = 200
-logger = Logger("Client")
+logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 
 
 # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
@@ -51,42 +45,6 @@ def generate_dummy_appointment():
     json.dump(dummy_appointment_data, open("dummy_appointment_data.json", "w"))
 
     logger.info("\nData stored in dummy_appointment_data.json")
-
-
-def load_config(config):
-    """
-    Looks through all of the config options to make sure they contain the right type of data and builds a config
-    dictionary.
-
-    Args:
-        config (:obj:`module`): It takes in a config module object.
-
-    Returns:
-        :obj:`dict` A dictionary containing the config values.
-    """
-
-    conf_dict = {}
-
-    data_folder = config.DATA_FOLDER
-    if isinstance(data_folder, str):
-        data_folder = os.path.expanduser(data_folder)
-    else:
-        raise ValueError("The provided user folder is invalid.")
-
-    conf_fields = {
-        "DEFAULT_PISA_API_SERVER": {"value": config.DEFAULT_PISA_API_SERVER, "type": str},
-        "DEFAULT_PISA_API_PORT": {"value": config.DEFAULT_PISA_API_PORT, "type": int},
-        "DATA_FOLDER": {"value": data_folder, "type": str},
-        "CLIENT_LOG_FILE": {"value": data_folder + config.CLIENT_LOG_FILE, "type": str},
-        "APPOINTMENTS_FOLDER_NAME": {"value": data_folder + config.APPOINTMENTS_FOLDER_NAME, "type": str},
-        "CLI_PUBLIC_KEY": {"value": data_folder + config.CLI_PUBLIC_KEY, "type": str},
-        "CLI_PRIVATE_KEY": {"value": data_folder + config.CLI_PRIVATE_KEY, "type": str},
-        "PISA_PUBLIC_KEY": {"value": data_folder + config.PISA_PUBLIC_KEY, "type": str},
-    }
-
-    check_conf_fields(conf_fields, logger)
-
-    return conf_dict
 
 
 # Loads and returns Pisa keys from disk
@@ -380,8 +338,6 @@ def show_usage():
 
 
 if __name__ == "__main__":
-    config = load_config(conf)
-
     pisa_api_server = config.get("DEFAULT_PISA_API_SERVER")
     pisa_api_port = config.get("DEFAULT_PISA_API_PORT")
     commands = ["add_appointment", "get_appointment", "help"]
