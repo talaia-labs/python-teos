@@ -97,7 +97,6 @@ jobs:
           name: Run e2e tests
           command: |
             . venv/bin/activate
-            python3 -m pisa.pisad &
             pytest test/pisa/e2e/
 
       # - store_artifacts:
