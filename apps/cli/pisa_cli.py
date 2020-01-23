@@ -9,16 +9,9 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from uuid import uuid4
 
+from apps.cli import config, LOG_PREFIX
 from apps.cli.help import help_add_appointment, help_get_appointment
 from apps.cli.blob import Blob
-from apps.cli import (
-    DEFAULT_PISA_API_SERVER,
-    DEFAULT_PISA_API_PORT,
-    CLI_PUBLIC_KEY,
-    CLI_PRIVATE_KEY,
-    PISA_PUBLIC_KEY,
-    APPOINTMENTS_FOLDER_NAME,
-)
 
 from common.logger import Logger
 from common.appointment import Appointment
@@ -27,7 +20,7 @@ from common.tools import check_sha256_hex_format, check_locator_format, compute_
 
 
 HTTP_OK = 200
-logger = Logger("Client")
+logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 
 
 # FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
@@ -73,13 +66,13 @@ def load_key_file_data(file_name):
 # Makes sure that the folder APPOINTMENTS_FOLDER_NAME exists, then saves the appointment and signature in it.
 def save_signed_appointment(appointment, signature):
     # Create the appointments directory if it doesn't already exist
-    os.makedirs(APPOINTMENTS_FOLDER_NAME, exist_ok=True)
+    os.makedirs(config.get("APPOINTMENTS_FOLDER_NAME"), exist_ok=True)
 
     timestamp = int(time.time())
     locator = appointment["locator"]
     uuid = uuid4().hex  # prevent filename collisions
 
-    filename = "{}/appointment-{}-{}-{}.json".format(APPOINTMENTS_FOLDER_NAME, timestamp, locator, uuid)
+    filename = "{}/appointment-{}-{}-{}.json".format(config.get("APPOINTMENTS_FOLDER_NAME"), timestamp, locator, uuid)
     data = {"appointment": appointment, "signature": signature}
 
     with open(filename, "w") as f:
@@ -233,7 +226,7 @@ def post_data_to_add_appointment_endpoint(data):
 # Verify that the signature returned from the watchtower is valid.
 def check_signature(signature, appointment):
     try:
-        pisa_pk_der = load_key_file_data(PISA_PUBLIC_KEY)
+        pisa_pk_der = load_key_file_data(config.get("PISA_PUBLIC_KEY"))
         pisa_pk = Cryptographer.load_public_key_der(pisa_pk_der)
 
         if pisa_pk is None:
@@ -287,7 +280,7 @@ def get_appointment(args):
 
 def get_appointment_signature(appointment):
     try:
-        sk_der = load_key_file_data(CLI_PRIVATE_KEY)
+        sk_der = load_key_file_data(config.get("CLI_PRIVATE_KEY"))
         cli_sk = Cryptographer.load_private_key_der(sk_der)
 
         signature = Cryptographer.sign(appointment.serialize(), cli_sk)
@@ -309,7 +302,7 @@ def get_appointment_signature(appointment):
 
 def get_pk():
     try:
-        cli_pk_der = load_key_file_data(CLI_PUBLIC_KEY)
+        cli_pk_der = load_key_file_data(config.get("CLI_PUBLIC_KEY"))
         hex_pk_der = binascii.hexlify(cli_pk_der)
 
         return hex_pk_der
@@ -345,8 +338,8 @@ def show_usage():
 
 
 if __name__ == "__main__":
-    pisa_api_server = DEFAULT_PISA_API_SERVER
-    pisa_api_port = DEFAULT_PISA_API_PORT
+    pisa_api_server = config.get("DEFAULT_PISA_API_SERVER")
+    pisa_api_port = config.get("DEFAULT_PISA_API_PORT")
     commands = ["add_appointment", "get_appointment", "help"]
     testing_commands = ["generate_dummy_appointment"]
 

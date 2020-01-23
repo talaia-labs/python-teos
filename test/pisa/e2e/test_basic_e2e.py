@@ -9,12 +9,21 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 from pisa.utils.auth_proxy import JSONRPCException
-from test.pisa.e2e.conftest import END_TIME_DELTA, build_appointment_data, get_random_value_hex, create_penalty_tx
+from test.pisa.e2e.conftest import (
+    END_TIME_DELTA,
+    build_appointment_data,
+    get_random_value_hex,
+    create_penalty_tx,
+    run_pisad,
+)
 
 # We'll use pisa_cli to add appointments. The expected input format is a list of arguments with a json-encoded
 # appointment
 pisa_cli.pisa_api_server = HOST
 pisa_cli.pisa_api_port = PORT
+
+# Run pisad
+pisad_process = run_pisad()
 
 
 def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):

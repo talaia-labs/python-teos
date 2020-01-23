@@ -1,9 +1,11 @@
 import json
 import plyvel
 
+from pisa import LOG_PREFIX
+
 from common.logger import Logger
 
-logger = Logger("DBManager")
+logger = Logger(actor="DBManager", log_name_prefix=LOG_PREFIX)
 
 WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"

@@ -2,6 +2,7 @@ import json
 from queue import Queue
 from threading import Thread
 
+from pisa import LOG_PREFIX
 from common.logger import Logger
 from pisa.cleaner import Cleaner
 from pisa.carrier import Carrier
@@ -10,7 +11,7 @@ from pisa.block_processor import BlockProcessor
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
 
-logger = Logger("Responder")
+logger = Logger(actor="Responder", log_name_prefix=LOG_PREFIX)
 
 
 class TransactionTracker:
