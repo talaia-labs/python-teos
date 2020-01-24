@@ -211,7 +211,7 @@ def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs)
     assert appointment_info[0].get("penalty_rawtx") == penalty_tx1
 
 
-def test_appointment_shutdown_pisa(create_txs, bitcoin_cli):
+def test_appointment_shutdown_pisa_trigger_back_online(create_txs, bitcoin_cli):
     global pisad_process
 
     pisa_pid = pisad_process.pid
@@ -222,7 +222,6 @@ def test_appointment_shutdown_pisa(create_txs, bitcoin_cli):
     locator = compute_locator(commitment_tx_id)
 
     assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
-    sleep(2)
 
     # Restart pisa
     pisad_process.terminate()
@@ -241,7 +240,43 @@ def test_appointment_shutdown_pisa(create_txs, bitcoin_cli):
     new_addr = bitcoin_cli.getnewaddress()
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
 
-    # The appointment should have been removed since the penalty_tx was malformed.
+    # The appointment should have been moved to the Responder
+    sleep(1)
+    appointment_info = get_appointment_info(locator)
+
+    assert appointment_info is not None
+    assert len(appointment_info) == 1
+    assert appointment_info[0].get("status") == "dispute_responded"
+
+
+def test_appointment_shutdown_pisa_trigger_while_offline(create_txs, bitcoin_cli):
+    global pisad_process
+
+    pisa_pid = pisad_process.pid
+
+    commitment_tx, penalty_tx = create_txs
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    locator = compute_locator(commitment_tx_id)
+
+    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+
+    # Check that the appointment is still in the Watcher
+    appointment_info = get_appointment_info(locator)
+    assert appointment_info is not None
+    assert len(appointment_info) == 1
+    assert appointment_info[0].get("status") == "being_watched"
+
+    # Shutdown and trigger
+    pisad_process.terminate()
+    new_addr = bitcoin_cli.getnewaddress()
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
+
+    # Restart
+    pisad_process = run_pisad()
+    assert pisa_pid != pisad_process.pid
+
+    # The appointment should have been moved to the Responder
     sleep(1)
     appointment_info = get_appointment_info(locator)
 
