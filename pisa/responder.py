@@ -146,6 +146,17 @@ class Responder:
         self.chain_monitor = chain_monitor
         self.db_manager = db_manager
 
+    def awake(self):
+        self.asleep = False
+        self.chain_monitor.responder_asleep = False
+        Thread(target=self.do_watch).start()
+
+    def sleep(self):
+        self.asleep = True
+        self.chain_monitor.responder_asleep = True
+
+        logger.info("No more pending trackers, going back to sleep")
+
     @staticmethod
     def on_sync(block_hash):
         """
@@ -265,9 +276,7 @@ class Responder:
         )
 
         if self.asleep:
-            self.asleep = False
-            self.chain_monitor.responder_asleep = False
-            Thread(target=self.do_watch).start()
+            self.awake()
 
     def do_watch(self):
         """
@@ -321,10 +330,7 @@ class Responder:
                 prev_block_hash = block.get("hash")
 
         # Go back to sleep if there are no more pending trackers
-        self.asleep = True
-        self.chain_monitor.responder_asleep = True
-
-        logger.info("No more pending trackers, going back to sleep")
+        self.sleep()
 
     def check_confirmations(self, txs):
         """

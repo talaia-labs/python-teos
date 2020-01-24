@@ -60,6 +60,10 @@ def main():
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
 
+                # Set the current tip as the last known block for both on a fresh start
+                db_manager.store_last_block_hash_watcher(BlockProcessor.get_best_block_hash())
+                db_manager.store_last_block_hash_responder(BlockProcessor.get_best_block_hash())
+
             else:
                 logger.info("Bootstrapping from backed up data")
                 block_processor = BlockProcessor()
@@ -68,11 +72,10 @@ def main():
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                last_common_ancestor_responder = None
                 missed_blocks_responder = None
 
                 # Build Responder with backed up data if found
-                if last_block_responder is not None:
+                if len(responder_trackers_data) != 0:
                     last_common_ancestor_responder, dropped_txs_responder = block_processor.find_last_common_ancestor(
                         last_block_responder
                     )
@@ -81,11 +84,12 @@ def main():
                     watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
                         responder_trackers_data
                     )
-                    watcher.responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
+                    Builder.populate_block_queue(watcher.responder.block_queue, missed_blocks_responder)
+                    watcher.responder.awake()
 
                 # Build Watcher. If the blocks of both match we don't perform the search twice.
-                if last_block_watcher is not None:
-                    if last_block_watcher == last_block_responder:
+                if len(watcher_appointments_data) != 0:
+                    if last_block_watcher == last_block_responder and missed_blocks_responder is not None:
                         missed_blocks_watcher = missed_blocks_responder
                     else:
                         last_common_ancestor_watcher, dropped_txs_watcher = block_processor.find_last_common_ancestor(
@@ -96,7 +100,8 @@ def main():
                     watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(
                         watcher_appointments_data
                     )
-                    watcher.block_queue = Builder.build_block_queue(missed_blocks_watcher)
+                    Builder.populate_block_queue(watcher.block_queue, missed_blocks_watcher)
+                    watcher.awake()
 
             # Fire the API
             API(watcher, config=config).start()
