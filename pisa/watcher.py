@@ -76,6 +76,19 @@ class Watcher:
         if not isinstance(responder, Responder):
             self.responder = Responder(db_manager, chain_monitor)
 
+    def awake(self):
+        self.asleep = False
+        self.chain_monitor.watcher_asleep = False
+        Thread(target=self.do_watch).start()
+
+        logger.info("Waking up")
+
+    def sleep(self):
+        self.asleep = True
+        self.chain_monitor.watcher_asleep = True
+
+        logger.info("No more pending appointments, going back to sleep")
+
     def add_appointment(self, appointment):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
@@ -118,11 +131,7 @@ class Watcher:
                 self.locator_uuid_map[appointment.locator] = [uuid]
 
             if self.asleep:
-                self.asleep = False
-                self.chain_monitor.watcher_asleep = False
-                Thread(target=self.do_watch).start()
-
-                logger.info("Waking up")
+                self.awake()
 
             self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
             self.db_manager.create_append_locator_map(appointment.locator, uuid)
@@ -208,10 +217,7 @@ class Watcher:
                 self.db_manager.store_last_block_hash_watcher(block_hash)
 
         # Go back to sleep if there are no more appointments
-        self.asleep = True
-        self.chain_monitor.watcher_asleep = True
-
-        logger.info("No more pending appointments, going back to sleep")
+        self.sleep()
 
     def get_breaches(self, txids):
         """
