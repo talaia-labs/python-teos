@@ -32,14 +32,13 @@ class Builder:
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointment = Appointment.from_dict(data)
-            appointments[uuid] = appointment
+            appointments[uuid] = {"locator": data.get("locator"), "end_time": data.get("end_time")}
 
-            if appointment.locator in locator_uuid_map:
-                locator_uuid_map[appointment.locator].append(uuid)
+            if data.get("locator") in locator_uuid_map:
+                locator_uuid_map[data.get("locator")].append(uuid)
 
             else:
-                locator_uuid_map[appointment.locator] = [uuid]
+                locator_uuid_map[data.get("locator")] = [uuid]
 
         return appointments, locator_uuid_map
 
@@ -67,33 +66,33 @@ class Builder:
         tx_tracker_map = {}
 
         for uuid, data in tracker_data.items():
-            tracker = TransactionTracker.from_dict(data)
-            trackers[uuid] = tracker
+            trackers[uuid] = {
+                "penalty_txid": data.get("penalty_txid"),
+                "locator": data.get("locator"),
+                "appointment_end": data.get("appointment_end"),
+            }
 
-            if tracker.penalty_txid in tx_tracker_map:
-                tx_tracker_map[tracker.penalty_txid].append(uuid)
+            if data.get("penalty_txid") in tx_tracker_map:
+                tx_tracker_map[data.get("penalty_txid")].append(uuid)
 
             else:
-                tx_tracker_map[tracker.penalty_txid] = [uuid]
+                tx_tracker_map[data.get("penalty_txid")] = [uuid]
 
         return trackers, tx_tracker_map
 
     @staticmethod
-    def build_block_queue(missed_blocks):
+    def populate_block_queue(block_queue, missed_blocks):
         """
-        Builds a ``Queue`` of block hashes to initialize the :mod:`Watcher <pisa.watcher.Watcher>` or the
+        Populates a ``Queue`` of block hashes to initialize the :mod:`Watcher <pisa.watcher.Watcher>` or the
         :mod:`Responder <pisa.responder.Responder>` using backed up data.
 
         Args:
+            block_queue (:obj:`Queue`): a ``Queue``
             missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (do to a crash or shutdown).
 
         Returns:
             :obj:`Queue`: A ``Queue`` containing all the missed blocks hashes.
         """
 
-        block_queue = Queue()
-
         for block in missed_blocks:
             block_queue.put(block)
-
-        return block_queue
