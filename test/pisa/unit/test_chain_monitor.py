@@ -29,8 +29,8 @@ def test_init(run_bitcoind):
     assert chain_monitor.watcher_asleep and chain_monitor.responder_asleep
 
 
-def test_attach_watcher(chain_monitor):
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
+def test_attach_watcher(chain_monitor, db_manager):
+    watcher = Watcher(db_manager=db_manager, chain_monitor=chain_monitor, sk_der=None, config=get_config())
     chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
 
     # booleans are not passed as reference in Python, so the flags need to be set separately
@@ -44,8 +44,8 @@ def test_attach_watcher(chain_monitor):
     assert watcher.block_queue.get() == r_hash
 
 
-def test_attach_responder(chain_monitor):
-    responder = Responder(db_manager=None, chain_monitor=chain_monitor)
+def test_attach_responder(chain_monitor, db_manager):
+    responder = Responder(db_manager=db_manager, chain_monitor=chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, responder.asleep)
 
     # Same kind of testing as with the attach watcher
@@ -103,12 +103,12 @@ def test_update_state(chain_monitor):
     assert chain_monitor.best_tip == another_block_hash and new_block_hash == chain_monitor.last_tips[-1]
 
 
-def test_monitor_chain_polling():
+def test_monitor_chain_polling(db_manager):
     # Try polling with the Watcher
     chain_monitor = ChainMonitor()
     chain_monitor.best_tip = BlockProcessor.get_best_block_hash()
 
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
+    watcher = Watcher(db_manager=db_manager, chain_monitor=chain_monitor, sk_der=None, config=get_config())
     chain_monitor.attach_watcher(watcher.block_queue, asleep=False)
 
     # monitor_chain_polling runs until terminate if set
@@ -130,12 +130,12 @@ def test_monitor_chain_polling():
     polling_thread.join()
 
 
-def test_monitor_chain_zmq():
+def test_monitor_chain_zmq(db_manager):
     # Try zmq with the Responder
     chain_monitor = ChainMonitor()
     chain_monitor.best_tip = BlockProcessor.get_best_block_hash()
 
-    responder = Responder(db_manager=None, chain_monitor=chain_monitor)
+    responder = Responder(db_manager=db_manager, chain_monitor=chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, asleep=False)
 
     zmq_thread = Thread(target=chain_monitor.monitor_chain_zmq, daemon=True)
@@ -164,12 +164,12 @@ def test_monitor_chain_zmq():
     zmq_thread.join()
 
 
-def test_monitor_chain():
+def test_monitor_chain(db_manager):
     # Not much to test here, this should launch two threads (one per monitor approach) and finish on terminate
     chain_monitor = ChainMonitor()
 
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
-    responder = Responder(db_manager=None, chain_monitor=chain_monitor)
+    watcher = Watcher(db_manager=db_manager, chain_monitor=chain_monitor, sk_der=None, config=get_config())
+    responder = Responder(db_manager=db_manager, chain_monitor=chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, asleep=False)
     chain_monitor.attach_watcher(watcher.block_queue, asleep=False)
 
@@ -194,12 +194,12 @@ def test_monitor_chain():
     generate_block()
 
 
-def test_monitor_chain_single_update():
+def test_monitor_chain_single_update(db_manager):
     # This test tests that if both threads try to add the same block to the queue, only the first one will make it
     chain_monitor = ChainMonitor()
 
-    watcher = Watcher(db_manager=None, chain_monitor=chain_monitor, sk_der=None, config=get_config())
-    responder = Responder(db_manager=None, chain_monitor=chain_monitor)
+    watcher = Watcher(db_manager=db_manager, chain_monitor=chain_monitor, sk_der=None, config=get_config())
+    responder = Responder(db_manager=db_manager, chain_monitor=chain_monitor)
     chain_monitor.attach_responder(responder.block_queue, asleep=False)
     chain_monitor.attach_watcher(watcher.block_queue, asleep=False)
 
