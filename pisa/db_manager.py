@@ -185,9 +185,8 @@ class DBManager:
         triggered_appointments = self.load_all_triggered_flags()
 
         if not include_triggered:
-            appointments = {
-                uuid: appointment for uuid, appointment in appointments.items() if uuid not in triggered_appointments
-            }
+            not_triggered = list(set(appointments.keys()).difference(triggered_appointments))
+            appointments = {uuid: appointments[uuid] for uuid in not_triggered}
 
         return appointments
 
@@ -319,6 +318,19 @@ class DBManager:
         self.delete_entry(uuid, prefix=WATCHER_PREFIX)
         logger.info("Deleting appointment from Watcher's db", uuid=uuid)
 
+    def batch_delete_watcher_appointments(self, uuids):
+        """
+        Deletes an appointment from the database.
+
+        Args:
+           uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the appointments to be deleted.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.delete((WATCHER_PREFIX + uuid).encode("utf-8"))
+                logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+
     def delete_responder_tracker(self, uuid):
         """
         Deletes a tracker from the database.
@@ -329,6 +341,19 @@ class DBManager:
 
         self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
         logger.info("Deleting appointment from Responder's db", uuid=uuid)
+
+    def batch_delete_responder_trackers(self, uuids):
+        """
+        Deletes an appointment from the database.
+
+        Args:
+           uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the trackers to be deleted.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.delete((RESPONDER_PREFIX + uuid).encode("utf-8"))
+                logger.info("Deleting appointment from Responder's db", uuid=uuid)
 
     def load_last_block_hash_watcher(self):
         """
@@ -383,6 +408,19 @@ class DBManager:
         self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
         logger.info("Flagging appointment as triggered", uuid=uuid)
 
+    def batch_create_triggered_appointment_flag(self, uuids):
+        """
+        Creates a flag that signals that an appointment has been triggered for every appointment in the given list
+
+        Args:
+            uuids (:obj:`list`): a list of identifier for the appointments to flag.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), b"")
+                logger.info("Flagging appointment as triggered", uuid=uuid)
+
     def load_all_triggered_flags(self):
         """
         Loads all the appointment triggered flags from the database.
@@ -406,3 +444,16 @@ class DBManager:
 
         self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
         logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+
+    def batch_delete_triggered_appointment_flag(self, uuids):
+        """
+        Deletes a list of flag signaling that some appointment have been triggered.
+
+        Args:
+            uuids (:obj:`list`): the identifier of the flag to be removed.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.delete((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"))
+                logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
