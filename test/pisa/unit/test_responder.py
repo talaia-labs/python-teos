@@ -436,7 +436,7 @@ def test_get_completed_trackers(db_manager, chain_monitor):
 
     # And now let's check
     completed_trackers = responder.get_completed_trackers(initial_height + 6)
-    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers]
+    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers.items()]
     ended_trackers_keys = list(trackers_end_conf.keys())
     assert set(completed_trackers_ids) == set(ended_trackers_keys)
 
@@ -444,7 +444,7 @@ def test_get_completed_trackers(db_manager, chain_monitor):
     generate_blocks(6)
 
     completed_trackers = responder.get_completed_trackers(initial_height + 12)
-    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers]
+    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers.items()]
     ended_trackers_keys.extend(list(trackers_no_end.keys()))
 
     assert set(completed_trackers_ids) == set(ended_trackers_keys)
