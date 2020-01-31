@@ -42,9 +42,10 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def db_manager():
     manager = DBManager("test_db")
+    # Add last know block for the Responder in the db
     yield manager
 
     manager.db.close()
