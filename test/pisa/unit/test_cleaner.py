@@ -104,7 +104,7 @@ def test_update_delete_db_locator_map(db_manager):
     for uuid, appointment in appointments.items():
         locator = appointment.get("locator")
         locator_map_before = db_manager.load_locator_map(locator)
-        Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
+        Cleaner.update_delete_db_locator_map([uuid], locator, db_manager)
         locator_map_after = db_manager.load_locator_map(locator)
 
         if locator_map_after is None:
@@ -163,7 +163,7 @@ def test_delete_completed_trackers_db_match(db_manager):
         trackers, tx_tracker_map = set_up_trackers(db_manager, MAX_ITEMS)
         selected_trackers = random.sample(list(trackers.keys()), k=ITEMS)
 
-        completed_trackers = [(tracker, 6) for tracker in selected_trackers]
+        completed_trackers = {tracker: 6 for tracker in selected_trackers}
 
         Cleaner.delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
 
@@ -200,7 +200,7 @@ def test_delete_completed_trackers_no_db_match(db_manager):
             tx_tracker_map[penalty_txid] = [uuid]
             selected_trackers.append(uuid)
 
-        completed_trackers = [(tracker, 6) for tracker in selected_trackers]
+        completed_trackers = {tracker: 6 for tracker in selected_trackers}
 
         # We should be able to delete the correct ones and not fail in the others
         Cleaner.delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
