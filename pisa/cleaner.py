@@ -51,7 +51,7 @@ class Cleaner:
         db_manager.delete_triggered_appointment_flag(uuid)
 
     @staticmethod
-    def update_delete_db_locator_map(uuid, locator, db_manager):
+    def update_delete_db_locator_map(uuids, locator, db_manager):
         """
         Updates the locator:uuid map of a given locator from the database by removing a given uuid. If the uuid is the
         only element of the map, the map is deleted, otherwise the uuid is simply removed and the database is updated.
@@ -59,24 +59,29 @@ class Cleaner:
         If either the uuid of the locator are not found, the data is not modified.
 
         Args:
-            uuid (:obj:`str`): the identifier to be removed from the map.
+            uuids (:obj:`list`): a list of identifiers to be removed from the map.
             locator (:obj:`str`): the identifier of the map to be either updated or deleted.
             db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
                 database.
         """
 
         locator_map = db_manager.load_locator_map(locator)
+
         if locator_map is not None:
-            if uuid in locator_map:
-                if len(locator_map) == 1:
+            if set(locator_map).issuperset(uuids):
+                # Remove the map if all keys are requested to be deleted
+                if set(locator_map) == set(uuids):
                     db_manager.delete_locator_map(locator)
                 else:
-                    locator_map.remove(uuid)
+                    # Otherwise remove only the selected keys
+                    locator_map = list(set(locator_map).difference(uuids))
                     db_manager.update_locator_map(locator, locator_map)
+
             else:
-                logger.error("UUID not found in the db", uuid=uuid)
+                logger.error("Some UUIDs not found in the db", locator=locator, all_uuids=uuids)
+
         else:
-            logger.error("Locator not found in the db", uuid=uuid)
+            logger.error("Locator map not found in the db", uuid=locator)
 
     @staticmethod
     def delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager):
@@ -94,15 +99,24 @@ class Cleaner:
                 database.
         """
 
+        locator_maps_to_update = {}
+
         for uuid in expired_appointments:
             locator = appointments[uuid].get("locator")
             logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
 
             Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
-            Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
 
-            # Expired appointments are not flagged, so they can be deleted without caring about the db flag.
-            db_manager.delete_watcher_appointment(uuid)
+            if locator not in locator_maps_to_update:
+                locator_maps_to_update[locator] = []
+
+            locator_maps_to_update[locator].append(uuid)
+
+        for locator, uuids in locator_maps_to_update.items():
+            Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
+
+        # Expired appointments are not flagged, so they can be deleted without caring about the db flag.
+        db_manager.batch_delete_watcher_appointments(expired_appointments)
 
     @staticmethod
     def delete_completed_appointments(completed_appointments, appointments, locator_uuid_map, db_manager):
@@ -121,6 +135,7 @@ class Cleaner:
             db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
                 database.
         """
+        locator_maps_to_update = {}
 
         for uuid in completed_appointments:
             locator = appointments[uuid].get("locator")
@@ -129,9 +144,18 @@ class Cleaner:
                 "Appointment cannot be completed, it contains invalid data. Deleting", locator=locator, uuid=uuid
             )
 
-            db_manager.delete_watcher_appointment(uuid)
             Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
-            Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
+
+            if locator not in locator_maps_to_update:
+                locator_maps_to_update[locator] = []
+
+            locator_maps_to_update[locator].append(uuid)
+
+        for locator, uuids in locator_maps_to_update.items():
+            # Update / delete the locator map
+            Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
+
+        db_manager.batch_delete_watcher_appointments(completed_appointments)
 
     @staticmethod
     def flag_triggered_appointments(triggered_appointments, appointments, locator_uuid_map, db_manager):
@@ -164,13 +188,15 @@ class Cleaner:
                 trackers.
             tx_tracker_map (:obj:`dict`): a ``penalty_txid:uuid`` map for the :obj:`Responder
                 <pisa.responder.Responder>` trackers.
-            completed_trackers (:obj:`list`): a list of completed trackers to be deleted.
+            completed_trackers (:obj:`dict`): a dict of completed trackers to be deleted (uuid:confirmations).
             height (:obj:`int`): the block height at which the trackers were completed.
             db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
                 database.
         """
 
-        for uuid, confirmations in completed_trackers:
+        locator_maps_to_update = {}
+
+        for uuid, confirmations in completed_trackers.items():
             logger.info(
                 "Appointment completed. Appointment ended after reaching enough confirmations",
                 uuid=uuid,
@@ -190,10 +216,16 @@ class Cleaner:
             else:
                 tx_tracker_map[penalty_txid].remove(uuid)
 
-            # Delete appointment from the db (from watchers's and responder's db) and remove flag
-            db_manager.delete_responder_tracker(uuid)
-            db_manager.delete_watcher_appointment(uuid)
-            db_manager.delete_triggered_appointment_flag(uuid)
+            if locator not in locator_maps_to_update:
+                locator_maps_to_update[locator] = []
 
+            locator_maps_to_update[locator].append(uuid)
+
+        for locator, uuids in locator_maps_to_update.items():
             # Update / delete the locator map
-            Cleaner.update_delete_db_locator_map(uuid, locator, db_manager)
+            Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
+
+        # Delete appointment from the db (from watchers's and responder's db) and remove flag
+        db_manager.batch_delete_responder_trackers(list(completed_trackers.keys()))
+        db_manager.batch_delete_watcher_appointments(list(completed_trackers.keys()))
+        db_manager.batch_delete_triggered_appointment_flag(list(completed_trackers.keys()))
