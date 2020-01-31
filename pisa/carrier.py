@@ -38,7 +38,15 @@ class Carrier:
     """
     The :class:`Carrier` is the class in charge of interacting with ``bitcoind`` to send/get transactions. It uses
     :obj:`Receipt` objects to report about the sending outcome.
+
+    Attributes:
+        issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
+            and over. It should periodically be reset to prevent it from growing unbounded.
+
     """
+
+    def __init__(self):
+        self.issued_receipts = {}
 
     # NOTCOVERED
     def send_transaction(self, rawtx, txid):
@@ -52,6 +60,12 @@ class Carrier:
         Returns:
             :obj:`Receipt`: A receipt reporting whether the transaction was successfully delivered or not and why.
         """
+
+        if txid in self.issued_receipts:
+            logger.info("Transaction already sent", txid=txid)
+            receipt = self.issued_receipts[txid]
+
+            return receipt
 
         try:
             logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
@@ -100,6 +114,8 @@ class Carrier:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
                 logger.error("JSONRPCException", method="Carrier.send_transaction", error=e.error)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
+
+        self.issued_receipts[txid] = receipt
 
         return receipt
 
