@@ -1,10 +1,12 @@
 import json
+import binascii
 from time import sleep
 from riemann.tx import Tx
 
 from pisa import HOST, PORT
 from apps.cli import pisa_cli
 from apps.cli.blob import Blob
+from apps.cli import config as cli_conf
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -35,7 +37,7 @@ def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
 def get_appointment_info(locator):
     # Check that the justice has been triggered (the appointment has moved from Watcher to Responder)
     sleep(1)  # Let's add a bit of delay so the state can be updated
-    return pisa_cli.get_appointment([locator])
+    return pisa_cli.get_appointment(locator)
 
 
 def test_appointment_life_cycle(bitcoin_cli, create_txs):
@@ -119,18 +121,22 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), appointment_data.get("tx_id"))
     appointment = Appointment.from_dict(appointment_data)
 
-    signature = pisa_cli.get_appointment_signature(appointment)
-    hex_pk_der = pisa_cli.get_pk()
+    pisa_pk, cli_sk, cli_pk_der = pisa_cli.load_keys(
+        cli_conf.get("PISA_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
+    )
+    hex_pk_der = binascii.hexlify(cli_pk_der)
 
+    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
     data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
-    response_json = pisa_cli.post_data_to_add_appointment_endpoint(data)
+    response = pisa_cli.post_appointment(data)
+    response_json = pisa_cli.process_post_appointment_response(response)
 
     # Check that the server has accepted the appointment
     signature = response_json.get("signature")
     assert signature is not None
-    assert pisa_cli.check_signature(signature, appointment) is True
+    assert Cryptographer.verify(appointment.serialize(), signature, pisa_pk) is True
     assert response_json.get("locator") == appointment.locator
 
     # Trigger the appointment
