@@ -3,6 +3,7 @@ from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from common.logger import Logger
+from common.cryptographer import Cryptographer
 
 from pisa import config, LOG_PREFIX
 from pisa.api import API
@@ -44,8 +45,9 @@ def main():
 
     else:
         try:
-            with open(config.get("PISA_SECRET_KEY"), "rb") as key_file:
-                secret_key_der = key_file.read()
+            secret_key_der = Cryptographer.load_key_file(config.get("PISA_SECRET_KEY"))
+            if not secret_key_der:
+                raise IOError("PISA private key can't be loaded")
 
             watcher = Watcher(db_manager, Responder(db_manager), secret_key_der, config)
 

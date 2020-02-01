@@ -147,6 +147,35 @@ class Cryptographer:
         return blob
 
     @staticmethod
+    def load_key_file(file_path):
+        """
+        Loads a key from a key file.
+
+        Args:
+            file_path (:obj:`str`): the path to the key file to be loaded.
+
+        Returns:
+            :obj:`bytes` or :obj:`None`: the key file data if the file can be found and read. ``None`` otherwise.
+        """
+
+        if not isinstance(file_path, str):
+            logger.error("Key file path was expected, {} received".format(type(file_path)))
+            return None
+
+        try:
+            with open(file_path, "rb") as key_file:
+                key = key_file.read()
+            return key
+
+        except FileNotFoundError:
+            logger.error("Key file not found. Please check your settings")
+            return None
+
+        except IOError as e:
+            logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+            return None
+
+    @staticmethod
     def load_public_key_der(pk_der):
         """
         Creates an :mod:`EllipticCurvePublicKey` object from a given ``DER`` encoded public key.
@@ -199,13 +228,15 @@ class Cryptographer:
             return sk
 
         except UnsupportedAlgorithm:
-            raise ValueError("Could not deserialize the private key (unsupported algorithm).")
+            logger.error("Could not deserialize the private key (unsupported algorithm)")
 
         except ValueError:
             logger.error("The provided data cannot be deserialized (wrong size or format)")
 
         except TypeError:
             logger.error("The provided data cannot be deserialized (wrong type)")
+
+        return None
 
     @staticmethod
     def sign(data, sk, rtype="str"):

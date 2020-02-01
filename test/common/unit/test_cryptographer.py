@@ -1,3 +1,5 @@
+import os
+import pytest
 import binascii
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -179,6 +181,30 @@ def test_decrypt_wrong_return():
 
     except ValueError:
         assert True
+
+
+def test_load_key_file():
+    dummy_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+    dummy_sk_der = dummy_sk.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    # If file exists and has data in it, function should work.
+    with open("key_test_file", "wb") as f:
+        f.write(dummy_sk_der)
+
+    appt_data = Cryptographer.load_key_file("key_test_file")
+    assert appt_data
+
+    os.remove("key_test_file")
+
+    # If file doesn't exist, function should return None
+    assert Cryptographer.load_key_file("nonexistent_file") is None
+
+    # If something that's not a file_path is passed as parameter the method should also return None
+    assert Cryptographer.load_key_file(0) is None and Cryptographer.load_key_file(None) is None
 
 
 def test_load_public_key_der():
