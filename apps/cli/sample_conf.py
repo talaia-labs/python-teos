@@ -5,7 +5,7 @@ DEFAULT_PISA_API_PORT = 9814
 # PISA-CLI
 DATA_FOLDER = "~/.pisa_btc/"
 
-CLIENT_LOG_FILE = "pisa-cli.log"
+CLIENT_LOG_FILE = "cli.log"
 APPOINTMENTS_FOLDER_NAME = "appointment_receipts"
 
 CLI_PUBLIC_KEY = "cli_pk.der"
