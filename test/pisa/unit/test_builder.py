@@ -4,6 +4,7 @@ from queue import Queue
 
 from pisa.builder import Builder
 from pisa.watcher import Watcher
+from pisa.responder import Responder
 from test.pisa.unit.conftest import (
     get_random_value_hex,
     generate_dummy_appointment,
@@ -89,7 +90,7 @@ def test_populate_block_queue():
 
 
 def test_update_states_empty_list(db_manager):
-    w = Watcher(db_manager=db_manager, chain_monitor=None, sk_der=None, config=None)
+    w = Watcher(db_manager=db_manager, responder=Responder(db_manager), sk_der=None, config=None)
 
     missed_blocks_watcher = []
     missed_blocks_responder = [get_random_value_hex(32)]
@@ -102,121 +103,35 @@ def test_update_states_empty_list(db_manager):
         Builder.update_states(w, missed_blocks_responder, missed_blocks_watcher)
 
 
-def test_update_states_different_sizes(run_bitcoind, db_manager, chain_monitor):
-    w = Watcher(db_manager=db_manager, chain_monitor=chain_monitor, sk_der=None, config=get_config())
-    chain_monitor.attach_watcher(w.responder, True)
-    chain_monitor.attach_responder(w.responder, True)
-
-    # For the states to be updated data needs to be present in the actors (either appointments or trackers).
-    # Let's start from the Watcher. We add one appointment and mine some blocks that both are gonna miss.
-    w.appointments[uuid4().hex] = {"locator": get_random_value_hex(16), "end_time": 200}
+def test_update_states_responder_misses_more(run_bitcoind, db_manager):
+    w = Watcher(db_manager=db_manager, responder=Responder(db_manager), sk_der=None, config=get_config())
 
     blocks = []
     for _ in range(5):
         generate_block()
         blocks.append(bitcoin_cli().getbestblockhash())
 
-    # Updating the states should bring both to the same last known block. The Watcher's is stored in the db since it has
-    # gone over do_watch, whereas the Responders in only updated by update state.
+    # Updating the states should bring both to the same last known block.
+    w.awake()
+    w.responder.awake()
     Builder.update_states(w, blocks, blocks[1:])
 
     assert db_manager.load_last_block_hash_watcher() == blocks[-1]
     assert w.responder.last_known_block == blocks[-1]
 
-    # If both have work, both last known blocks are updated
-    w.sleep()
-    w.responder.sleep()
 
-    w.responder.trackers[uuid4().hex] = {
-        "penalty_txid": get_random_value_hex(32),
-        "locator": get_random_value_hex(16),
-        "appointment_end": 200,
-    }
+def test_update_states_watcher_misses_more(run_bitcoind, db_manager):
+    # Same as before, but data is now in the Responder
+    w = Watcher(db_manager=db_manager, responder=Responder(db_manager), sk_der=None, config=get_config())
 
     blocks = []
     for _ in range(5):
         generate_block()
         blocks.append(bitcoin_cli().getbestblockhash())
 
+    w.awake()
+    w.responder.awake()
     Builder.update_states(w, blocks[1:], blocks)
-    assert db_manager.load_last_block_hash_watcher() == blocks[-1]
-    assert db_manager.load_last_block_hash_responder() == blocks[-1]
-
-    # Let's try the opposite of the first test (Responder with data, Watcher without)
-    w.sleep()
-    w.responder.sleep()
-
-    w.appointments = {}
-    last_block_prev = blocks[-1]
-
-    blocks = []
-    for _ in range(5):
-        generate_block()
-        blocks.append(bitcoin_cli().getbestblockhash())
-
-    # The Responder should have been brought up to date via do_watch, whereas the Watcher's last known block hash't
-    # change. The Watcher does not keep track of reorgs, so if he has no work to do he does not even update the last
-    # known block.
-    Builder.update_states(w, blocks[1:], blocks)
-    assert db_manager.load_last_block_hash_watcher() == last_block_prev
-    assert db_manager.load_last_block_hash_responder() == blocks[-1]
-
-
-def test_update_states_same_sizes(db_manager, chain_monitor):
-    # The exact same behaviour of the last test is expected here, since different sizes are even using
-    # populate_block_queue and then run with the same list size.
-    w = Watcher(db_manager=db_manager, chain_monitor=chain_monitor, sk_der=None, config=get_config())
-    chain_monitor.attach_watcher(w.responder, True)
-    chain_monitor.attach_responder(w.responder, True)
-
-    # For the states to be updated data needs to be present in the actors (either appointments or trackers).
-    # Let's start from the Watcher. We add one appointment and mine some blocks that both are gonna miss.
-    w.appointments[uuid4().hex] = {"locator": get_random_value_hex(16), "end_time": 200}
-
-    blocks = []
-    for _ in range(5):
-        generate_block()
-        blocks.append(bitcoin_cli().getbestblockhash())
-
-    Builder.update_states(w, blocks, blocks)
 
     assert db_manager.load_last_block_hash_watcher() == blocks[-1]
-    assert w.responder.last_known_block == blocks[-1]
-
-    # If both have work, both last known blocks are updated
-    w.sleep()
-    w.responder.sleep()
-
-    w.responder.trackers[uuid4().hex] = {
-        "penalty_txid": get_random_value_hex(32),
-        "locator": get_random_value_hex(16),
-        "appointment_end": 200,
-    }
-
-    blocks = []
-    for _ in range(5):
-        generate_block()
-        blocks.append(bitcoin_cli().getbestblockhash())
-
-    Builder.update_states(w, blocks, blocks)
-    assert db_manager.load_last_block_hash_watcher() == blocks[-1]
-    assert db_manager.load_last_block_hash_responder() == blocks[-1]
-
-    # Let's try the opposite of the first test (Responder with data, Watcher without)
-    w.sleep()
-    w.responder.sleep()
-
-    w.appointments = {}
-    last_block_prev = blocks[-1]
-
-    blocks = []
-    for _ in range(5):
-        generate_block()
-        blocks.append(bitcoin_cli().getbestblockhash())
-
-    # The Responder should have been brought up to date via do_watch, whereas the Watcher's last known block hash't
-    # change. The Watcher does not keep track of reorgs, so if he has no work to do he does not even update the last
-    # known block.
-    Builder.update_states(w, blocks, blocks)
-    assert db_manager.load_last_block_hash_watcher() == last_block_prev
     assert db_manager.load_last_block_hash_responder() == blocks[-1]
