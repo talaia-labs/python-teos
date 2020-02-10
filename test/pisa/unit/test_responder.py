@@ -1,6 +1,7 @@
 import json
 import pytest
 import random
+from queue import Queue
 from uuid import uuid4
 from shutil import rmtree
 from copy import deepcopy
@@ -18,17 +19,19 @@ from test.pisa.unit.conftest import generate_block, generate_blocks, get_random_
 
 
 @pytest.fixture(scope="module")
-def responder(db_manager, chain_monitor):
-    responder = Responder(db_manager, chain_monitor)
-    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+def responder(db_manager):
+    responder = Responder(db_manager)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    chain_monitor.monitor_chain()
 
     return responder
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
     db_manager = DBManager(db_name)
+
     yield db_manager
 
     db_manager.db.close()
@@ -144,19 +147,17 @@ def test_tracker_from_dict_invalid_data():
             assert True
 
 
-def test_init_responder(responder):
+def test_init_responder(temp_db_manager):
+    responder = Responder(temp_db_manager)
     assert isinstance(responder.trackers, dict) and len(responder.trackers) == 0
     assert isinstance(responder.tx_tracker_map, dict) and len(responder.tx_tracker_map) == 0
     assert isinstance(responder.unconfirmed_txs, list) and len(responder.unconfirmed_txs) == 0
     assert isinstance(responder.missed_confirmations, dict) and len(responder.missed_confirmations) == 0
-    assert isinstance(responder.chain_monitor, ChainMonitor)
     assert responder.block_queue.empty()
-    assert responder.asleep is True
 
 
-def test_handle_breach(db_manager, chain_monitor):
-    responder = Responder(db_manager, chain_monitor)
-    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+def test_handle_breach(db_manager):
+    responder = Responder(db_manager)
 
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
@@ -174,19 +175,10 @@ def test_handle_breach(db_manager, chain_monitor):
 
     assert receipt.delivered is True
 
-    # The responder automatically fires add_tracker on adding a tracker if it is asleep. We need to stop the processes
-    # now. To do so we delete all the trackers, and generate a new block.
-    responder.trackers = dict()
-    generate_block()
 
-
-def test_add_bad_response(responder):
+def test_handle_breach_bad_response(responder):
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
-
-    # Now that the asleep / awake functionality has been tested we can avoid manually killing the responder by setting
-    # to awake. That will prevent the chain_monitor thread to be launched again.
-    responder.asleep = False
 
     # A txid instead of a rawtx should be enough for unit tests using the bitcoind mock, better tests are needed though.
     tracker.penalty_rawtx = tracker.penalty_txid
@@ -206,8 +198,6 @@ def test_add_bad_response(responder):
 
 
 def test_add_tracker(responder):
-    # Responder is asleep
-
     for _ in range(20):
         uuid = uuid4().hex
         confirmations = 0
@@ -236,8 +226,6 @@ def test_add_tracker(responder):
 
 
 def test_add_tracker_same_penalty_txid(responder):
-    # Responder is asleep
-
     confirmations = 0
     locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(random_txid=True)
     uuid_1 = uuid4().hex
@@ -262,8 +250,6 @@ def test_add_tracker_same_penalty_txid(responder):
 
 
 def test_add_tracker_already_confirmed(responder):
-    # Responder is asleep
-
     for i in range(20):
         uuid = uuid4().hex
         confirmations = i + 1
@@ -276,10 +262,11 @@ def test_add_tracker_already_confirmed(responder):
         assert penalty_txid not in responder.unconfirmed_txs
 
 
-def test_do_watch(temp_db_manager, chain_monitor):
+def test_do_watch(temp_db_manager):
     # Create a fresh responder to simplify the test
-    responder = Responder(temp_db_manager, chain_monitor)
-    chain_monitor.attach_responder(responder.block_queue, False)
+    responder = Responder(temp_db_manager)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    chain_monitor.monitor_chain()
 
     trackers = [create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(20)]
 
@@ -332,12 +319,12 @@ def test_do_watch(temp_db_manager, chain_monitor):
     generate_blocks(6)
 
     assert len(responder.tx_tracker_map) == 0
-    assert responder.asleep is True
 
 
-def test_check_confirmations(temp_db_manager, chain_monitor):
-    responder = Responder(temp_db_manager, chain_monitor)
-    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+def test_check_confirmations(db_manager):
+    responder = Responder(db_manager)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    chain_monitor.monitor_chain()
 
     # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
     # been confirmed. To test this we need to create a list of transactions and the state of the responder
@@ -391,11 +378,12 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_trackers(db_manager, chain_monitor):
+def test_get_completed_trackers(db_manager):
     initial_height = bitcoin_cli().getblockcount()
 
-    responder = Responder(db_manager, chain_monitor)
-    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+    responder = Responder(db_manager)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    chain_monitor.monitor_chain()
 
     # A complete tracker is a tracker that has reached the appointment end with enough confs (> MIN_CONFIRMATIONS)
     # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
@@ -450,10 +438,10 @@ def test_get_completed_trackers(db_manager, chain_monitor):
     assert set(completed_trackers_ids) == set(ended_trackers_keys)
 
 
-def test_rebroadcast(db_manager, chain_monitor):
-    responder = Responder(db_manager, chain_monitor)
-    responder.asleep = False
-    chain_monitor.attach_responder(responder.block_queue, responder.asleep)
+def test_rebroadcast(db_manager):
+    responder = Responder(db_manager)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    chain_monitor.monitor_chain()
 
     txs_to_rebroadcast = []
 

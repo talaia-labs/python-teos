@@ -10,7 +10,6 @@ from common.logger import Logger
 
 from pisa import LOG_PREFIX
 from pisa.cleaner import Cleaner
-from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 
 logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
@@ -33,13 +32,10 @@ class Watcher:
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
-        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
-            new blocks received by ``bitcoind``.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
         config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
             ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
-        responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance. If ``None`` is passed, a new
-            instance is created. Populated instances are useful when bootstrapping the system from backed-up data.
+        responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance.
 
 
     Attributes:
@@ -48,11 +44,8 @@ class Watcher:
             It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
-        asleep (:obj:`bool`): A flag that signals whether the :obj:`Watcher` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
         populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
-        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
-            new blocks received by ``bitcoind``.
         config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
             ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         db_manager (:obj:`DBManager <pisa.db_manager>`): A db manager instance to interact with the database.
@@ -63,41 +56,27 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, chain_monitor, sk_der, config, responder=None):
+    def __init__(self, db_manager, responder, sk_der, config):
         self.appointments = dict()
         self.locator_uuid_map = dict()
-        self.asleep = True
         self.block_queue = Queue()
-        self.chain_monitor = chain_monitor
         self.config = config
         self.db_manager = db_manager
+        self.responder = responder
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
-        if not isinstance(responder, Responder):
-            self.responder = Responder(db_manager, chain_monitor)
-
     def awake(self):
-        self.asleep = False
-        self.chain_monitor.watcher_asleep = False
-        watcher_thread = Thread(target=self.do_watch, daemon=True).start()
-
-        logger.info("Waking up")
+        watcher_thread = Thread(target=self.do_watch, daemon=True)
+        watcher_thread.start()
 
         return watcher_thread
-
-    def sleep(self):
-        self.asleep = True
-        self.chain_monitor.watcher_asleep = True
-
-        logger.info("No more pending appointments, going back to sleep")
 
     def add_appointment(self, appointment):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
-        ``add_appointment`` is the entry point of the Watcher. Upon receiving a new appointment, if the :obj:`Watcher`
-        is asleep, it will be awaken and start monitoring the blockchain (``do_watch``) until ``appointments`` is empty.
-        It will go back to sleep once there are no more pending appointments.
+        ``add_appointment`` is the entry point of the Watcher. Upon receiving a new appointment it will start monitoring
+        the blockchain (``do_watch``) until ``appointments`` is empty.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
         :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` and pass the information to the
@@ -132,9 +111,6 @@ class Watcher:
             else:
                 self.locator_uuid_map[appointment.locator] = [uuid]
 
-            if self.asleep:
-                self.awake()
-
             self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
             self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
@@ -159,15 +135,13 @@ class Watcher:
         :obj:`Responder <pisa.responder.Responder>` upon detecting a breach.
         """
 
-        while len(self.appointments) > 0:
+        while True:
             block_hash = self.block_queue.get()
-            logger.info("New block received", block_hash=block_hash)
-
             block = BlockProcessor.get_block(block_hash)
+            logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
 
-            if block is not None:
+            if len(self.appointments) > 0 and block is not None:
                 txids = block.get("tx")
-
                 logger.info("List of transactions", txids=txids)
 
                 expired_appointments = [
@@ -203,7 +177,7 @@ class Watcher:
                         block_hash,
                     )
 
-                    # FIXME: This is only necessary because of the triggered appointment approach. Fix if it changes.
+                    # FIXME: Only necessary because of the triggered appointment approach. Fix if it changes.
 
                     if receipt.delivered:
                         Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
@@ -219,13 +193,12 @@ class Watcher:
                     appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                # Register the last processed block for the watcher
-                self.db_manager.store_last_block_hash_watcher(block_hash)
+                if len(self.appointments) is 0:
+                    logger.info("No more pending appointments")
 
+            # Register the last processed block for the watcher
+            self.db_manager.store_last_block_hash_watcher(block_hash)
             self.block_queue.task_done()
-
-        # Go back to sleep if there are no more appointments
-        self.sleep()
 
     def get_breaches(self, txids):
         """
