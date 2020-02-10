@@ -120,7 +120,6 @@ class Builder:
                 set(missed_blocks_responder).difference(missed_blocks_watcher), key=missed_blocks_responder.index
             )
             Builder.populate_block_queue(watcher.responder.block_queue, block_diff)
-            watcher.responder.awake()
             watcher.responder.block_queue.join()
 
         elif len(missed_blocks_watcher) > len(missed_blocks_responder):
@@ -128,27 +127,12 @@ class Builder:
                 set(missed_blocks_watcher).difference(missed_blocks_responder), key=missed_blocks_watcher.index
             )
             Builder.populate_block_queue(watcher.block_queue, block_diff)
-            watcher.awake()
             watcher.block_queue.join()
 
-        # Awake the actors if they are asleep and have pending work. No new inputs are provided, so if the Watcher is
-        # asleep it will remain asleep. However, the Responder may come and go to sleep since it will be awaken if
-        # appointments are passed trough from the Watcher.
-        if watcher.appointments and watcher.asleep:
-            watcher.awake()
-
-        if watcher.responder.trackers and watcher.responder.asleep:
-            watcher.responder.awake()
-
+        # Once they are at the same height, we update them one by one
         for block in missed_blocks_watcher:
-            if not watcher.asleep:
-                watcher.block_queue.put(block)
-                watcher.block_queue.join()
+            watcher.block_queue.put(block)
+            watcher.block_queue.join()
 
-            if not watcher.responder.asleep:
-                watcher.responder.block_queue.put(block)
-                watcher.responder.block_queue.join()
-            else:
-                # The Responder keeps track of last know block for reorgs, so it has to be updated even if there're no
-                # trackers
-                watcher.responder.last_known_block = block
+            watcher.responder.block_queue.put(block)
+            watcher.responder.block_queue.join()

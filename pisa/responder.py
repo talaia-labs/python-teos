@@ -108,11 +108,6 @@ class Responder:
     the decrypted ``penalty_txs`` handed by the :obj:`Watcher <pisa.watcher.Watcher>` and ensuring the they make it to
     the blockchain.
 
-    The :class:`Responder` can be in two states:
-
-    - Asleep (``self.asleep = True)`` when there are no trackers to take care of (``self.trackers`` is empty).
-    - Awake (``self.asleep = False)`` when there are trackers to take care of (actively monitoring the blockchain).
-
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
             database.
@@ -126,40 +121,28 @@ class Responder:
         unconfirmed_txs (:obj:`list`): A list that keeps track of all unconfirmed ``penalty_txs``.
         missed_confirmations (:obj:`dict`): A dictionary that keeps count of how many confirmations each ``penalty_tx``
             has missed. Used to trigger rebroadcast if needed.
-        asleep (:obj:`bool`): A flag that signals whether the :obj:`Responder` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Responder` to receive block hashes from ``bitcoind``. It
-            is populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
-        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
-            new blocks received by ``bitcoind``.
+        is populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
         db_manager (:obj:`DBManager <pisa.db_manager.DBManager>`): A ``DBManager`` instance to interact with the
             database.
 
     """
 
-    def __init__(self, db_manager, chain_monitor):
+    def __init__(self, db_manager):
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
-        self.asleep = True
         self.block_queue = Queue()
-        self.chain_monitor = chain_monitor
         self.db_manager = db_manager
         self.carrier = Carrier()
         self.last_known_block = db_manager.load_last_block_hash_responder()
 
     def awake(self):
-        self.asleep = False
-        self.chain_monitor.responder_asleep = False
-        responder_thread = Thread(target=self.do_watch, daemon=True).start()
+        responder_thread = Thread(target=self.do_watch, daemon=True)
+        responder_thread.start()
 
         return responder_thread
-
-    def sleep(self):
-        self.asleep = True
-        self.chain_monitor.responder_asleep = True
-
-        logger.info("No more pending trackers, going back to sleep")
 
     @staticmethod
     def on_sync(block_hash):
@@ -212,9 +195,6 @@ class Responder:
             into the blockchain.
         """
 
-        if self.asleep:
-            logger.info("Waking up")
-
         receipt = self.carrier.send_transaction(penalty_rawtx, penalty_txid)
 
         if receipt.delivered:
@@ -238,8 +218,6 @@ class Responder:
         A reduction of :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the
         ``penalty_txid`` added to ``unconfirmed_txs`` if ``confirmations=0``. Finally, all the data is stored in the
         database.
-
-        ``add_tracker`` awakes the :obj:`Responder` if it is asleep.
 
         Args:
             uuid (:obj:`str`): a unique identifier for the appointment.
@@ -278,9 +256,6 @@ class Responder:
             "New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, appointment_end=appointment_end
         )
 
-        if self.asleep:
-            self.awake()
-
     def do_watch(self):
         """
         Monitors the blockchain whilst there are pending trackers.
@@ -293,20 +268,17 @@ class Responder:
         if self.last_known_block is None:
             self.last_known_block = BlockProcessor.get_best_block_hash()
 
-        while len(self.trackers) > 0:
-            # We get notified for every new received block
+        while True:
             block_hash = self.block_queue.get()
             block = BlockProcessor.get_block(block_hash)
+            logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
 
-            if block is not None:
-                txs = block.get("tx")
-
-                logger.info(
-                    "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"), txs=txs
-                )
+            if len(self.trackers) > 0 and block is not None:
+                txids = block.get("tx")
+                logger.info("List of transactions", txids=txids)
 
                 if self.last_known_block == block.get("previousblockhash"):
-                    self.check_confirmations(txs)
+                    self.check_confirmations(txids)
 
                     height = block.get("height")
                     completed_trackers = self.get_completed_trackers(height)
@@ -328,16 +300,16 @@ class Responder:
                     # ToDo: #24-properly-handle-reorgs
                     self.handle_reorgs(block_hash)
 
-                # Register the last processed block for the responder
-                self.db_manager.store_last_block_hash_responder(block_hash)
+                # Clear the receipts issued in this block
+                self.carrier.issued_receipts = {}
 
-                self.last_known_block = block.get("hash")
+                if len(self.trackers) is 0:
+                    logger.info("No more pending trackers")
 
+            # Register the last processed block for the responder
+            self.db_manager.store_last_block_hash_responder(block_hash)
+            self.last_known_block = block.get("hash")
             self.block_queue.task_done()
-            self.carrier.issued_receipts = {}
-
-        # Go back to sleep if there are no more pending trackers
-        self.sleep()
 
     def check_confirmations(self, txs):
         """
