@@ -35,8 +35,9 @@ def test_send_double_spending_transaction(carrier):
     receipt = carrier.send_transaction(tx.hex(), txid)
     sent_txs.append(txid)
 
-    # Wait for a block to be mined
+    # Wait for a block to be mined. Issued receipts is reset from the Responder every block, so we should do it too.
     generate_blocks(2)
+    carrier.issued_receipts = {}
 
     # Try to send it again
     receipt2 = carrier.send_transaction(tx.hex(), txid)

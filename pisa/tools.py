@@ -1,4 +1,5 @@
 from http.client import HTTPException
+from socket import timeout
 
 import pisa.conf as conf
 from pisa.utils.auth_proxy import AuthServiceProxy, JSONRPCException
@@ -36,7 +37,7 @@ def can_connect_to_bitcoind():
 
     try:
         bitcoin_cli().help()
-    except (ConnectionRefusedError, JSONRPCException, HTTPException):
+    except (timeout, ConnectionRefusedError, JSONRPCException, HTTPException):
         can_connect = False
 
     return can_connect

@@ -1,5 +1,6 @@
 import pytest
 from uuid import uuid4
+from shutil import rmtree
 from threading import Thread
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
@@ -8,6 +9,7 @@ from pisa.watcher import Watcher
 from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
 from pisa.chain_monitor import ChainMonitor
+from pisa.db_manager import DBManager
 
 from test.pisa.unit.conftest import (
     generate_blocks,
@@ -18,8 +20,13 @@ from test.pisa.unit.conftest import (
 )
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
+import common.cryptographer
+from pisa import LOG_PREFIX
+from common.logger import Logger
 from common.tools import compute_locator
 from common.cryptographer import Cryptographer
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 APPOINTMENTS = 5
@@ -36,11 +43,22 @@ sk_der = signing_key.private_bytes(
 )
 
 
+@pytest.fixture(scope="session")
+def temp_db_manager():
+    db_name = get_random_value_hex(8)
+    db_manager = DBManager(db_name)
+
+    yield db_manager
+
+    db_manager.db.close()
+    rmtree(db_name)
+
+
 @pytest.fixture(scope="module")
-def watcher(db_manager, chain_monitor):
-    watcher = Watcher(db_manager, chain_monitor, sk_der, get_config())
-    chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
-    chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
+def watcher(db_manager):
+    watcher = Watcher(db_manager, Responder(db_manager), sk_der, get_config())
+    chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
+    chain_monitor.monitor_chain()
 
     return watcher
 
@@ -76,19 +94,13 @@ def create_appointments(n):
 def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
-    assert watcher.asleep is True
     assert watcher.block_queue.empty()
-    assert isinstance(watcher.chain_monitor, ChainMonitor)
     assert isinstance(watcher.config, dict)
     assert isinstance(watcher.signing_key, ec.EllipticCurvePrivateKey)
     assert isinstance(watcher.responder, Responder)
 
 
 def test_add_appointment(watcher):
-    # The watcher automatically fires do_watch and do_subscribe on adding an appointment if it is asleep (initial state)
-    # Avoid this by setting the state to awake.
-    watcher.asleep = False
-
     # We should be able to add appointments up to the limit
     for _ in range(10):
         appointment, dispute_tx = generate_dummy_appointment(
@@ -128,10 +140,11 @@ def test_add_too_many_appointments(watcher):
     assert sig is None
 
 
-def test_do_watch(watcher):
+def test_do_watch(watcher, temp_db_manager):
+    watcher.db_manager = temp_db_manager
+
     # We will wipe all the previous data and add 5 appointments
     appointments, locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
-    watcher.chain_monitor.watcher_asleep = False
 
     # Set the data into the Watcher and in the db
     watcher.locator_uuid_map = locator_uuid_map
@@ -140,9 +153,10 @@ def test_do_watch(watcher):
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
         watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
-        watcher.db_manager.store_update_locator_map(appointment.locator, uuid)
+        watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
-    Thread(target=watcher.do_watch, daemon=True).start()
+    do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
+    do_watch_thread.start()
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
@@ -158,7 +172,6 @@ def test_do_watch(watcher):
     generate_blocks(EXPIRY_DELTA + START_TIME_OFFSET + END_TIME_OFFSET)
 
     assert len(watcher.appointments) == 0
-    assert watcher.asleep is True
 
 
 def test_get_breaches(watcher, txids, locator_uuid_map):
@@ -190,7 +203,7 @@ def test_filter_valid_breaches_random_data(watcher):
         uuid = uuid4().hex
         appointments[uuid] = {"locator": dummy_appointment.locator, "end_time": dummy_appointment.end_time}
         watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
-        watcher.db_manager.store_update_locator_map(dummy_appointment.locator, uuid)
+        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
         locator_uuid_map[dummy_appointment.locator] = [uuid]
 
@@ -201,9 +214,10 @@ def test_filter_valid_breaches_random_data(watcher):
     watcher.locator_uuid_map = locator_uuid_map
     watcher.appointments = appointments
 
-    filtered_valid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
 
-    assert not any([fil_breach["valid_breach"] for uuid, fil_breach in filtered_valid_breaches.items()])
+    # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
+    assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
 
 
 def test_filter_valid_breaches(watcher):
@@ -229,10 +243,11 @@ def test_filter_valid_breaches(watcher):
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
         watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
-        watcher.db_manager.store_update_locator_map(dummy_appointment.locator, uuid)
+        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
     watcher.locator_uuid_map = locator_uuid_map
 
-    filtered_valid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
 
-    assert all([fil_breach["valid_breach"] for uuid, fil_breach in filtered_valid_breaches.items()])
+    # We have "triggered" a single breach and it was valid.
+    assert len(invalid_breaches) == 0 and len(valid_breaches) == 1

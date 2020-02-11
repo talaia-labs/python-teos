@@ -7,8 +7,10 @@ from cryptography.hazmat.primitives import serialization
 
 from pisa.api import API
 from pisa.watcher import Watcher
+from pisa.responder import Responder
 from pisa.tools import bitcoin_cli
 from pisa import HOST, PORT
+from pisa.chain_monitor import ChainMonitor
 
 from test.pisa.unit.conftest import (
     generate_block,
@@ -32,7 +34,7 @@ config = get_config()
 
 
 @pytest.fixture(scope="module")
-def run_api(db_manager, chain_monitor):
+def run_api(db_manager):
     sk, pk = generate_keypair()
     sk_der = sk.private_bytes(
         encoding=serialization.Encoding.DER,
@@ -40,9 +42,10 @@ def run_api(db_manager, chain_monitor):
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    watcher = Watcher(db_manager, chain_monitor, sk_der, get_config())
-    chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
-    chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
+    watcher = Watcher(db_manager, Responder(db_manager), sk_der, get_config())
+    chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
+    watcher.awake()
+    chain_monitor.monitor_chain()
 
     api_thread = Thread(target=API(watcher, config).start)
     api_thread.daemon = True

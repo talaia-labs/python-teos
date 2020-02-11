@@ -1,9 +1,11 @@
 import json
 import plyvel
 
+from pisa import LOG_PREFIX
+
 from common.logger import Logger
 
-logger = Logger("DBManager")
+logger = Logger(actor="DBManager", log_name_prefix=LOG_PREFIX)
 
 WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"
@@ -30,6 +32,10 @@ class DBManager:
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
             database will be create if the specified path does not contain one.
+
+    Raises:
+        ValueError: If the provided ``db_path`` is not a string.
+        plyvel.Error: If the db is currently unavailable (being used by another process).
     """
 
     def __init__(self, db_path):
@@ -43,6 +49,10 @@ class DBManager:
             if "create_if_missing is false" in str(e):
                 logger.info("No db found. Creating a fresh one")
                 self.db = plyvel.DB(db_path, create_if_missing=True)
+
+            elif "LOCK: Resource temporarily unavailable" in str(e):
+                logger.info("The db is already being used by another process (LOCK)")
+                raise e
 
     def load_appointments_db(self, prefix):
         """
@@ -175,9 +185,8 @@ class DBManager:
         triggered_appointments = self.load_all_triggered_flags()
 
         if not include_triggered:
-            appointments = {
-                uuid: appointment for uuid, appointment in appointments.items() if uuid not in triggered_appointments
-            }
+            not_triggered = list(set(appointments.keys()).difference(triggered_appointments))
+            appointments = {uuid: appointments[uuid] for uuid in not_triggered}
 
         return appointments
 
@@ -195,6 +204,10 @@ class DBManager:
     def store_watcher_appointment(self, uuid, appointment):
         """
         Stores an appointment in the database using the ``WATCHER_PREFIX`` prefix.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the appointment to be stored.
+            appointment (:obj: `str`): the json encoded appointment to be stored as data.
         """
 
         self.create_entry(uuid, appointment, prefix=WATCHER_PREFIX)
@@ -203,6 +216,10 @@ class DBManager:
     def store_responder_tracker(self, uuid, tracker):
         """
         Stores a tracker in the database using the ``RESPONDER_PREFIX`` prefix.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the appointment to be stored.
+            tracker (:obj: `str`): the json encoded tracker to be stored as data.
         """
 
         self.create_entry(uuid, tracker, prefix=RESPONDER_PREFIX)
@@ -232,9 +249,9 @@ class DBManager:
 
         return locator_map
 
-    def store_update_locator_map(self, locator, uuid):
+    def create_append_locator_map(self, locator, uuid):
         """
-        Stores (or updates if already exists) a ``locator:uuid`` map.
+        Creates (or appends to if already exists) a ``locator:uuid`` map.
 
         If the map already exists, the new ``uuid`` is appended to the existing ones (if it is not already there).
 
@@ -260,6 +277,25 @@ class DBManager:
         key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
         self.db.put(key, json.dumps(locator_map).encode("utf-8"))
 
+    def update_locator_map(self, locator, locator_map):
+        """
+        Updates a ``locator:uuid`` map in the database by deleting one of it's uuid. It will only work as long as
+        the given ``locator_map`` is a subset of the current one and it's not empty.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex-encoded string used as the key of the map.
+            locator_map (:obj:`list`): a list of uuids to replace the current one on the db.
+        """
+
+        current_locator_map = self.load_locator_map(locator)
+
+        if set(locator_map).issubset(current_locator_map) and len(locator_map) is not 0:
+            key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
+            self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+
+        else:
+            logger.error("Trying to update a locator_map with completely different, or empty, data")
+
     def delete_locator_map(self, locator):
         """
         Deletes a ``locator:uuid`` map.
@@ -282,6 +318,19 @@ class DBManager:
         self.delete_entry(uuid, prefix=WATCHER_PREFIX)
         logger.info("Deleting appointment from Watcher's db", uuid=uuid)
 
+    def batch_delete_watcher_appointments(self, uuids):
+        """
+        Deletes an appointment from the database.
+
+        Args:
+           uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the appointments to be deleted.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.delete((WATCHER_PREFIX + uuid).encode("utf-8"))
+                logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+
     def delete_responder_tracker(self, uuid):
         """
         Deletes a tracker from the database.
@@ -292,6 +341,19 @@ class DBManager:
 
         self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
         logger.info("Deleting appointment from Responder's db", uuid=uuid)
+
+    def batch_delete_responder_trackers(self, uuids):
+        """
+        Deletes an appointment from the database.
+
+        Args:
+           uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the trackers to be deleted.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.delete((RESPONDER_PREFIX + uuid).encode("utf-8"))
+                logger.info("Deleting appointment from Responder's db", uuid=uuid)
 
     def load_last_block_hash_watcher(self):
         """
@@ -338,9 +400,26 @@ class DBManager:
     def create_triggered_appointment_flag(self, uuid):
         """
         Creates a flag that signals that an appointment has been triggered.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the flag to be created.
         """
 
         self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
+        logger.info("Flagging appointment as triggered", uuid=uuid)
+
+    def batch_create_triggered_appointment_flag(self, uuids):
+        """
+        Creates a flag that signals that an appointment has been triggered for every appointment in the given list
+
+        Args:
+            uuids (:obj:`list`): a list of identifier for the appointments to flag.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), b"")
+                logger.info("Flagging appointment as triggered", uuid=uuid)
 
     def load_all_triggered_flags(self):
         """
@@ -358,6 +437,23 @@ class DBManager:
     def delete_triggered_appointment_flag(self, uuid):
         """
         Deletes a flag that signals that an appointment has been triggered.
+
+        Args:
+            uuid (:obj:`str`): the identifier of the flag to be removed.
         """
 
         self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
+        logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+
+    def batch_delete_triggered_appointment_flag(self, uuids):
+        """
+        Deletes a list of flag signaling that some appointment have been triggered.
+
+        Args:
+            uuids (:obj:`list`): the identifier of the flag to be removed.
+        """
+
+        with self.db.write_batch() as b:
+            for uuid in uuids:
+                b.delete((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"))
+                logger.info("Removing triggered flag from appointment appointment", uuid=uuid)

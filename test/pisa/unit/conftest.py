@@ -1,3 +1,4 @@
+import os
 import pytest
 import random
 import requests
@@ -14,7 +15,6 @@ from apps.cli.blob import Blob
 from pisa.responder import TransactionTracker
 from pisa.tools import bitcoin_cli
 from pisa.db_manager import DBManager
-from pisa.chain_monitor import ChainMonitor
 from common.appointment import Appointment
 from common.tools import compute_locator
 
@@ -22,8 +22,13 @@ from bitcoind_mock.transaction import create_dummy_transaction
 from bitcoind_mock.bitcoind import BitcoindMock
 from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
 
+from pisa import LOG_PREFIX
+import common.cryptographer
+from common.logger import Logger
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 @pytest.fixture(scope="session")
@@ -41,24 +46,15 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def db_manager():
     manager = DBManager("test_db")
+    # Add last know block for the Responder in the db
+
     yield manager
 
     manager.db.close()
     rmtree("test_db")
-
-
-@pytest.fixture(scope="module")
-def chain_monitor():
-    chain_monitor = ChainMonitor()
-    chain_monitor.monitor_chain()
-
-    yield chain_monitor
-
-    chain_monitor.terminate = True
-    generate_block()
 
 
 def generate_keypair():
@@ -161,6 +157,7 @@ def generate_dummy_tracker():
 
 
 def get_config():
+    data_folder = os.path.expanduser("~/.pisa_btc")
     config = {
         "BTC_RPC_USER": "username",
         "BTC_RPC_PASSWD": "password",
@@ -170,13 +167,12 @@ def get_config():
         "FEED_PROTOCOL": "tcp",
         "FEED_ADDR": "127.0.0.1",
         "FEED_PORT": 28332,
+        "DATA_FOLDER": data_folder,
         "MAX_APPOINTMENTS": 100,
         "EXPIRY_DELTA": 6,
         "MIN_TO_SELF_DELAY": 20,
-        "SERVER_LOG_FILE": "pisa.log",
-        "PISA_SECRET_KEY": "pisa_sk.der",
-        "CLIENT_LOG_FILE": "pisa.log",
-        "TEST_LOG_FILE": "test.log",
+        "SERVER_LOG_FILE": data_folder + "pisa.log",
+        "PISA_SECRET_KEY": data_folder + "pisa_sk.der",
         "DB_PATH": "appointments",
     }
 

@@ -2,17 +2,22 @@ from getopt import getopt
 from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+import common.cryptographer
 from common.logger import Logger
+from common.cryptographer import Cryptographer
+
+from pisa import config, LOG_PREFIX
 from pisa.api import API
 from pisa.watcher import Watcher
 from pisa.builder import Builder
-import pisa.conf as conf
+from pisa.responder import Responder
 from pisa.db_manager import DBManager
 from pisa.chain_monitor import ChainMonitor
 from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
-logger = Logger("Daemon")
+logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def handle_signals(signal_received, frame):
@@ -24,135 +29,110 @@ def handle_signals(signal_received, frame):
     exit(0)
 
 
-def load_config(config):
-    """
-    Looks through all of the config options to make sure they contain the right type of data and builds a config
-    dictionary. 
-
-    Args:
-        config (:obj:`module`): It takes in a config module object.
-
-    Returns:
-        :obj:`dict` A dictionary containing the config values.
-    """
-
-    conf_dict = {}
-
-    conf_fields = {
-        "BTC_RPC_USER": {"value": config.BTC_RPC_USER, "type": str},
-        "BTC_RPC_PASSWD": {"value": config.BTC_RPC_PASSWD, "type": str},
-        "BTC_RPC_HOST": {"value": config.BTC_RPC_HOST, "type": str},
-        "BTC_RPC_PORT": {"value": config.BTC_RPC_PORT, "type": int},
-        "BTC_NETWORK": {"value": config.BTC_NETWORK, "type": str},
-        "FEED_PROTOCOL": {"value": config.FEED_PROTOCOL, "type": str},
-        "FEED_ADDR": {"value": config.FEED_ADDR, "type": str},
-        "FEED_PORT": {"value": config.FEED_PORT, "type": int},
-        "MAX_APPOINTMENTS": {"value": config.MAX_APPOINTMENTS, "type": int},
-        "EXPIRY_DELTA": {"value": config.EXPIRY_DELTA, "type": int},
-        "MIN_TO_SELF_DELAY": {"value": config.MIN_TO_SELF_DELAY, "type": int},
-        "SERVER_LOG_FILE": {"value": config.SERVER_LOG_FILE, "type": str},
-        "PISA_SECRET_KEY": {"value": config.PISA_SECRET_KEY, "type": str},
-        "CLIENT_LOG_FILE": {"value": config.CLIENT_LOG_FILE, "type": str},
-        "TEST_LOG_FILE": {"value": config.TEST_LOG_FILE, "type": str},
-        "DB_PATH": {"value": config.DB_PATH, "type": str},
-    }
-
-    for field in conf_fields:
-        value = conf_fields[field]["value"]
-        correct_type = conf_fields[field]["type"]
-
-        if (value is not None) and isinstance(value, correct_type):
-            conf_dict[field] = value
-        else:
-            err_msg = "{} variable in config is of the wrong type".format(field)
-            logger.error(err_msg)
-            raise ValueError(err_msg)
-
-    return conf_dict
-
-
-if __name__ == "__main__":
-    logger.info("Starting PISA")
+def main():
+    global db_manager, chain_monitor
 
     signal(SIGINT, handle_signals)
     signal(SIGTERM, handle_signals)
     signal(SIGQUIT, handle_signals)
 
-    opts, _ = getopt(argv[1:], "", [""])
-    for opt, arg in opts:
-        # FIXME: Leaving this here for future option/arguments
-        pass
-
-    pisa_config = load_config(conf)
+    logger.info("Starting PISA")
+    db_manager = DBManager(config.get("DB_PATH"))
 
     if not can_connect_to_bitcoind():
         logger.error("Can't connect to bitcoind. Shutting down")
 
-    elif not in_correct_network(pisa_config.get("BTC_NETWORK")):
+    elif not in_correct_network(config.get("BTC_NETWORK")):
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
         try:
-            db_manager = DBManager(pisa_config.get("DB_PATH"))
+            secret_key_der = Cryptographer.load_key_file(config.get("PISA_SECRET_KEY"))
+            if not secret_key_der:
+                raise IOError("PISA private key can't be loaded")
+
+            watcher = Watcher(db_manager, Responder(db_manager), secret_key_der, config)
 
             # Create the chain monitor and start monitoring the chain
-            chain_monitor = ChainMonitor()
-            chain_monitor.monitor_chain()
+            chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
 
             watcher_appointments_data = db_manager.load_watcher_appointments()
             responder_trackers_data = db_manager.load_responder_trackers()
 
-            with open(pisa_config.get("PISA_SECRET_KEY"), "rb") as key_file:
-                secret_key_der = key_file.read()
-
-            watcher = Watcher(db_manager, chain_monitor, secret_key_der, pisa_config)
-            chain_monitor.attach_watcher(watcher.block_queue, watcher.asleep)
-            chain_monitor.attach_responder(watcher.responder.block_queue, watcher.responder.asleep)
-
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
 
+                watcher.awake()
+                watcher.responder.awake()
+
             else:
                 logger.info("Bootstrapping from backed up data")
-                block_processor = BlockProcessor()
+
+                # Update the Watcher backed up data if found.
+                if len(watcher_appointments_data) != 0:
+                    watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(
+                        watcher_appointments_data
+                    )
+
+                # Update the Responder with backed up data if found.
+                if len(responder_trackers_data) != 0:
+                    watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
+                        responder_trackers_data
+                    )
+
+                # Awaking components so the states can be updated.
+                watcher.awake()
+                watcher.responder.awake()
 
                 last_block_watcher = db_manager.load_last_block_hash_watcher()
                 last_block_responder = db_manager.load_last_block_hash_responder()
 
-                # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                last_common_ancestor_responder = None
-                missed_blocks_responder = None
+                # Populate the block queues with data if they've missed some while offline. If the blocks of both match
+                # we don't perform the search twice.
+                block_processor = BlockProcessor()
 
-                # Build Responder with backed up data if found
-                if last_block_responder is not None:
+                # FIXME: 32-reorgs-offline dropped txs are not used at this point.
+                last_common_ancestor_watcher, dropped_txs_watcher = block_processor.find_last_common_ancestor(
+                    last_block_watcher
+                )
+                missed_blocks_watcher = block_processor.get_missed_blocks(last_common_ancestor_watcher)
+
+                if last_block_watcher == last_block_responder:
+                    dropped_txs_responder = dropped_txs_watcher
+                    missed_blocks_responder = missed_blocks_watcher
+
+                else:
                     last_common_ancestor_responder, dropped_txs_responder = block_processor.find_last_common_ancestor(
                         last_block_responder
                     )
                     missed_blocks_responder = block_processor.get_missed_blocks(last_common_ancestor_responder)
 
-                    watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
-                        responder_trackers_data
-                    )
-                    watcher.responder.block_queue = Builder.build_block_queue(missed_blocks_responder)
+                # If only one of the instances needs to be updated, it can be done separately.
+                if len(missed_blocks_watcher) == 0 and len(missed_blocks_responder) != 0:
+                    Builder.populate_block_queue(watcher.responder.block_queue, missed_blocks_responder)
+                    watcher.responder.block_queue.join()
 
-                # Build Watcher. If the blocks of both match we don't perform the search twice.
-                if last_block_watcher is not None:
-                    if last_block_watcher == last_block_responder:
-                        missed_blocks_watcher = missed_blocks_responder
-                    else:
-                        last_common_ancestor_watcher, dropped_txs_watcher = block_processor.find_last_common_ancestor(
-                            last_block_watcher
-                        )
-                        missed_blocks_watcher = block_processor.get_missed_blocks(last_common_ancestor_watcher)
+                elif len(missed_blocks_responder) == 0 and len(missed_blocks_watcher) != 0:
+                    Builder.populate_block_queue(watcher.block_queue, missed_blocks_watcher)
+                    watcher.block_queue.join()
 
-                    watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(
-                        watcher_appointments_data
-                    )
-                    watcher.block_queue = Builder.build_block_queue(missed_blocks_watcher)
+                # Otherwise they need to be updated at the same time, block by block
+                elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
+                    Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
 
-            # Fire the API
-            API(watcher, config=pisa_config).start()
-
+            # Fire the API and the ChainMonitor
+            # FIXME: 92-block-data-during-bootstrap-db
+            chain_monitor.monitor_chain()
+            API(watcher, config=config).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
+
+
+if __name__ == "__main__":
+    opts, _ = getopt(argv[1:], "", [""])
+    for opt, arg in opts:
+        # FIXME: Leaving this here for future option/arguments
+        pass
+
+    main()

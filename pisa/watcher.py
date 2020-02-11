@@ -2,17 +2,19 @@ from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
+import common.cryptographer
 from common.cryptographer import Cryptographer
 from common.appointment import Appointment
 from common.tools import compute_locator
 
 from common.logger import Logger
 
+from pisa import LOG_PREFIX
 from pisa.cleaner import Cleaner
-from pisa.responder import Responder
 from pisa.block_processor import BlockProcessor
 
-logger = Logger("Watcher")
+logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 class Watcher:
@@ -32,13 +34,10 @@ class Watcher:
 
     Args:
         db_manager (:obj:`DBManager <pisa.db_manager>`): a ``DBManager`` instance to interact with the database.
-        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
-            new blocks received by ``bitcoind``.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
         config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
             ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
-        responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance. If ``None`` is passed, a new
-            instance is created. Populated instances are useful when bootstrapping the system from backed-up data.
+        responder (:obj:`Responder <pisa.responder.Responder>`): a ``Responder`` instance.
 
 
     Attributes:
@@ -47,11 +46,8 @@ class Watcher:
             It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
-        asleep (:obj:`bool`): A flag that signals whether the :obj:`Watcher` is asleep or awake.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
         populated by the :obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`.
-        chain_monitor (:obj:`ChainMonitor <pisa.chain_monitor.ChainMonitor>`): a ``ChainMonitor`` instance used to track
-            new blocks received by ``bitcoind``.
         config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
             ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         db_manager (:obj:`DBManager <pisa.db_manager>`): A db manager instance to interact with the database.
@@ -62,26 +58,27 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, chain_monitor, sk_der, config, responder=None):
+    def __init__(self, db_manager, responder, sk_der, config):
         self.appointments = dict()
         self.locator_uuid_map = dict()
-        self.asleep = True
         self.block_queue = Queue()
-        self.chain_monitor = chain_monitor
         self.config = config
         self.db_manager = db_manager
+        self.responder = responder
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
-        if not isinstance(responder, Responder):
-            self.responder = Responder(db_manager, chain_monitor)
+    def awake(self):
+        watcher_thread = Thread(target=self.do_watch, daemon=True)
+        watcher_thread.start()
+
+        return watcher_thread
 
     def add_appointment(self, appointment):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
-        ``add_appointment`` is the entry point of the Watcher. Upon receiving a new appointment, if the :obj:`Watcher`
-        is asleep, it will be awaken and start monitoring the blockchain (``do_watch``) until ``appointments`` is empty.
-        It will go back to sleep once there are no more pending appointments.
+        ``add_appointment`` is the entry point of the Watcher. Upon receiving a new appointment it will start monitoring
+        the blockchain (``do_watch``) until ``appointments`` is empty.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
         :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` and pass the information to the
@@ -116,15 +113,8 @@ class Watcher:
             else:
                 self.locator_uuid_map[appointment.locator] = [uuid]
 
-            if self.asleep:
-                self.asleep = False
-                self.chain_monitor.watcher_asleep = False
-                Thread(target=self.do_watch).start()
-
-                logger.info("Waking up")
-
             self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
-            self.db_manager.store_update_locator_map(appointment.locator, uuid)
+            self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
             appointment_added = True
             signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
@@ -147,15 +137,13 @@ class Watcher:
         :obj:`Responder <pisa.responder.Responder>` upon detecting a breach.
         """
 
-        while len(self.appointments) > 0:
+        while True:
             block_hash = self.block_queue.get()
-            logger.info("New block received", block_hash=block_hash)
-
             block = BlockProcessor.get_block(block_hash)
+            logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
 
-            if block is not None:
+            if len(self.appointments) > 0 and block is not None:
                 txids = block.get("tx")
-
                 logger.info("List of transactions", txids=txids)
 
                 expired_appointments = [
@@ -164,45 +152,55 @@ class Watcher:
                     if block["height"] > appointment_data.get("end_time") + self.config.get("EXPIRY_DELTA")
                 ]
 
-                Cleaner.delete_expired_appointment(
+                Cleaner.delete_expired_appointments(
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                filtered_breaches = self.filter_valid_breaches(self.get_breaches(txids))
+                valid_breaches, invalid_breaches = self.filter_valid_breaches(self.get_breaches(txids))
 
-                for uuid, filtered_breach in filtered_breaches.items():
-                    # Errors decrypting the Blob will result in a None penalty_txid
-                    if filtered_breach["valid_breach"] is True:
-                        logger.info(
-                            "Notifying responder and deleting appointment",
-                            penalty_txid=filtered_breach["penalty_txid"],
-                            locator=filtered_breach["locator"],
-                            uuid=uuid,
-                        )
+                triggered_flags = []
+                appointments_to_delete = []
 
-                        self.responder.handle_breach(
-                            uuid,
-                            filtered_breach["locator"],
-                            filtered_breach["dispute_txid"],
-                            filtered_breach["penalty_txid"],
-                            filtered_breach["penalty_rawtx"],
-                            self.appointments[uuid].get("end_time"),
-                            block_hash,
-                        )
-
-                    # Delete the appointment and update db
-                    Cleaner.delete_completed_appointment(
-                        uuid, self.appointments, self.locator_uuid_map, self.db_manager
+                for uuid, breach in valid_breaches.items():
+                    logger.info(
+                        "Notifying responder and deleting appointment",
+                        penalty_txid=breach["penalty_txid"],
+                        locator=breach["locator"],
+                        uuid=uuid,
                     )
 
-                # Register the last processed block for the watcher
-                self.db_manager.store_last_block_hash_watcher(block_hash)
+                    receipt = self.responder.handle_breach(
+                        uuid,
+                        breach["locator"],
+                        breach["dispute_txid"],
+                        breach["penalty_txid"],
+                        breach["penalty_rawtx"],
+                        self.appointments[uuid].get("end_time"),
+                        block_hash,
+                    )
 
-        # Go back to sleep if there are no more appointments
-        self.asleep = True
-        self.chain_monitor.watcher_asleep = True
+                    # FIXME: Only necessary because of the triggered appointment approach. Fix if it changes.
 
-        logger.info("No more pending appointments, going back to sleep")
+                    if receipt.delivered:
+                        Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
+                        triggered_flags.append(uuid)
+                    else:
+                        appointments_to_delete.append(uuid)
+
+                # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
+                appointments_to_delete.extend(invalid_breaches)
+                self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
+
+                Cleaner.delete_completed_appointments(
+                    appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
+                )
+
+                if len(self.appointments) is 0:
+                    logger.info("No more pending appointments")
+
+            # Register the last processed block for the watcher
+            self.db_manager.store_last_block_hash_watcher(block_hash)
+            self.block_queue.task_done()
 
     def get_breaches(self, txids):
         """
@@ -248,36 +246,42 @@ class Watcher:
             ``{locator, dispute_txid, penalty_txid, penalty_rawtx, valid_breach}``
         """
 
-        filtered_breaches = {}
+        valid_breaches = {}
+        invalid_breaches = []
+
+        # A cache of the already decrypted blobs so replicate decryption can be avoided
+        decrypted_blobs = {}
 
         for locator, dispute_txid in breaches.items():
             for uuid in self.locator_uuid_map[locator]:
                 appointment = Appointment.from_dict(self.db_manager.load_watcher_appointment(uuid))
 
-                try:
-                    penalty_rawtx = Cryptographer.decrypt(appointment.encrypted_blob, dispute_txid)
-
-                except ValueError:
-                    penalty_rawtx = None
-
-                penalty_tx = BlockProcessor.decode_raw_transaction(penalty_rawtx)
-
-                if penalty_tx is not None:
-                    penalty_txid = penalty_tx.get("txid")
-                    valid_breach = True
-
-                    logger.info("Breach found for locator", locator=locator, uuid=uuid, penalty_txid=penalty_txid)
+                if appointment.encrypted_blob.data in decrypted_blobs:
+                    penalty_tx, penalty_rawtx = decrypted_blobs[appointment.encrypted_blob.data]
 
                 else:
-                    penalty_txid = None
-                    valid_breach = False
+                    try:
+                        penalty_rawtx = Cryptographer.decrypt(appointment.encrypted_blob, dispute_txid)
 
-                filtered_breaches[uuid] = {
-                    "locator": locator,
-                    "dispute_txid": dispute_txid,
-                    "penalty_txid": penalty_txid,
-                    "penalty_rawtx": penalty_rawtx,
-                    "valid_breach": valid_breach,
-                }
+                    except ValueError:
+                        penalty_rawtx = None
 
-        return filtered_breaches
+                    penalty_tx = BlockProcessor.decode_raw_transaction(penalty_rawtx)
+                    decrypted_blobs[appointment.encrypted_blob.data] = (penalty_tx, penalty_rawtx)
+
+                if penalty_tx is not None:
+                    valid_breaches[uuid] = {
+                        "locator": locator,
+                        "dispute_txid": dispute_txid,
+                        "penalty_txid": penalty_tx.get("txid"),
+                        "penalty_rawtx": penalty_rawtx,
+                    }
+
+                    logger.info(
+                        "Breach found for locator", locator=locator, uuid=uuid, penalty_txid=penalty_tx.get("txid")
+                    )
+
+                else:
+                    invalid_breaches.append(uuid)
+
+        return valid_breaches, invalid_breaches

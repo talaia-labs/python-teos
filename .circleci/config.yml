@@ -5,10 +5,8 @@
 version: 2
 jobs:
   build:
-    docker:
-      # specify the version you desire here
-      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
-      - image: circleci/python:3.6.1
+    machine:
+      image: ubuntu-1604:201903-01
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
@@ -20,53 +18,87 @@ jobs:
     steps:
       - checkout
 
+      # Get bitcoin_sandbox
+      - run:
+          name: Get bitcoin_sandbox
+          command: git clone --single-branch --branch ln https://github.com/sr-gi/bitcoin_sandbox.git
+
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}
+            - v2-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "bitcoin_sandbox/requirements.txt" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+            - v2-dependencies-
 
       - run:
-          name: install dependencies
+          name: Install dependencies
           command: |
+            pyenv local 3.7.0
             python3 -m venv venv
             . venv/bin/activate
-            pip install -r pisa/requirements.txt  
+            sudo pip install --upgrade pip
+            pip install -r pisa/requirements.txt
             pip install -r pisa/requirements-dev.txt
             pip install -r apps/cli/requirements-dev.txt
+            pip install -r bitcoin_sandbox/requirements.txt
 
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}
+          key: v2-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "bitcoin_sandbox/requirements.txt" }}
 
-      # run tests!
-      # this example uses Django's built-in test-runner
-      # other common Python testing frameworks include pytest and nose
-      # https://pytest.org
-      # https://nose.readthedocs.io
+      # Build docker env for E2E testing
       - run:
-          name: create config
-          command: cp pisa/sample_conf.py pisa/conf.py
+          name: Build bitcoin_sandbox
+          command: |
+            cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
+            cp test/pisa/e2e/sandbox-conf.py bitcoin_sandbox/bitcoin_sandbox/conf.py
+            cp bitcoin_sandbox/docker/Dockerfile_ubuntu_no_ln bitcoin_sandbox/Dockerfile
+            . venv/bin/activate
+            cd bitcoin_sandbox && python -m bitcoin_sandbox.run_scenarios
+
+
+      # Run unit tests
+      - run:
+          name: Creates config files
+          command: |
+            cp pisa/sample_conf.py pisa/conf.py
+            cp apps/cli/sample_conf.py apps/cli/conf.py
 
       - run:
-          name: run pisa unit tests
+          name: Run pisa unit tests
           command: |
             . venv/bin/activate
             pytest test/pisa/unit/
 
       - run:
-          name: run common unit tests
+          name: Run common unit tests
           command: |
             . venv/bin/activate
             pytest test/common/unit
 
       - run:
-          name: run cli unit tests
+          name: Run cli unit tests
           command: |
             . venv/bin/activate
             pytest test/apps/cli/unit
+
+      # Setup pisa for E2E testing
+      - run:
+          name: Setup pisa
+          command: |
+            . venv/bin/activate
+            cp test/pisa/e2e/pisa-conf.py pisa/conf.py
+            python3 -m apps.generate_key -d ~/.pisa_btc/
+            python3 -m apps.generate_key -n cli -d ~/.pisa_btc/
+
+
+      # Run E2E tests
+      - run:
+          name: Run e2e tests
+          command: |
+            . venv/bin/activate
+            pytest test/pisa/e2e/
 
       # - store_artifacts:
       #    path: test-reports

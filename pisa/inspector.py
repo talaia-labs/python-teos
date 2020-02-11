@@ -1,15 +1,17 @@
 import re
 from binascii import unhexlify
 
+import common.cryptographer
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 
-from pisa import errors
+from pisa import errors, LOG_PREFIX
 from common.logger import Logger
 from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
-logger = Logger("Inspector")
+logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by PISA, would be stored in the logs. This is a possible DoS surface
@@ -58,8 +60,8 @@ class Inspector:
                 rcode, message = self.check_to_self_delay(appointment_data.get("to_self_delay"))
             if rcode == 0:
                 rcode, message = self.check_blob(appointment_data.get("encrypted_blob"))
-            if rcode == 0:
-                rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
+            # if rcode == 0:
+            #     rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
 
             if rcode == 0:
                 r = Appointment.from_dict(appointment_data)
@@ -336,11 +338,16 @@ class Inspector:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty signature received"
 
-        pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
-        valid_sig = Cryptographer.verify(Appointment.from_dict(appointment_data).serialize(), signature, pk)
+        elif pk_der is None:
+            rcode = errors.APPOINTMENT_EMPTY_FIELD
+            message = "empty public key received"
 
-        if not valid_sig:
-            rcode = errors.APPOINTMENT_INVALID_SIGNATURE
-            message = "invalid signature"
+        else:
+            pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
+            valid_sig = Cryptographer.verify(Appointment.from_dict(appointment_data).serialize(), signature, pk)
+
+            if not valid_sig:
+                rcode = errors.APPOINTMENT_INVALID_SIGNATURE
+                message = "invalid signature"
 
         return rcode, message

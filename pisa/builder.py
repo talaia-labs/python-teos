@@ -1,9 +1,3 @@
-from queue import Queue
-
-from pisa.responder import TransactionTracker
-from common.appointment import Appointment
-
-
 class Builder:
     """
     The :class:`Builder` class is in charge or reconstructing data loaded from the database and build the data
@@ -32,14 +26,13 @@ class Builder:
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointment = Appointment.from_dict(data)
-            appointments[uuid] = appointment
+            appointments[uuid] = {"locator": data.get("locator"), "end_time": data.get("end_time")}
 
-            if appointment.locator in locator_uuid_map:
-                locator_uuid_map[appointment.locator].append(uuid)
+            if data.get("locator") in locator_uuid_map:
+                locator_uuid_map[data.get("locator")].append(uuid)
 
             else:
-                locator_uuid_map[appointment.locator] = [uuid]
+                locator_uuid_map[data.get("locator")] = [uuid]
 
         return appointments, locator_uuid_map
 
@@ -67,33 +60,79 @@ class Builder:
         tx_tracker_map = {}
 
         for uuid, data in tracker_data.items():
-            tracker = TransactionTracker.from_dict(data)
-            trackers[uuid] = tracker
+            trackers[uuid] = {
+                "penalty_txid": data.get("penalty_txid"),
+                "locator": data.get("locator"),
+                "appointment_end": data.get("appointment_end"),
+            }
 
-            if tracker.penalty_txid in tx_tracker_map:
-                tx_tracker_map[tracker.penalty_txid].append(uuid)
+            if data.get("penalty_txid") in tx_tracker_map:
+                tx_tracker_map[data.get("penalty_txid")].append(uuid)
 
             else:
-                tx_tracker_map[tracker.penalty_txid] = [uuid]
+                tx_tracker_map[data.get("penalty_txid")] = [uuid]
 
         return trackers, tx_tracker_map
 
     @staticmethod
-    def build_block_queue(missed_blocks):
+    def populate_block_queue(block_queue, missed_blocks):
         """
-        Builds a ``Queue`` of block hashes to initialize the :mod:`Watcher <pisa.watcher.Watcher>` or the
+        Populates a ``Queue`` of block hashes to initialize the :mod:`Watcher <pisa.watcher.Watcher>` or the
         :mod:`Responder <pisa.responder.Responder>` using backed up data.
 
         Args:
+            block_queue (:obj:`Queue`): a ``Queue``
             missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (do to a crash or shutdown).
 
         Returns:
             :obj:`Queue`: A ``Queue`` containing all the missed blocks hashes.
         """
 
-        block_queue = Queue()
-
         for block in missed_blocks:
             block_queue.put(block)
 
-        return block_queue
+    @staticmethod
+    def update_states(watcher, missed_blocks_watcher, missed_blocks_responder):
+        """
+        Updates the states of both the :mod:`Watcher <pisa.watcher.Watcher>` and the :mod:`Responder <pisa.responder.Responder>`.
+        If both have pending blocks to process they need to be updates at the same time, block by block.
+
+        If only one instance has to be updated, ``populate_block_queue`` should be used.
+
+        Args:
+            watcher (:obj:`Watcher <pisa.watcher.Watcher>`): a ``Watcher`` instance (including a ``Responder``).
+            missed_blocks_watcher (:obj:`list`): the list of block missed by the ``Watcher``.
+            missed_blocks_responder (:obj:`list`): the list of block missed by the ``Responder``.
+
+        Raises:
+            ValueError: is one of the provided list is empty.
+        """
+
+        if len(missed_blocks_responder) == 0 or len(missed_blocks_watcher) == 0:
+            raise ValueError(
+                "Both the Watcher and the Responder must have missed blocks. Use ``populate_block_queue`` otherwise."
+            )
+
+        # If the missed blocks of the Watcher and the Responder are not the same, we need to bring one up to date with
+        # the other.
+        if len(missed_blocks_responder) > len(missed_blocks_watcher):
+            block_diff = sorted(
+                set(missed_blocks_responder).difference(missed_blocks_watcher), key=missed_blocks_responder.index
+            )
+            Builder.populate_block_queue(watcher.responder.block_queue, block_diff)
+            watcher.responder.block_queue.join()
+
+        elif len(missed_blocks_watcher) > len(missed_blocks_responder):
+            block_diff = sorted(
+                set(missed_blocks_watcher).difference(missed_blocks_responder), key=missed_blocks_watcher.index
+            )
+            Builder.populate_block_queue(watcher.block_queue, block_diff)
+            watcher.block_queue.join()
+
+        # Once they are at the same height, we update them one by one
+        for block in missed_blocks_watcher:
+            watcher.block_queue.put(block)
+            watcher.block_queue.join()
+
+            watcher.responder.block_queue.put(block)
+            watcher.responder.block_queue.join()

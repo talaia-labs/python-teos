@@ -3,16 +3,12 @@ import struct
 import binascii
 from pytest import fixture
 
-from pisa import c_logger
 from common.appointment import Appointment
 from pisa.encrypted_blob import EncryptedBlob
 
 from test.pisa.unit.conftest import get_random_value_hex
 
 from common.constants import LOCATOR_LEN_BYTES
-
-
-c_logger.disabled = True
 
 
 # Not much to test here, adding it for completeness

@@ -1,33 +1,28 @@
-import logging
+import os
+import apps.cli.conf as conf
+from common.tools import extend_paths, check_conf_fields, setup_logging, setup_data_folder
 
-# PISA-SERVER
-DEFAULT_PISA_API_SERVER = "btc.pisa.watch"
-DEFAULT_PISA_API_PORT = 9814
+LOG_PREFIX = "cli"
 
-# PISA-CLI
-CLIENT_LOG_FILE = "pisa-cli.log"
-APPOINTMENTS_FOLDER_NAME = "appointments"
+# Load config fields
+conf_fields = {
+    "DEFAULT_PISA_API_SERVER": {"value": conf.DEFAULT_PISA_API_SERVER, "type": str},
+    "DEFAULT_PISA_API_PORT": {"value": conf.DEFAULT_PISA_API_PORT, "type": int},
+    "DATA_FOLDER": {"value": conf.DATA_FOLDER, "type": str},
+    "CLIENT_LOG_FILE": {"value": conf.CLIENT_LOG_FILE, "type": str, "path": True},
+    "APPOINTMENTS_FOLDER_NAME": {"value": conf.APPOINTMENTS_FOLDER_NAME, "type": str, "path": True},
+    # "CLI_PUBLIC_KEY": {"value": conf.CLI_PUBLIC_KEY, "type": str, "path": True},
+    # "CLI_PRIVATE_KEY": {"value": conf.CLI_PRIVATE_KEY, "type": str, "path": True},
+    # "PISA_PUBLIC_KEY": {"value": conf.PISA_PUBLIC_KEY, "type": str, "path": True},
+}
 
-CLI_PUBLIC_KEY = "cli_pk.der"
-CLI_PRIVATE_KEY = "cli_sk.der"
-PISA_PUBLIC_KEY = "pisa_pk.der"
+# Expand user (~) if found and check fields are correct
+conf_fields["DATA_FOLDER"]["value"] = os.path.expanduser(conf_fields["DATA_FOLDER"]["value"])
+# Extend relative paths
+conf_fields = extend_paths(conf_fields["DATA_FOLDER"]["value"], conf_fields)
 
-# Create the file logger
-f_logger = logging.getLogger("cli_file_log")
-f_logger.setLevel(logging.INFO)
+# Sanity check fields and build config dictionary
+config = check_conf_fields(conf_fields)
 
-fh = logging.FileHandler(CLIENT_LOG_FILE)
-fh.setLevel(logging.INFO)
-fh_formatter = logging.Formatter("%(message)s")
-fh.setFormatter(fh_formatter)
-f_logger.addHandler(fh)
-
-# Create the console logger
-c_logger = logging.getLogger("cli_console_log")
-c_logger.setLevel(logging.INFO)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-ch_formatter = logging.Formatter("%(asctime)s %(message)s.", "%Y-%m-%d %H:%M:%S")
-ch.setFormatter(ch_formatter)
-c_logger.addHandler(ch)
+setup_data_folder(config.get("DATA_FOLDER"))
+setup_logging(config.get("CLIENT_LOG_FILE"), LOG_PREFIX)

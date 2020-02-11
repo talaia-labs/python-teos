@@ -1,4 +1,10 @@
+import pytest
 import random
+
+
+@pytest.fixture(scope="session", autouse=True)
+def prng_seed():
+    random.seed(0)
 
 
 def get_random_value_hex(nbytes):

@@ -1,12 +1,17 @@
+import os
 import binascii
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
+import common.cryptographer
 from apps.cli.blob import Blob
+from common.logger import Logger
 from common.cryptographer import Cryptographer
 from pisa.encrypted_blob import EncryptedBlob
 from test.common.unit.conftest import get_random_value_hex
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
 data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
 key = "b2e984a570f6f49bc38ace178e09147b0aa296cbb7c92eb01412f7e2d07b5659"
@@ -179,6 +184,30 @@ def test_decrypt_wrong_return():
 
     except ValueError:
         assert True
+
+
+def test_load_key_file():
+    dummy_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+    dummy_sk_der = dummy_sk.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    # If file exists and has data in it, function should work.
+    with open("key_test_file", "wb") as f:
+        f.write(dummy_sk_der)
+
+    appt_data = Cryptographer.load_key_file("key_test_file")
+    assert appt_data
+
+    os.remove("key_test_file")
+
+    # If file doesn't exist, function should return None
+    assert Cryptographer.load_key_file("nonexistent_file") is None
+
+    # If something that's not a file_path is passed as parameter the method should also return None
+    assert Cryptographer.load_key_file(0) is None and Cryptographer.load_key_file(None) is None
 
 
 def test_load_public_key_der():
