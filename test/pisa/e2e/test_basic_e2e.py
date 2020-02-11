@@ -34,6 +34,13 @@ wt_cli.pisa_api_port = PORT
 pisad_process = run_pisad()
 
 
+def get_pisa_pk():
+    pisa_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(config.get("PISA_SECRET_KEY")))
+    pisa_pk = pisa_sk.public_key()
+
+    return pisa_pk
+
+
 def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
     # Broadcast the commitment transaction and mine a block
     bitcoin_cli.sendrawtransaction(commitment_tx)
@@ -46,7 +53,9 @@ def get_appointment_info(locator):
     return wt_cli.get_appointment(locator)
 
 
-def test_appointment_life_cycle(bitcoin_cli, create_txs):
+def test_appointment_life_cycle(monkeypatch, bitcoin_cli, create_txs):
+    monkeypatch.setattr(wt_cli, "load_keys", get_pisa_pk)
+
     commitment_tx, penalty_tx = create_txs
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
@@ -89,7 +98,9 @@ def test_appointment_life_cycle(bitcoin_cli, create_txs):
     assert appointment_info[0].get("status") == "not_found"
 
 
-def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
+def test_appointment_malformed_penalty(monkeypatch, bitcoin_cli, create_txs):
+    monkeypatch.setattr(wt_cli, "load_keys", get_pisa_pk)
+
     # Lets start by creating two valid transaction
     commitment_tx, penalty_tx = create_txs
 
@@ -128,7 +139,7 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     # We can't use wt_cli.add_appointment here since it computes the locator internally, so let's do it manually.
     # We will encrypt the blob using the random value and derive the locator from the commitment tx.
     appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
-    appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), appointment_data.get("tx_id"))
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), get_random_value_hex(32))
     appointment = Appointment.from_dict(appointment_data)
 
     # pisa_pk, cli_sk, cli_pk_der = wt_cli.load_keys(
@@ -140,8 +151,7 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     # data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
     # FIXME: Since the pk is now hardcoded for the alpha in the cli we cannot use load_keys here. We need to derive
     #   the pk from the sk on disk.
-    pisa_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(config.get("PISA_SECRET_KEY")))
-    pisa_pk = pisa_sk.public_key()
+    pisa_pk = get_pisa_pk()
     data = {"appointment": appointment.to_dict()}
 
     # Send appointment to the server.
@@ -167,7 +177,9 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     assert appointment_info[0].get("status") == "not_found"
 
 
-def test_two_identical_appointments(bitcoin_cli, create_txs):
+def test_two_identical_appointments(monkeypatch, bitcoin_cli, create_txs):
+    monkeypatch.setattr(wt_cli, "load_keys", get_pisa_pk)
+
     # Tests sending two identical appointments to the tower.
     # At the moment there are no checks for identical appointments, so both will be accepted, decrypted and kept until
     # the end.
@@ -200,7 +212,9 @@ def test_two_identical_appointments(bitcoin_cli, create_txs):
         assert info.get("penalty_rawtx") == penalty_tx
 
 
-def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs):
+def test_two_appointment_same_locator_different_penalty(monkeypatch, bitcoin_cli, create_txs):
+    monkeypatch.setattr(wt_cli, "load_keys", get_pisa_pk)
+
     # This tests sending an appointment with two valid transaction with the same locator.
     commitment_tx, penalty_tx1 = create_txs
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
@@ -232,8 +246,10 @@ def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs)
     assert appointment_info[0].get("penalty_rawtx") == penalty_tx1
 
 
-def test_appointment_shutdown_pisa_trigger_back_online(create_txs, bitcoin_cli):
+def test_appointment_shutdown_pisa_trigger_back_online(monkeypatch, create_txs, bitcoin_cli):
     global pisad_process
+
+    monkeypatch.setattr(wt_cli, "load_keys", get_pisa_pk)
 
     pisa_pid = pisad_process.pid
 
@@ -270,8 +286,10 @@ def test_appointment_shutdown_pisa_trigger_back_online(create_txs, bitcoin_cli):
     assert appointment_info[0].get("status") == "dispute_responded"
 
 
-def test_appointment_shutdown_pisa_trigger_while_offline(create_txs, bitcoin_cli):
+def test_appointment_shutdown_pisa_trigger_while_offline(monkeypatch, create_txs, bitcoin_cli):
     global pisad_process
+
+    monkeypatch.setattr(wt_cli, "load_keys", get_pisa_pk)
 
     pisa_pid = pisad_process.pid
 
