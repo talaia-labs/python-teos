@@ -2,6 +2,7 @@ from getopt import getopt
 from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+import common.cryptographer
 from common.logger import Logger
 from common.cryptographer import Cryptographer
 
@@ -16,6 +17,7 @@ from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def handle_signals(signal_received, frame):

@@ -1,6 +1,7 @@
 import re
 from binascii import unhexlify
 
+import common.cryptographer
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 
@@ -10,6 +11,7 @@ from common.appointment import Appointment
 from pisa.block_processor import BlockProcessor
 
 logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by PISA, would be stored in the logs. This is a possible DoS surface

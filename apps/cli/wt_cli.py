@@ -13,6 +13,7 @@ from apps.cli import config, LOG_PREFIX
 from apps.cli.help import help_add_appointment, help_get_appointment
 from apps.cli.blob import Blob
 
+import common.cryptographer
 from common import constants
 from common.logger import Logger
 from common.appointment import Appointment
@@ -20,7 +21,7 @@ from common.cryptographer import Cryptographer
 from common.tools import check_sha256_hex_format, check_locator_format, compute_locator
 
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
-
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 # FIXME: creating a simpler load_keys for the alpha. Client keys will not be necessary. PISA key is hardcoded.
 # def load_keys(pisa_pk_path, cli_sk_path, cli_pk_path):

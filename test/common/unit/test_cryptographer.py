@@ -1,14 +1,17 @@
 import os
-import pytest
 import binascii
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
+import common.cryptographer
 from apps.cli.blob import Blob
+from common.logger import Logger
 from common.cryptographer import Cryptographer
 from pisa.encrypted_blob import EncryptedBlob
 from test.common.unit.conftest import get_random_value_hex
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
 data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
 key = "b2e984a570f6f49bc38ace178e09147b0aa296cbb7c92eb01412f7e2d07b5659"

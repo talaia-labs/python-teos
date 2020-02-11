@@ -1,4 +1,3 @@
-import pytest
 import responses
 import json
 import os
@@ -9,6 +8,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+import common.cryptographer
+from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -16,6 +17,8 @@ from common.cryptographer import Cryptographer
 from apps.cli.blob import Blob
 import apps.cli.wt_cli as wt_cli
 from test.apps.cli.unit.conftest import get_random_value_hex
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=wt_cli.LOG_PREFIX)
 
 # dummy keys for the tests
 dummy_sk = ec.generate_private_key(ec.SECP256K1, default_backend())

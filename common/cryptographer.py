@@ -10,9 +10,8 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key, lo
 from cryptography.exceptions import InvalidSignature
 from common.tools import check_sha256_hex_format
 
-from common.logger import Logger
-
-logger = Logger("Cryptographer")
+# FIXME: Common has not log file, so it needs to log in the same log as the caller. This is a temporary fix.
+logger = None
 
 
 class Cryptographer:
@@ -39,12 +38,10 @@ class Cryptographer:
 
         if len(data) % 2:
             error = "Incorrect (Odd-length) value"
-            logger.error(error, data=data)
             raise ValueError(error)
 
         if not check_sha256_hex_format(secret):
             error = "Secret must be a 32-byte hex value (64 hex chars)"
-            logger.error(error, secret=secret)
             raise ValueError(error)
 
         return True
