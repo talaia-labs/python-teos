@@ -125,13 +125,15 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), appointment_data.get("tx_id"))
     appointment = Appointment.from_dict(appointment_data)
 
-    pisa_pk, cli_sk, cli_pk_der = wt_cli.load_keys(
-        cli_conf.get("PISA_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
-    )
-    hex_pk_der = binascii.hexlify(cli_pk_der)
-
-    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
-    data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
+    # pisa_pk, cli_sk, cli_pk_der = wt_cli.load_keys(
+    #     cli_conf.get("PISA_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
+    # )
+    # hex_pk_der = binascii.hexlify(cli_pk_der)
+    #
+    # signature = Cryptographer.sign(appointment.serialize(), cli_sk)
+    # data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
+    pisa_pk = wt_cli.load_keys()
+    data = {"appointment": appointment.to_dict()}
 
     # Send appointment to the server.
     response = wt_cli.post_appointment(data)
