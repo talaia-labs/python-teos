@@ -3,6 +3,7 @@ import binascii
 from time import sleep
 from riemann.tx import Tx
 
+from pisa import config
 from pisa import HOST, PORT
 from apps.cli import wt_cli
 from apps.cli.blob import Blob
@@ -137,7 +138,10 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     #
     # signature = Cryptographer.sign(appointment.serialize(), cli_sk)
     # data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
-    pisa_pk = wt_cli.load_keys()
+    # FIXME: Since the pk is now hardcoded for the alpha in the cli we cannot use load_keys here. We need to derive
+    #   the pk from the sk on disk.
+    pisa_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(config.get("PISA_SECRET_KEY")))
+    pisa_pk = pisa_sk.public_key()
     data = {"appointment": appointment.to_dict()}
 
     # Send appointment to the server.
