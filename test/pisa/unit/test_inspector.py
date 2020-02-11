@@ -14,6 +14,12 @@ from test.pisa.unit.conftest import get_random_value_hex, generate_dummy_appoint
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
+from common.logger import Logger
+
+from pisa import LOG_PREFIX
+import common.cryptographer
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 inspector = Inspector(get_config())

@@ -20,8 +20,13 @@ from test.pisa.unit.conftest import (
 )
 from pisa.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
 
+import common.cryptographer
+from pisa import LOG_PREFIX
+from common.logger import Logger
 from common.tools import compute_locator
 from common.cryptographer import Cryptographer
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 APPOINTMENTS = 5

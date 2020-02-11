@@ -10,9 +10,8 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key, lo
 from cryptography.exceptions import InvalidSignature
 from common.tools import check_sha256_hex_format
 
-from common.logger import Logger
-
-logger = Logger("Cryptographer")
+# FIXME: Common has not log file, so it needs to log in the same log as the caller. This is a temporary fix.
+logger = None
 
 
 class Cryptographer:
@@ -39,12 +38,10 @@ class Cryptographer:
 
         if len(data) % 2:
             error = "Incorrect (Odd-length) value"
-            logger.error(error, data=data)
             raise ValueError(error)
 
         if not check_sha256_hex_format(secret):
             error = "Secret must be a 32-byte hex value (64 hex chars)"
-            logger.error(error, secret=secret)
             raise ValueError(error)
 
         return True
@@ -147,6 +144,35 @@ class Cryptographer:
         return blob
 
     @staticmethod
+    def load_key_file(file_path):
+        """
+        Loads a key from a key file.
+
+        Args:
+            file_path (:obj:`str`): the path to the key file to be loaded.
+
+        Returns:
+            :obj:`bytes` or :obj:`None`: the key file data if the file can be found and read. ``None`` otherwise.
+        """
+
+        if not isinstance(file_path, str):
+            logger.error("Key file path was expected, {} received".format(type(file_path)))
+            return None
+
+        try:
+            with open(file_path, "rb") as key_file:
+                key = key_file.read()
+            return key
+
+        except FileNotFoundError:
+            logger.error("Key file not found. Please check your settings")
+            return None
+
+        except IOError as e:
+            logger.error("I/O error({}): {}".format(e.errno, e.strerror))
+            return None
+
+    @staticmethod
     def load_public_key_der(pk_der):
         """
         Creates an :mod:`EllipticCurvePublicKey` object from a given ``DER`` encoded public key.
@@ -199,13 +225,15 @@ class Cryptographer:
             return sk
 
         except UnsupportedAlgorithm:
-            raise ValueError("Could not deserialize the private key (unsupported algorithm).")
+            logger.error("Could not deserialize the private key (unsupported algorithm)")
 
         except ValueError:
             logger.error("The provided data cannot be deserialized (wrong size or format)")
 
         except TypeError:
             logger.error("The provided data cannot be deserialized (wrong type)")
+
+        return None
 
     @staticmethod
     def sign(data, sk, rtype="str"):

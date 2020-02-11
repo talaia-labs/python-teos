@@ -2,6 +2,7 @@ from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
+import common.cryptographer
 from common.cryptographer import Cryptographer
 from common.appointment import Appointment
 from common.tools import compute_locator
@@ -13,6 +14,7 @@ from pisa.cleaner import Cleaner
 from pisa.block_processor import BlockProcessor
 
 logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 class Watcher:

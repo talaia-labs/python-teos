@@ -2,7 +2,9 @@ from getopt import getopt
 from sys import argv, exit
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+import common.cryptographer
 from common.logger import Logger
+from common.cryptographer import Cryptographer
 
 from pisa import config, LOG_PREFIX
 from pisa.api import API
@@ -15,6 +17,7 @@ from pisa.block_processor import BlockProcessor
 from pisa.tools import can_connect_to_bitcoind, in_correct_network
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def handle_signals(signal_received, frame):
@@ -44,8 +47,9 @@ def main():
 
     else:
         try:
-            with open(config.get("PISA_SECRET_KEY"), "rb") as key_file:
-                secret_key_der = key_file.read()
+            secret_key_der = Cryptographer.load_key_file(config.get("PISA_SECRET_KEY"))
+            if not secret_key_der:
+                raise IOError("PISA private key can't be loaded")
 
             watcher = Watcher(db_manager, Responder(db_manager), secret_key_der, config)
 

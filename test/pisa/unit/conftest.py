@@ -22,8 +22,13 @@ from bitcoind_mock.transaction import create_dummy_transaction
 from bitcoind_mock.bitcoind import BitcoindMock
 from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
 
+from pisa import LOG_PREFIX
+import common.cryptographer
+from common.logger import Logger
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
+
+common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 @pytest.fixture(scope="session")
