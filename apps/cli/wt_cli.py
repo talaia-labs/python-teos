@@ -22,65 +22,49 @@ from common.tools import check_sha256_hex_format, check_locator_format, compute_
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 
 
-# FIXME: TESTING ENDPOINT, WON'T BE THERE IN PRODUCTION
-def generate_dummy_appointment():
-    get_block_count_end_point = "http://{}:{}/get_block_count".format(pisa_api_server, pisa_api_port)
-    r = requests.get(url=get_block_count_end_point, timeout=5)
+# FIXME: creating a simpler load_keys for the alpha. Client keys will not be necessary. PISA key is hardcoded.
+# def load_keys(pisa_pk_path, cli_sk_path, cli_pk_path):
+#     """
+#     Loads all the keys required so sign, send, and verify the appointment.
+#
+#     Args:
+#         pisa_pk_path (:obj:`str`): path to the PISA public key file.
+#         cli_sk_path (:obj:`str`): path to the client private key file.
+#         cli_pk_path (:obj:`str`): path to the client public key file.
+#
+#     Returns:
+#         :obj:`tuple` or ``None``: a three item tuple containing a pisa_pk object, cli_sk object and the cli_sk_der
+#         encoded key if all keys can be loaded. ``None`` otherwise.
+#     """
+#
+#     pisa_pk_der = Cryptographer.load_key_file(pisa_pk_path)
+#     pisa_pk = Cryptographer.load_public_key_der(pisa_pk_der)
+#
+#     if pisa_pk is None:
+#         logger.error("PISA's public key file not found. Please check your settings")
+#         return None
+#
+#     cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
+#     cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
+#
+#     if cli_sk is None:
+#         logger.error("Client's private key file not found. Please check your settings")
+#         return None
+#
+#     cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
+#
+#     if cli_pk_der is None:
+#         logger.error("Client's public key file not found. Please check your settings")
+#         return None
+#
+#     return pisa_pk, cli_sk, cli_pk_der
 
-    current_height = r.json().get("block_count")
 
-    dummy_appointment_data = {
-        "tx": os.urandom(192).hex(),
-        "tx_id": os.urandom(32).hex(),
-        "start_time": current_height + 5,
-        "end_time": current_height + 10,
-        "to_self_delay": 20,
-    }
+def load_keys():
+    PISA_PUBLIC_KEY = "3056301006072a8648ce3d020106052b8104000a0342000430053e39c53b8bcb43354a4ed886b8082af1d1e8fc14956e60ad0592bfdfab511b7e309f6ac83b7495462196692e145bf7b1a321e96ec8fc4d678719c77342da"
+    pisa_pk = Cryptographer.load_public_key_der(binascii.unhexlify(PISA_PUBLIC_KEY))
 
-    logger.info(
-        "Generating dummy appointment data:" "\n\n" + json.dumps(dummy_appointment_data, indent=4, sort_keys=True)
-    )
-
-    json.dump(dummy_appointment_data, open("dummy_appointment_data.json", "w"))
-
-    logger.info("\nData stored in dummy_appointment_data.json")
-
-
-def load_keys(pisa_pk_path, cli_sk_path, cli_pk_path):
-    """
-    Loads all the keys required so sign, send, and verify the appointment.
-
-    Args:
-        pisa_pk_path (:obj:`str`): path to the PISA public key file.
-        cli_sk_path (:obj:`str`): path to the client private key file.
-        cli_pk_path (:obj:`str`): path to the client public key file.
-
-    Returns:
-        :obj:`tuple` or ``None``: a three item tuple containing a pisa_pk object, cli_sk object and the cli_sk_der
-        encoded key if all keys can be loaded. ``None`` otherwise.
-    """
-
-    pisa_pk_der = Cryptographer.load_key_file(pisa_pk_path)
-    pisa_pk = Cryptographer.load_public_key_der(pisa_pk_der)
-
-    if pisa_pk is None:
-        logger.error("PISA's public key file not found. Please check your settings")
-        return None
-
-    cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
-    cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
-
-    if cli_sk is None:
-        logger.error("Client's private key file not found. Please check your settings")
-        return None
-
-    cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
-
-    if cli_pk_der is None:
-        logger.error("Client's public key file not found. Please check your settings")
-        return None
-
-    return pisa_pk, cli_sk, cli_pk_der
+    return pisa_pk
 
 
 def add_appointment(args):
@@ -109,16 +93,20 @@ def add_appointment(args):
         :obj:`bool`: True if the appointment is accepted by the tower and the receipt is properly stored, false if any
         error occurs during the process.
     """
+    # FIXME: creating a simpler load_keys for the alpha. Client keys will not be necessary. PISA key is hardcoded.
+    # pisa_pk, cli_sk, cli_pk_der = load_keys(
+    #     config.get("PISA_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
+    # )
+    #
+    # try:
+    #     hex_pk_der = binascii.hexlify(cli_pk_der)
+    #
+    # except binascii.Error as e:
+    #     logger.error("Could not successfully encode public key as hex", error=str(e))
+    #     return False
+    pisa_pk = load_keys()
 
-    pisa_pk, cli_sk, cli_pk_der = load_keys(
-        config.get("PISA_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
-    )
-
-    try:
-        hex_pk_der = binascii.hexlify(cli_pk_der)
-
-    except binascii.Error as e:
-        logger.error("Could not successfully encode public key as hex", error=str(e))
+    if pisa_pk is None:
         return False
 
     # Get appointment data from user.
@@ -146,15 +134,21 @@ def add_appointment(args):
         return False
 
     appointment = Appointment.from_dict(appointment_data)
-    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
 
-    if not (appointment and signature):
-        return False
-
-    data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
+    # FIXME: getting rid of the client-side signature for the alpha. A proper authentication is required.
+    # signature = Cryptographer.sign(appointment.serialize(), cli_sk)
+    #
+    # if not (appointment and signature):
+    #     return False
+    #
+    # data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
+    data = {"appointment": appointment.to_dict()}
 
     # Send appointment to the server.
     server_response = post_appointment(data)
+    if server_response is None:
+        return False
+
     response_json = process_post_appointment_response(server_response)
 
     if response_json is None:
@@ -316,6 +310,7 @@ def save_appointment_receipt(appointment, signature):
     try:
         with open(filename, "w") as f:
             json.dump(data, f)
+            logger.info("Appointment saved at {}".format(filename))
             return True
 
     except IOError as e:
@@ -378,7 +373,6 @@ if __name__ == "__main__":
     pisa_api_server = config.get("DEFAULT_PISA_API_SERVER")
     pisa_api_port = config.get("DEFAULT_PISA_API_PORT")
     commands = ["add_appointment", "get_appointment", "help"]
-    testing_commands = ["generate_dummy_appointment"]
 
     try:
         opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])
@@ -431,11 +425,6 @@ if __name__ == "__main__":
 
                     else:
                         sys.exit(show_usage())
-
-            # FIXME: testing command, not for production
-            elif command in testing_commands:
-                if command == "generate_dummy_appointment":
-                    generate_dummy_appointment()
 
             else:
                 logger.error("Unknown command. Use help to check the list of available commands")

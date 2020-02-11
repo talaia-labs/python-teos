@@ -58,8 +58,8 @@ class Inspector:
                 rcode, message = self.check_to_self_delay(appointment_data.get("to_self_delay"))
             if rcode == 0:
                 rcode, message = self.check_blob(appointment_data.get("encrypted_blob"))
-            if rcode == 0:
-                rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
+            # if rcode == 0:
+            #     rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
 
             if rcode == 0:
                 r = Appointment.from_dict(appointment_data)
@@ -336,11 +336,16 @@ class Inspector:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty signature received"
 
-        pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
-        valid_sig = Cryptographer.verify(Appointment.from_dict(appointment_data).serialize(), signature, pk)
+        elif pk_der is None:
+            rcode = errors.APPOINTMENT_EMPTY_FIELD
+            message = "empty public key received"
 
-        if not valid_sig:
-            rcode = errors.APPOINTMENT_INVALID_SIGNATURE
-            message = "invalid signature"
+        else:
+            pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
+            valid_sig = Cryptographer.verify(Appointment.from_dict(appointment_data).serialize(), signature, pk)
+
+            if not valid_sig:
+                rcode = errors.APPOINTMENT_INVALID_SIGNATURE
+                message = "invalid signature"
 
         return rcode, message

@@ -4,7 +4,7 @@ from time import sleep
 from riemann.tx import Tx
 
 from pisa import HOST, PORT
-from apps.cli import pisa_cli
+from apps.cli import wt_cli
 from apps.cli.blob import Blob
 from apps.cli import config as cli_conf
 from common.tools import compute_locator
@@ -19,10 +19,10 @@ from test.pisa.e2e.conftest import (
     run_pisad,
 )
 
-# We'll use pisa_cli to add appointments. The expected input format is a list of arguments with a json-encoded
+# We'll use wt_cli to add appointments. The expected input format is a list of arguments with a json-encoded
 # appointment
-pisa_cli.pisa_api_server = HOST
-pisa_cli.pisa_api_port = PORT
+wt_cli.pisa_api_server = HOST
+wt_cli.pisa_api_port = PORT
 
 # Run pisad
 pisad_process = run_pisad()
@@ -37,7 +37,7 @@ def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
 def get_appointment_info(locator):
     # Check that the justice has been triggered (the appointment has moved from Watcher to Responder)
     sleep(1)  # Let's add a bit of delay so the state can be updated
-    return pisa_cli.get_appointment(locator)
+    return wt_cli.get_appointment(locator)
 
 
 def test_appointment_life_cycle(bitcoin_cli, create_txs):
@@ -46,13 +46,17 @@ def test_appointment_life_cycle(bitcoin_cli, create_txs):
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment_data)]) is True
+
+    appointment_info = get_appointment_info(locator)
+    assert appointment_info is not None
+    assert len(appointment_info) == 1
+    assert appointment_info[0].get("status") == "being_watched"
 
     new_addr = bitcoin_cli.getnewaddress()
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
 
     appointment_info = get_appointment_info(locator)
-
     assert appointment_info is not None
     assert len(appointment_info) == 1
     assert appointment_info[0].get("status") == "dispute_responded"
@@ -92,7 +96,7 @@ def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, mod_penalty_tx.hex())
     locator = compute_locator(commitment_tx_id)
 
-    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment_data)]) is True
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -115,13 +119,13 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     # The appointment data is built using a random 32-byte value.
     appointment_data = build_appointment_data(bitcoin_cli, get_random_value_hex(32), penalty_tx)
 
-    # We can't use pisa_cli.add_appointment here since it computes the locator internally, so let's do it manually.
+    # We can't use wt_cli.add_appointment here since it computes the locator internally, so let's do it manually.
     # We will encrypt the blob using the random value and derive the locator from the commitment tx.
     appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), appointment_data.get("tx_id"))
     appointment = Appointment.from_dict(appointment_data)
 
-    pisa_pk, cli_sk, cli_pk_der = pisa_cli.load_keys(
+    pisa_pk, cli_sk, cli_pk_der = wt_cli.load_keys(
         cli_conf.get("PISA_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
     )
     hex_pk_der = binascii.hexlify(cli_pk_der)
@@ -130,8 +134,8 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
-    response = pisa_cli.post_appointment(data)
-    response_json = pisa_cli.process_post_appointment_response(response)
+    response = wt_cli.post_appointment(data)
+    response_json = wt_cli.process_post_appointment_response(response)
 
     # Check that the server has accepted the appointment
     signature = response_json.get("signature")
@@ -165,8 +169,8 @@ def test_two_identical_appointments(bitcoin_cli, create_txs):
     locator = compute_locator(commitment_tx_id)
 
     # Send the appointment twice
-    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
-    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment_data)]) is True
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -199,8 +203,8 @@ def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs)
     appointment2_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx2)
     locator = compute_locator(commitment_tx_id)
 
-    assert pisa_cli.add_appointment([json.dumps(appointment1_data)]) is True
-    assert pisa_cli.add_appointment([json.dumps(appointment2_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment1_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment2_data)]) is True
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -227,7 +231,7 @@ def test_appointment_shutdown_pisa_trigger_back_online(create_txs, bitcoin_cli):
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment_data)]) is True
 
     # Restart pisa
     pisad_process.terminate()
@@ -265,7 +269,7 @@ def test_appointment_shutdown_pisa_trigger_while_offline(create_txs, bitcoin_cli
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    assert pisa_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert wt_cli.add_appointment([json.dumps(appointment_data)]) is True
 
     # Check that the appointment is still in the Watcher
     appointment_info = get_appointment_info(locator)
