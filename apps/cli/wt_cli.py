@@ -356,7 +356,7 @@ def get_appointment(locator):
 def show_usage():
     return (
         "USAGE: "
-        "\n\tpython pisa-cli.py [global options] command [command options] [arguments]"
+        "\n\tpython wt_cli.py [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
         "\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server."
         "\n\tget_appointment \tGets json formatted data about an appointment from the PISA server."
@@ -365,7 +365,7 @@ def show_usage():
         "\n\t-s, --server \tAPI server where to send the requests. Defaults to btc.pisa.watch (modifiable in "
         "__init__.py)"
         "\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)"
-        "\n\t-d, --debug \tshows debug information and stores it in pisa_cli.log"
+        "\n\t-d, --debug \tshows debug information and stores it in wt_cli.log"
         "\n\t-h --help \tshows this message."
     )
 

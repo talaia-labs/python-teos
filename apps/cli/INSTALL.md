@@ -1,8 +1,8 @@
 # Install 
 
-`pisa-cli` has some dependencies that can be satisfied by following [DEPENDENCIES.md](DEPENDENCIES.md). If your system already satisfies the dependencies, you can skip that part.
+`wt_cli` has some dependencies that can be satisfied by following [DEPENDENCIES.md](DEPENDENCIES.md). If your system already satisfies the dependencies, you can skip that part.
 
-In order to run `pisa-cli`, you should set your `PYTHONPATH` env variable to include the folder that contains the `apps` folder. You can do so by running:
+In order to run `wt_cli`, you should set your `PYTHONPATH` env variable to include the folder that contains the `apps` folder. You can do so by running:
 
 	export PYTHONPATH=$PYTHONPATH:<absolute_path_to_apps>
 	
@@ -14,7 +14,7 @@ You should also include the command in your `.bash_rc` to avoid having to run it
 
 	echo 'export PYTHONPATH=$PYTHONPATH:<absolute_path_to_apps>' >> ~/.bash_rc
 	
-Once the `PYTHONPATH` is set, you should be able to run `pisa-cli` straightaway. Try it by running:
+Once the `PYTHONPATH` is set, you should be able to run `wt_cli` straightaway. Try it by running:
 
 	cd <absolute_path_to_apps>/apps/cli
-	python pisa-cli.py -h
+	python wt_cli.py -h

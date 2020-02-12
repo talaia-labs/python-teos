@@ -1,10 +1,10 @@
 # Dependencies
 
-`pisa-cli` has both system-wide and Python dependencies. This document walks you trough how to satisfy them.
+`wt_cli` has both system-wide and Python dependencies. This document walks you trough how to satisfy them.
 
 ## System-wide dependencies
 
-`pisa-cli` has the following system-wide dependencies:
+`wt_cli` has the following system-wide dependencies:
 
 - `python3`
 - `pip3`
@@ -27,7 +27,7 @@ It is also likely that, if `python3` is installed in our system, the `python` al
 
 	python3 --version
 
-If `python3` is installed but the `python` alias is not set to it, we should either set it, or use `python3` to run `pisa-cli`.
+If `python3` is installed but the `python` alias is not set to it, we should either set it, or use `python3` to run `wt_cli`.
 
 Regarding `pip`, we can check what version is installed in our system (if any) by running:
 
@@ -74,7 +74,7 @@ and for `pip3`:
 
 ## Python dependencies
 
-`pisa-cli` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
+`wt_cli` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
 
 - `cryptography`
 - `requests`
