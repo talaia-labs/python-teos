@@ -39,7 +39,7 @@ class API:
         remote_addr = request.environ.get("REMOTE_ADDR")
         remote_port = request.environ.get("REMOTE_PORT")
 
-        logger.info("Connection accepted", from_addr_port="{}:{}".format(remote_addr, remote_port))
+        logger.info("Received add_appointment request", from_addr_port="{}:{}".format(remote_addr, remote_port))
 
         # Check content type once if properly defined
         request_data = json.loads(request.get_json())
@@ -101,9 +101,15 @@ class API:
             - Appointments hold by the :obj:`Responder <pisa.responder.Responder>` are flagged as ``dispute_triggered``.
             - Unknown appointments are flagged as ``not_found``.
         """
+        remote_addr = request.environ.get("REMOTE_ADDR")
+        remote_port = request.environ.get("REMOTE_PORT")
 
         locator = request.args.get("locator")
         response = []
+
+        logger.info(
+            "Received get_appointment request", from_addr_port="{}:{}".format(remote_addr, remote_port), locator=locator
+        )
 
         # ToDo: #15-add-system-monitor
         if not isinstance(locator, str) or len(locator) != LOCATOR_LEN_HEX:
