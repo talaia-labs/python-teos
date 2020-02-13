@@ -7,7 +7,6 @@ from pisa import HOST, PORT, LOG_PREFIX
 from common.logger import Logger
 from pisa.inspector import Inspector
 from common.appointment import Appointment
-from pisa.block_processor import BlockProcessor
 
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
 
@@ -83,7 +82,7 @@ class API:
         else:
             return jsonify({"error": error}), rcode
 
-    # FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
+    # FIXME: THE NEXT TWO API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
     # ToDo: #17-add-api-keys
     def get_appointment(self):
         """
@@ -168,21 +167,6 @@ class API:
 
         return response
 
-    @staticmethod
-    def get_block_count():
-        """
-        Provides the block height of the Watchtower.
-
-        This is a testing endpoint that (most likely) will be removed in production. Its purpose is to give information
-        to testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
-
-        Returns:
-            :obj:`dict`: A json encoded dictionary containing the block height.
-
-        """
-
-        return jsonify({"block_count": BlockProcessor.get_block_count()})
-
     def start(self):
         """
         This function starts the Flask server used to run the API. Adds all the routes to the functions listed above.
@@ -192,7 +176,6 @@ class API:
             "/": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["GET"]),
             "/get_all_appointments": (self.get_all_appointments, ["GET"]),
-            "/get_block_count": (self.get_block_count, ["GET"]),
         }
 
         for url, params in routes.items():
