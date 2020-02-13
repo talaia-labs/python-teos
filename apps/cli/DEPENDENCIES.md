@@ -1,6 +1,6 @@
 # Dependencies
 
-`wt_cli` has both system-wide and Python dependencies. This document walks you trough how to satisfy them.
+`wt_cli` has both system-wide and Python dependencies. This document walks you through how to satisfy them.
 
 ## System-wide dependencies
 
