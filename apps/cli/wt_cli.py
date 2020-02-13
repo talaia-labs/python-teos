@@ -235,7 +235,7 @@ def post_appointment(data):
     logger.info("Sending appointment to PISA")
 
     try:
-        add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
+        add_appointment_endpoint = "{}:{}".format(pisa_api_server, pisa_api_port)
         return requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
 
     except ConnectTimeout:
@@ -337,7 +337,7 @@ def get_appointment(locator):
         logger.error("The provided locator is not valid", locator=locator)
         return None
 
-    get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
+    get_appointment_endpoint = "{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
     parameters = "?locator={}".format(locator)
 
     try:

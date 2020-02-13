@@ -1,6 +1,6 @@
 # PISA-WT-SERVER
-DEFAULT_PISA_API_SERVER = "teos.pisa.watch"
-DEFAULT_PISA_API_PORT = 9814
+DEFAULT_PISA_API_SERVER = "https://teos.pisa.watch"
+DEFAULT_PISA_API_PORT = 443
 
 # WT-CLI
 DATA_FOLDER = "~/.wt_cli/"
