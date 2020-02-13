@@ -25,7 +25,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
 # We'll use wt_cli to add appointments. The expected input format is a list of arguments with a json-encoded
 # appointment
-wt_cli.pisa_api_server = HOST
+wt_cli.pisa_api_server = "http://{}".format(HOST)
 wt_cli.pisa_api_port = PORT
 
 # Run pisad
