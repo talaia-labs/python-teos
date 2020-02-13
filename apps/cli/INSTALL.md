@@ -29,9 +29,7 @@ Python code can be also run as a module, to do you need to use `python -m`. From
     
 Notice that if you run `wt_cli` as a module, you'll need to replace all the calls to `python wt_cli.py <argument>` to `python -m apps.cli.wt_cli <argument>` 
 
-## Create a config file
-You need to create a config file with the basic configuration parameters for `wt_cli`. To do so run:
+## Modify configuration parameters
+If you'd like to modify some of the configuration defaults (such as the user directory, where the logs and appointment receipts will be stored) you can do so in the config file located at:
 
-	cp <absolute_path_to_apps>/apps/cli/sample_conf.py  <absolute_path_to_apps>/apps/cli/conf.py
-	
-You can change any of the config options in `conf.py` after that, like the path to your user data directory.
+	 <absolute_path_to_apps>/apps/cli/conf.py
