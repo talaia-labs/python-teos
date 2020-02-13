@@ -40,35 +40,41 @@ class API:
 
         logger.info("Received add_appointment request", from_addr_port="{}:{}".format(remote_addr, remote_port))
 
-        # Check content type once if properly defined
-        request_data = json.loads(request.get_json())
-        inspector = Inspector(self.config)
-        appointment = inspector.inspect(
-            request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
-        )
+        if request.is_json:
+            # Check content type once if properly defined
+            request_data = json.loads(request.get_json())
+            inspector = Inspector(self.config)
+            appointment = inspector.inspect(
+                request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
+            )
 
-        error = None
-        response = None
+            error = None
+            response = None
 
-        if type(appointment) == Appointment:
-            appointment_added, signature = self.watcher.add_appointment(appointment)
+            if type(appointment) == Appointment:
+                appointment_added, signature = self.watcher.add_appointment(appointment)
 
-            if appointment_added:
-                rcode = HTTP_OK
-                response = {"locator": appointment.locator, "signature": signature}
+                if appointment_added:
+                    rcode = HTTP_OK
+                    response = {"locator": appointment.locator, "signature": signature}
+
+                else:
+                    rcode = HTTP_SERVICE_UNAVAILABLE
+                    error = "appointment rejected"
+
+            elif type(appointment) == tuple:
+                rcode = HTTP_BAD_REQUEST
+                error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
 
             else:
-                rcode = HTTP_SERVICE_UNAVAILABLE
-                error = "appointment rejected"
-
-        elif type(appointment) == tuple:
-            rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
+                # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
+                rcode = HTTP_BAD_REQUEST
+                error = "appointment rejected. Request does not match the standard"
 
         else:
-            # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
             rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Request does not match the standard"
+            error = "appointment rejected. Request is not json encoded"
+            response = None
 
         logger.info(
             "Sending response and disconnecting",

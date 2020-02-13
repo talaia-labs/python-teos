@@ -36,7 +36,7 @@ This command is used to register appointments to the PISA server. Appointments *
 	  "tx_id": tx_id,
 	  "start_time": s,
 	  "end_time": e,
-	  "dispute_delta": d }
+	  "to_self_delay": d }
 	
 `tx` **must** be the raw penalty transaction that will be encrypted before sent to the PISA server. `type(tx) = hex encoded str`
 
