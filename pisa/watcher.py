@@ -24,7 +24,7 @@ class Watcher:
 
     The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
     checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
-    :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the data
+    :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the data
     is passed to the :obj:`Responder <pisa.responder.Responder>`.
 
     If an appointment reaches its end with no breach, the data is simply deleted.
@@ -81,7 +81,7 @@ class Watcher:
         the blockchain (``do_watch``) until ``appointments`` is empty.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
-        :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` and pass the information to the
+        :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` and pass the information to the
         :obj:`Responder <pisa.responder.Responder>`.
 
         The tower may store multiple appointments with the same ``locator`` to avoid DoS attacks based on data
@@ -232,7 +232,7 @@ class Watcher:
         """
         Filters what of the found breaches contain valid transaction data.
 
-        The :obj:`Watcher` cannot if a given :obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` contains a valid
+        The :obj:`Watcher` cannot if a given :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` contains a valid
         transaction until a breach if seen. Blobs that contain arbitrary data are dropped and not sent to the
         :obj:`Responder <pisa.responder.Responder>`.
 

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from apps.cli import config, LOG_PREFIX
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli.blob import Blob
+from common.blob import Blob
 
 import common.cryptographer
 from common import constants

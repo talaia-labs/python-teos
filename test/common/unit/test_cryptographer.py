@@ -5,10 +5,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
 import common.cryptographer
-from apps.cli.blob import Blob
+from common.blob import Blob
 from common.logger import Logger
 from common.cryptographer import Cryptographer
-from pisa.encrypted_blob import EncryptedBlob
+from common.encrypted_blob import EncryptedBlob
 from test.common.unit.conftest import get_random_value_hex
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")

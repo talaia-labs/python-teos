@@ -1,13 +1,11 @@
 import json
-import binascii
 from time import sleep
 from riemann.tx import Tx
 
 from pisa import config
 from pisa import HOST, PORT
 from apps.cli import wt_cli
-from apps.cli.blob import Blob
-from apps.cli import config as cli_conf
+from common.blob import Blob
 
 import common.cryptographer
 from common.logger import Logger

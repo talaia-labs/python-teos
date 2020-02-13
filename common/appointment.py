@@ -2,7 +2,7 @@ import json
 import struct
 from binascii import unhexlify
 
-from pisa.encrypted_blob import EncryptedBlob
+from common.encrypted_blob import EncryptedBlob
 
 
 class Appointment:
@@ -16,7 +16,7 @@ class Appointment:
         end_time (:mod:`int`): The block height where the tower will stop watching for breaches.
         to_self_delay (:mod:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
             covering.
-        encrypted_blob (:obj:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>`): An ``EncryptedBlob`` object
+        encrypted_blob (:obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): An ``EncryptedBlob`` object
             containing an encrypted penalty transaction. The tower will decrypt it and broadcast the penalty transaction
             upon seeing a breach on the blockchain.
     """

@@ -14,7 +14,7 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-from apps.cli.blob import Blob
+from common.blob import Blob
 import apps.cli.wt_cli as wt_cli
 from test.apps.cli.unit.conftest import get_random_value_hex
 
