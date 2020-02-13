@@ -246,6 +246,12 @@ def post_appointment(data):
         logger.error("Can't connect to PISA API. Server cannot be reached")
         return None
 
+    except requests.exceptions.InvalidSchema:
+        logger.error("No transport protocol found. Have you missed http(s):// in the server url?")
+
+    except requests.exceptions.Timeout:
+        logger.error("The request timed out")
+
 
 def process_post_appointment_response(response):
     """
@@ -351,6 +357,12 @@ def get_appointment(locator):
     except ConnectionError:
         logger.error("Can't connect to PISA API. Server cannot be reached")
         return None
+
+    except requests.exceptions.InvalidSchema:
+        logger.error("No transport protocol found. Have you missed http(s):// in the server url?")
+
+    except requests.exceptions.Timeout:
+        logger.error("The request timed out")
 
 
 def show_usage():
