@@ -2,6 +2,9 @@
 
 `wt_cli` has some dependencies that can be satisfied by following [DEPENDENCIES.md](DEPENDENCIES.md). If your system already satisfies the dependencies, you can skip that part.
 
+There are two ways of running `wt_cli`: adding the library to the `PYTHONPATH` env variable, or running it as a module
+
+## Modifying `PYTHONPATH`
 In order to run `wt_cli`, you should set your `PYTHONPATH` env variable to include the folder that contains the `apps` folder. You can do so by running:
 
 	export PYTHONPATH=$PYTHONPATH:<absolute_path_to_apps>
@@ -18,3 +21,10 @@ Once the `PYTHONPATH` is set, you should be able to run `wt_cli` straightaway. T
 
 	cd <absolute_path_to_apps>/apps/cli
 	python wt_cli.py -h
+	
+## Running `wt_cli` as a module
+Python code can be also run as a module, to do you need to use `python -m`. From `apps` **parent** directory run:
+
+    python -m apps.cli.wt_cli -h
+    
+Notice that if you run `wt_cli` as a module, you'll need to replace all the calls to `python wt_cli.py <argument>` to `python -m apps.cli.wt_cli <argument>` 
