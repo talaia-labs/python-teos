@@ -221,7 +221,7 @@ class Inspector:
 
         elif end_time > block_height + BLOCKS_IN_A_MONTH:  # 4320 = roughly a month in blocks
             rcode = errors.APPOINTMENT_FIELD_TOO_BIG
-            message = "end_time should be within the next month (>= current_height + 4320)"
+            message = "end_time should be within the next month (<= current_height + 4320)"
 
         elif start_time >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
@@ -277,8 +277,8 @@ class Inspector:
 
         elif to_self_delay > start_end_diff:
             rcode = errors.APPOINTMENT_FIELD_TOO_BIG
-            message = "to_self_delay can't be bigger than the appointment time {} ({})".format(
-                start_end_diff, to_self_delay
+            message = "to_self_delay can't be bigger than the appointment time ({} > {})".format(
+                to_self_delay, start_end_diff
             )
 
         elif to_self_delay < self.config.get("MIN_TO_SELF_DELAY"):
