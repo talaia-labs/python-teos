@@ -50,6 +50,12 @@ This command is used to register appointments to the PISA server. Appointments *
 
 The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text. 
 
+### Alpha release restrictions
+The alpha release does not have authentication, payments nor rate limiting, therefore some self imposed restrictions apply:
+
+- `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`
+- `end_time` cannot be bigger than (roughtly) a month. That is `4320 blocks`
+
 
 #### Usage
 
