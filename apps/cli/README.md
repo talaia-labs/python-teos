@@ -15,9 +15,8 @@ Refer to [INSTALL.md](INSTALL.md)
 	
 #### Global options
 
-- `-s, --server`:	API server where to send the requests. Defaults to btc.pisa.watch (modifiable in \_\_init\_\_.py)
-- `-p, --port` :	API port where to send the requests. Defaults to 9814 (modifiable in \_\_init\_\_.py)
-- `-d, --debug`: 	shows debug information and stores it in pisa.log
+- `-s, --server`:	API server where to send the requests. Defaults to https://teos.pisa.watch (modifiable in conf.py)
+- `-p, --port` :	API port where to send the requests. Defaults to 443 (modifiable in conf.py)
 - `-h --help`: 	shows a list of commands or help for a specific command.
 
 #### Commands
@@ -53,8 +52,8 @@ The API will return a `application/json` HTTP response code `200/OK` if the appo
 ### Alpha release restrictions
 The alpha release does not have authentication, payments nor rate limiting, therefore some self imposed restrictions apply:
 
-- `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`
-- `end_time` cannot be bigger than (roughtly) a month. That is `4320 blocks`
+- `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`.
+- `end_time` cannot be bigger than (roughtly) a month. That is `4320` blocks on top of `start_time`.
 
 
 #### Usage
@@ -70,7 +69,7 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 
  This command is used to get information about an specific appointment from the PISA server.	
 
-**Appointment can be in three states**
+**Appointment can be in three states:**
 
 - `not_found`: meaning the locator is not recognised by the tower. This can either mean the locator is wrong, or the appointment has already been fulfilled (the PISA server does not keep track of completed appointments for now).
 - `being_watched`: the appointment has been accepted by the PISA server and it's being watched at the moment. This stage means that the dispute transaction has not been seen yet, and therefore no penalty transaction has been broadcast.
@@ -144,4 +143,4 @@ or
 
 ## PISA API	
 
-If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [PISA-API.md](PISA-API.md)
+If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [PISA-API.md](PISA-API.md).
