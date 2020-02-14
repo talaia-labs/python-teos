@@ -13,9 +13,9 @@ For example, for user alice running a UNIX system and having `apps` in her home 
 	
 	export PYTHONPATH=$PYTHONPATH:/home/alice/
 	
-You should also include the command in your `.bash_rc` to avoid having to run it every time you open a new terminal. You can do it by running:
+You should also include the command in your `.bashrc` to avoid having to run it every time you open a new terminal. You can do it by running:
 
-	echo 'export PYTHONPATH=$PYTHONPATH:<absolute_path_to_apps>' >> ~/.bash_rc
+	echo 'export PYTHONPATH=$PYTHONPATH:<absolute_path_to_apps>' >> ~/.bashrc
 	
 Once the `PYTHONPATH` is set, you should be able to run `wt_cli` straightaway. Try it by running:
 
