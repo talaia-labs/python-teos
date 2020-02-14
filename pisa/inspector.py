@@ -19,6 +19,9 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 #        stored + blacklist if multiple wrong requests are received.
 
 
+BLOCKS_IN_A_MONTH = 4320  # 4320 = roughly a month in blocks
+
+
 class Inspector:
     """
     The :class:`Inspector` class is in charge of verifying that the appointment data provided by the user is correct.
@@ -57,7 +60,10 @@ class Inspector:
                     appointment_data.get("end_time"), appointment_data.get("start_time"), block_height
                 )
             if rcode == 0:
-                rcode, message = self.check_to_self_delay(appointment_data.get("to_self_delay"))
+                rcode, message = self.check_to_self_delay(
+                    appointment_data.get("to_self_delay"),
+                    appointment_data.get("end_time") - appointment_data.get("start_time"),
+                )
             if rcode == 0:
                 rcode, message = self.check_blob(appointment_data.get("encrypted_blob"))
             # if rcode == 0:
@@ -161,7 +167,14 @@ class Inspector:
             if start_time < block_height:
                 message = "start_time is in the past"
             else:
-                message = "start_time is too close to current height"
+                message = (
+                    "start_time is too close to current height. "
+                    "Accepted times are: [current_height+1, current_height+2]"
+                )
+
+        elif start_time > block_height + 6:
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "start_time is too far in the future. Accepted start times are up to 6 blocks in the future"
 
         if message is not None:
             logger.error(message)
@@ -206,6 +219,10 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong end_time data type ({})".format(t)
 
+        elif end_time > block_height + BLOCKS_IN_A_MONTH:  # 4320 = roughly a month in blocks
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "end_time should be within the next month (>= current_height + 4320)"
+
         elif start_time >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             if start_time > end_time:
@@ -225,7 +242,7 @@ class Inspector:
 
         return rcode, message
 
-    def check_to_self_delay(self, to_self_delay):
+    def check_to_self_delay(self, to_self_delay, start_end_diff):
         """
         Checks if the provided ``to_self_delay`` is correct.
 
@@ -257,6 +274,12 @@ class Inspector:
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong to_self_delay data type ({})".format(t)
+
+        elif to_self_delay > start_end_diff:
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "to_self_delay can't be bigger than the appointment time {} ({})".format(
+                start_end_diff, to_self_delay
+            )
 
         elif to_self_delay < self.config.get("MIN_TO_SELF_DELAY"):
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
