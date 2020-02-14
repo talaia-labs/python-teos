@@ -7,7 +7,7 @@ The PISA REST API consists, currently, of two endpoints: `/` and `/get_appointme
 `/` is the default endpoint, and is where the appointments should be sent to. `/` accepts `HTTP POST` requests only, with json request body, where data must match the following format:
 
 	{"locator": l, "start_time": s, "end_time": e, 
-	"dispute_delta": d, "encrypted_blob": eb}
+	"to_self_delay": d, "encrypted_blob": eb}
 	
 We'll discuss the parameters one by one in the following: 
 	
@@ -21,8 +21,8 @@ The to\_self\_delay, `d`, is the time PISA would have to respond with the **pena
 
 The encrypted\_blob, `eb`, is a data blob containing the `raw penalty transaction` and it is encrypted using `CHACHA20-POLY1305`. The `encryption key` used by the cipher is the sha256 of the **dispute transaction id**, and the `nonce` is a 12-byte long zero byte array:
 
-	sk = sk = sha256(unhexlify(secret)).digest()
-	nonce = nonce = bytearray(12) # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+	sk = sha256(unhexlify(secret)).digest()
+	nonce = bytearray(12) # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 	
 Finally, the encrypted blob must be hex encoded. `type(eb) = hex encoded str`
 
@@ -38,11 +38,11 @@ The API will return a `application/json` HTTP response code `200/OK` if the appo
 	
 # Get appointment
 	
-`/get_appointment` is an endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `/get_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the locator of an appointment. The query must match the following format:
+`/get_appointment` is an endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `/get_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the **locator** of an appointment. The query must match the following format:
 
 `https://pisa_server:pisa_port/get_appointment?locator=appointment_locator`
 
-### Appointment can be in three states
+**Appointment can be in three states**:
 
 - `not_found`: meaning the locator is not recognised by the API. This could either mean the locator is wrong, or the appointment has already been fulfilled.
 - `being_watched`: the appointment has been accepted by the PISA server and it's being watched at the moment. This stage means that the dispute transaction has not been seen yet, and therefore no penalty transaction has been published.
