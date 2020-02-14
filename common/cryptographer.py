@@ -78,7 +78,7 @@ class Cryptographer:
         sk = sha256(unhexlify(secret)).digest()
         nonce = bytearray(12)
 
-        logger.info("Encrypting blob", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
+        logger.debug("Encrypting blob", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
 
         # Encrypt the data
         cipher = ChaCha20Poly1305(sk)
