@@ -60,10 +60,7 @@ class Inspector:
                     appointment_data.get("end_time"), appointment_data.get("start_time"), block_height
                 )
             if rcode == 0:
-                rcode, message = self.check_to_self_delay(
-                    appointment_data.get("to_self_delay"),
-                    appointment_data.get("end_time") - appointment_data.get("start_time"),
-                )
+                rcode, message = self.check_to_self_delay(appointment_data.get("to_self_delay"))
             if rcode == 0:
                 rcode, message = self.check_blob(appointment_data.get("encrypted_blob"))
             # if rcode == 0:
@@ -242,7 +239,7 @@ class Inspector:
 
         return rcode, message
 
-    def check_to_self_delay(self, to_self_delay, start_end_diff):
+    def check_to_self_delay(self, to_self_delay):
         """
         Checks if the provided ``to_self_delay`` is correct.
 
@@ -275,10 +272,10 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong to_self_delay data type ({})".format(t)
 
-        elif to_self_delay > start_end_diff:
+        elif to_self_delay > pow(2, 32):
             rcode = errors.APPOINTMENT_FIELD_TOO_BIG
-            message = "to_self_delay can't be bigger than the appointment time ({} > {})".format(
-                to_self_delay, start_end_diff
+            message = "to_self_delay must fit the transaction nLockTime field ({} > {})".format(
+                to_self_delay, pow(2, 32)
             )
 
         elif to_self_delay < self.config.get("MIN_TO_SELF_DELAY"):
