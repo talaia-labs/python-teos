@@ -35,10 +35,12 @@ class API:
             can be found at :mod:`Errors <pisa.errors>`.
         """
 
-        remote_addr = request.environ.get("REMOTE_ADDR")
-        remote_port = request.environ.get("REMOTE_PORT")
+        # Getting the real IP if the server is behind a reverse proxy
+        remote_addr = request.environ.get("HTTP_X_REAL_IP")
+        if not remote_addr:
+            remote_addr = request.environ.get("REMOTE_ADDR")
 
-        logger.info("Received add_appointment request", from_addr_port="{}:{}".format(remote_addr, remote_port))
+        logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
 
         if request.is_json:
             # Check content type once if properly defined
@@ -77,10 +79,7 @@ class API:
             response = None
 
         logger.info(
-            "Sending response and disconnecting",
-            from_addr_port="{}:{}".format(remote_addr, remote_port),
-            response=response,
-            error=error,
+            "Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response, error=error
         )
 
         if error is None:
@@ -106,15 +105,16 @@ class API:
             - Appointments hold by the :obj:`Responder <pisa.responder.Responder>` are flagged as ``dispute_triggered``.
             - Unknown appointments are flagged as ``not_found``.
         """
-        remote_addr = request.environ.get("REMOTE_ADDR")
-        remote_port = request.environ.get("REMOTE_PORT")
+
+        # Getting the real IP if the server is behind a reverse proxy
+        remote_addr = request.environ.get("HTTP_X_REAL_IP")
+        if not remote_addr:
+            remote_addr = request.environ.get("REMOTE_ADDR")
 
         locator = request.args.get("locator")
         response = []
 
-        logger.info(
-            "Received get_appointment request", from_addr_port="{}:{}".format(remote_addr, remote_port), locator=locator
-        )
+        logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
         # ToDo: #15-add-system-monitor
         if not isinstance(locator, str) or len(locator) != LOCATOR_LEN_HEX:
