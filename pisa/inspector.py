@@ -167,7 +167,7 @@ class Inspector:
             else:
                 message = (
                     "start_time is too close to current height. "
-                    "Accepted times are: [current_height+1, current_height+2]"
+                    "Accepted times are: [current_height+1, current_height+6]"
                 )
 
         elif start_time > block_height + 6:
