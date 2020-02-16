@@ -26,7 +26,14 @@ The encrypted\_blob, `eb`, is a data blob containing the `raw penalty transactio
 	
 Finally, the encrypted blob must be hex encoded. `type(eb) = hex encoded str`
 
-The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text. 
+The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text.
+
+### Alpha release restrictions
+The alpha release does not have authentication, payments nor rate limiting, therefore some self imposed restrictions apply:
+
+- `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`.
+- `end_time` cannot be bigger than (roughtly) a month. That is `4320` blocks on top of `start_time`.
+- `encrypted_blob`s are limited to `2 kib`. 
 
 #### Appointment example
 
