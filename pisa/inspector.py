@@ -20,6 +20,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 
 
 BLOCKS_IN_A_MONTH = 4320  # 4320 = roughly a month in blocks
+ENCRYPTED_BLOB_MAX_SIZE_HEX = 2 * 2048
 
 
 class Inspector:
@@ -320,6 +321,10 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
+
+        elif len(encrypted_blob) > ENCRYPTED_BLOB_MAX_SIZE_HEX:
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "encrypted_blob has to be 2Kib at most (current {})".format(len(encrypted_blob) // 2)
 
         elif re.search(r"^[0-9A-Fa-f]+$", encrypted_blob) is None:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT
