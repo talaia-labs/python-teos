@@ -269,7 +269,9 @@ def process_post_appointment_response(response):
         response_json = response.json()
 
     except json.JSONDecodeError:
-        logger.error("The response was not valid JSON")
+        logger.error(
+            "The server returned a non-JSON response", status_code=response.status_code, reason=response.reason
+        )
         return None
 
     if response.status_code != constants.HTTP_OK:
