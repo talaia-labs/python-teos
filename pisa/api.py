@@ -42,6 +42,9 @@ class API:
 
         logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
 
+        # FIXME: Logging every request so we can get better understanding of bugs in the alpha
+        logger.debug("Request details", data="{}".format(request.data))
+
         if request.is_json:
             # Check content type once if properly defined
             request_data = json.loads(request.get_json())
