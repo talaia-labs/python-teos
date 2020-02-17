@@ -165,7 +165,7 @@ def add_appointment(args):
         logger.error("The returned appointment's signature is invalid")
         return False
 
-    logger.info("Appointment accepted and signed by PISA")
+    logger.info("Appointment accepted and signed by the Eye of Satoshi")
 
     # All good, store appointment and signature
     return save_appointment_receipt(appointment.to_dict(), signature)
@@ -232,18 +232,18 @@ def post_appointment(data):
         None otherwise.
     """
 
-    logger.info("Sending appointment to PISA")
+    logger.info("Sending appointment to the Eye of Satoshi")
 
     try:
         add_appointment_endpoint = "{}:{}".format(pisa_api_server, pisa_api_port)
         return requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
 
     except ConnectTimeout:
-        logger.error("Can't connect to PISA API. Connection timeout")
+        logger.error("Can't connect to the Eye of Satoshi's API. Connection timeout")
         return None
 
     except ConnectionError:
-        logger.error("Can't connect to PISA API. Server cannot be reached")
+        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
         return None
 
     except requests.exceptions.InvalidSchema:
@@ -353,11 +353,11 @@ def get_appointment(locator):
         return r.json()
 
     except ConnectTimeout:
-        logger.error("Can't connect to PISA API. Connection timeout")
+        logger.error("Can't connect to the Eye of Satoshi's API. Connection timeout")
         return None
 
     except ConnectionError:
-        logger.error("Can't connect to PISA API. Server cannot be reached")
+        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
         return None
 
     except requests.exceptions.InvalidSchema:
@@ -372,8 +372,8 @@ def show_usage():
         "USAGE: "
         "\n\tpython wt_cli.py [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
-        "\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server."
-        "\n\tget_appointment \tGets json formatted data about an appointment from the PISA server."
+        "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
+        "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
         "\n\thelp \t\t\tShows a list of commands or help for a specific command."
         "\n\nGLOBAL OPTIONS:"
         "\n\t-s, --server \tAPI server where to send the requests. Defaults to https://teos.pisa.watch (modifiable in "

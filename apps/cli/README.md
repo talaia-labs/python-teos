@@ -53,7 +53,7 @@ The API will return a `application/json` HTTP response code `200/OK` if the appo
 The alpha release does not have authentication, payments nor rate limiting, therefore some self imposed restrictions apply:
 
 - `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`.
-- `end_time` cannot be bigger than (roughtly) a month. That is `4320` blocks on top of `start_time`.
+- `end_time` cannot be bigger than (roughly) a month. That is `4320` blocks on top of `start_time`.
 - `encrypted_blob`s are limited to `2 kib`.
 
 
