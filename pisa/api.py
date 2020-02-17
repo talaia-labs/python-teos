@@ -7,7 +7,6 @@ from pisa import HOST, PORT, LOG_PREFIX
 from common.logger import Logger
 from pisa.inspector import Inspector
 from common.appointment import Appointment
-from pisa.block_processor import BlockProcessor
 
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
 
@@ -36,46 +35,54 @@ class API:
             can be found at :mod:`Errors <pisa.errors>`.
         """
 
-        remote_addr = request.environ.get("REMOTE_ADDR")
-        remote_port = request.environ.get("REMOTE_PORT")
+        # Getting the real IP if the server is behind a reverse proxy
+        remote_addr = request.environ.get("HTTP_X_REAL_IP")
+        if not remote_addr:
+            remote_addr = request.environ.get("REMOTE_ADDR")
 
-        logger.info("Connection accepted", from_addr_port="{}:{}".format(remote_addr, remote_port))
+        logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
 
-        # Check content type once if properly defined
-        request_data = json.loads(request.get_json())
-        inspector = Inspector(self.config)
-        appointment = inspector.inspect(
-            request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
-        )
+        # FIXME: Logging every request so we can get better understanding of bugs in the alpha
+        logger.debug("Request details", data="{}".format(request.data))
 
-        error = None
-        response = None
+        if request.is_json:
+            # Check content type once if properly defined
+            request_data = json.loads(request.get_json())
+            inspector = Inspector(self.config)
+            appointment = inspector.inspect(
+                request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
+            )
 
-        if type(appointment) == Appointment:
-            appointment_added, signature = self.watcher.add_appointment(appointment)
+            error = None
+            response = None
 
-            if appointment_added:
-                rcode = HTTP_OK
-                response = {"locator": appointment.locator, "signature": signature}
+            if type(appointment) == Appointment:
+                appointment_added, signature = self.watcher.add_appointment(appointment)
+
+                if appointment_added:
+                    rcode = HTTP_OK
+                    response = {"locator": appointment.locator, "signature": signature}
+
+                else:
+                    rcode = HTTP_SERVICE_UNAVAILABLE
+                    error = "appointment rejected"
+
+            elif type(appointment) == tuple:
+                rcode = HTTP_BAD_REQUEST
+                error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
 
             else:
-                rcode = HTTP_SERVICE_UNAVAILABLE
-                error = "appointment rejected"
-
-        elif type(appointment) == tuple:
-            rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
+                # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
+                rcode = HTTP_BAD_REQUEST
+                error = "appointment rejected. Request does not match the standard"
 
         else:
-            # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
             rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Request does not match the standard"
+            error = "appointment rejected. Request is not json encoded"
+            response = None
 
         logger.info(
-            "Sending response and disconnecting",
-            from_addr_port="{}:{}".format(remote_addr, remote_port),
-            response=response,
-            error=error,
+            "Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response, error=error
         )
 
         if error is None:
@@ -83,7 +90,7 @@ class API:
         else:
             return jsonify({"error": error}), rcode
 
-    # FIXME: THE NEXT THREE API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
+    # FIXME: THE NEXT TWO API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
     # ToDo: #17-add-api-keys
     def get_appointment(self):
         """
@@ -102,8 +109,15 @@ class API:
             - Unknown appointments are flagged as ``not_found``.
         """
 
+        # Getting the real IP if the server is behind a reverse proxy
+        remote_addr = request.environ.get("HTTP_X_REAL_IP")
+        if not remote_addr:
+            remote_addr = request.environ.get("REMOTE_ADDR")
+
         locator = request.args.get("locator")
         response = []
+
+        logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
         # ToDo: #15-add-system-monitor
         if not isinstance(locator, str) or len(locator) != LOCATOR_LEN_HEX:
@@ -162,21 +176,6 @@ class API:
 
         return response
 
-    @staticmethod
-    def get_block_count():
-        """
-        Provides the block height of the Watchtower.
-
-        This is a testing endpoint that (most likely) will be removed in production. Its purpose is to give information
-        to testers about the current block so they can define a dummy appointment without having to run a bitcoin node.
-
-        Returns:
-            :obj:`dict`: A json encoded dictionary containing the block height.
-
-        """
-
-        return jsonify({"block_count": BlockProcessor.get_block_count()})
-
     def start(self):
         """
         This function starts the Flask server used to run the API. Adds all the routes to the functions listed above.
@@ -186,7 +185,6 @@ class API:
             "/": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["GET"]),
             "/get_all_appointments": (self.get_all_appointments, ["GET"]),
-            "/get_block_count": (self.get_block_count, ["GET"]),
         }
 
         for url, params in routes.items():

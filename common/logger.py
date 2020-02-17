@@ -60,7 +60,7 @@ class Logger:
 
     def debug(self, msg, **kwargs):
         """
-        Logs an ``DEBUG`` level message to stdout and file.
+        Logs a ``DEBUG`` level message to stdout and file.
 
         Args:
              msg (:obj:`str`): the message to be logged.
@@ -84,7 +84,7 @@ class Logger:
 
     def warning(self, msg, **kwargs):
         """
-        Logs an ``WARNING`` level message to stdout and file.
+        Logs a ``WARNING`` level message to stdout and file.
 
         Args:
              msg (:obj:`str`): the message to be logged.

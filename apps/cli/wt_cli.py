@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from apps.cli import config, LOG_PREFIX
 from apps.cli.help import help_add_appointment, help_get_appointment
-from apps.cli.blob import Blob
+from common.blob import Blob
 
 import common.cryptographer
 from common import constants
@@ -235,7 +235,7 @@ def post_appointment(data):
     logger.info("Sending appointment to PISA")
 
     try:
-        add_appointment_endpoint = "http://{}:{}".format(pisa_api_server, pisa_api_port)
+        add_appointment_endpoint = "{}:{}".format(pisa_api_server, pisa_api_port)
         return requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
 
     except ConnectTimeout:
@@ -245,6 +245,12 @@ def post_appointment(data):
     except ConnectionError:
         logger.error("Can't connect to PISA API. Server cannot be reached")
         return None
+
+    except requests.exceptions.InvalidSchema:
+        logger.error("No transport protocol found. Have you missed http(s):// in the server url?")
+
+    except requests.exceptions.Timeout:
+        logger.error("The request timed out")
 
 
 def process_post_appointment_response(response):
@@ -263,7 +269,9 @@ def process_post_appointment_response(response):
         response_json = response.json()
 
     except json.JSONDecodeError:
-        logger.error("The response was not valid JSON")
+        logger.error(
+            "The server returned a non-JSON response", status_code=response.status_code, reason=response.reason
+        )
         return None
 
     if response.status_code != constants.HTTP_OK:
@@ -337,7 +345,7 @@ def get_appointment(locator):
         logger.error("The provided locator is not valid", locator=locator)
         return None
 
-    get_appointment_endpoint = "http://{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
+    get_appointment_endpoint = "{}:{}/get_appointment".format(pisa_api_server, pisa_api_port)
     parameters = "?locator={}".format(locator)
 
     try:
@@ -352,11 +360,17 @@ def get_appointment(locator):
         logger.error("Can't connect to PISA API. Server cannot be reached")
         return None
 
+    except requests.exceptions.InvalidSchema:
+        logger.error("No transport protocol found. Have you missed http(s):// in the server url?")
+
+    except requests.exceptions.Timeout:
+        logger.error("The request timed out")
+
 
 def show_usage():
     return (
         "USAGE: "
-        "\n\tpython pisa-cli.py [global options] command [command options] [arguments]"
+        "\n\tpython wt_cli.py [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
         "\n\tadd_appointment \tRegisters a json formatted appointment to the PISA server."
         "\n\tget_appointment \tGets json formatted data about an appointment from the PISA server."
@@ -365,7 +379,7 @@ def show_usage():
         "\n\t-s, --server \tAPI server where to send the requests. Defaults to btc.pisa.watch (modifiable in "
         "__init__.py)"
         "\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)"
-        "\n\t-d, --debug \tshows debug information and stores it in pisa_cli.log"
+        "\n\t-d, --debug \tshows debug information and stores it in wt_cli.log"
         "\n\t-h --help \tshows this message."
     )
 

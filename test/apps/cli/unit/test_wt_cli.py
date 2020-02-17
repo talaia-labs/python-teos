@@ -14,7 +14,7 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-from apps.cli.blob import Blob
+from common.blob import Blob
 import apps.cli.wt_cli as wt_cli
 from test.apps.cli.unit.conftest import get_random_value_hex
 
@@ -38,9 +38,9 @@ dummy_pk_der = dummy_pk.public_bytes(
 # Replace the key in the module with a key we control for the tests
 wt_cli.pisa_public_key = dummy_pk
 # Replace endpoint with dummy one
-wt_cli.pisa_api_server = "dummy.com"
+wt_cli.pisa_api_server = "https://dummy.com"
 wt_cli.pisa_api_port = 12345
-pisa_endpoint = "http://{}:{}/".format(wt_cli.pisa_api_server, wt_cli.pisa_api_port)
+pisa_endpoint = "{}:{}/".format(wt_cli.pisa_api_server, wt_cli.pisa_api_port)
 
 dummy_appointment_request = {
     "tx": get_random_value_hex(192),

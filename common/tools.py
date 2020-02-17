@@ -129,10 +129,10 @@ def setup_logging(log_file_path, log_name_prefix):
 
     # Create the file logger
     f_logger = logging.getLogger("{}_file_log".format(log_name_prefix))
-    f_logger.setLevel(logging.INFO)
+    f_logger.setLevel(logging.DEBUG)
 
     fh = logging.FileHandler(log_file_path)
-    fh.setLevel(logging.INFO)
+    fh.setLevel(logging.DEBUG)
     fh_formatter = logging.Formatter("%(message)s")
     fh.setFormatter(fh_formatter)
     f_logger.addHandler(fh)

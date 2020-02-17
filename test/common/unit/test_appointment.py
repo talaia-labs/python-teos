@@ -4,7 +4,7 @@ import binascii
 from pytest import fixture
 
 from common.appointment import Appointment
-from pisa.encrypted_blob import EncryptedBlob
+from common.encrypted_blob import EncryptedBlob
 
 from test.pisa.unit.conftest import get_random_value_hex
 

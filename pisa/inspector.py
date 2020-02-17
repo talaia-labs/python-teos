@@ -19,6 +19,10 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 #        stored + blacklist if multiple wrong requests are received.
 
 
+BLOCKS_IN_A_MONTH = 4320  # 4320 = roughly a month in blocks
+ENCRYPTED_BLOB_MAX_SIZE_HEX = 2 * 2048
+
+
 class Inspector:
     """
     The :class:`Inspector` class is in charge of verifying that the appointment data provided by the user is correct.
@@ -161,7 +165,14 @@ class Inspector:
             if start_time < block_height:
                 message = "start_time is in the past"
             else:
-                message = "start_time is too close to current height"
+                message = (
+                    "start_time is too close to current height. "
+                    "Accepted times are: [current_height+1, current_height+6]"
+                )
+
+        elif start_time > block_height + 6:
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "start_time is too far in the future. Accepted start times are up to 6 blocks in the future"
 
         if message is not None:
             logger.error(message)
@@ -205,6 +216,10 @@ class Inspector:
         elif t != int:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong end_time data type ({})".format(t)
+
+        elif end_time > block_height + BLOCKS_IN_A_MONTH:  # 4320 = roughly a month in blocks
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "end_time should be within the next month (<= current_height + 4320)"
 
         elif start_time >= end_time:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
@@ -258,6 +273,12 @@ class Inspector:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong to_self_delay data type ({})".format(t)
 
+        elif to_self_delay > pow(2, 32):
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "to_self_delay must fit the transaction nLockTime field ({} > {})".format(
+                to_self_delay, pow(2, 32)
+            )
+
         elif to_self_delay < self.config.get("MIN_TO_SELF_DELAY"):
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = "to_self_delay too small. The to_self_delay should be at least {} (current: {})".format(
@@ -300,6 +321,10 @@ class Inspector:
         elif t != str:
             rcode = errors.APPOINTMENT_WRONG_FIELD_TYPE
             message = "wrong encrypted_blob data type ({})".format(t)
+
+        elif len(encrypted_blob) > ENCRYPTED_BLOB_MAX_SIZE_HEX:
+            rcode = errors.APPOINTMENT_FIELD_TOO_BIG
+            message = "encrypted_blob has to be 2Kib at most (current {})".format(len(encrypted_blob) // 2)
 
         elif re.search(r"^[0-9A-Fa-f]+$", encrypted_blob) is None:
             rcode = errors.APPOINTMENT_WRONG_FIELD_FORMAT

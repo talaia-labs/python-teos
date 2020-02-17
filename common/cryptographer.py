@@ -49,12 +49,12 @@ class Cryptographer:
     @staticmethod
     def encrypt(blob, secret, rtype="str"):
         """
-        Encrypts a given :mod:`Blob <apps.cli.blob.Blob>` data using ``CHACHA20POLY1305``.
+        Encrypts a given :mod:`Blob <common.cli.blob.Blob>` data using ``CHACHA20POLY1305``.
 
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-              blob (:mod:`Blob <apps.cli.blob.Blob>`): a ``Blob`` object containing a raw penalty transaction.
+              blob (:mod:`Blob <common.cli.blob.Blob>`): a ``Blob`` object containing a raw penalty transaction.
               secret (:mod:`str`): a value to used to derive the encryption key. Should be the dispute txid.
               rtype(:mod:`str`): the return type for the encrypted value. Can be either ``'str'`` or ``'bytes'``.
 
@@ -78,7 +78,7 @@ class Cryptographer:
         sk = sha256(unhexlify(secret)).digest()
         nonce = bytearray(12)
 
-        logger.info("Encrypting blob", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
+        logger.debug("Encrypting blob", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
 
         # Encrypt the data
         cipher = ChaCha20Poly1305(sk)
@@ -93,12 +93,12 @@ class Cryptographer:
     # ToDo: #20-test-tx-decrypting-edge-cases
     def decrypt(encrypted_blob, secret, rtype="str"):
         """
-        Decrypts a given :mod:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>` using ``CHACHA20POLY1305``.
+        Decrypts a given :mod:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` using ``CHACHA20POLY1305``.
 
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-              encrypted_blob(:mod:`EncryptedBlob <pisa.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob`` potentially
+              encrypted_blob(:mod:`EncryptedBlob <comnmon.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob`` potentially
                 containing a penalty transaction.
               secret (:mod:`str`): a value to used to derive the decryption key. Should be the dispute txid.
               rtype(:mod:`str`): the return type for the decrypted value. Can be either ``'str'`` or ``'bytes'``.

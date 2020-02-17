@@ -1,13 +1,11 @@
 import json
-import binascii
 from time import sleep
 from riemann.tx import Tx
 
 from pisa import config
 from pisa import HOST, PORT
 from apps.cli import wt_cli
-from apps.cli.blob import Blob
-from apps.cli import config as cli_conf
+from common.blob import Blob
 
 import common.cryptographer
 from common.logger import Logger
@@ -27,7 +25,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
 # We'll use wt_cli to add appointments. The expected input format is a list of arguments with a json-encoded
 # appointment
-wt_cli.pisa_api_server = HOST
+wt_cli.pisa_api_server = "http://{}".format(HOST)
 wt_cli.pisa_api_port = PORT
 
 # Run pisad

@@ -2,12 +2,12 @@
 
 ### Disclaimer: Everything in here is experimental and subject to change.
 
-The PISA REST API consists, currently, of two endpoints: `/` and `/check_appointment`
+The PISA REST API consists, currently, of two endpoints: `/` and `/get_appointment`
 
 `/` is the default endpoint, and is where the appointments should be sent to. `/` accepts `HTTP POST` requests only, with json request body, where data must match the following format:
 
 	{"locator": l, "start_time": s, "end_time": e, 
-	"dispute_delta": d, "encrypted_blob": eb}
+	"to_self_delay": d, "encrypted_blob": eb}
 	
 We'll discuss the parameters one by one in the following: 
 	
@@ -21,12 +21,19 @@ The to\_self\_delay, `d`, is the time PISA would have to respond with the **pena
 
 The encrypted\_blob, `eb`, is a data blob containing the `raw penalty transaction` and it is encrypted using `CHACHA20-POLY1305`. The `encryption key` used by the cipher is the sha256 of the **dispute transaction id**, and the `nonce` is a 12-byte long zero byte array:
 
-	sk = sk = sha256(unhexlify(secret)).digest()
-	nonce = nonce = bytearray(12) # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+	sk = sha256(unhexlify(secret)).digest()
+	nonce = bytearray(12) # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 	
 Finally, the encrypted blob must be hex encoded. `type(eb) = hex encoded str`
 
-The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text. 
+The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text.
+
+### Alpha release restrictions
+The alpha release does not have authentication, payments nor rate limiting, therefore some self imposed restrictions apply:
+
+- `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`.
+- `end_time` cannot be bigger than (roughtly) a month. That is `4320` blocks on top of `start_time`.
+- `encrypted_blob`s are limited to `2 kib`. 
 
 #### Appointment example
 
@@ -36,21 +43,21 @@ The API will return a `application/json` HTTP response code `200/OK` if the appo
 	"to_self_delay": 20, 
 	"encrypted_blob": "6c7687a97e874363e1c2b9a08386125e09ea000a9b4330feb33a5c698265f3565c267554e6fdd7b0544ced026aaab73c255bcc97c18eb9fa704d9cc5f1c83adaf921de7ba62b2b6ddb1bda7775288019ec3708642e738eddc22882abf5b3f4e34ef2d4077ed23e135f7fe22caaec845982918e7df4a3f949cadd2d3e7c541b1dbf77daf64e7ed61531aaa487b468581b5aa7b1da81e2617e351c9d5cf445e3391c3fea4497aaa7ad286552759791b9caa5e4c055d1b38adfceddb1ef2b99e3b467dd0b0b13ce863c1bf6b6f24543c30d"}
 	
-# Check appointment
+# Get appointment
 	
-`/check_appointment` is an endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `/check_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the locator of an appointment. The query must match the following format:
+`/get_appointment` is an endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `/get_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the **locator** of an appointment. The query must match the following format:
 
-`http://pisa_server:pisa_port/check_appointment?locator=appointment_locator`
+`https://pisa_server:pisa_port/get_appointment?locator=appointment_locator`
 
-### Appointment can be in three states
+**Appointment can be in three states**:
 
 - `not_found`: meaning the locator is not recognised by the API. This could either mean the locator is wrong, or the appointment has already been fulfilled.
-- `being_watched`: the appointment has been accepted by the PISA server and it's being watched at the moment. This stage means that the dispute transaction has not been seen yet, and therefore no justice transaction has been published.
-- `dispute_responded`: the dispute was found by the watcher and the corresponding justice transaction has been broadcast by the node. In this stage PISA is actively monitoring until the justice transaction reaches enough confirmations and making sure no fork occurs in the meantime.
+- `being_watched`: the appointment has been accepted by the PISA server and it's being watched at the moment. This stage means that the dispute transaction has not been seen yet, and therefore no penalty transaction has been published.
+- `dispute_responded`: the dispute was found by the watcher and the corresponding penalty transaction has been broadcast by the node. In this stage PISA is actively monitoring until the penalty transaction reaches enough confirmations and making sure no fork occurs in the meantime.
 
-### Check appointment response formats
+### Get appointment response formats
 
-`/check_appointment` will always reply with `json` containing the information about the requested appointment. The structure is as follows:
+`/get_appointment` will always reply with `json` containing the information about the requested appointment. The structure is as follows:
 
 **not_found**
 
