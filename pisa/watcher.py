@@ -144,7 +144,6 @@ class Watcher:
 
             if len(self.appointments) > 0 and block is not None:
                 txids = block.get("tx")
-                logger.info("List of transactions", txids=txids)
 
                 expired_appointments = [
                     uuid

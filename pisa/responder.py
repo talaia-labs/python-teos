@@ -275,7 +275,6 @@ class Responder:
 
             if len(self.trackers) > 0 and block is not None:
                 txids = block.get("tx")
-                logger.info("List of transactions", txids=txids)
 
                 if self.last_known_block == block.get("previousblockhash"):
                     self.check_confirmations(txids)
