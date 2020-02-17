@@ -376,9 +376,9 @@ def show_usage():
         "\n\tget_appointment \tGets json formatted data about an appointment from the PISA server."
         "\n\thelp \t\t\tShows a list of commands or help for a specific command."
         "\n\nGLOBAL OPTIONS:"
-        "\n\t-s, --server \tAPI server where to send the requests. Defaults to btc.pisa.watch (modifiable in "
-        "__init__.py)"
-        "\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in __init__.py)"
+        "\n\t-s, --server \tAPI server where to send the requests. Defaults to https://teos.pisa.watch (modifiable in "
+        "config.py)"
+        "\n\t-p, --port \tAPI port where to send the requests. Defaults to 443 (modifiable in conf.py)"
         "\n\t-d, --debug \tshows debug information and stores it in wt_cli.log"
         "\n\t-h --help \tshows this message."
     )
