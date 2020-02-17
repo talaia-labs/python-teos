@@ -1,7 +1,7 @@
 from binascii import unhexlify
 
 from common.blob import Blob
-from test.pisa.unit.conftest import get_random_value_hex
+from test.common.unit.conftest import get_random_value_hex
 
 
 def test_init_blob():
