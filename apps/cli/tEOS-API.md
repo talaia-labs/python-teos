@@ -1,8 +1,8 @@
-## PISA-API
+## tEOS-API
 
 ### Disclaimer: Everything in here is experimental and subject to change.
 
-The PISA REST API consists, currently, of two endpoints: `/` and `/get_appointment`
+The Eye of Satoshi's REST API consists, currently, of two endpoints: `/` and `/get_appointment`
 
 `/` is the default endpoint, and is where the appointments should be sent to. `/` accepts `HTTP POST` requests only, with json request body, where data must match the following format:
 
@@ -13,11 +13,11 @@ We'll discuss the parameters one by one in the following:
 	
 The locator, `l`, is the first half of the **dispute transaction id** (i.e. the 16 MSB of the dispute_txid encoded in hex). `type(l) = hex encoded str`
 
-The start\_time, `s`, is the time when the PISA server will start watching your transaction, and will normally match with whenever you will be offline. `s` is measured in block height, and must be **higher than the current block height**. `type(s) = int`
+The start\_time, `s`, is the time when the tower will start watching your transaction, and will normally match with whenever you will be offline. `s` is measured in block height, and must be **higher than the current block height**. `type(s) = int`
 
-The end\_time, `e`, is the time where the PISA server will stop watching your transaction, and will normally match with whenever you should be back online. `e` is also measured in block height, and must be **higher than** `s`. `type(e) = int`
+The end\_time, `e`, is the time where the tower will stop watching your transaction, and will normally match with whenever you should be back online. `e` is also measured in block height, and must be **higher than** `s`. `type(e) = int`
 
-The to\_self\_delay, `d`, is the time PISA would have to respond with the **penalty transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the dispute_delta does not match the `OP_CSV `, PISA would try to respond with the penalty transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be, at least, `20`. `type(d) = int`
+The to\_self\_delay, `d`, is the time  the tower would have to respond with the **penalty transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the dispute_delta does not match the `OP_CSV `, the tower would try to respond with the penalty transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be, at least, `20`. `type(d) = int`
 
 The encrypted\_blob, `eb`, is a data blob containing the `raw penalty transaction` and it is encrypted using `CHACHA20-POLY1305`. The `encryption key` used by the cipher is the sha256 of the **dispute transaction id**, and the `nonce` is a 12-byte long zero byte array:
 
@@ -45,15 +45,15 @@ The alpha release does not have authentication, payments nor rate limiting, ther
 	
 # Get appointment
 	
-`/get_appointment` is an endpoint provided to check the status of the appointments sent to PISA. The endpoint is accessible without any type of authentication for now. `/get_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the **locator** of an appointment. The query must match the following format:
+`/get_appointment` is an endpoint provided to check the status of the appointments sent to the tower. The endpoint is accessible without any type of authentication for now. `/get_appointment` accepts `HTTP GET` requests only, where the data to be provided must be the **locator** of an appointment. The query must match the following format:
 
-`https://pisa_server:pisa_port/get_appointment?locator=appointment_locator`
+`https://teos_server:teos_port/get_appointment?locator=appointment_locator`
 
 **Appointment can be in three states**:
 
 - `not_found`: meaning the locator is not recognised by the API. This could either mean the locator is wrong, or the appointment has already been fulfilled.
-- `being_watched`: the appointment has been accepted by the PISA server and it's being watched at the moment. This stage means that the dispute transaction has not been seen yet, and therefore no penalty transaction has been published.
-- `dispute_responded`: the dispute was found by the watcher and the corresponding penalty transaction has been broadcast by the node. In this stage PISA is actively monitoring until the penalty transaction reaches enough confirmations and making sure no fork occurs in the meantime.
+- `being_watched`: the appointment has been accepted by the tower server and it's being watched at the moment. This stage means that the dispute transaction has not been seen yet, and therefore no penalty transaction has been published.
+- `dispute_responded`: the dispute was found by the watcher and the corresponding penalty transaction has been broadcast by the node. In this stage the tower is actively monitoring until the penalty transaction reaches enough confirmations and making sure no fork occurs in the meantime.
 
 ### Get appointment response formats
 
@@ -91,6 +91,6 @@ In the above scenario, Bob can hire our service with a bad encrypted blob for th
 
 ### Data persistence
 
-PISA keeps track of the appointment while they are being monitored, but data is wiped once an appointment has been completed with enough confirmations. Notice that during the alpha there will be no authentication, so data may be wiped periodically.
+The Eye of Satoshi keeps track of the appointment while they are being monitored, but data is wiped once an appointment has been completed with enough confirmations. Notice that during the alpha there will be no authentication, so data may be wiped periodically.
 
 

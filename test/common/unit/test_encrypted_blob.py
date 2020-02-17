@@ -1,5 +1,5 @@
 from common.encrypted_blob import EncryptedBlob
-from test.pisa.unit.conftest import get_random_value_hex
+from test.common.unit.conftest import get_random_value_hex
 
 
 def test_init_encrypted_blob():
