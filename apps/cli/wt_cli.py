@@ -63,7 +63,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 
 
 def load_keys():
-    PISA_PUBLIC_KEY = "3056301006072a8648ce3d020106052b8104000a0342000430053e39c53b8bcb43354a4ed886b8082af1d1e8fc14956e60ad0592bfdfab511b7e309f6ac83b7495462196692e145bf7b1a321e96ec8fc4d678719c77342da"
+    PISA_PUBLIC_KEY = "0230053e39c53b8bcb43354a4ed886b8082af1d1e8fc14956e60ad0592bfdfab51"
     pisa_pk = PublicKey(binascii.unhexlify(PISA_PUBLIC_KEY))
 
     return pisa_pk
