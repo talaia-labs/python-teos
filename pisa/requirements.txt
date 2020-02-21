@@ -1,5 +1,7 @@
 zmq
 flask
 cryptography
+coincurve
+pyzbase32
 requests
 plyvel
