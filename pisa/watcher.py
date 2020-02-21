@@ -51,7 +51,7 @@ class Watcher:
         config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
             ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         db_manager (:obj:`DBManager <pisa.db_manager>`): A db manager instance to interact with the database.
-        signing_key (:mod:`EllipticCurvePrivateKey`): a private key used to sign accepted appointments.
+        signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
 
     Raises:
         ValueError: if `pisa_sk_file` is not found.
