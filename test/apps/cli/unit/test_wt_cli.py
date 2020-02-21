@@ -1,12 +1,8 @@
-import responses
-import json
 import os
+import json
 import shutil
-from binascii import hexlify
-
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+import responses
+from coincurve import PrivateKey
 
 import common.cryptographer
 from common.logger import Logger
@@ -21,18 +17,9 @@ from test.apps.cli.unit.conftest import get_random_value_hex
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=wt_cli.LOG_PREFIX)
 
 # dummy keys for the tests
-dummy_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-dummy_pk = dummy_sk.public_key()
-another_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-
-dummy_sk_der = dummy_sk.private_bytes(
-    encoding=serialization.Encoding.DER,
-    format=serialization.PrivateFormat.TraditionalOpenSSL,
-    encryption_algorithm=serialization.NoEncryption(),
-)
-dummy_pk_der = dummy_pk.public_bytes(
-    encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
-)
+dummy_sk = PrivateKey()
+dummy_pk = dummy_sk.public_key
+another_sk = PrivateKey()
 
 
 # Replace the key in the module with a key we control for the tests
@@ -69,14 +56,6 @@ def load_dummy_keys(*args):
     return dummy_pk
 
 
-def get_dummy_pisa_pk_der(*args):
-    return dummy_pk_der
-
-
-def get_dummy_hex_pk_der(*args):
-    return hexlify(get_dummy_pisa_pk_der())
-
-
 def get_dummy_signature(*args):
     return Cryptographer.sign(dummy_appointment.serialize(), dummy_sk)
 
@@ -90,7 +69,7 @@ def get_bad_signature(*args):
 #     private_key_file_path = "sk_test_file"
 #     public_key_file_path = "pk_test_file"
 #     with open(private_key_file_path, "wb") as f:
-#         f.write(dummy_sk_der)
+#         f.write(dummy_sk.to_der())
 #     with open(public_key_file_path, "wb") as f:
 #         f.write(dummy_pk_der)
 #
