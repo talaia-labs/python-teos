@@ -34,7 +34,7 @@ pisad_process = run_pisad()
 
 def get_pisa_pk():
     pisa_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(config.get("PISA_SECRET_KEY")))
-    pisa_pk = pisa_sk.public_key()
+    pisa_pk = pisa_sk.public_key
 
     return pisa_pk
 
@@ -159,7 +159,8 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     # Check that the server has accepted the appointment
     signature = response_json.get("signature")
     assert signature is not None
-    assert Cryptographer.verify(appointment.serialize(), signature, pisa_pk) is True
+    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    assert Cryptographer.verify_rpk(pisa_pk, rpk) is True
     assert response_json.get("locator") == appointment.locator
 
     # Trigger the appointment
