@@ -1,9 +1,10 @@
 import os
-import binascii
+from binascii import unhexlify
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
+from coincurve import PrivateKey, PublicKey
 import common.cryptographer
 from common.blob import Blob
 from common.logger import Logger
@@ -22,32 +23,10 @@ WRONG_TYPES = [None, 2134, 14.56, str(), list(), dict()]
 
 
 def generate_keypair():
-    sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    pk = sk.public_key()
-
-    sk_der = sk.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
+    sk = PrivateKey()
+    pk = sk.public_key
 
     return sk, pk
-
-
-def generate_keypair_der():
-    sk, pk = generate_keypair()
-
-    sk_der = sk.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    pk_der = pk.public_bytes(
-        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-
-    return sk_der, pk_der
 
 
 def test_check_data_key_format_wrong_data():
@@ -105,27 +84,10 @@ def test_encrypt_wrong_key_size():
         assert True
 
 
-def test_encrypt_hex():
+def test_encrypt():
     blob = Blob(data)
 
     assert Cryptographer.encrypt(blob, key) == encrypted_data
-
-
-def test_encrypt_bytes():
-    blob = Blob(data)
-
-    byte_blob = Cryptographer.encrypt(blob, key, rtype="bytes")
-    assert isinstance(byte_blob, bytes) and byte_blob == binascii.unhexlify(encrypted_data)
-
-
-def test_encrypt_wrong_return():
-    # Any other type but "hex" (default) or "bytes" should fail
-    try:
-        Cryptographer.encrypt(Blob(data), key, rtype="random_value")
-        assert False
-
-    except ValueError:
-        assert True
 
 
 def test_decrypt_invalid_tag():
@@ -165,25 +127,9 @@ def test_decrypt_wrong_key_size():
         assert True
 
 
-def test_decrypt_hex():
+def test_decrypt():
     # Valid data should run with no InvalidTag and verify
     assert Cryptographer.decrypt(EncryptedBlob(encrypted_data), key) == data
-
-
-def test_decrypt_bytes():
-    # We can also get the decryption in bytes
-    byte_blob = Cryptographer.decrypt(EncryptedBlob(encrypted_data), key, rtype="bytes")
-    assert isinstance(byte_blob, bytes) and byte_blob == binascii.unhexlify(data)
-
-
-def test_decrypt_wrong_return():
-    # Any other type but "hex" (default) or "bytes" should fail
-    try:
-        Cryptographer.decrypt(EncryptedBlob(encrypted_data), key, rtype="random_value")
-        assert False
-
-    except ValueError:
-        assert True
 
 
 def test_load_key_file():
@@ -210,19 +156,6 @@ def test_load_key_file():
     assert Cryptographer.load_key_file(0) is None and Cryptographer.load_key_file(None) is None
 
 
-def test_load_public_key_der():
-    # load_public_key_der expects a byte encoded data. Any other should fail and return None
-    for wtype in WRONG_TYPES:
-        assert Cryptographer.load_public_key_der(wtype) is None
-
-    # On the other hand, any random formatter byte array would also fail (zeros for example)
-    assert Cryptographer.load_public_key_der(bytes(32)) is None
-
-    # A proper formatted key should load
-    _, pk_der = generate_keypair_der()
-    assert Cryptographer.load_public_key_der(pk_der) is not None
-
-
 def test_load_private_key_der():
     # load_private_key_der expects a byte encoded data. Any other should fail and return None
     for wtype in WRONG_TYPES:
@@ -232,25 +165,8 @@ def test_load_private_key_der():
     assert Cryptographer.load_private_key_der(bytes(32)) is None
 
     # A proper formatted key should load
-    sk_der, _ = generate_keypair_der()
+    sk_der = generate_keypair()[0].to_der()
     assert Cryptographer.load_private_key_der(sk_der) is not None
-
-
-def test_sign_wrong_rtype():
-    # Calling sign with an rtype different than 'str' or 'bytes' should fail
-    for wtype in WRONG_TYPES:
-        try:
-            Cryptographer.sign(b"", "", rtype=wtype)
-            assert False
-
-        except ValueError:
-            assert True
-
-
-def test_sign_wrong_sk():
-    # If a sk is not passed, sign will return None
-    for wtype in WRONG_TYPES:
-        assert Cryptographer.sign(b"", wtype) is None
 
 
 def test_sign():
@@ -259,55 +175,83 @@ def test_sign():
     message = b""
 
     assert Cryptographer.sign(message, sk) is not None
-
-    # Check that the returns work
-    assert isinstance(Cryptographer.sign(message, sk, rtype="str"), str)
-    assert isinstance(Cryptographer.sign(message, sk, rtype="bytes"), bytes)
+    assert isinstance(Cryptographer.sign(message, sk), str)
 
 
-def test_verify_wrong_pk():
-    # If a pk is not passed, verify will return None
+def test_sign_ground_truth():
+    # Generate a signature that has been verified by c-lightning.
+    raw_sk = "24e9a981580d27d9277071a8381542e89a7c124868c4e862a13595dc75c6922f"
+    sk = PrivateKey.from_hex(raw_sk)
+
+    c_lightning_rpk = "0235293db86c6aaa74aff69ebacad8471d5242901ea9f6a0341a8dca331875e62c"
+    message = b"Test message"
+
+    sig = Cryptographer.sign(message, sk)
+    rpk = Cryptographer.recover_pk(message, sig)
+
+    assert Cryptographer.verify_rpk(PublicKey(unhexlify(c_lightning_rpk)), rpk)
+
+
+def test_sign_wrong_sk():
+    # If a sk is not passed, sign will return None
     for wtype in WRONG_TYPES:
-        assert Cryptographer.sign("", wtype) is None
+        assert Cryptographer.sign(b"", wtype) is None
 
 
-def test_verify_random_values():
-    # Random values shouldn't verify
-    sk, pk = generate_keypair()
-
-    message = binascii.unhexlify(get_random_value_hex(32))
-    signature = get_random_value_hex(32)
-
-    assert Cryptographer.verify(message, signature, pk) is False
-
-
-def test_verify_wrong_pair():
-    # Verifying with a wrong keypair must fail
+def test_recover_pk():
     sk, _ = generate_keypair()
-    _, pk = generate_keypair()
+    message = b"Test message"
 
-    message = binascii.unhexlify(get_random_value_hex(32))
-    signature = get_random_value_hex(32)
+    zbase32_sig = Cryptographer.sign(message, sk)
+    rpk = Cryptographer.recover_pk(message, zbase32_sig)
 
-    assert Cryptographer.verify(message, signature, pk) is False
-
-
-def test_verify_wrong_message():
-    # Verifying with a wrong keypair must fail
-    sk, pk = generate_keypair()
-
-    message = binascii.unhexlify(get_random_value_hex(32))
-    signature = Cryptographer.sign(message, sk)
-
-    wrong_message = binascii.unhexlify(get_random_value_hex(32))
-
-    assert Cryptographer.verify(wrong_message, signature, pk) is False
+    assert isinstance(rpk, PublicKey)
 
 
-def test_verify():
-    # A properly generated signature should verify
-    sk, pk = generate_keypair()
-    message = binascii.unhexlify(get_random_value_hex(32))
-    signature = Cryptographer.sign(message, sk)
+def test_recover_pk_ground_truth():
+    # Use a message a signature generated by c-lightning and see if we recover the proper key
+    message = b"Test message"
+    org_pk = "02b821c749295d5c24f6166ae77d8353eaa36fc4e47326670c6d2522cbd344bab9"
+    zsig = "rbwewwyr4zem3w5t39fd1xyeamfzbmfgztwm4b613ybjtmoeod5kazaxqo3akn3ae75bqi3aqeds8cs6n43w4p58ft34itjnnb61bp54"
 
-    assert Cryptographer.verify(message, signature, pk) is True
+    rpk = Cryptographer.recover_pk(message, zsig)
+
+    assert Cryptographer.verify_rpk(PublicKey(unhexlify(org_pk)), rpk)
+
+
+def test_recover_pk_wrong_inputs():
+    str_message = "Test message"
+    message = bytes(20)
+    str_sig = "aaaaaaaa"
+    sig = bytes(20)
+
+    # Wrong input type
+    assert Cryptographer.recover_pk(message, str_sig) is None
+    assert Cryptographer.recover_pk(str_message, str_sig) is None
+    assert Cryptographer.recover_pk(str_message, sig) is None
+    assert Cryptographer.recover_pk(message, str_sig) is None
+
+    # Wrong input size or format
+    assert Cryptographer.recover_pk(message, sig) is None
+    assert Cryptographer.recover_pk(message, bytes(104)) is None
+
+
+def test_verify_pk():
+    sk, _ = generate_keypair()
+    message = b"Test message"
+
+    zbase32_sig = Cryptographer.sign(message, sk)
+    rpk = Cryptographer.recover_pk(message, zbase32_sig)
+
+    assert Cryptographer.verify_rpk(sk.public_key, rpk)
+
+
+def test_verify_pk_wrong():
+    sk, _ = generate_keypair()
+    sk2, _ = generate_keypair()
+    message = b"Test message"
+
+    zbase32_sig = Cryptographer.sign(message, sk)
+    rpk = Cryptographer.recover_pk(message, zbase32_sig)
+
+    assert not Cryptographer.verify_rpk(sk2.public_key, rpk)
