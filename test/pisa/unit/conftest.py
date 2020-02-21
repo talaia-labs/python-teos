@@ -5,11 +5,8 @@ import requests
 from time import sleep
 from shutil import rmtree
 from threading import Thread
-from binascii import hexlify
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
+from coincurve import PrivateKey
 
 from common.blob import Blob
 from pisa.responder import TransactionTracker
@@ -58,10 +55,10 @@ def db_manager():
 
 
 def generate_keypair():
-    client_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    client_pk = client_sk.public_key()
+    sk = PrivateKey()
+    pk = sk.public_key
 
-    return client_sk, client_pk
+    return sk, pk
 
 
 def get_random_value_hex(nbytes):
@@ -106,9 +103,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
 
     # dummy keys for this test
     client_sk, client_pk = generate_keypair()
-    client_pk_der = client_pk.public_bytes(
-        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
+    client_pk_hex = client_pk.format().hex()
 
     locator = compute_locator(dispute_txid)
     blob = Blob(dummy_appointment_data.get("tx"))
@@ -124,9 +119,8 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
     }
 
     signature = Cryptographer.sign(Appointment.from_dict(appointment_data).serialize(), client_sk)
-    pk_hex = hexlify(client_pk_der).decode("utf-8")
 
-    data = {"appointment": appointment_data, "signature": signature, "public_key": pk_hex}
+    data = {"appointment": appointment_data, "signature": signature, "public_key": client_pk_hex}
 
     return data, dispute_tx.hex()
 

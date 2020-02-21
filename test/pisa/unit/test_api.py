@@ -3,7 +3,6 @@ import pytest
 import requests
 from time import sleep
 from threading import Thread
-from cryptography.hazmat.primitives import serialization
 
 from pisa.api import API
 from pisa.watcher import Watcher
@@ -36,13 +35,8 @@ config = get_config()
 @pytest.fixture(scope="module")
 def run_api(db_manager):
     sk, pk = generate_keypair()
-    sk_der = sk.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
 
-    watcher = Watcher(db_manager, Responder(db_manager), sk_der, get_config())
+    watcher = Watcher(db_manager, Responder(db_manager), sk.to_der(), get_config())
     chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
     watcher.awake()
     chain_monitor.monitor_chain()
