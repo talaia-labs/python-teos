@@ -46,7 +46,7 @@ def test_check_locator_format():
         get_random_value_hex(LOCATOR_LEN_BYTES - 1),
     ]
     for wtype in wrong_inputs:
-        assert check_sha256_hex_format(wtype) is False
+        assert check_locator_format(wtype) is False
 
     for _ in range(100):
         assert check_locator_format(get_random_value_hex(LOCATOR_LEN_BYTES)) is True
