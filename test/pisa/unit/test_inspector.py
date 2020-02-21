@@ -1,8 +1,4 @@
-from binascii import hexlify, unhexlify
-
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
+from binascii import unhexlify
 
 from pisa.errors import *
 from pisa.inspector import Inspector
@@ -176,17 +172,14 @@ def test_check_blob():
 def test_check_appointment_signature():
     # The inspector receives the public key as hex
     client_sk, client_pk = generate_keypair()
-    client_pk_der = client_pk.public_bytes(
-        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    client_pk_hex = hexlify(client_pk_der).decode("utf-8")
+    client_pk_hex = client_pk.format().hex()
 
     dummy_appointment_data, _ = generate_dummy_appointment_data(real_height=False)
     assert Inspector.check_appointment_signature(
         dummy_appointment_data["appointment"], dummy_appointment_data["signature"], dummy_appointment_data["public_key"]
     )
 
-    fake_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
+    fake_sk, _ = generate_keypair()
 
     # Create a bad signature to make sure inspector rejects it
     bad_signature = Cryptographer.sign(
@@ -203,10 +196,7 @@ def test_inspect(run_bitcoind):
     # appointments.
 
     client_sk, client_pk = generate_keypair()
-    client_pk_der = client_pk.public_bytes(
-        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    client_pk_hex = hexlify(client_pk_der).decode("utf-8")
+    client_pk_hex = client_pk.format().hex()
 
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)

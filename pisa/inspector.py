@@ -3,7 +3,7 @@ from binascii import unhexlify
 
 import common.cryptographer
 from common.constants import LOCATOR_LEN_HEX
-from common.cryptographer import Cryptographer
+from common.cryptographer import Cryptographer, PublicKey
 
 from pisa import errors, LOG_PREFIX
 from common.logger import Logger
@@ -337,14 +337,14 @@ class Inspector:
 
     @staticmethod
     # Verifies that the appointment signature is a valid signature with public key
-    def check_appointment_signature(appointment_data, signature, pk_der):
+    def check_appointment_signature(appointment_data, signature, pk):
         """
         Checks if the provided user signature is correct.
 
         Args:
             appointment_data (:obj:`dict`): the appointment that was signed by the user.
             signature (:obj:`str`): the user's signature (hex encoded).
-            pk_der (:obj:`str`): the user's public key (hex encoded, DER format).
+            pk (:obj:`str`): the user's public key (hex encoded).
 
         Returns:
             :obj:`tuple`: A tuple (return code, message) as follows:
@@ -363,13 +363,19 @@ class Inspector:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty signature received"
 
-        elif pk_der is None:
+        elif pk is None:
             rcode = errors.APPOINTMENT_EMPTY_FIELD
             message = "empty public key received"
 
+        elif re.match(r"^[0-9A-Fa-f]{66}$", pk) is None:
+            rcode = errors.APPOINTMENT_WRONG_FIELD
+            message = "public key must be a hex encoded 33-byte long value"
+
         else:
-            pk = Cryptographer.load_public_key_der(unhexlify(pk_der))
-            valid_sig = Cryptographer.verify(Appointment.from_dict(appointment_data).serialize(), signature, pk)
+            appointment = Appointment.from_dict(appointment_data)
+            rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+            pk = PublicKey(unhexlify(pk))
+            valid_sig = Cryptographer.verify_rpk(pk, rpk)
 
             if not valid_sig:
                 rcode = errors.APPOINTMENT_INVALID_SIGNATURE
