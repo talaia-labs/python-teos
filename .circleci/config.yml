@@ -21,15 +21,14 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v3-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}
+            - v5-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
             # fallback to using the latest cache if no exact match is found
-            - v3-dependencies-
+            - v5-dependencies-
 
       - run:
           name: Install dependencies
           command: |
-            sudo apt-get install snapd
-            sudo snap install bitcoin-core
+            sudo snap install `cat test/pisa/e2e/bitcoind_snap.sh`
             pyenv local 3.7.0
             python3 -m venv venv
             . venv/bin/activate
@@ -41,7 +40,8 @@ jobs:
       - save_cache:
           paths:
             - ./venv
-          key: v3-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}
+            - /snap
+          key: v5-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
 
       # Run unit tests
       - run:
@@ -71,7 +71,10 @@ jobs:
       # Run bitcoind for E2E testing
       - run:
           name: Run bitcoind
-          command: bitcoin-core.daemon -conf=test/pisa/e2e/bitcoin.conf
+          command: |
+            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            cp test/pisa/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            /snap/bin/bitcoin-core.daemon
 
       # Setup pisa for E2E testing
       - run:
