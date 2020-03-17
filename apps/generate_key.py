@@ -23,7 +23,7 @@ def save_sk(sk, filename):
 
 
 def save_pk(pk, filename):
-    der = pk.public_bytes(encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    der = pk.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.CompressedPoint)
     with open(filename, "wb") as der_out:
         der_out.write(der)
 
