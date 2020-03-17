@@ -1,7 +1,7 @@
 [run]
 omit =
     *__init__.py
-    pisa/pisad.py
-    pisa/logger.py
-    pisa/sample_conf.py
-    pisa/utils/auth_proxy.py
+    teos/teosd.py
+    teos/logger.py
+    teos/sample_conf.py
+    teos/utils/auth_proxy.py

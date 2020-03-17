@@ -1,6 +1,6 @@
-# wt_cli
+# teos_cli
 
-`wt_cli` is a command line interface to interact with the Eye of Satoshi watchtower server, written in Python3.
+`teos_cli` is a command line interface to interact with the Eye of Satoshi watchtower server, written in Python3.
 
 ## Dependencies
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
@@ -11,7 +11,7 @@ Refer to [INSTALL.md](INSTALL.md)
 
 ## Usage
 
-	python wt_cli.py [global options] command [command options] [arguments]
+	python teos_cli.py [global options] command [command options] [arguments]
 	
 #### Global options
 
@@ -59,7 +59,7 @@ The alpha release does not have authentication, payments nor rate limiting, ther
 
 #### Usage
 
-	python wt_cli.py add_appointment [command options] <appointment>/<path_to_appointment_file>
+	python teos_cli.py add_appointment [command options] <appointment>/<path_to_appointment_file>
 	
 if `-f, --file` **is** specified, then the command expects a path to a json file instead of a json encoded string as parameter.
 	
@@ -103,7 +103,7 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 	
 #### Usage
 
-	python wt_cli.py get_appointment <appointment_locator>
+	python teos_cli.py get_appointment <appointment_locator>
 	
 
 	
@@ -112,11 +112,11 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 Shows the list of commands or help about how to run a specific command.
 
 #### Usage
-	python wt_cli.py help
+	python teos_cli.py help
 	
 or
 
-	python wt_cli.py help command
+	python teos_cli.py help command
 
 ## Example
 
@@ -131,7 +131,7 @@ or
 2. Send the appointment to the tower API. Which will then start monitoring for matching transactions.
 
     ```
-    python wt_cli.py add_appointment -f dummy_appointment_data.json
+    python teos_cli.py add_appointment -f dummy_appointment_data.json
     ```
 
     This returns a appointment locator that can be used to get updates about this appointment from the tower.
@@ -139,20 +139,20 @@ or
 3. Test that the tower is still watching the appointment by replacing the appointment locator received into the following command:
 
     ```
-    python wt_cli.py get_appointment <appointment_locator>
+    python teos_cli.py get_appointment <appointment_locator>
     ```
 
 ## the Eye of Satoshi's API	
 
-If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [tEOS-API.md](tEOS-API.md).
+If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [tEOS-API.md](TEOS-API.md).
 
 ## Are you reckless? Try me on mainnet
 Would you like to try me on `mainnet` instead of `testnet`? Add `-s https://mainnet.teos.pisa.watch` to your calls, for example:
 
 ```
-python wt_cli.py -s https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
+python teos_cli.py -s https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
 ```
 
 You can also change the config file to avoid specifying the server every time:
 
-`DEFAULT_PISA_API_SERVER = "https://teosmainnet.pisa.watch"`
+`DEFAULT_TEOS_API_SERVER = "https://teosmainnet.pisa.watch"`

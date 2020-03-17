@@ -41,7 +41,7 @@ class Appointment:
                 ``{locator, start_time, end_time, to_self_delay, encrypted_blob}``
 
         Returns:
-            :obj:`Appointment <pisa.appointment.Appointment>`: An appointment initialized using the provided data.
+            :obj:`Appointment <teos.appointment.Appointment>`: An appointment initialized using the provided data.
 
         Raises:
             ValueError: If one of the mandatory keys is missing in ``appointment_data``.
