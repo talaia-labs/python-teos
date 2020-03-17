@@ -11,9 +11,9 @@ conf_fields = {
     "DATA_FOLDER": {"value": conf.DATA_FOLDER, "type": str},
     "CLIENT_LOG_FILE": {"value": conf.CLIENT_LOG_FILE, "type": str, "path": True},
     "APPOINTMENTS_FOLDER_NAME": {"value": conf.APPOINTMENTS_FOLDER_NAME, "type": str, "path": True},
-    # "CLI_PUBLIC_KEY": {"value": conf.CLI_PUBLIC_KEY, "type": str, "path": True},
-    # "CLI_PRIVATE_KEY": {"value": conf.CLI_PRIVATE_KEY, "type": str, "path": True},
-    # "TEOS_PUBLIC_KEY": {"value": conf.TEOS_PUBLIC_KEY, "type": str, "path": True},
+    "CLI_PUBLIC_KEY": {"value": conf.CLI_PUBLIC_KEY, "type": str, "path": True},
+    "CLI_PRIVATE_KEY": {"value": conf.CLI_PRIVATE_KEY, "type": str, "path": True},
+    "TEOS_PUBLIC_KEY": {"value": conf.TEOS_PUBLIC_KEY, "type": str, "path": True},
 }
 
 # Expand user (~) if found and check fields are correct

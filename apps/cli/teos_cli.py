@@ -24,49 +24,57 @@ from common.tools import check_sha256_hex_format, check_locator_format, compute_
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
-# FIXME: creating a simpler load_keys for the alpha. Client keys will not be necessary. TEOS key is hardcoded.
-# def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
-#     """
-#     Loads all the keys required so sign, send, and verify the appointment.
-#
-#     Args:
-#         teos_pk_path (:obj:`str`): path to the TEOS public key file.
-#         cli_sk_path (:obj:`str`): path to the client private key file.
-#         cli_pk_path (:obj:`str`): path to the client public key file.
-#
-#     Returns:
-#         :obj:`tuple` or ``None``: a three item tuple containing a teos_pk object, cli_sk object and the cli_sk_der
-#         encoded key if all keys can be loaded. ``None`` otherwise.
-#     """
-#
-#     teos_pk_der = Cryptographer.load_key_file(teos_pk_path)
-#     teos_pk = Cryptographer.load_public_key_der(teos_pk_der)
-#
-#     if teos_pk is None:
-#         logger.error("TEOS's public key file not found. Please check your settings")
-#         return None
-#
-#     cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
-#     cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
-#
-#     if cli_sk is None:
-#         logger.error("Client's private key file not found. Please check your settings")
-#         return None
-#
-#     cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
-#
-#     if cli_pk_der is None:
-#         logger.error("Client's public key file not found. Please check your settings")
-#         return None
-#
-#     return teos_pk, cli_sk, cli_pk_der
 
+def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
+    """
+    Loads all the keys required so sign, send, and verify the appointment.
 
-def load_keys():
-    TEOS_PUBLIC_KEY = "0230053e39c53b8bcb43354a4ed886b8082af1d1e8fc14956e60ad0592bfdfab51"
-    teos_pk = PublicKey(binascii.unhexlify(TEOS_PUBLIC_KEY))
+    Args:
+        teos_pk_path (:obj:`str`): path to the TEOS public key file.
+        cli_sk_path (:obj:`str`): path to the client private key file.
+        cli_pk_path (:obj:`str`): path to the client public key file.
 
-    return teos_pk
+    Returns:
+        :obj:`tuple` or ``None``: a three item tuple containing a teos_pk object, cli_sk object and the cli_sk_der
+        encoded key if all keys can be loaded. ``None`` otherwise.
+    """
+
+    if teos_pk_path is None:
+        logger.error("TEOS's public key file not found. Please check your settings")
+        return None
+
+    if cli_sk_path is None:
+        logger.error("Client's private key file not found. Please check your settings")
+        return None
+
+    if cli_pk_path is None:
+        logger.error("Client's public key file not found. Please check your settings")
+        return None
+
+    try:
+        teos_pk_der = Cryptographer.load_key_file(teos_pk_path)
+        teos_pk = PublicKey(teos_pk_der)
+
+    except ValueError:
+        logger.error("TEOS public key is invalid or cannot be parsed")
+        return None
+
+    cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
+    cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
+
+    if cli_sk is None:
+        logger.error("Client private key is invalid or cannot be parsed")
+        return None
+
+    try:
+        cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
+        PublicKey(cli_pk_der)
+
+    except ValueError:
+        logger.error("Client public key is invalid or cannot be parsed")
+        return None
+
+    return teos_pk, cli_sk, cli_pk_der
 
 
 def add_appointment(args):
@@ -95,18 +103,17 @@ def add_appointment(args):
         :obj:`bool`: True if the appointment is accepted by the tower and the receipt is properly stored, false if any
         error occurs during the process.
     """
-    # FIXME: creating a simpler load_keys for the alpha. Client keys will not be necessary. TEOS key is hardcoded.
-    # teos_pk, cli_sk, cli_pk_der = load_keys(
-    #     config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
-    # )
-    #
-    # try:
-    #     hex_pk_der = binascii.hexlify(cli_pk_der)
-    #
-    # except binascii.Error as e:
-    #     logger.error("Could not successfully encode public key as hex", error=str(e))
-    #     return False
-    teos_pk = load_keys()
+
+    teos_pk, cli_sk, cli_pk_der = load_keys(
+        config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
+    )
+
+    try:
+        hex_pk_der = binascii.hexlify(cli_pk_der)
+
+    except binascii.Error as e:
+        logger.error("Could not successfully encode public key as hex", error=str(e))
+        return False
 
     if teos_pk is None:
         return False
@@ -136,15 +143,12 @@ def add_appointment(args):
         return False
 
     appointment = Appointment.from_dict(appointment_data)
+    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
 
-    # FIXME: getting rid of the client-side signature for the alpha. A proper authentication is required.
-    # signature = Cryptographer.sign(appointment.serialize(), cli_sk)
-    #
-    # if not (appointment and signature):
-    #     return False
-    #
-    # data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
-    data = {"appointment": appointment.to_dict()}
+    if not (appointment and signature):
+        return False
+
+    data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
     server_response = post_appointment(data)

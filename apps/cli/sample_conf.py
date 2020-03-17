@@ -7,3 +7,8 @@ DATA_FOLDER = "~/.teos_cli/"
 
 CLIENT_LOG_FILE = "cli.log"
 APPOINTMENTS_FOLDER_NAME = "appointment_receipts"
+
+# KEYS
+TEOS_PUBLIC_KEY = "teos_pk.der"
+CLI_PRIVATE_KEY = "cli_sk.der"
+CLI_PUBLIC_KEY = "cli_pk.der"

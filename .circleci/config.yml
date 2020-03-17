@@ -81,7 +81,8 @@ jobs:
             . venv/bin/activate
             cp test/teos/e2e/teos-conf.py teos/conf.py
             python3 -m apps.generate_key -d ~/.teos/
-            python3 -m apps.generate_key -n cli -d ~/.teos/
+            python3 -m apps.generate_key -n cli -d ~/.teos_cli/
+            cp ~/.teos/teos_pk.der ~/.teos_cli/
 
 
       # Run E2E tests
