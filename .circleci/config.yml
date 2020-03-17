@@ -41,6 +41,14 @@ jobs:
             - /snap
           key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
 
+      # Run bitcoind for E2E testing (running it early so it has time to bootstrap)
+      - run:
+          name: Run bitcoind
+          command: |
+            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            cp test/pisa/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            /snap/bin/bitcoin-core.daemon
+
       # Run unit tests
       - run:
           name: Creates config files
@@ -65,14 +73,6 @@ jobs:
           command: |
             . venv/bin/activate
             pytest test/apps/cli/unit
-
-      # Run bitcoind for E2E testing
-      - run:
-          name: Run bitcoind
-          command: |
-            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            cp test/pisa/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            /snap/bin/bitcoin-core.daemon
 
       # Setup pisa for E2E testing
       - run:
