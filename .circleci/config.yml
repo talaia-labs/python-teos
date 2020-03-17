@@ -21,9 +21,7 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v5-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
-            # fallback to using the latest cache if no exact match is found
-            - v5-dependencies-
+            - v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
 
       - run:
           name: Install dependencies
@@ -41,7 +39,7 @@ jobs:
           paths:
             - ./venv
             - /snap
-          key: v5-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
+          key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
 
       # Run unit tests
       - run:
