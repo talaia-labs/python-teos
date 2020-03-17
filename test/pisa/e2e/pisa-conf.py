@@ -2,13 +2,13 @@
 BTC_RPC_USER = "user"
 BTC_RPC_PASSWD = "passwd"
 BTC_RPC_HOST = "localhost"
-BTC_RPC_PORT = 18445
+BTC_RPC_PORT = 18443
 BTC_NETWORK = "regtest"
 
 # ZMQ
 FEED_PROTOCOL = "tcp"
 FEED_ADDR = "127.0.0.1"
-FEED_PORT = 28335
+FEED_PORT = 28332
 
 # PISA
 DATA_FOLDER = "~/.pisa_btc/"

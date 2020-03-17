@@ -3,6 +3,7 @@ import pytest
 import logging
 from copy import deepcopy
 
+# FIXME: Import from pisa. Common should not import anything from cli nor pisa.
 from pisa import conf_fields
 
 from common.constants import LOCATOR_LEN_BYTES
