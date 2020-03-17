@@ -1,8 +1,9 @@
 import json
+import binascii
 from time import sleep
 from riemann.tx import Tx
 
-from teos import config
+
 from teos import HOST, PORT
 from apps.cli import teos_cli
 from common.blob import Blob
@@ -20,6 +21,7 @@ from test.teos.e2e.conftest import (
     create_penalty_tx,
     run_teosd,
 )
+from apps.cli import config as cli_conf
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
@@ -30,13 +32,6 @@ teos_cli.teos_api_port = PORT
 
 # Run teosd
 teosd_process = run_teosd()
-
-
-def get_teos_pk():
-    teos_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY")))
-    teos_pk = teos_sk.public_key
-
-    return teos_pk
 
 
 def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
@@ -51,9 +46,7 @@ def get_appointment_info(locator):
     return teos_cli.get_appointment(locator)
 
 
-def test_appointment_life_cycle(monkeypatch, bitcoin_cli, create_txs):
-    monkeypatch.setattr(teos_cli, "load_keys", get_teos_pk)
-
+def test_appointment_life_cycle(bitcoin_cli, create_txs):
     commitment_tx, penalty_tx = create_txs
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
@@ -96,9 +89,7 @@ def test_appointment_life_cycle(monkeypatch, bitcoin_cli, create_txs):
     assert appointment_info[0].get("status") == "not_found"
 
 
-def test_appointment_malformed_penalty(monkeypatch, bitcoin_cli, create_txs):
-    monkeypatch.setattr(teos_cli, "load_keys", get_teos_pk)
-
+def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
     # Lets start by creating two valid transaction
     commitment_tx, penalty_tx = create_txs
 
@@ -140,17 +131,13 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), get_random_value_hex(32))
     appointment = Appointment.from_dict(appointment_data)
 
-    # teos_pk, cli_sk, cli_pk_der = teos_cli.load_keys(
-    #     cli_conf.get("TEOS_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
-    # )
-    # hex_pk_der = binascii.hexlify(cli_pk_der)
-    #
-    # signature = Cryptographer.sign(appointment.serialize(), cli_sk)
-    # data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
-    # FIXME: Since the pk is now hardcoded for the alpha in the cli we cannot use load_keys here. We need to derive
-    #   the pk from the sk on disk.
-    teos_pk = get_teos_pk()
-    data = {"appointment": appointment.to_dict()}
+    teos_pk, cli_sk, cli_pk_der = teos_cli.load_keys(
+        cli_conf.get("TEOS_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
+    )
+    hex_pk_der = binascii.hexlify(cli_pk_der)
+
+    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
+    data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
     response = teos_cli.post_appointment(data)
@@ -176,9 +163,7 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     assert appointment_info[0].get("status") == "not_found"
 
 
-def test_two_identical_appointments(monkeypatch, bitcoin_cli, create_txs):
-    monkeypatch.setattr(teos_cli, "load_keys", get_teos_pk)
-
+def test_two_identical_appointments(bitcoin_cli, create_txs):
     # Tests sending two identical appointments to the tower.
     # At the moment there are no checks for identical appointments, so both will be accepted, decrypted and kept until
     # the end.
@@ -211,9 +196,7 @@ def test_two_identical_appointments(monkeypatch, bitcoin_cli, create_txs):
         assert info.get("penalty_rawtx") == penalty_tx
 
 
-def test_two_appointment_same_locator_different_penalty(monkeypatch, bitcoin_cli, create_txs):
-    monkeypatch.setattr(teos_cli, "load_keys", get_teos_pk)
-
+def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs):
     # This tests sending an appointment with two valid transaction with the same locator.
     commitment_tx, penalty_tx1 = create_txs
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
@@ -245,10 +228,8 @@ def test_two_appointment_same_locator_different_penalty(monkeypatch, bitcoin_cli
     assert appointment_info[0].get("penalty_rawtx") == penalty_tx1
 
 
-def test_appointment_shutdown_teos_trigger_back_online(monkeypatch, create_txs, bitcoin_cli):
+def test_appointment_shutdown_teos_trigger_back_online(create_txs, bitcoin_cli):
     global teosd_process
-
-    monkeypatch.setattr(teos_cli, "load_keys", get_teos_pk)
 
     teos_pid = teosd_process.pid
 
@@ -285,10 +266,8 @@ def test_appointment_shutdown_teos_trigger_back_online(monkeypatch, create_txs, 
     assert appointment_info[0].get("status") == "dispute_responded"
 
 
-def test_appointment_shutdown_teos_trigger_while_offline(monkeypatch, create_txs, bitcoin_cli):
+def test_appointment_shutdown_teos_trigger_while_offline(create_txs, bitcoin_cli):
     global teosd_process
-
-    monkeypatch.setattr(teos_cli, "load_keys", get_teos_pk)
 
     teos_pid = teosd_process.pid
 
