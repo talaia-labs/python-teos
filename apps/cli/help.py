@@ -1,9 +1,9 @@
 def help_add_appointment():
     return (
         "NAME:"
-        "\tpython wt_cli add_appointment - Registers a json formatted appointment to the tower."
+        "\tpython teos_cli add_appointment - Registers a json formatted appointment to the tower."
         "\n\nUSAGE:"
-        "\tpython wt_cli add_appointment [command options] appointment/path_to_appointment_file"
+        "\tpython teos_cli add_appointment [command options] appointment/path_to_appointment_file"
         "\n\nDESCRIPTION:"
         "\n\n\tRegisters a json formatted appointment to the tower."
         "\n\tif -f, --file *is* specified, then the command expects a path to a json file instead of a json encoded "
@@ -17,9 +17,9 @@ def help_add_appointment():
 def help_get_appointment():
     return (
         "NAME:"
-        "\tpython wt_cli get_appointment - Gets json formatted data about an appointment from the tower."
+        "\tpython teos_cli get_appointment - Gets json formatted data about an appointment from the tower."
         "\n\nUSAGE:"
-        "\tpython wt_cli get_appointment appointment_locator"
+        "\tpython teos_cli get_appointment appointment_locator"
         "\n\nDESCRIPTION:"
         "\n\n\tGets json formatted data about an appointment from the tower.\n"
     )

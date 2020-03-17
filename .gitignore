@@ -17,4 +17,5 @@ test.py
 .coverage
 htmlcov
 docs/
-.pisa_btc
+.teos
+.teos_cli

@@ -1,4 +1,4 @@
-## tEOS-API
+## TEOS-API
 
 ### Disclaimer: Everything in here is experimental and subject to change.
 

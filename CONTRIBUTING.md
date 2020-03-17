@@ -1,6 +1,6 @@
-# Contributing to PISA
+# Contributing to The Eye of Satoshi
 
-The following is a set of guidelines for contributing to PISA.
+The following is a set of guidelines for contributing to TEOS.
 
 ## Code Style Guidelines
 We use [black](https://github.com/psf/black) as our base code formatter with a line length of 120 chars. Before submitting a PR make sure you have properly formatted your code by running:
@@ -36,7 +36,7 @@ An exception to the rule are nested `if` statements that placed right after each
 for opt, arg in opts:
     if opt in ["-s", "server"]:
         if arg:
-            pisa_api_server = arg
+            teos_api_server = arg
 ```
 
 ```python

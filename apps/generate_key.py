@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 
 # Simple tool to generate an ECDSA private key using the secp256k1 curve and save private and public keys
-# as 'pisa_sk.der' 'and pisa_pk.der', respectively.
+# as 'teos_sk.der' 'and teos_pk.der', respectively.
 
 
 def save_sk(sk, filename):
@@ -23,13 +23,13 @@ def save_sk(sk, filename):
 
 
 def save_pk(pk, filename):
-    der = pk.public_bytes(encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    der = pk.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.CompressedPoint)
     with open(filename, "wb") as der_out:
         der_out.write(der)
 
 
 if __name__ == "__main__":
-    name = "pisa"
+    name = "teos"
     output_dir = "."
 
     opts, _ = getopt(argv[1:], "n:d:", ["name", "dir"])
