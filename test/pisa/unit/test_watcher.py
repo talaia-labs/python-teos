@@ -2,8 +2,7 @@ import pytest
 from uuid import uuid4
 from shutil import rmtree
 from threading import Thread
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
+from coincurve import PrivateKey
 
 from pisa.watcher import Watcher
 from pisa.responder import Responder
@@ -36,11 +35,6 @@ TEST_SET_SIZE = 200
 
 
 signing_key, public_key = generate_keypair()
-sk_der = signing_key.private_bytes(
-    encoding=serialization.Encoding.DER,
-    format=serialization.PrivateFormat.TraditionalOpenSSL,
-    encryption_algorithm=serialization.NoEncryption(),
-)
 
 
 @pytest.fixture(scope="session")
@@ -56,7 +50,7 @@ def temp_db_manager():
 
 @pytest.fixture(scope="module")
 def watcher(db_manager):
-    watcher = Watcher(db_manager, Responder(db_manager), sk_der, get_config())
+    watcher = Watcher(db_manager, Responder(db_manager), signing_key.to_der(), get_config())
     chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
     chain_monitor.monitor_chain()
 
@@ -96,7 +90,7 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
     assert isinstance(watcher.config, dict)
-    assert isinstance(watcher.signing_key, ec.EllipticCurvePrivateKey)
+    assert isinstance(watcher.signing_key, PrivateKey)
     assert isinstance(watcher.responder, Responder)
 
 
@@ -109,13 +103,17 @@ def test_add_appointment(watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert Cryptographer.verify(appointment.serialize(), sig, public_key)
+        assert Cryptographer.verify_rpk(
+            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        )
 
         # Check that we can also add an already added appointment (same locator)
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert Cryptographer.verify(appointment.serialize(), sig, public_key)
+        assert Cryptographer.verify_rpk(
+            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        )
 
 
 def test_add_too_many_appointments(watcher):
@@ -129,7 +127,9 @@ def test_add_too_many_appointments(watcher):
         added_appointment, sig = watcher.add_appointment(appointment)
 
         assert added_appointment is True
-        assert Cryptographer.verify(appointment.serialize(), sig, public_key)
+        assert Cryptographer.verify_rpk(
+            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        )
 
     appointment, dispute_tx = generate_dummy_appointment(
         start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET

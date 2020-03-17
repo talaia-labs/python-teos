@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 def save_sk(sk, filename):
     der = sk.private_bytes(
         encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
 

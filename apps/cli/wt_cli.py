@@ -5,9 +5,10 @@ import requests
 import time
 import binascii
 from sys import argv
+from uuid import uuid4
+from coincurve import PublicKey
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
-from uuid import uuid4
 
 from apps.cli import config, LOG_PREFIX
 from apps.cli.help import help_add_appointment, help_get_appointment
@@ -62,8 +63,8 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 
 
 def load_keys():
-    PISA_PUBLIC_KEY = "3056301006072a8648ce3d020106052b8104000a0342000430053e39c53b8bcb43354a4ed886b8082af1d1e8fc14956e60ad0592bfdfab511b7e309f6ac83b7495462196692e145bf7b1a321e96ec8fc4d678719c77342da"
-    pisa_pk = Cryptographer.load_public_key_der(binascii.unhexlify(PISA_PUBLIC_KEY))
+    PISA_PUBLIC_KEY = "0230053e39c53b8bcb43354a4ed886b8082af1d1e8fc14956e60ad0592bfdfab51"
+    pisa_pk = PublicKey(binascii.unhexlify(PISA_PUBLIC_KEY))
 
     return pisa_pk
 
@@ -161,7 +162,8 @@ def add_appointment(args):
         logger.error("The response does not contain the signature of the appointment")
         return False
 
-    if not Cryptographer.verify(appointment.serialize(), signature, pisa_pk):
+    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    if not Cryptographer.verify_rpk(pisa_pk, rpk):
         logger.error("The returned appointment's signature is invalid")
         return False
 

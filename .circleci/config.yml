@@ -18,21 +18,15 @@ jobs:
     steps:
       - checkout
 
-      # Get bitcoin_sandbox
-      - run:
-          name: Get bitcoin_sandbox
-          command: git clone --single-branch --branch ln https://github.com/sr-gi/bitcoin_sandbox.git
-
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v2-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "bitcoin_sandbox/requirements.txt" }}
-            # fallback to using the latest cache if no exact match is found
-            - v2-dependencies-
+            - v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
 
       - run:
           name: Install dependencies
           command: |
+            sudo snap install `cat test/pisa/e2e/bitcoind_snap.sh`
             pyenv local 3.7.0
             python3 -m venv venv
             . venv/bin/activate
@@ -40,23 +34,20 @@ jobs:
             pip install -r pisa/requirements.txt
             pip install -r pisa/requirements-dev.txt
             pip install -r apps/cli/requirements-dev.txt
-            pip install -r bitcoin_sandbox/requirements.txt
 
       - save_cache:
           paths:
             - ./venv
-          key: v2-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "bitcoin_sandbox/requirements.txt" }}
+            - /snap
+          key: v1-dependencies-{{ checksum "pisa/requirements.txt" }}-{{ checksum "pisa/requirements-dev.txt" }}-{{ checksum "apps/cli/requirements-dev.txt" }}-{{ checksum "test/pisa/e2e/bitcoind_snap.sh" }}
 
-      # Build docker env for E2E testing
+      # Run bitcoind for E2E testing (running it early so it has time to bootstrap)
       - run:
-          name: Build bitcoin_sandbox
+          name: Run bitcoind
           command: |
-            cp test/pisa/e2e/bitcoin.conf bitcoin_sandbox/
-            cp test/pisa/e2e/sandbox-conf.py bitcoin_sandbox/bitcoin_sandbox/conf.py
-            cp bitcoin_sandbox/docker/Dockerfile_ubuntu_no_ln bitcoin_sandbox/Dockerfile
-            . venv/bin/activate
-            cd bitcoin_sandbox && python -m bitcoin_sandbox.run_scenarios
-
+            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            cp test/pisa/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            /snap/bin/bitcoin-core.daemon
 
       # Run unit tests
       - run:

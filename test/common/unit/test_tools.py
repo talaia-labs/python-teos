@@ -3,6 +3,7 @@ import pytest
 import logging
 from copy import deepcopy
 
+# FIXME: Import from pisa. Common should not import anything from cli nor pisa.
 from pisa import conf_fields
 
 from common.constants import LOCATOR_LEN_BYTES
@@ -46,7 +47,7 @@ def test_check_locator_format():
         get_random_value_hex(LOCATOR_LEN_BYTES - 1),
     ]
     for wtype in wrong_inputs:
-        assert check_sha256_hex_format(wtype) is False
+        assert check_locator_format(wtype) is False
 
     for _ in range(100):
         assert check_locator_format(get_random_value_hex(LOCATOR_LEN_BYTES)) is True
