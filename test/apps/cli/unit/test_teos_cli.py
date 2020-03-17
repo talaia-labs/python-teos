@@ -52,8 +52,7 @@ dummy_appointment = Appointment.from_dict(dummy_appointment_full)
 
 
 def load_dummy_keys(*args):
-    # return dummy_pk, dummy_sk, dummy_pk_der
-    return dummy_pk
+    return dummy_pk, dummy_sk, dummy_pk.format(compressed=True)
 
 
 def get_dummy_signature(*args):
@@ -64,30 +63,39 @@ def get_bad_signature(*args):
     return Cryptographer.sign(dummy_appointment.serialize(), another_sk)
 
 
-# def test_load_keys():
-#     # Let's first create a private key and public key files
-#     private_key_file_path = "sk_test_file"
-#     public_key_file_path = "pk_test_file"
-#     with open(private_key_file_path, "wb") as f:
-#         f.write(dummy_sk.to_der())
-#     with open(public_key_file_path, "wb") as f:
-#         f.write(dummy_pk_der)
-#
-#     # Now we can test the function passing the using this files (we'll use the same pk for both)
-#     r = teos_cli.load_keys(public_key_file_path, private_key_file_path, public_key_file_path)
-#     assert isinstance(r, tuple)
-#     assert len(r) == 3
-#
-#     # If any param does not match we should get None as result
-#     assert teos_cli.load_keys(None, private_key_file_path, public_key_file_path) is None
-#     assert teos_cli.load_keys(public_key_file_path, None, public_key_file_path) is None
-#     assert teos_cli.load_keys(public_key_file_path, private_key_file_path, None) is None
-#
-#     # The same should happen if we pass a public key where a private should be, for instance
-#     assert teos_cli.load_keys(private_key_file_path, public_key_file_path, private_key_file_path) is None
-#
-#     os.remove(private_key_file_path)
-#     os.remove(public_key_file_path)
+def test_load_keys():
+    # Let's first create a private key and public key files
+    private_key_file_path = "sk_test_file"
+    public_key_file_path = "pk_test_file"
+    empty_file_path = "empty_file"
+    with open(private_key_file_path, "wb") as f:
+        f.write(dummy_sk.to_der())
+    with open(public_key_file_path, "wb") as f:
+        f.write(dummy_pk.format(compressed=True))
+    with open(empty_file_path, "wb") as f:
+        pass
+
+    # Now we can test the function passing the using this files (we'll use the same pk for both)
+    r = teos_cli.load_keys(public_key_file_path, private_key_file_path, public_key_file_path)
+    assert isinstance(r, tuple)
+    assert len(r) == 3
+
+    # If any param does not match we should get None as result
+    assert teos_cli.load_keys(None, private_key_file_path, public_key_file_path) is None
+    assert teos_cli.load_keys(public_key_file_path, None, public_key_file_path) is None
+    assert teos_cli.load_keys(public_key_file_path, private_key_file_path, None) is None
+
+    # The same should happen if we pass a public key where a private should be, for instance
+    assert teos_cli.load_keys(private_key_file_path, public_key_file_path, private_key_file_path) is None
+
+    # Same if any of the files is empty
+    assert teos_cli.load_keys(empty_file_path, private_key_file_path, public_key_file_path) is None
+    assert teos_cli.load_keys(public_key_file_path, empty_file_path, public_key_file_path) is None
+    assert teos_cli.load_keys(public_key_file_path, private_key_file_path, empty_file_path) is None
+
+    os.remove(private_key_file_path)
+    os.remove(public_key_file_path)
+    os.remove(empty_file_path)
 
 
 # TODO: 90-add-more-add-appointment-tests

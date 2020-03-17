@@ -39,24 +39,39 @@ def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
         encoded key if all keys can be loaded. ``None`` otherwise.
     """
 
-    teos_pk_der = Cryptographer.load_key_file(teos_pk_path)
-    teos_pk = PublicKey(teos_pk_der)
-
-    if teos_pk is None:
+    if teos_pk_path is None:
         logger.error("TEOS's public key file not found. Please check your settings")
+        return None
+
+    if cli_sk_path is None:
+        logger.error("Client's private key file not found. Please check your settings")
+        return None
+
+    if cli_pk_path is None:
+        logger.error("Client's public key file not found. Please check your settings")
+        return None
+
+    try:
+        teos_pk_der = Cryptographer.load_key_file(teos_pk_path)
+        teos_pk = PublicKey(teos_pk_der)
+
+    except ValueError:
+        logger.error("TEOS public key is invalid or cannot be parsed")
         return None
 
     cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
     cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
 
     if cli_sk is None:
-        logger.error("Client's private key file not found. Please check your settings")
+        logger.error("Client private key is invalid or cannot be parsed")
         return None
 
-    cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
+    try:
+        cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
+        PublicKey(cli_pk_der)
 
-    if cli_pk_der is None:
-        logger.error("Client's public key file not found. Please check your settings")
+    except ValueError:
+        logger.error("Client public key is invalid or cannot be parsed")
         return None
 
     return teos_pk, cli_sk, cli_pk_der
