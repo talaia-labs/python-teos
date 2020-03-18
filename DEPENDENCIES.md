@@ -2,7 +2,7 @@
 
 `teos` has both system-wide and Python dependencies. This document walks you through how to satisfy them.
 
-## System-wide dependencies
+## System-wide Dependencies
 
 `teos` has the following system-wide dependencies:
 
@@ -84,7 +84,7 @@ zmqpubhashtx=tcp://127.0.0.1:28333
 zmqpubrawtx=tcp://127.0.0.1:28333
 ```
 
-### Installing the dependencies
+### Installing the Dependencies
 
 `python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
 
@@ -108,7 +108,7 @@ and for `pip3`:
 
 `pip3` will be installed alongside `python3` in this case.
 
-## Python dependencies
+## Python Dependencies
 
 `teos` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
 
