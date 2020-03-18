@@ -21,18 +21,19 @@ BTC_RPC_PORT = 18443
 BTC_NETWORK = "regtest"
 ```
 
-
 ### Running TEOS
-In order to run `teos` you will need to create a configuration file (follow [INSTALL.md](INSTALL.md)) and run `teosd.py`. Currently you will also need a set of keys (to sign appointments) stored in your data directory.
+You can run `teos` buy running `teosd.py` under `teos`. 
 
-You can use `generate_keys.py` to generate those keys.
+To run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can use `generate_keys.py` to generate those keys.
+
+`teos` comes with a default configuration file (check [conf.py](teos/conf.py)). The configuration file include, amost others, where your data folder is placed, what network it connects to, etc.
 
 ### Interacting with a TEOS instance
 You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `cli`.
 
-Since `teos_cli` works independently of `teos`, you will need a separate configuration file for this (follow [cli/INSTALL.md](cli/INSTALL.md)).
+Since `teos_cli` works independently of `teos`, it uses a different configuration file (check [cli/conf.py](cli/conf.py)).
 
-`teos_cli` will also need an independent set of keys (that can be generated using `generate_keys.py`) as well as the public key of the tower instance (`teos_pk.der`). The same data directory can be used for both if you are running things locally.
+`teos_cli` also needs an independent set of keys (that can be generated using `generate_keys.py`) as well as the public key of the tower instance (`teos_pk.der`). The same data directory can be used for both if you are running things locally.
 
 Notice that `teos_cli` is a simple way to interact with `teos`, but ideally that should be part of your wallet functionality (therefore why they are independent entities). `teos_cli` can be used as an example for how to send data to a [BOLT13](https://github.com/sr-gi/bolt13) compliant watchtower.
  
