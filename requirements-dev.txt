@@ -1,3 +1,4 @@
 pytest
 black
+responses
 bitcoind_mock===0.0.4

@@ -1,5 +1,5 @@
 import os
-import apps.cli.conf as conf
+import cli.conf as conf
 from common.tools import extend_paths, check_conf_fields, setup_logging, setup_data_folder
 
 LOG_PREFIX = "cli"

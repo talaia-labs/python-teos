@@ -7,8 +7,16 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 
-# Simple tool to generate an ECDSA private key using the secp256k1 curve and save private and public keys
-# as 'teos_sk.der' 'and teos_pk.der', respectively.
+"""
+Simple way too to generate an ECDSA key pair using the secp256k1 curve and store it on disk.
+
+Default output dir = .
+Default key naming = teos_sk.der and teos_pk.der
+
+The output dir and naming can be changed using the -n and -d command line options, respectively.
+
+DISCLAIMER: Use this for testing only, using keys generated from this file in production is highly unadvised.
+"""
 
 
 def save_sk(sk, filename):

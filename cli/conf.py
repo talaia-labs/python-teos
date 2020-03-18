@@ -1,6 +1,6 @@
 # TEOS-SERVER
-DEFAULT_TEOS_API_SERVER = "https://teos.pisa.watch"
-DEFAULT_TEOS_API_PORT = 443
+DEFAULT_TEOS_API_SERVER = "http://localhost"
+DEFAULT_TEOS_API_PORT = 9814
 
 # WT-CLI
 DATA_FOLDER = "~/.teos_cli/"

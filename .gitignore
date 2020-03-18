@@ -3,11 +3,10 @@
 .venv/
 *.log
 .DS_Store
-conf.py
 bitcoin.conf*
 *__pycache__
 .pending*
-apps/cli/*.json
+cli/*.json
 appointments/
 test.py
 *.pyc
