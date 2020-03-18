@@ -8,6 +8,7 @@
 
 - `python3`
 - `pip3`
+- `bitcoind`
 
 ### Checking if the dependencies are already satisfied
 
@@ -47,6 +48,11 @@ A similar thing to the `python` alias applies to the `pip` alias. We can check i
 	
 And, if it happens to be installed, change the alias to `pip3`, or use `pip3` instead of `pip`.
 
+### Installing bitcoind
+
+`teos` runs on top of a Bitcoin Core node. Other underlaying Bitcoin nodes are not supported at the moment. 
+
+You can get Bitcoin Core from [bitcoin.org](https://bitcoin.org/en/download).
 
 ### Installing the dependencies
 

@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 
 """
-Simple too to generate an ECDSA key pair using the secp256k1 curve and store it on disk.
+Simple way too to generate an ECDSA key pair using the secp256k1 curve and store it on disk.
 
 Default output dir = .
 Default key naming = teos_sk.der and teos_pk.der
@@ -38,7 +38,7 @@ def save_pk(pk, filename):
 
 if __name__ == "__main__":
     name = "teos"
-    output_dir = "apps"
+    output_dir = "."
 
     opts, _ = getopt(argv[1:], "n:d:", ["name", "dir"])
     for opt, arg in opts:
