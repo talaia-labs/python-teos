@@ -46,6 +46,10 @@ if rcode == 0:
     rcode, message = self.check_end_time(end_time, start_time, block_height)
 ```
 
+## Dev requirements
+In order to contrubite you will need to install additional dependencies. They can be found at `requirements-dev.txt`. Install them by running:
+
+	pip install -r requirements-dev.txt
 
 ## Code Documentation
 Code should be, at least, documented using docstrings. We use the [Sphinx Google Style](https://www.sphinx-doc.org/en/master/usage/extensions/example_google.html#example-google) for documenting functions.
