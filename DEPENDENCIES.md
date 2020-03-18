@@ -54,6 +54,36 @@ And, if it happens to be installed, change the alias to `pip3`, or use `pip3` in
 
 You can get Bitcoin Core from [bitcoin.org](https://bitcoin.org/en/download).
 
+Bitcoin needs to be running with the following options enables:
+
+- `zmq` for rawblockhash notifications
+- `txindex` to be able to look for non-wallet transactions
+- `server` to run rpc commands
+
+Here's an example of a `bitcoin.conf` you can use:
+
+```
+# [debug]
+regtest=1
+daemon=1
+debug=1
+logips=1
+
+# [rpc]
+server=1
+rpcuser=user
+rpcpassword=passwd
+
+# [blockchain]
+txindex=1
+
+# [ZMQ]
+zmqpubhashblock=tcp://127.0.0.1:28332
+zmqpubrawblock=tcp://127.0.0.1:28332
+zmqpubhashtx=tcp://127.0.0.1:28333
+zmqpubrawtx=tcp://127.0.0.1:28333
+```
+
 ### Installing the dependencies
 
 `python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.

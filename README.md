@@ -14,6 +14,14 @@ TEOS consists in three main modules:
 
 Additionally, tests for every module can be found at `tests`.
 
+By default, `teos` will run on `regtest`. In order to run it on another network you need to change your `bitcoin.conf` (to run in the proper network) and your `conf.py` to match the network name and rpc port:
+
+```
+BTC_RPC_PORT = 18443
+BTC_NETWORK = "regtest"
+```
+
+
 ### Running TEOS
 In order to run `teos` you will need to create a configuration file (follow [INSTALL.md](INSTALL.md)) and run `teosd.py`. Currently you will also need a set of keys (to sign appointments) stored in your data directory.
 
