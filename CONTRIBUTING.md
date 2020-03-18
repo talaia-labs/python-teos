@@ -1,4 +1,4 @@
-# Contributing to The Eye of Satoshi
+# Contributing to the Eye of Satoshi
 
 The following is a set of guidelines for contributing to TEOS.
 
