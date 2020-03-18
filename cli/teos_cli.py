@@ -10,8 +10,8 @@ from coincurve import PublicKey
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 
-from apps.cli import config, LOG_PREFIX
-from apps.cli.help import help_add_appointment, help_get_appointment
+from cli import config, LOG_PREFIX
+from cli.help import help_add_appointment, help_get_appointment
 from common.blob import Blob
 
 import common.cryptographer

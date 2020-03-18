@@ -5,7 +5,7 @@ from riemann.tx import Tx
 
 
 from teos import HOST, PORT
-from apps.cli import teos_cli
+from cli import teos_cli
 from common.blob import Blob
 
 import common.cryptographer
@@ -21,7 +21,7 @@ from test.teos.e2e.conftest import (
     create_penalty_tx,
     run_teosd,
 )
-from apps.cli import config as cli_conf
+from cli import config as cli_conf
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 

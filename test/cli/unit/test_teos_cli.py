@@ -11,8 +11,8 @@ from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
 from common.blob import Blob
-import apps.cli.teos_cli as teos_cli
-from test.apps.cli.unit.conftest import get_random_value_hex
+import cli.teos_cli as teos_cli
+from test.cli.unit.conftest import get_random_value_hex
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=teos_cli.LOG_PREFIX)
 
