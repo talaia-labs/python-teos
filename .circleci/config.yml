@@ -51,12 +51,6 @@ jobs:
 
       # Run unit tests
       - run:
-          name: Creates config files
-          command: |
-            cp teos/sample_conf.py teos/conf.py
-            cp cli/sample_conf.py cli/conf.py
-
-      - run:
           name: Run teos unit tests
           command: |
             . venv/bin/activate
