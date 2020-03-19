@@ -64,8 +64,8 @@ class Inspector:
                 rcode, message = self.check_to_self_delay(appointment_data.get("to_self_delay"))
             if rcode == 0:
                 rcode, message = self.check_blob(appointment_data.get("encrypted_blob"))
-            # if rcode == 0:
-            #     rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
+            if rcode == 0:
+                rcode, message = self.check_appointment_signature(appointment_data, signature, public_key)
 
             if rcode == 0:
                 r = Appointment.from_dict(appointment_data)
