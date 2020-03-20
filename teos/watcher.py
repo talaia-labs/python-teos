@@ -3,15 +3,13 @@ from queue import Queue
 from threading import Thread
 
 import common.cryptographer
-from common.cryptographer import Cryptographer
-from common.appointment import Appointment
-from common.tools import compute_locator
-
 from common.logger import Logger
+from common.tools import compute_locator
+from common.appointment import Appointment
+from common.cryptographer import Cryptographer
 
 from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
-from teos.block_processor import BlockProcessor
 
 logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
@@ -34,11 +32,12 @@ class Watcher:
 
     Args:
         db_manager (:obj:`DBManager <teos.db_manager>`): a ``DBManager`` instance to interact with the database.
-        sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
-        config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
-            ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+            get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
-
+        sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
+        max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
+        expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Attributes:
         appointments (:obj:`dict`): a dictionary containing a simplification of the appointments (:obj:`Appointment
@@ -48,23 +47,28 @@ class Watcher:
             appointments with the same ``locator``.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
         populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
-        config (:obj:`dict`): a dictionary containing all the configuration parameters. Used locally to retrieve
-            ``MAX_APPOINTMENTS``  and ``EXPIRY_DELTA``.
         db_manager (:obj:`DBManager <teos.db_manager>`): A db manager instance to interact with the database.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+            get block from bitcoind.
+        responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
+        max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
+        expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Raises:
         ValueError: if `teos_sk_file` is not found.
 
     """
 
-    def __init__(self, db_manager, responder, sk_der, config):
+    def __init__(self, db_manager, block_processor, responder, sk_der, max_appointments, expiry_delta):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.block_queue = Queue()
-        self.config = config
         self.db_manager = db_manager
+        self.block_processor = block_processor
         self.responder = responder
+        self.max_appointments = max_appointments
+        self.expiry_delta = expiry_delta
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
     def awake(self):
@@ -102,7 +106,7 @@ class Watcher:
 
         """
 
-        if len(self.appointments) < self.config.get("MAX_APPOINTMENTS"):
+        if len(self.appointments) < self.max_appointments:
 
             uuid = uuid4().hex
             self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
@@ -139,7 +143,7 @@ class Watcher:
 
         while True:
             block_hash = self.block_queue.get()
-            block = BlockProcessor.get_block(block_hash)
+            block = self.block_processor.get_block(block_hash)
             logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
 
             if len(self.appointments) > 0 and block is not None:
@@ -148,7 +152,7 @@ class Watcher:
                 expired_appointments = [
                     uuid
                     for uuid, appointment_data in self.appointments.items()
-                    if block["height"] > appointment_data.get("end_time") + self.config.get("EXPIRY_DELTA")
+                    if block["height"] > appointment_data.get("end_time") + self.expiry_delta
                 ]
 
                 Cleaner.delete_expired_appointments(
@@ -265,7 +269,7 @@ class Watcher:
                     except ValueError:
                         penalty_rawtx = None
 
-                    penalty_tx = BlockProcessor.decode_raw_transaction(penalty_rawtx)
+                    penalty_tx = self.block_processor.decode_raw_transaction(penalty_rawtx)
                     decrypted_blobs[appointment.encrypted_blob.data] = (penalty_tx, penalty_rawtx)
 
                 if penalty_tx is not None:

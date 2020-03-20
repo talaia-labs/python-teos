@@ -1,15 +1,20 @@
-from getopt import getopt
+import os
 from sys import argv, exit
+from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 import common.cryptographer
 from common.logger import Logger
+from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
+from common.tools import setup_logging, setup_data_folder
 
-from teos import config, LOG_PREFIX
+from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF
 from teos.api import API
 from teos.watcher import Watcher
 from teos.builder import Builder
+from teos.carrier import Carrier
+from teos.inspector import Inspector
 from teos.responder import Responder
 from teos.db_manager import DBManager
 from teos.chain_monitor import ChainMonitor
@@ -36,13 +41,22 @@ def main():
     signal(SIGTERM, handle_signals)
     signal(SIGQUIT, handle_signals)
 
+    # Loads config and sets up the data folder and log file
+    config_loader = ConfigLoader(DATA_DIR, DEFAULT_CONF, command_line_conf)
+    config = config_loader.build_config()
+    setup_data_folder(DATA_DIR)
+    setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
+
     logger.info("Starting TEOS")
     db_manager = DBManager(config.get("DB_PATH"))
 
-    if not can_connect_to_bitcoind():
+    bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
+    bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
+
+    if not can_connect_to_bitcoind(bitcoind_connect_params):
         logger.error("Can't connect to bitcoind. Shutting down")
 
-    elif not in_correct_network(config.get("BTC_NETWORK")):
+    elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
     else:
@@ -51,10 +65,23 @@ def main():
             if not secret_key_der:
                 raise IOError("TEOS private key can't be loaded")
 
-            watcher = Watcher(db_manager, Responder(db_manager), secret_key_der, config)
+            block_processor = BlockProcessor(bitcoind_connect_params)
+            carrier = Carrier(bitcoind_connect_params)
+
+            responder = Responder(db_manager, carrier, block_processor)
+            watcher = Watcher(
+                db_manager,
+                block_processor,
+                responder,
+                secret_key_der,
+                config.get("MAX_APPOINTMENTS"),
+                config.get("EXPIRY_DELTA"),
+            )
 
             # Create the chain monitor and start monitoring the chain
-            chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
+            chain_monitor = ChainMonitor(
+                watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
+            )
 
             watcher_appointments_data = db_manager.load_watcher_appointments()
             responder_trackers_data = db_manager.load_responder_trackers()
@@ -89,7 +116,6 @@ def main():
 
                 # Populate the block queues with data if they've missed some while offline. If the blocks of both match
                 # we don't perform the search twice.
-                block_processor = BlockProcessor()
 
                 # FIXME: 32-reorgs-offline dropped txs are not used at this point.
                 last_common_ancestor_watcher, dropped_txs_watcher = block_processor.find_last_common_ancestor(
@@ -123,16 +149,37 @@ def main():
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            API(watcher, config=config).start()
+            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
 
 
 if __name__ == "__main__":
-    opts, _ = getopt(argv[1:], "", [""])
-    for opt, arg in opts:
-        # FIXME: Leaving this here for future option/arguments
-        pass
+    command_line_conf = {}
+
+    try:
+        opts, _ = getopt(
+            argv[1:], "", ["btcnetwork=", "btcrpcuser=", "btcrpcpassword=", "btcrpcconnect=", "btcrpcport=", "datadir="]
+        )
+        for opt, arg in opts:
+            if opt in ["--btcnetwork"]:
+                command_line_conf["BTC_NETWORK"] = arg
+            if opt in ["--btcrpcuser"]:
+                command_line_conf["BTC_RPC_USER"] = arg
+            if opt in ["--btcrpcpassword"]:
+                command_line_conf["BTC_RPC_PASSWD"] = arg
+            if opt in ["--btcrpcconnect"]:
+                command_line_conf["BTC_RPC_CONNECT"] = arg
+            if opt in ["--btcrpcport"]:
+                try:
+                    command_line_conf["BTC_RPC_PORT"] = int(arg)
+                except ValueError:
+                    exit("btcrpcport must be an integer")
+            if opt in ["--datadir"]:
+                DATA_DIR = os.path.expanduser(arg)
+
+    except GetoptError as e:
+        exit(e)
 
     main()
