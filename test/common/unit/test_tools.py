@@ -12,7 +12,7 @@ from common.tools import (
     check_locator_format,
     compute_locator,
     setup_data_folder,
-    check_conf_fields,
+    create_config_dict,
     extend_paths,
     setup_logging,
 )
@@ -77,7 +77,7 @@ def test_setup_data_folder():
 
 def test_check_conf_fields():
     # The test should work with a valid config_fields (obtained from a valid conf.py)
-    assert type(check_conf_fields(conf_fields_copy)) == dict
+    assert type(create_config_dict(conf_fields_copy)) == dict
 
 
 def test_bad_check_conf_fields():
@@ -88,7 +88,7 @@ def test_bad_check_conf_fields():
 
     # We should get a ValueError here.
     with pytest.raises(Exception):
-        check_conf_fields(conf_fields_copy)
+        create_config_dict(conf_fields_copy)
 
 
 def test_extend_paths():

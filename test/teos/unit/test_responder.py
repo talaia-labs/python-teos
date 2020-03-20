@@ -1,27 +1,33 @@
 import json
 import pytest
 import random
-from queue import Queue
 from uuid import uuid4
+from queue import Queue
 from shutil import rmtree
 from copy import deepcopy
 from threading import Thread
 
-from teos.db_manager import DBManager
-from teos.responder import Responder, TransactionTracker
-from teos.block_processor import BlockProcessor
-from teos.chain_monitor import ChainMonitor
+from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
+from teos.db_manager import DBManager
+from teos.chain_monitor import ChainMonitor
+from teos.responder import Responder, TransactionTracker
 
 from common.constants import LOCATOR_LEN_HEX
 from bitcoind_mock.transaction import create_dummy_transaction, create_tx_from_hex
-from test.teos.unit.conftest import generate_block, generate_blocks, get_random_value_hex
+from test.teos.unit.conftest import (
+    generate_block,
+    generate_blocks,
+    get_random_value_hex,
+    bitcoind_connect_params,
+    bitcoind_feed_params,
+)
 
 
 @pytest.fixture(scope="module")
-def responder(db_manager):
-    responder = Responder(db_manager)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+def responder(db_manager, carrier, block_processor):
+    responder = Responder(db_manager, carrier, block_processor)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     return responder
@@ -61,7 +67,7 @@ def create_dummy_tracker_data(random_txid=False, penalty_rawtx=None):
     if random_txid is True:
         penalty_txid = get_random_value_hex(32)
 
-    appointment_end = bitcoin_cli().getblockcount() + 2
+    appointment_end = bitcoin_cli(bitcoind_connect_params).getblockcount() + 2
     locator = dispute_txid[:LOCATOR_LEN_HEX]
 
     return locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end
@@ -86,21 +92,21 @@ def test_tracker_init(run_bitcoind):
     )
 
 
-def test_on_sync(run_bitcoind, responder):
+def test_on_sync(run_bitcoind, responder, block_processor):
     # We're on sync if we're 1 or less blocks behind the tip
-    chain_tip = BlockProcessor.get_best_block_hash()
-    assert Responder.on_sync(chain_tip) is True
+    chain_tip = block_processor.get_best_block_hash()
+    assert responder.on_sync(chain_tip) is True
 
     generate_block()
-    assert Responder.on_sync(chain_tip) is True
+    assert responder.on_sync(chain_tip) is True
 
 
-def test_on_sync_fail(responder):
+def test_on_sync_fail(responder, block_processor):
     # This should fail if we're more than 1 block behind the tip
-    chain_tip = BlockProcessor.get_best_block_hash()
+    chain_tip = block_processor.get_best_block_hash()
     generate_blocks(2)
 
-    assert Responder.on_sync(chain_tip) is False
+    assert responder.on_sync(chain_tip) is False
 
 
 def test_tracker_to_dict():
@@ -147,8 +153,8 @@ def test_tracker_from_dict_invalid_data():
             assert True
 
 
-def test_init_responder(temp_db_manager):
-    responder = Responder(temp_db_manager)
+def test_init_responder(temp_db_manager, carrier, block_processor):
+    responder = Responder(temp_db_manager, carrier, block_processor)
     assert isinstance(responder.trackers, dict) and len(responder.trackers) == 0
     assert isinstance(responder.tx_tracker_map, dict) and len(responder.tx_tracker_map) == 0
     assert isinstance(responder.unconfirmed_txs, list) and len(responder.unconfirmed_txs) == 0
@@ -156,8 +162,8 @@ def test_init_responder(temp_db_manager):
     assert responder.block_queue.empty()
 
 
-def test_handle_breach(db_manager):
-    responder = Responder(db_manager)
+def test_handle_breach(db_manager, carrier, block_processor):
+    responder = Responder(db_manager, carrier, block_processor)
 
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
@@ -176,7 +182,11 @@ def test_handle_breach(db_manager):
     assert receipt.delivered is True
 
 
-def test_handle_breach_bad_response(responder):
+def test_handle_breach_bad_response(db_manager, block_processor):
+    # We need a new carrier here, otherwise the transaction will be flagged as previously sent and receipt.delivered
+    # will be True
+    responder = Responder(db_manager, Carrier(bitcoind_connect_params), block_processor)
+
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
 
@@ -262,10 +272,10 @@ def test_add_tracker_already_confirmed(responder):
         assert penalty_txid not in responder.unconfirmed_txs
 
 
-def test_do_watch(temp_db_manager):
+def test_do_watch(temp_db_manager, carrier, block_processor):
     # Create a fresh responder to simplify the test
-    responder = Responder(temp_db_manager)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    responder = Responder(temp_db_manager, carrier, block_processor)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     trackers = [create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(20)]
@@ -293,7 +303,7 @@ def test_do_watch(temp_db_manager):
     # And broadcast some of the transactions
     broadcast_txs = []
     for tracker in trackers[:5]:
-        bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
+        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(tracker.penalty_rawtx)
         broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
@@ -312,7 +322,7 @@ def test_do_watch(temp_db_manager):
     # Do the rest
     broadcast_txs = []
     for tracker in trackers[5:]:
-        bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
+        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(tracker.penalty_rawtx)
         broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
@@ -321,9 +331,9 @@ def test_do_watch(temp_db_manager):
     assert len(responder.tx_tracker_map) == 0
 
 
-def test_check_confirmations(db_manager):
-    responder = Responder(db_manager)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+def test_check_confirmations(db_manager, carrier, block_processor):
+    responder = Responder(db_manager, carrier, block_processor)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
@@ -378,11 +388,11 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_trackers(db_manager):
-    initial_height = bitcoin_cli().getblockcount()
+def test_get_completed_trackers(db_manager, carrier, block_processor):
+    initial_height = bitcoin_cli(bitcoind_connect_params).getblockcount()
 
-    responder = Responder(db_manager)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+    responder = Responder(db_manager, carrier, block_processor)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     # A complete tracker is a tracker that has reached the appointment end with enough confs (> MIN_CONFIRMATIONS)
@@ -417,7 +427,7 @@ def test_get_completed_trackers(db_manager):
         }
 
     for uuid, tracker in all_trackers.items():
-        bitcoin_cli().sendrawtransaction(tracker.penalty_rawtx)
+        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(tracker.penalty_rawtx)
 
     # The dummy appointments have a end_appointment time of current + 2, but trackers need at least 6 confs by default
     generate_blocks(6)
@@ -438,9 +448,9 @@ def test_get_completed_trackers(db_manager):
     assert set(completed_trackers_ids) == set(ended_trackers_keys)
 
 
-def test_rebroadcast(db_manager):
-    responder = Responder(db_manager)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue)
+def test_rebroadcast(db_manager, carrier, block_processor):
+    responder = Responder(db_manager, carrier, block_processor)
+    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     txs_to_rebroadcast = []

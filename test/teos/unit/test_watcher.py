@@ -4,11 +4,19 @@ from shutil import rmtree
 from threading import Thread
 from coincurve import PrivateKey
 
+from teos import LOG_PREFIX
+from teos.carrier import Carrier
 from teos.watcher import Watcher
-from teos.responder import Responder
 from teos.tools import bitcoin_cli
-from teos.chain_monitor import ChainMonitor
+from teos.responder import Responder
 from teos.db_manager import DBManager
+from teos.chain_monitor import ChainMonitor
+from teos.block_processor import BlockProcessor
+
+import common.cryptographer
+from common.logger import Logger
+from common.tools import compute_locator
+from common.cryptographer import Cryptographer
 
 from test.teos.unit.conftest import (
     generate_blocks,
@@ -16,14 +24,9 @@ from test.teos.unit.conftest import (
     get_random_value_hex,
     generate_keypair,
     get_config,
+    bitcoind_feed_params,
+    bitcoind_connect_params,
 )
-from teos.conf import EXPIRY_DELTA, MAX_APPOINTMENTS
-
-import common.cryptographer
-from teos import LOG_PREFIX
-from common.logger import Logger
-from common.tools import compute_locator
-from common.cryptographer import Cryptographer
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
@@ -33,6 +36,7 @@ START_TIME_OFFSET = 1
 END_TIME_OFFSET = 1
 TEST_SET_SIZE = 200
 
+config = get_config()
 
 signing_key, public_key = generate_keypair()
 
@@ -50,8 +54,22 @@ def temp_db_manager():
 
 @pytest.fixture(scope="module")
 def watcher(db_manager):
-    watcher = Watcher(db_manager, Responder(db_manager), signing_key.to_der(), get_config())
-    chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
+    block_processor = BlockProcessor(bitcoind_connect_params)
+    carrier = Carrier(bitcoind_connect_params)
+
+    responder = Responder(db_manager, carrier, block_processor)
+    watcher = Watcher(
+        db_manager,
+        block_processor,
+        responder,
+        signing_key.to_der(),
+        config.get("MAX_APPOINTMENTS"),
+        config.get("EXPIRY_DELTA"),
+    )
+
+    chain_monitor = ChainMonitor(
+        watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
+    )
     chain_monitor.monitor_chain()
 
     return watcher
@@ -89,9 +107,11 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
-    assert isinstance(watcher.config, dict)
-    assert isinstance(watcher.signing_key, PrivateKey)
+    assert isinstance(watcher.block_processor, BlockProcessor)
     assert isinstance(watcher.responder, Responder)
+    assert isinstance(watcher.max_appointments, int)
+    assert isinstance(watcher.expiry_delta, int)
+    assert isinstance(watcher.signing_key, PrivateKey)
 
 
 def test_add_appointment(watcher):
@@ -120,7 +140,7 @@ def test_add_too_many_appointments(watcher):
     # Any appointment on top of those should fail
     watcher.appointments = dict()
 
-    for _ in range(MAX_APPOINTMENTS):
+    for _ in range(config.get("MAX_APPOINTMENTS")):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
@@ -160,7 +180,7 @@ def test_do_watch(watcher, temp_db_manager):
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
-        bitcoin_cli().sendrawtransaction(dispute_tx)
+        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(dispute_tx)
 
     # After generating enough blocks, the number of appointments should have reduced by two
     generate_blocks(START_TIME_OFFSET + END_TIME_OFFSET)
@@ -169,7 +189,7 @@ def test_do_watch(watcher, temp_db_manager):
 
     # The rest of appointments will timeout after the end (2) + EXPIRY_DELTA
     # Wait for an additional block to be safe
-    generate_blocks(EXPIRY_DELTA + START_TIME_OFFSET + END_TIME_OFFSET)
+    generate_blocks(config.get("EXPIRY_DELTA") + START_TIME_OFFSET + END_TIME_OFFSET)
 
     assert len(watcher.appointments) == 0
 

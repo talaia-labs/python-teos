@@ -5,10 +5,11 @@ from time import sleep
 from threading import Thread
 
 from teos.api import API
-from teos.watcher import Watcher
-from teos.responder import Responder
-from teos.tools import bitcoin_cli
 from teos import HOST, PORT
+from teos.watcher import Watcher
+from teos.tools import bitcoin_cli
+from teos.inspector import Inspector
+from teos.responder import Responder
 from teos.chain_monitor import ChainMonitor
 
 from test.teos.unit.conftest import (
@@ -18,7 +19,10 @@ from test.teos.unit.conftest import (
     generate_dummy_appointment_data,
     generate_keypair,
     get_config,
+    bitcoind_connect_params,
+    bitcoind_feed_params,
 )
+
 
 from common.constants import LOCATOR_LEN_BYTES
 
@@ -33,15 +37,21 @@ config = get_config()
 
 
 @pytest.fixture(scope="module")
-def run_api(db_manager):
+def run_api(db_manager, carrier, block_processor):
     sk, pk = generate_keypair()
 
-    watcher = Watcher(db_manager, Responder(db_manager), sk.to_der(), get_config())
-    chain_monitor = ChainMonitor(watcher.block_queue, watcher.responder.block_queue)
+    responder = Responder(db_manager, carrier, block_processor)
+    watcher = Watcher(
+        db_manager, block_processor, responder, sk.to_der(), config.get("MAX_APPOINTMENTS"), config.get("EXPIRY_DELTA")
+    )
+
+    chain_monitor = ChainMonitor(
+        watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
+    )
     watcher.awake()
     chain_monitor.monitor_chain()
 
-    api_thread = Thread(target=API(watcher, config).start)
+    api_thread = Thread(target=API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher).start)
     api_thread.daemon = True
     api_thread.start()
 
@@ -131,7 +141,7 @@ def test_get_all_appointments_responder():
     locators = [appointment["locator"] for appointment in appointments]
     for locator, dispute_tx in locator_dispute_tx_map.items():
         if locator in locators:
-            bitcoin_cli().sendrawtransaction(dispute_tx)
+            bitcoin_cli(bitcoind_connect_params).sendrawtransaction(dispute_tx)
 
     # Confirm transactions
     generate_blocks(6)
@@ -173,7 +183,7 @@ def test_request_appointment_watcher(new_appt_data):
 def test_request_appointment_responder(new_appt_data):
     # Let's do something similar to what we did with the watcher but now we'll send the dispute tx to the network
     dispute_tx = locator_dispute_tx_map[new_appt_data["appointment"]["locator"]]
-    bitcoin_cli().sendrawtransaction(dispute_tx)
+    bitcoin_cli(bitcoind_connect_params).sendrawtransaction(dispute_tx)
 
     r = add_appointment(new_appt_data)
     assert r.status_code == 200

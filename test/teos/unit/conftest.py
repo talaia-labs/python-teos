@@ -1,31 +1,39 @@
-import os
 import pytest
 import random
 import requests
 from time import sleep
 from shutil import rmtree
 from threading import Thread
-
 from coincurve import PrivateKey
 
-from common.blob import Blob
-from teos.responder import TransactionTracker
-from teos.tools import bitcoin_cli
-from teos.db_manager import DBManager
-from common.appointment import Appointment
-from common.tools import compute_locator
-
-from bitcoind_mock.transaction import create_dummy_transaction
 from bitcoind_mock.bitcoind import BitcoindMock
 from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
+from bitcoind_mock.transaction import create_dummy_transaction
 
-from teos import LOG_PREFIX
+from teos.carrier import Carrier
+from teos.tools import bitcoin_cli
+from teos.db_manager import DBManager
+from teos import LOG_PREFIX, DEFAULT_CONF
+from teos.responder import TransactionTracker
+from teos.block_processor import BlockProcessor
+
 import common.cryptographer
+from common.blob import Blob
 from common.logger import Logger
+from common.tools import compute_locator
+from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
+from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
+
+# Set params to connect to regtest for testing
+DEFAULT_CONF["BTC_RPC_PORT"]["value"] = 18443
+DEFAULT_CONF["BTC_NETWORK"]["value"] = "regtest"
+
+bitcoind_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
+bitcoind_feed_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("FEED")}
 
 
 @pytest.fixture(scope="session")
@@ -52,6 +60,16 @@ def db_manager():
 
     manager.db.close()
     rmtree("test_db")
+
+
+@pytest.fixture(scope="module")
+def carrier():
+    return Carrier(bitcoind_connect_params)
+
+
+@pytest.fixture(scope="module")
+def block_processor():
+    return BlockProcessor(bitcoind_connect_params)
 
 
 def generate_keypair():
@@ -84,7 +102,7 @@ def fork(block_hash):
 
 def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
     if real_height:
-        current_height = bitcoin_cli().getblockcount()
+        current_height = bitcoin_cli(bitcoind_connect_params).getblockcount()
 
     else:
         current_height = 10
@@ -151,23 +169,7 @@ def generate_dummy_tracker():
 
 
 def get_config():
-    data_folder = os.path.expanduser("~/.teos")
-    config = {
-        "BTC_RPC_USER": "username",
-        "BTC_RPC_PASSWD": "password",
-        "BTC_RPC_HOST": "localhost",
-        "BTC_RPC_PORT": 8332,
-        "BTC_NETWORK": "regtest",
-        "FEED_PROTOCOL": "tcp",
-        "FEED_ADDR": "127.0.0.1",
-        "FEED_PORT": 28332,
-        "DATA_FOLDER": data_folder,
-        "MAX_APPOINTMENTS": 100,
-        "EXPIRY_DELTA": 6,
-        "MIN_TO_SELF_DELAY": 20,
-        "SERVER_LOG_FILE": data_folder + "teos.log",
-        "TEOS_SECRET_KEY": data_folder + "teos_sk.der",
-        "DB_PATH": "appointments",
-    }
+    config_loader = ConfigLoader(".", DEFAULT_CONF, {})
+    config = config_loader.build_config()
 
     return config
