@@ -34,7 +34,7 @@ def handle_signals(signal_received, frame):
     exit(0)
 
 
-def main():
+def main(command_line_conf):
     global db_manager, chain_monitor
 
     signal(SIGINT, handle_signals)
@@ -182,4 +182,4 @@ if __name__ == "__main__":
     except GetoptError as e:
         exit(e)
 
-    main()
+    main(command_line_conf)
