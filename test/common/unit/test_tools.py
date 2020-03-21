@@ -1,10 +1,5 @@
 import os
-import pytest
 import logging
-from copy import deepcopy
-
-# FIXME: Import from teos. Common should not import anything from cli nor teos.
-from teos import conf_fields
 
 from common.constants import LOCATOR_LEN_BYTES
 from common.tools import (
@@ -12,14 +7,10 @@ from common.tools import (
     check_locator_format,
     compute_locator,
     setup_data_folder,
-    create_config_dict,
     extend_paths,
     setup_logging,
 )
 from test.common.unit.conftest import get_random_value_hex
-
-
-conf_fields_copy = deepcopy(conf_fields)
 
 
 def test_check_sha256_hex_format():
@@ -75,22 +66,6 @@ def test_setup_data_folder():
     os.rmdir(test_folder)
 
 
-def test_check_conf_fields():
-    # The test should work with a valid config_fields (obtained from a valid conf.py)
-    assert type(create_config_dict(conf_fields_copy)) == dict
-
-
-def test_bad_check_conf_fields():
-    # Create a messed up version of the file that should throw an error.
-    conf_fields_copy["BTC_RPC_USER"] = 0000
-    conf_fields_copy["BTC_RPC_PASSWD"] = "password"
-    conf_fields_copy["BTC_RPC_HOST"] = 000
-
-    # We should get a ValueError here.
-    with pytest.raises(Exception):
-        create_config_dict(conf_fields_copy)
-
-
 def test_extend_paths():
     # Test that only items with the path flag are extended
     config_fields = {
@@ -99,9 +74,9 @@ def test_extend_paths():
         "foovar": {"value": "foovarfoovar"},
     }
     base_path = "base_path/"
-    extended_config_field = extend_paths(base_path, config_fields)
+    extend_paths(base_path, config_fields)
 
-    for k, field in extended_config_field.items():
+    for k, field in config_fields.items():
         if field.get("path") is True:
             assert base_path in field.get("value")
         else:
