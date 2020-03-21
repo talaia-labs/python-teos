@@ -10,15 +10,17 @@ from coincurve import PublicKey
 from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 
-from cli import config, LOG_PREFIX
 from cli.help import help_add_appointment, help_get_appointment
-from common.blob import Blob
+from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
 
 import common.cryptographer
+from common.blob import Blob
 from common import constants
 from common.logger import Logger
 from common.appointment import Appointment
+from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
+from common.tools import setup_logging, setup_data_folder
 from common.tools import check_sha256_hex_format, check_locator_format, compute_locator
 
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
@@ -77,7 +79,7 @@ def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
     return teos_pk, cli_sk, cli_pk_der
 
 
-def add_appointment(args):
+def add_appointment(args, config):
     """
     Manages the add_appointment command, from argument parsing, trough sending the appointment to the tower, until
     saving the appointment receipt.
@@ -151,7 +153,7 @@ def add_appointment(args):
     data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
-    server_response = post_appointment(data)
+    server_response = post_appointment(data, config)
     if server_response is None:
         return False
 
@@ -174,7 +176,7 @@ def add_appointment(args):
     logger.info("Appointment accepted and signed by the Eye of Satoshi")
 
     # All good, store appointment and signature
-    return save_appointment_receipt(appointment.to_dict(), signature)
+    return save_appointment_receipt(appointment.to_dict(), signature, config)
 
 
 def parse_add_appointment_args(args):
@@ -225,7 +227,7 @@ def parse_add_appointment_args(args):
     return appointment_data
 
 
-def post_appointment(data):
+def post_appointment(data, config):
     """
     Sends appointment data to add_appointment endpoint to be processed by the tower.
 
@@ -241,7 +243,7 @@ def post_appointment(data):
     logger.info("Sending appointment to the Eye of Satoshi")
 
     try:
-        add_appointment_endpoint = "{}:{}".format(teos_api_server, teos_api_port)
+        add_appointment_endpoint = "{}:{}".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
         return requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
 
     except ConnectTimeout:
@@ -297,7 +299,7 @@ def process_post_appointment_response(response):
     return response_json
 
 
-def save_appointment_receipt(appointment, signature):
+def save_appointment_receipt(appointment, signature, config):
     """
     Saves an appointment receipt to disk. A receipt consists in an appointment and a signature from the tower.
 
@@ -333,7 +335,7 @@ def save_appointment_receipt(appointment, signature):
         return False
 
 
-def get_appointment(locator):
+def get_appointment(locator, config):
     """
     Gets information about an appointment from the tower.
 
@@ -351,7 +353,7 @@ def get_appointment(locator):
         logger.error("The provided locator is not valid", locator=locator)
         return None
 
-    get_appointment_endpoint = "{}:{}/get_appointment".format(teos_api_server, teos_api_port)
+    get_appointment_endpoint = "{}:{}/get_appointment".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
     parameters = "?locator={}".format(locator)
 
     try:
@@ -391,31 +393,40 @@ def show_usage():
 
 
 if __name__ == "__main__":
-    teos_api_server = config.get("DEFAULT_TEOS_API_SERVER")
-    teos_api_port = config.get("DEFAULT_TEOS_API_PORT")
+    command_line_conf = {}
     commands = ["add_appointment", "get_appointment", "help"]
 
     try:
         opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])
 
         for opt, arg in opts:
-            if opt in ["-s", "server"]:
+            if opt in ["-s", "--server"]:
                 if arg:
-                    teos_api_server = arg
+                    command_line_conf["TEOS_SERVER"] = arg
 
             if opt in ["-p", "--port"]:
                 if arg:
-                    teos_api_port = int(arg)
+                    try:
+                        command_line_conf["TEOS_PORT"] = int(arg)
+                    except ValueError:
+                        exit("port must be an integer")
 
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
+
+        # Loads config and sets up the data folder and log file
+        config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+        config = config_loader.build_config()
+
+        setup_data_folder(DATA_DIR)
+        setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
         if args:
             command = args.pop(0)
 
             if command in commands:
                 if command == "add_appointment":
-                    add_appointment(args)
+                    add_appointment(args, config)
 
                 elif command == "get_appointment":
                     if not args:
@@ -427,7 +438,7 @@ if __name__ == "__main__":
                         if arg_opt in ["-h", "--help"]:
                             sys.exit(help_get_appointment())
 
-                        appointment_data = get_appointment(arg_opt)
+                        appointment_data = get_appointment(arg_opt, config)
                         if appointment_data:
                             print(appointment_data)
 
