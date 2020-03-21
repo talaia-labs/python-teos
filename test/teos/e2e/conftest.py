@@ -3,9 +3,12 @@ import random
 from multiprocessing import Process
 from decimal import Decimal, getcontext
 
-import teos.conf as conf
 from teos.teosd import main
+from teos import DEFAULT_CONF
 from teos.utils.auth_proxy import AuthServiceProxy
+
+from common.config_loader import ConfigLoader
+
 
 getcontext().prec = 10
 END_TIME_DELTA = 10
@@ -13,9 +16,16 @@ END_TIME_DELTA = 10
 
 @pytest.fixture(scope="session")
 def bitcoin_cli():
-    # return AuthServiceProxy("http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST, 18444))
+    btc_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
+
     return AuthServiceProxy(
-        "http://%s:%s@%s:%d" % (conf.BTC_RPC_USER, conf.BTC_RPC_PASSWD, conf.BTC_RPC_HOST, conf.BTC_RPC_PORT)
+        "http://%s:%s@%s:%d"
+        % (
+            btc_connect_params.get("BTC_RPC_USER"),
+            btc_connect_params.get("BTC_RPC_PASSWD"),
+            btc_connect_params.get("BTC_RPC_CONNECT"),
+            18443,
+        )
     )
 
 
@@ -51,7 +61,7 @@ def create_txs(bitcoin_cli):
 
 
 def run_teosd():
-    teosd_process = Process(target=main, daemon=True)
+    teosd_process = Process(target=main, kwargs={"command_line_conf": {}}, daemon=True)
     teosd_process.start()
 
     return teosd_process
@@ -116,3 +126,10 @@ def build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx):
     }
 
     return appointment_data
+
+
+def get_config(data_folder, conf_file_name, default_conf):
+    config_loader = ConfigLoader(data_folder, conf_file_name, default_conf, {})
+    config = config_loader.build_config()
+
+    return config
