@@ -12,9 +12,11 @@ from common.cryptographer import Cryptographer
 
 from common.blob import Blob
 import cli.teos_cli as teos_cli
-from test.cli.unit.conftest import get_random_value_hex
+from test.cli.unit.conftest import get_random_value_hex, get_config
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=teos_cli.LOG_PREFIX)
+
+config = get_config()
 
 # dummy keys for the tests
 dummy_sk = PrivateKey()
@@ -25,9 +27,7 @@ another_sk = PrivateKey()
 # Replace the key in the module with a key we control for the tests
 teos_cli.teos_public_key = dummy_pk
 # Replace endpoint with dummy one
-teos_cli.teos_api_server = "https://dummy.com"
-teos_cli.teos_api_port = 12345
-teos_endpoint = "{}:{}/".format(teos_cli.teos_api_server, teos_cli.teos_api_port)
+teos_endpoint = "{}:{}/".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
 
 dummy_appointment_request = {
     "tx": get_random_value_hex(192),
@@ -107,7 +107,7 @@ def test_add_appointment(monkeypatch):
 
     response = {"locator": dummy_appointment.locator, "signature": get_dummy_signature()}
     responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)])
+    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)], config)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == teos_endpoint
@@ -128,7 +128,9 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
     }
 
     responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)])
+    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)], config)
+
+    shutil.rmtree(config.get("APPOINTMENTS_FOLDER_NAME"))
 
     assert result is False
 
@@ -164,7 +166,7 @@ def test_post_appointment():
     }
 
     responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    response = teos_cli.post_appointment(json.dumps(dummy_appointment_request))
+    response = teos_cli.post_appointment(json.dumps(dummy_appointment_request), config)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == teos_endpoint
@@ -181,27 +183,27 @@ def test_process_post_appointment_response():
 
     # A 200 OK with a correct json response should return the json of the response
     responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request))
+    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), config)
     assert teos_cli.process_post_appointment_response(r) == r.json()
 
     # If we modify the response code tor a rejection (lets say 404) we should get None
     responses.replace(responses.POST, teos_endpoint, json=response, status=404)
-    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request))
+    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), config)
     assert teos_cli.process_post_appointment_response(r) is None
 
     # The same should happen if the response is not in json
     responses.replace(responses.POST, teos_endpoint, status=404)
-    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request))
+    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), config)
     assert teos_cli.process_post_appointment_response(r) is None
 
 
 def test_save_appointment_receipt(monkeypatch):
     appointments_folder = "test_appointments_receipts"
-    teos_cli.config["APPOINTMENTS_FOLDER_NAME"] = appointments_folder
+    config["APPOINTMENTS_FOLDER_NAME"] = appointments_folder
 
     # The functions creates a new directory if it does not exist
     assert not os.path.exists(appointments_folder)
-    teos_cli.save_appointment_receipt(dummy_appointment.to_dict(), get_dummy_signature())
+    teos_cli.save_appointment_receipt(dummy_appointment.to_dict(), get_dummy_signature(), config)
     assert os.path.exists(appointments_folder)
 
     # Check that the receipt has been saved by checking the file names
@@ -219,7 +221,7 @@ def test_get_appointment():
 
     request_url = "{}get_appointment?locator={}".format(teos_endpoint, response.get("locator"))
     responses.add(responses.GET, request_url, json=response, status=200)
-    result = teos_cli.get_appointment(response.get("locator"))
+    result = teos_cli.get_appointment(response.get("locator"), config)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == request_url
@@ -234,4 +236,4 @@ def test_get_appointment_err():
     request_url = "{}get_appointment?locator=".format(teos_endpoint, locator)
     responses.add(responses.GET, request_url, body=ConnectionError())
 
-    assert not teos_cli.get_appointment(locator)
+    assert not teos_cli.get_appointment(locator, config)
