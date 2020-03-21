@@ -28,9 +28,9 @@ class ConfigLoader:
             ones in default / config file.
     """
 
-    def __init__(self, data_dir, default_conf, command_line_conf):
+    def __init__(self, data_dir, conf_file_name, default_conf, command_line_conf):
         self.data_dir = data_dir
-        self.conf_file_path = self.data_dir + "teos.conf"
+        self.conf_file_path = self.data_dir + conf_file_name
         self.conf_fields = default_conf
         self.command_line_conf = command_line_conf
 

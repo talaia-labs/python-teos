@@ -9,7 +9,6 @@ from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_logging, setup_data_folder
 
-from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF
 from teos.api import API
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -20,6 +19,7 @@ from teos.db_manager import DBManager
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.tools import can_connect_to_bitcoind, in_correct_network
+from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
@@ -42,7 +42,7 @@ def main():
     signal(SIGQUIT, handle_signals)
 
     # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(DATA_DIR, DEFAULT_CONF, command_line_conf)
+    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
     setup_data_folder(DATA_DIR)
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)

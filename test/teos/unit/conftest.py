@@ -169,7 +169,7 @@ def generate_dummy_tracker():
 
 
 def get_config():
-    config_loader = ConfigLoader(".", DEFAULT_CONF, {})
+    config_loader = ConfigLoader(".", "teos.conf", DEFAULT_CONF, {})
     config = config_loader.build_config()
 
     return config

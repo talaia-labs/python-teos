@@ -4,6 +4,7 @@ from teos.utils.auth_proxy import AuthServiceProxy
 HOST = "localhost"
 PORT = 9814
 DATA_DIR = os.path.expanduser("~/.teos/")
+CONF_FILE_NAME = "teos.conf"
 LOG_PREFIX = "teos"
 
 # Default conf fields
