@@ -58,7 +58,11 @@ class ConfigLoader:
                         k_upper = k.upper()
                         if k_upper in self.conf_fields:
                             if self.conf_fields[k_upper]["type"] == int:
-                                self.conf_fields[k_upper]["value"] = int(v)
+                                try:
+                                    self.conf_fields[k_upper]["value"] = int(v)
+                                except ValueError:
+                                    err_msg = "{} is not an integer ({}).".format(k, v)
+                                    raise ValueError(err_msg)
                             else:
                                 self.conf_fields[k_upper]["value"] = v
 
@@ -92,7 +96,7 @@ class ConfigLoader:
             value = self.conf_fields[field]["value"]
             correct_type = self.conf_fields[field]["type"]
 
-            if (value is not None) and isinstance(value, correct_type):
+            if isinstance(value, correct_type):
                 conf_dict[field] = value
             else:
                 err_msg = "{} variable in config is of the wrong type".format(field)
