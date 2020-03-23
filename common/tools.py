@@ -69,7 +69,7 @@ def extend_paths(base_path, config_fields):
 
     for key, field in config_fields.items():
         if field.get("path") is True:
-            config_fields[key]["value"] = base_path + config_fields[key]["value"]
+            config_fields[key]["value"] = os.path.join(base_path, config_fields[key]["value"])
 
 
 def setup_logging(log_file_path, log_name_prefix):
