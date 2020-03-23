@@ -4,7 +4,7 @@ from multiprocessing import Process
 from decimal import Decimal, getcontext
 
 from teos.teosd import main
-from teos import DEFAULT_CONF
+from teos import DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF
 from teos.utils.auth_proxy import AuthServiceProxy
 
 from common.config_loader import ConfigLoader
@@ -16,15 +16,17 @@ END_TIME_DELTA = 10
 
 @pytest.fixture(scope="session")
 def bitcoin_cli():
-    btc_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
+    config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
+    print(config)
+    # btc_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
 
     return AuthServiceProxy(
         "http://%s:%s@%s:%d"
         % (
-            btc_connect_params.get("BTC_RPC_USER"),
-            btc_connect_params.get("BTC_RPC_PASSWD"),
-            btc_connect_params.get("BTC_RPC_CONNECT"),
-            18443,
+            config.get("BTC_RPC_USER"),
+            config.get("BTC_RPC_PASSWD"),
+            config.get("BTC_RPC_CONNECT"),
+            config.get("BTC_RPC_PORT"),
         )
     )
 
