@@ -1,0 +1,193 @@
+import os
+import shutil
+import pytest
+from copy import deepcopy
+from configparser import ConfigParser
+from common.config_loader import ConfigLoader
+
+DEFAULT_CONF = {
+    "FOO_STR": {"value": "var", "type": str},
+    "FOO_STR_2": {"value": "var", "type": str},
+    "FOO_INT": {"value": 12345, "type": int},
+    "FOO_INT2": {"value": 6789, "type": int},
+    "FOO_STR_PATH": {"value": "foo.var", "type": str, "path": True},
+    "FOO_STR_PATH_2": {"value": "foo2.var", "type": str, "path": True},
+}
+
+CONF_FILE_CONF = {
+    "FOO_STR": {"value": "var", "type": str},
+    "FOO_INT2": {"value": 6789, "type": int},
+    "FOO_STR_PATH": {"value": "foo.var", "type": str, "path": True},
+    "ADDITIONAL_FOO": {"value": "additional_var", "type": str},
+}
+
+COMMAND_LINE_CONF = {
+    "FOO_STR": {"value": "cmd_var", "type": str},
+    "FOO_INT": {"value": 54321, "type": int},
+    "FOO_STR_PATH": {"value": "var.foo", "type": str, "path": True},
+}
+
+data_dir = "test_data_dir/"
+conf_file_name = "test_conf.conf"
+
+conf_file_data = {k: v["value"] for k, v in CONF_FILE_CONF.items()}
+cmd_data = {k: v["value"] for k, v in COMMAND_LINE_CONF.items()}
+
+
+@pytest.fixture(scope="module")
+def conf_file_conf():
+    config_parser = ConfigParser()
+
+    config_parser["foo_section"] = conf_file_data
+
+    os.mkdir(data_dir)
+
+    with open(data_dir + conf_file_name, "w") as fout:
+        config_parser.write(fout)
+
+    yield conf_file_data
+
+    shutil.rmtree(data_dir)
+
+
+def test_init():
+    conf_loader = ConfigLoader(data_dir, conf_file_name, DEFAULT_CONF, COMMAND_LINE_CONF)
+    assert conf_loader.data_dir == data_dir
+    assert conf_loader.conf_file_path == data_dir + conf_file_name
+    assert conf_loader.conf_fields == DEFAULT_CONF
+    assert conf_loader.command_line_conf == COMMAND_LINE_CONF
+
+
+def test_build_conf_only_default():
+    foo_data_dir = "foo/"
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, {})
+    config = conf_loader.build_config()
+
+    for k, v in config.items():
+        assert k in DEFAULT_CONF
+        assert isinstance(v, DEFAULT_CONF[k].get("type"))
+
+        if DEFAULT_CONF[k].get("path"):
+            assert v == foo_data_dir + DEFAULT_CONF[k].get("value")
+        else:
+            assert v == DEFAULT_CONF[k].get("value")
+
+
+def test_build_conf_with_conf_file(conf_file_conf):
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+
+    conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, {})
+    config = conf_loader.build_config()
+
+    for k, v in config.items():
+        # Check that we have only loaded parameters that were already in the default conf. Additional params are not
+        # loaded
+        assert k in DEFAULT_CONF
+        assert isinstance(v, DEFAULT_CONF[k].get("type"))
+
+        # If a value is in the conf file, it will overwrite the one in the default conf
+        if k in conf_file_conf:
+            comp_v = conf_file_conf[k]
+        else:
+            comp_v = DEFAULT_CONF[k].get("value")
+
+        if DEFAULT_CONF[k].get("path"):
+            assert v == data_dir + comp_v
+        else:
+            assert v == comp_v
+
+
+def test_build_conf_with_command_line():
+    foo_data_dir = "foo/"
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, cmd_data)
+    config = conf_loader.build_config()
+
+    for k, v in config.items():
+        # Check that we have only loaded parameters that were already in the default conf. Additional params are not
+        # loaded
+        assert k in DEFAULT_CONF
+        assert isinstance(v, DEFAULT_CONF[k].get("type"))
+
+        # If a value is in the command line conf, it will overwrite the one in the default conf
+        if k in COMMAND_LINE_CONF:
+            comp_v = cmd_data[k]
+        else:
+            comp_v = DEFAULT_CONF[k].get("value")
+
+        if DEFAULT_CONF[k].get("path"):
+            assert v == foo_data_dir + comp_v
+        else:
+            assert v == comp_v
+
+
+def test_build_conf_with_all(conf_file_conf):
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+
+    conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, cmd_data)
+    config = conf_loader.build_config()
+
+    for k, v in config.items():
+        # Check that we have only loaded parameters that were already in the default conf. Additional params are not
+        # loaded
+        assert k in DEFAULT_CONF
+        assert isinstance(v, DEFAULT_CONF[k].get("type"))
+
+        # The priority is: cmd, conf file, default
+        if k in cmd_data:
+            comp_v = cmd_data[k]
+        elif k in conf_file_conf:
+            comp_v = conf_file_conf[k]
+        else:
+            comp_v = DEFAULT_CONF[k].get("value")
+
+        if DEFAULT_CONF[k].get("path"):
+            assert v == data_dir + comp_v
+        else:
+            assert v == comp_v
+
+
+def test_build_invalid_data(conf_file_conf):
+    # Lets first try with only default
+    foo_data_dir = "foo/"
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+    default_conf_copy["FOO_INT"]["value"] = "foo"
+
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, {})
+
+    with pytest.raises(ValueError):
+        conf_loader.build_config()
+
+    # Set back the default value
+    default_conf_copy["FOO_INT"]["value"] = DEFAULT_CONF["FOO_INT"]["value"]
+
+    # Only conf file now
+    conf_file_conf["FOO_INT2"] = "foo"
+    # Save the wrong data
+    config_parser = ConfigParser()
+    config_parser["foo_section"] = conf_file_data
+    with open(data_dir + conf_file_name, "w") as fout:
+        config_parser.write(fout)
+
+    conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, {})
+
+    with pytest.raises(ValueError):
+        conf_loader.build_config()
+
+    # Only command line now
+    cmd_data["FOO_INT"] = "foo"
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, cmd_data)
+
+    with pytest.raises(ValueError):
+        conf_loader.build_config()
+
+    # All together
+    # Set back a wrong default
+    default_conf_copy["FOO_STR"]["value"] = 1234
+    conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, cmd_data)
+
+    with pytest.raises(ValueError):
+        conf_loader.build_config()
