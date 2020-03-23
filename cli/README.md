@@ -15,8 +15,8 @@ Refer to [INSTALL.md](INSTALL.md)
 	
 #### Global options
 
-- `-s, --server`:	API server where to send the requests. Defaults to https://teos.pisa.watch (modifiable in conf.py)
-- `-p, --port` :	API port where to send the requests. Defaults to 443 (modifiable in conf.py)
+- `-s, --server`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
+- `-p, --port` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
 - `-h --help`: 	shows a list of commands or help for a specific command.
 
 #### Commands
@@ -68,7 +68,7 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 
 ### get_appointment	
 
- This command is used to get information about an specific appointment from the Eye of Satoshi.	
+ This command is used to get information about a specific appointment from the Eye of Satoshi.	
 
 **Appointment can be in three states:**
 
@@ -146,8 +146,15 @@ or
 
 If you wish to read about the underlying API, and how to write your own tool to interact with it, refer to [tEOS-API.md](TEOS-API.md).
 
-## Are you reckless? Try me on mainnet
-Would you like to try me on `mainnet` instead of `testnet`? Add `-s https://mainnet.teos.pisa.watch` to your calls, for example:
+## Try our live instance
+
+By default, `teos_cli` will connect to your local instance (running on localhost). There are also a couple of live instances running, one for mainet and one for testnet:
+
+- testnet endpoint = `teos.pisa.watch`
+- mainnet endpoint = `teosmainnet.pisa.watch`
+
+### Connecting to the mainnet instance
+Add `-s https://teosmainnet.pisa.watch` to your calls, for example:
 
 ```
 python teos_cli.py -s https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
@@ -155,4 +162,4 @@ python teos_cli.py -s https://teosmainnet.pisa.watch add_appointment -f dummy_ap
 
 You can also change the config file to avoid specifying the server every time:
 
-`DEFAULT_TEOS_API_SERVER = "https://teosmainnet.pisa.watch"`
+`TEOS_SERVER = "https://teosmainnet.pisa.watch"`

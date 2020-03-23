@@ -1,6 +1,3 @@
-import pytest
-
-from teos.carrier import Carrier
 from bitcoind_mock.transaction import create_dummy_transaction
 from test.teos.unit.conftest import generate_blocks, get_random_value_hex
 from teos.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
@@ -12,11 +9,6 @@ from teos.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERR
 
 
 sent_txs = []
-
-
-@pytest.fixture(scope="module")
-def carrier():
-    return Carrier()
 
 
 def test_send_transaction(run_bitcoind, carrier):
@@ -56,15 +48,15 @@ def test_send_transaction_invalid_format(carrier):
     assert receipt.delivered is False and receipt.reason == RPC_DESERIALIZATION_ERROR
 
 
-def test_get_transaction():
+def test_get_transaction(carrier):
     # We should be able to get back every transaction we've sent
     for tx in sent_txs:
-        tx_info = Carrier.get_transaction(tx)
+        tx_info = carrier.get_transaction(tx)
 
         assert tx_info is not None
 
 
-def test_get_non_existing_transaction():
-    tx_info = Carrier.get_transaction(get_random_value_hex(32))
+def test_get_non_existing_transaction(carrier):
+    tx_info = carrier.get_transaction(get_random_value_hex(32))
 
     assert tx_info is None

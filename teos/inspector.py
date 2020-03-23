@@ -8,7 +8,6 @@ from common.cryptographer import Cryptographer, PublicKey
 from teos import errors, LOG_PREFIX
 from common.logger import Logger
 from common.appointment import Appointment
-from teos.block_processor import BlockProcessor
 
 logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
@@ -26,10 +25,16 @@ ENCRYPTED_BLOB_MAX_SIZE_HEX = 2 * 2048
 class Inspector:
     """
     The :class:`Inspector` class is in charge of verifying that the appointment data provided by the user is correct.
+
+    Args:
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance.
+        min_to_self_delay (:obj:`int`): the minimum to_self_delay accepted in appointments.
+
     """
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, block_processor, min_to_self_delay):
+        self.block_processor = block_processor
+        self.min_to_self_delay = min_to_self_delay
 
     def inspect(self, appointment_data, signature, public_key):
         """
@@ -49,7 +54,7 @@ class Inspector:
             Errors are defined in :mod:`Errors <teos.errors>`.
         """
 
-        block_height = BlockProcessor.get_block_count()
+        block_height = self.block_processor.get_block_count()
 
         if block_height is not None:
             rcode, message = self.check_locator(appointment_data.get("locator"))
@@ -279,10 +284,10 @@ class Inspector:
                 to_self_delay, pow(2, 32)
             )
 
-        elif to_self_delay < self.config.get("MIN_TO_SELF_DELAY"):
+        elif to_self_delay < self.min_to_self_delay:
             rcode = errors.APPOINTMENT_FIELD_TOO_SMALL
             message = "to_self_delay too small. The to_self_delay should be at least {} (current: {})".format(
-                self.config.get("MIN_TO_SELF_DELAY"), to_self_delay
+                self.min_to_self_delay, to_self_delay
             )
 
         if message is not None:

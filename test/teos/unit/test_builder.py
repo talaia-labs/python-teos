@@ -5,6 +5,7 @@ from queue import Queue
 from teos.builder import Builder
 from teos.watcher import Watcher
 from teos.responder import Responder
+
 from test.teos.unit.conftest import (
     get_random_value_hex,
     generate_dummy_appointment,
@@ -12,7 +13,10 @@ from test.teos.unit.conftest import (
     generate_block,
     bitcoin_cli,
     get_config,
+    bitcoind_connect_params,
 )
+
+config = get_config()
 
 
 def test_build_appointments():
@@ -89,8 +93,15 @@ def test_populate_block_queue():
     assert len(blocks) == 0
 
 
-def test_update_states_empty_list(db_manager):
-    w = Watcher(db_manager=db_manager, responder=Responder(db_manager), sk_der=None, config=None)
+def test_update_states_empty_list(db_manager, carrier, block_processor):
+    w = Watcher(
+        db_manager=db_manager,
+        block_processor=block_processor,
+        responder=Responder(db_manager, carrier, block_processor),
+        sk_der=None,
+        max_appointments=config.get("MAX_APPOINTMENTS"),
+        expiry_delta=config.get("EXPIRY_DELTA"),
+    )
 
     missed_blocks_watcher = []
     missed_blocks_responder = [get_random_value_hex(32)]
@@ -103,13 +114,20 @@ def test_update_states_empty_list(db_manager):
         Builder.update_states(w, missed_blocks_responder, missed_blocks_watcher)
 
 
-def test_update_states_responder_misses_more(run_bitcoind, db_manager):
-    w = Watcher(db_manager=db_manager, responder=Responder(db_manager), sk_der=None, config=get_config())
+def test_update_states_responder_misses_more(run_bitcoind, db_manager, carrier, block_processor):
+    w = Watcher(
+        db_manager=db_manager,
+        block_processor=block_processor,
+        responder=Responder(db_manager, carrier, block_processor),
+        sk_der=None,
+        max_appointments=config.get("MAX_APPOINTMENTS"),
+        expiry_delta=config.get("EXPIRY_DELTA"),
+    )
 
     blocks = []
     for _ in range(5):
         generate_block()
-        blocks.append(bitcoin_cli().getbestblockhash())
+        blocks.append(bitcoin_cli(bitcoind_connect_params).getbestblockhash())
 
     # Updating the states should bring both to the same last known block.
     w.awake()
@@ -120,14 +138,21 @@ def test_update_states_responder_misses_more(run_bitcoind, db_manager):
     assert w.responder.last_known_block == blocks[-1]
 
 
-def test_update_states_watcher_misses_more(run_bitcoind, db_manager):
+def test_update_states_watcher_misses_more(db_manager, carrier, block_processor):
     # Same as before, but data is now in the Responder
-    w = Watcher(db_manager=db_manager, responder=Responder(db_manager), sk_der=None, config=get_config())
+    w = Watcher(
+        db_manager=db_manager,
+        block_processor=block_processor,
+        responder=Responder(db_manager, carrier, block_processor),
+        sk_der=None,
+        max_appointments=config.get("MAX_APPOINTMENTS"),
+        expiry_delta=config.get("EXPIRY_DELTA"),
+    )
 
     blocks = []
     for _ in range(5):
         generate_block()
-        blocks.append(bitcoin_cli().getbestblockhash())
+        blocks.append(bitcoin_cli(bitcoind_connect_params).getbestblockhash())
 
     w.awake()
     w.responder.awake()

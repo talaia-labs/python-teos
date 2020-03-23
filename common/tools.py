@@ -1,6 +1,7 @@
 import re
 import os
 import logging
+from pathlib import Path
 from common.constants import LOCATOR_LEN_HEX
 
 
@@ -50,63 +51,7 @@ def setup_data_folder(data_folder):
         data_folder (:obj:`str`): the path of the folder
     """
 
-    if not os.path.isdir(data_folder):
-        os.makedirs(data_folder, exist_ok=True)
-
-
-def check_conf_fields(conf_fields):
-    """
-    Checks that the provided configuration field have the right type.
-
-    Args:
-        conf_fields (:obj:`dict`): a dictionary populated with the configuration file params and the expected types.
-            The format is as follows:
-
-            {"field0": {"value": value_from_conf_file, "type": expected_type, ...}}
-
-    Returns:
-        :obj:`dict`: A dictionary with the same keys as the provided one, but containing only the "value" field as value
-        if the provided ``conf_fields`` where correct.
-
-    Raises:
-        ValueError: If any of the dictionary elements does not have the expected type
-    """
-
-    conf_dict = {}
-
-    for field in conf_fields:
-        value = conf_fields[field]["value"]
-        correct_type = conf_fields[field]["type"]
-
-        if (value is not None) and isinstance(value, correct_type):
-            conf_dict[field] = value
-        else:
-            err_msg = "{} variable in config is of the wrong type".format(field)
-            raise ValueError(err_msg)
-
-    return conf_dict
-
-
-def extend_paths(base_path, config_fields):
-    """
-    Extends the relative paths of a given ``config_fields`` dictionary with a diven ``base_path``.
-
-    Paths in the config file are based on DATA_PATH, this method extends them so they are all absolute.
-
-    Args:
-        base_path (:obj:`str`): the base path to prepend the other paths.
-        config_fields (:obj:`dict`): a dictionary of configuration fields containing a ``path`` flag, as follows:
-            {"field0": {"value": value_from_conf_file, "path": True, ...}}
-
-    Returns:
-        :obj:`dict`: A ``config_fields`` with the flagged paths updated.
-    """
-
-    for key, field in config_fields.items():
-        if field.get("path") is True:
-            config_fields[key]["value"] = base_path + config_fields[key]["value"]
-
-    return config_fields
+    Path(data_folder).mkdir(parents=True, exist_ok=True)
 
 
 def setup_logging(log_file_path, log_name_prefix):

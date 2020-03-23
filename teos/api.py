@@ -5,7 +5,6 @@ from flask import Flask, request, abort, jsonify
 
 from teos import HOST, PORT, LOG_PREFIX
 from common.logger import Logger
-from teos.inspector import Inspector
 from common.appointment import Appointment
 
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
@@ -17,9 +16,18 @@ logger = Logger(actor="API", log_name_prefix=LOG_PREFIX)
 
 
 class API:
-    def __init__(self, watcher, config):
+    """
+    The :class:`API` is in charge of the interface between the user and the tower. It handles and server user requests.
+
+    Args:
+        inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
+            the received data.
+        watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
+    """
+
+    def __init__(self, inspector, watcher):
+        self.inspector = inspector
         self.watcher = watcher
-        self.config = config
 
     def add_appointment(self):
         """
@@ -48,8 +56,7 @@ class API:
         if request.is_json:
             # Check content type once if properly defined
             request_data = json.loads(request.get_json())
-            inspector = Inspector(self.config)
-            appointment = inspector.inspect(
+            appointment = self.inspector.inspect(
                 request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
             )
 

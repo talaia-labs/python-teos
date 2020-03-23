@@ -1,6 +1,6 @@
 class Builder:
     """
-    The :class:`Builder` class is in charge or reconstructing data loaded from the database and build the data
+    The :class:`Builder` class is in charge of reconstructing data loaded from the database and build the data
     structures of the :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>`.
     """
 

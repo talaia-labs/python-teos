@@ -1,26 +1,27 @@
 from binascii import unhexlify
 
 from teos.errors import *
-from teos.inspector import Inspector
-from common.appointment import Appointment
-from teos.block_processor import BlockProcessor
-from teos.conf import MIN_TO_SELF_DELAY
-
-from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment_data, generate_keypair, get_config
-
-from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
-from common.cryptographer import Cryptographer
-from common.logger import Logger
-
 from teos import LOG_PREFIX
+from teos.inspector import Inspector
+from teos.block_processor import BlockProcessor
+
 import common.cryptographer
+from common.logger import Logger
+from common.appointment import Appointment
+from common.cryptographer import Cryptographer
+from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
+
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    generate_dummy_appointment_data,
+    generate_keypair,
+    bitcoind_connect_params,
+    get_config,
+)
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
-
-inspector = Inspector(get_config())
 APPOINTMENT_OK = (0, None)
-
 NO_HEX_STRINGS = [
     "R" * LOCATOR_LEN_HEX,
     get_random_value_hex(LOCATOR_LEN_BYTES - 1) + "PP",
@@ -40,6 +41,11 @@ WRONG_TYPES = [
     object(),
 ]
 WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
+
+config = get_config()
+MIN_TO_SELF_DELAY = config.get("MIN_TO_SELF_DELAY")
+block_processor = BlockProcessor(bitcoind_connect_params)
+inspector = Inspector(block_processor, MIN_TO_SELF_DELAY)
 
 
 def test_check_locator():
@@ -200,7 +206,7 @@ def test_inspect(run_bitcoind):
 
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-    start_time = BlockProcessor.get_block_count() + 5
+    start_time = block_processor.get_block_count() + 5
     end_time = start_time + 20
     to_self_delay = MIN_TO_SELF_DELAY
     encrypted_blob = get_random_value_hex(64)

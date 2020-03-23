@@ -3,12 +3,10 @@ import binascii
 from time import sleep
 from riemann.tx import Tx
 
-
-from teos import HOST, PORT
-from cli import teos_cli
-from common.blob import Blob
+from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 import common.cryptographer
+from common.blob import Blob
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
@@ -20,15 +18,20 @@ from test.teos.e2e.conftest import (
     get_random_value_hex,
     create_penalty_tx,
     run_teosd,
+    get_config,
 )
-from cli import config as cli_conf
 
+cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
-# We'll use teos_cli to add appointments. The expected input format is a list of arguments with a json-encoded
-# appointment
-teos_cli.teos_api_server = "http://{}".format(HOST)
-teos_cli.teos_api_port = PORT
+# # We'll use teos_cli to add appointments. The expected input format is a list of arguments with a json-encoded
+# # appointment
+# teos_cli.teos_api_server = "http://{}".format(HOST)
+# teos_cli.teos_api_port = PORT
+
+teos_base_endpoint = "http://{}:{}".format(cli_config.get("TEOS_SERVER"), cli_config.get("TEOS_PORT"))
+teos_add_appointment_endpoint = teos_base_endpoint
+teos_get_appointment_endpoint = teos_base_endpoint + "/get_appointment"
 
 # Run teosd
 teosd_process = run_teosd()
@@ -43,7 +46,7 @@ def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
 def get_appointment_info(locator):
     # Check that the justice has been triggered (the appointment has moved from Watcher to Responder)
     sleep(1)  # Let's add a bit of delay so the state can be updated
-    return teos_cli.get_appointment(locator)
+    return teos_cli.get_appointment(locator, teos_get_appointment_endpoint)
 
 
 def test_appointment_life_cycle(bitcoin_cli, create_txs):
@@ -52,7 +55,7 @@ def test_appointment_life_cycle(bitcoin_cli, create_txs):
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    assert teos_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert teos_cli.add_appointment([json.dumps(appointment_data)], teos_add_appointment_endpoint, cli_config) is True
 
     appointment_info = get_appointment_info(locator)
     assert appointment_info is not None
@@ -102,7 +105,7 @@ def test_appointment_malformed_penalty(bitcoin_cli, create_txs):
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, mod_penalty_tx.hex())
     locator = compute_locator(commitment_tx_id)
 
-    assert teos_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert teos_cli.add_appointment([json.dumps(appointment_data)], teos_add_appointment_endpoint, cli_config) is True
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -132,7 +135,7 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     appointment = Appointment.from_dict(appointment_data)
 
     teos_pk, cli_sk, cli_pk_der = teos_cli.load_keys(
-        cli_conf.get("TEOS_PUBLIC_KEY"), cli_conf.get("CLI_PRIVATE_KEY"), cli_conf.get("CLI_PUBLIC_KEY")
+        cli_config.get("TEOS_PUBLIC_KEY"), cli_config.get("CLI_PRIVATE_KEY"), cli_config.get("CLI_PUBLIC_KEY")
     )
     hex_pk_der = binascii.hexlify(cli_pk_der)
 
@@ -140,7 +143,7 @@ def test_appointment_wrong_key(bitcoin_cli, create_txs):
     data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
-    response = teos_cli.post_appointment(data)
+    response = teos_cli.post_appointment(data, teos_add_appointment_endpoint)
     response_json = teos_cli.process_post_appointment_response(response)
 
     # Check that the server has accepted the appointment
@@ -176,8 +179,8 @@ def test_two_identical_appointments(bitcoin_cli, create_txs):
     locator = compute_locator(commitment_tx_id)
 
     # Send the appointment twice
-    assert teos_cli.add_appointment([json.dumps(appointment_data)]) is True
-    assert teos_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert teos_cli.add_appointment([json.dumps(appointment_data)], teos_add_appointment_endpoint, cli_config) is True
+    assert teos_cli.add_appointment([json.dumps(appointment_data)], teos_add_appointment_endpoint, cli_config) is True
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -210,8 +213,8 @@ def test_two_appointment_same_locator_different_penalty(bitcoin_cli, create_txs)
     appointment2_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx2)
     locator = compute_locator(commitment_tx_id)
 
-    assert teos_cli.add_appointment([json.dumps(appointment1_data)]) is True
-    assert teos_cli.add_appointment([json.dumps(appointment2_data)]) is True
+    assert teos_cli.add_appointment([json.dumps(appointment1_data)], teos_add_appointment_endpoint, cli_config) is True
+    assert teos_cli.add_appointment([json.dumps(appointment2_data)], teos_add_appointment_endpoint, cli_config) is True
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -238,7 +241,7 @@ def test_appointment_shutdown_teos_trigger_back_online(create_txs, bitcoin_cli):
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    assert teos_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert teos_cli.add_appointment([json.dumps(appointment_data)], teos_add_appointment_endpoint, cli_config) is True
 
     # Restart teos
     teosd_process.terminate()
@@ -276,7 +279,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(create_txs, bitcoin_cli
     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    assert teos_cli.add_appointment([json.dumps(appointment_data)]) is True
+    assert teos_cli.add_appointment([json.dumps(appointment_data)], teos_add_appointment_endpoint, cli_config) is True
 
     # Check that the appointment is still in the Watcher
     appointment_info = get_appointment_info(locator)

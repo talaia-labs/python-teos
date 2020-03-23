@@ -73,10 +73,10 @@ jobs:
           name: Setup teos
           command: |
             . venv/bin/activate
-            cp test/teos/e2e/teos-conf.py teos/conf.py
             python3 -m generate_keys -d ~/.teos/
             python3 -m generate_keys -n cli -d ~/.teos_cli/
             cp ~/.teos/teos_pk.der ~/.teos_cli/
+            cp test/teos/e2e/teos.conf ~/.teos/
 
 
       # Run E2E tests

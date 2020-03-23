@@ -11,10 +11,16 @@ class BlockProcessor:
     """
     The :class:`BlockProcessor` contains methods related to the blockchain. Most of its methods require communication
     with ``bitcoind``.
+
+    Args:
+        btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
+            (rpc user, rpc passwd, host and port)
     """
 
-    @staticmethod
-    def get_block(block_hash):
+    def __init__(self, btc_connect_params):
+        self.btc_connect_params = btc_connect_params
+
+    def get_block(self, block_hash):
         """
         Gives a block given a block hash by querying ``bitcoind``.
 
@@ -28,7 +34,7 @@ class BlockProcessor:
         """
 
         try:
-            block = bitcoin_cli().getblock(block_hash)
+            block = bitcoin_cli(self.btc_connect_params).getblock(block_hash)
 
         except JSONRPCException as e:
             block = None
@@ -36,8 +42,7 @@ class BlockProcessor:
 
         return block
 
-    @staticmethod
-    def get_best_block_hash():
+    def get_best_block_hash(self):
         """
         Returns the hash of the current best chain tip.
 
@@ -48,7 +53,7 @@ class BlockProcessor:
         """
 
         try:
-            block_hash = bitcoin_cli().getbestblockhash()
+            block_hash = bitcoin_cli(self.btc_connect_params).getbestblockhash()
 
         except JSONRPCException as e:
             block_hash = None
@@ -56,8 +61,7 @@ class BlockProcessor:
 
         return block_hash
 
-    @staticmethod
-    def get_block_count():
+    def get_block_count(self):
         """
         Returns the block height of the best chain.
 
@@ -68,7 +72,7 @@ class BlockProcessor:
         """
 
         try:
-            block_count = bitcoin_cli().getblockcount()
+            block_count = bitcoin_cli(self.btc_connect_params).getblockcount()
 
         except JSONRPCException as e:
             block_count = None
@@ -76,8 +80,7 @@ class BlockProcessor:
 
         return block_count
 
-    @staticmethod
-    def decode_raw_transaction(raw_tx):
+    def decode_raw_transaction(self, raw_tx):
         """
         Deserializes a given raw transaction (hex encoded) and builds a dictionary representing it with all the
         associated metadata given by ``bitcoind`` (e.g. confirmation count).
@@ -92,7 +95,7 @@ class BlockProcessor:
         """
 
         try:
-            tx = bitcoin_cli().decoderawtransaction(raw_tx)
+            tx = bitcoin_cli(self.btc_connect_params).decoderawtransaction(raw_tx)
 
         except JSONRPCException as e:
             tx = None
@@ -100,8 +103,7 @@ class BlockProcessor:
 
         return tx
 
-    @staticmethod
-    def get_distance_to_tip(target_block_hash):
+    def get_distance_to_tip(self, target_block_hash):
         """
         Compute the distance between a given block hash and the best chain tip.
 
@@ -117,10 +119,10 @@ class BlockProcessor:
 
         distance = None
 
-        chain_tip = BlockProcessor.get_best_block_hash()
-        chain_tip_height = BlockProcessor.get_block(chain_tip).get("height")
+        chain_tip = self.get_best_block_hash()
+        chain_tip_height = self.get_block(chain_tip).get("height")
 
-        target_block = BlockProcessor.get_block(target_block_hash)
+        target_block = self.get_block(target_block_hash)
 
         if target_block is not None:
             target_block_height = target_block.get("height")
@@ -129,8 +131,7 @@ class BlockProcessor:
 
         return distance
 
-    @staticmethod
-    def get_missed_blocks(last_know_block_hash):
+    def get_missed_blocks(self, last_know_block_hash):
         """
         Compute the blocks between the current best chain tip and a given block hash (``last_know_block_hash``).
 
@@ -144,19 +145,18 @@ class BlockProcessor:
             child of ``last_know_block_hash``.
         """
 
-        current_block_hash = BlockProcessor.get_best_block_hash()
+        current_block_hash = self.get_best_block_hash()
         missed_blocks = []
 
         while current_block_hash != last_know_block_hash and current_block_hash is not None:
             missed_blocks.append(current_block_hash)
 
-            current_block = BlockProcessor.get_block(current_block_hash)
+            current_block = self.get_block(current_block_hash)
             current_block_hash = current_block.get("previousblockhash")
 
         return missed_blocks[::-1]
 
-    @staticmethod
-    def is_block_in_best_chain(block_hash):
+    def is_block_in_best_chain(self, block_hash):
         """
         Checks whether or not a given block is on the best chain. Blocks are identified by block_hash.
 
@@ -173,7 +173,7 @@ class BlockProcessor:
             KeyError: If the block cannot be found in the blockchain.
         """
 
-        block = BlockProcessor.get_block(block_hash)
+        block = self.get_block(block_hash)
 
         if block is None:
             # This should never happen as long as we are using the same node, since bitcoind never drops orphan blocks
@@ -185,8 +185,7 @@ class BlockProcessor:
         else:
             return False
 
-    @staticmethod
-    def find_last_common_ancestor(last_known_block_hash):
+    def find_last_common_ancestor(self, last_known_block_hash):
         """
         Finds the last common ancestor between the current best chain tip and the last block known by us (older block).
 
@@ -204,8 +203,8 @@ class BlockProcessor:
         target_block_hash = last_known_block_hash
         dropped_txs = []
 
-        while not BlockProcessor.is_block_in_best_chain(target_block_hash):
-            block = BlockProcessor.get_block(target_block_hash)
+        while not self.is_block_in_best_chain(target_block_hash):
+            block = self.get_block(target_block_hash)
             dropped_txs.extend(block.get("tx"))
             target_block_hash = block.get("previousblockhash")
 

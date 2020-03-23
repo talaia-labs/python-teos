@@ -39,13 +39,18 @@ class Carrier:
     The :class:`Carrier` is the class in charge of interacting with ``bitcoind`` to send/get transactions. It uses
     :obj:`Receipt` objects to report about the sending outcome.
 
+    Args:
+        btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
+            (rpc user, rpc passwd, host and port)
+
     Attributes:
         issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
             and over. It should periodically be reset to prevent it from growing unbounded.
 
     """
 
-    def __init__(self):
+    def __init__(self, btc_connect_params):
+        self.btc_connect_params = btc_connect_params
         self.issued_receipts = {}
 
     # NOTCOVERED
@@ -69,7 +74,7 @@ class Carrier:
 
         try:
             logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
-            bitcoin_cli().sendrawtransaction(rawtx)
+            bitcoin_cli(self.btc_connect_params).sendrawtransaction(rawtx)
 
             receipt = Receipt(delivered=True)
 
@@ -119,8 +124,7 @@ class Carrier:
 
         return receipt
 
-    @staticmethod
-    def get_transaction(txid):
+    def get_transaction(self, txid):
         """
         Queries transaction data to ``bitcoind`` given a transaction id.
 
@@ -134,7 +138,7 @@ class Carrier:
         """
 
         try:
-            tx_info = bitcoin_cli().getrawtransaction(txid, 1)
+            tx_info = bitcoin_cli(self.btc_connect_params).getrawtransaction(txid, 1)
 
         except JSONRPCException as e:
             tx_info = None

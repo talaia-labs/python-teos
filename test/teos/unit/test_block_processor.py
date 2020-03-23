@@ -1,7 +1,6 @@
 import pytest
 
-from teos.block_processor import BlockProcessor
-from test.teos.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork
+from test.teos.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork, bitcoind_connect_params
 
 
 hex_tx = (
@@ -14,19 +13,16 @@ hex_tx = (
 )
 
 
-@pytest.fixture
-def best_block_hash():
-    return BlockProcessor.get_best_block_hash()
-
-
-def test_get_best_block_hash(run_bitcoind, best_block_hash):
+def test_get_best_block_hash(run_bitcoind, block_processor):
+    best_block_hash = block_processor.get_best_block_hash()
     # As long as bitcoind is running (or mocked in this case) we should always a block hash
     assert best_block_hash is not None and isinstance(best_block_hash, str)
 
 
-def test_get_block(best_block_hash):
+def test_get_block(block_processor):
+    best_block_hash = block_processor.get_best_block_hash()
     # Getting a block from a block hash we are aware of should return data
-    block = BlockProcessor.get_block(best_block_hash)
+    block = block_processor.get_block(best_block_hash)
 
     # Checking that the received block has at least the fields we need
     # FIXME: We could be more strict here, but we'll need to add those restrictions to bitcoind_sim too
@@ -34,75 +30,75 @@ def test_get_block(best_block_hash):
     assert block.get("hash") == best_block_hash and "height" in block and "previousblockhash" in block and "tx" in block
 
 
-def test_get_random_block():
-    block = BlockProcessor.get_block(get_random_value_hex(32))
+def test_get_random_block(block_processor):
+    block = block_processor.get_block(get_random_value_hex(32))
 
     assert block is None
 
 
-def test_get_block_count():
-    block_count = BlockProcessor.get_block_count()
+def test_get_block_count(block_processor):
+    block_count = block_processor.get_block_count()
     assert isinstance(block_count, int) and block_count >= 0
 
 
-def test_decode_raw_transaction():
+def test_decode_raw_transaction(block_processor):
     # We cannot exhaustively test this (we rely on bitcoind for this) but we can try to decode a correct transaction
-    assert BlockProcessor.decode_raw_transaction(hex_tx) is not None
+    assert block_processor.decode_raw_transaction(hex_tx) is not None
 
 
-def test_decode_raw_transaction_invalid():
+def test_decode_raw_transaction_invalid(block_processor):
     # Same but with an invalid one
-    assert BlockProcessor.decode_raw_transaction(hex_tx[::-1]) is None
+    assert block_processor.decode_raw_transaction(hex_tx[::-1]) is None
 
 
-def test_get_missed_blocks():
-    target_block = BlockProcessor.get_best_block_hash()
+def test_get_missed_blocks(block_processor):
+    target_block = block_processor.get_best_block_hash()
 
     # Generate some blocks and store the hash in a list
     missed_blocks = []
     for _ in range(5):
         generate_block()
-        missed_blocks.append(BlockProcessor.get_best_block_hash())
+        missed_blocks.append(block_processor.get_best_block_hash())
 
     # Check what we've missed
-    assert BlockProcessor.get_missed_blocks(target_block) == missed_blocks
+    assert block_processor.get_missed_blocks(target_block) == missed_blocks
 
     # We can see how it does not work if we replace the target by the first element in the list
     block_tip = missed_blocks[0]
-    assert BlockProcessor.get_missed_blocks(block_tip) != missed_blocks
+    assert block_processor.get_missed_blocks(block_tip) != missed_blocks
 
     # But it does again if we skip that block
-    assert BlockProcessor.get_missed_blocks(block_tip) == missed_blocks[1:]
+    assert block_processor.get_missed_blocks(block_tip) == missed_blocks[1:]
 
 
-def test_get_distance_to_tip():
+def test_get_distance_to_tip(block_processor):
     target_distance = 5
 
-    target_block = BlockProcessor.get_best_block_hash()
+    target_block = block_processor.get_best_block_hash()
 
     # Mine some blocks up to the target distance
     generate_blocks(target_distance)
 
     # Check if the distance is properly computed
-    assert BlockProcessor.get_distance_to_tip(target_block) == target_distance
+    assert block_processor.get_distance_to_tip(target_block) == target_distance
 
 
-def test_is_block_in_best_chain():
-    best_block_hash = BlockProcessor.get_best_block_hash()
-    best_block = BlockProcessor.get_block(best_block_hash)
+def test_is_block_in_best_chain(block_processor):
+    best_block_hash = block_processor.get_best_block_hash()
+    best_block = block_processor.get_block(best_block_hash)
 
-    assert BlockProcessor.is_block_in_best_chain(best_block_hash)
+    assert block_processor.is_block_in_best_chain(best_block_hash)
 
     fork(best_block.get("previousblockhash"))
     generate_blocks(2)
 
-    assert not BlockProcessor.is_block_in_best_chain(best_block_hash)
+    assert not block_processor.is_block_in_best_chain(best_block_hash)
 
 
-def test_find_last_common_ancestor():
-    ancestor = BlockProcessor.get_best_block_hash()
+def test_find_last_common_ancestor(block_processor):
+    ancestor = block_processor.get_best_block_hash()
     generate_blocks(3)
-    best_block_hash = BlockProcessor.get_best_block_hash()
+    best_block_hash = block_processor.get_best_block_hash()
 
     # Create a fork (forking creates a block if the mock is set by events)
     fork(ancestor)
@@ -111,6 +107,6 @@ def test_find_last_common_ancestor():
     generate_blocks(5)
 
     # The last common ancestor between the old best and the new best should be the "ancestor"
-    last_common_ancestor, dropped_txs = BlockProcessor.find_last_common_ancestor(best_block_hash)
+    last_common_ancestor, dropped_txs = block_processor.find_last_common_ancestor(best_block_hash)
     assert last_common_ancestor == ancestor
     assert len(dropped_txs) == 3

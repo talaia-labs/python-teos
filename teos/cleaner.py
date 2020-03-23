@@ -81,7 +81,7 @@ class Cleaner:
                 logger.error("Some UUIDs not found in the db", locator=locator, all_uuids=uuids)
 
         else:
-            logger.error("Locator map not found in the db", uuid=locator)
+            logger.error("Locator map not found in the db", locator=locator)
 
     @staticmethod
     def delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager):
