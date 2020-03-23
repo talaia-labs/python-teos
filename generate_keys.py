@@ -1,4 +1,5 @@
 import os.path
+from pathlib import Path
 from getopt import getopt
 from sys import argv, exit
 
@@ -48,15 +49,14 @@ if __name__ == "__main__":
         if opt in ["-d", "--dir"]:
             output_dir = arg
 
-    if output_dir.endswith("/"):
-        output_dir = output_dir[:-1]
+    # Create the output folder it it does not exist (and all the parents if they don't either)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    SK_FILE_NAME = "{}/{}_sk.der".format(output_dir, name)
-    PK_FILE_NAME = "{}/{}_pk.der".format(output_dir, name)
+    SK_FILE_NAME = os.path.join(output_dir, "{}_sk.der".format(name))
+    PK_FILE_NAME = os.path.join(output_dir, "{}_pk.der".format(name))
 
     if os.path.exists(SK_FILE_NAME):
-        print('A key with name "{}" already exists. Aborting.'.format(SK_FILE_NAME))
-        exit(1)
+        exit('A key with name "{}" already exists. Aborting.'.format(SK_FILE_NAME))
 
     sk = ec.generate_private_key(ec.SECP256K1, default_backend())
     pk = sk.public_key()
