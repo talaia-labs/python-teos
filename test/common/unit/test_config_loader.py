@@ -219,3 +219,26 @@ def test_create_config_dict_invalid_type():
 
     with pytest.raises(ValueError):
         conf_loader.create_config_dict()
+
+
+def test_extend_paths():
+    # Test that only items with the path flag are extended
+    foo_data_dir = "foo/"
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, {})
+    conf_loader.extend_paths()
+
+    for k, field in conf_loader.conf_fields.items():
+        if isinstance(field.get("value"), str):
+            if field.get("path") is True:
+                assert conf_loader.data_dir in field.get("value")
+            else:
+                assert conf_loader.data_dir not in field.get("value")
+
+    # Check that absolute paths are not extended
+    absolute_path = "/foo/var"
+    conf_loader.conf_fields["ABSOLUTE_PATH"] = {"value": absolute_path, "type": str, "path": True}
+    conf_loader.extend_paths()
+
+    assert conf_loader.conf_fields["ABSOLUTE_PATH"]["value"] == absolute_path

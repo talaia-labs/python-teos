@@ -7,7 +7,6 @@ from common.tools import (
     check_locator_format,
     compute_locator,
     setup_data_folder,
-    extend_paths,
     setup_logging,
 )
 from test.common.unit.conftest import get_random_value_hex
@@ -64,23 +63,6 @@ def test_setup_data_folder():
     assert os.path.isdir(test_folder)
 
     os.rmdir(test_folder)
-
-
-def test_extend_paths():
-    # Test that only items with the path flag are extended
-    config_fields = {
-        "foo": {"value": "foofoo"},
-        "var": {"value": "varvar", "path": True},
-        "foovar": {"value": "foovarfoovar"},
-    }
-    base_path = "base_path/"
-    extend_paths(base_path, config_fields)
-
-    for k, field in config_fields.items():
-        if field.get("path") is True:
-            assert base_path in field.get("value")
-        else:
-            assert base_path not in field.get("value")
 
 
 def test_setup_logging():

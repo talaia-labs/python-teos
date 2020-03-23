@@ -1,8 +1,6 @@
 import os
 import configparser
 
-from common.tools import extend_paths
-
 
 class ConfigLoader:
     """
@@ -71,7 +69,7 @@ class ConfigLoader:
             self.conf_fields[k]["value"] = v
 
         # Extend relative paths
-        extend_paths(self.data_dir, self.conf_fields)
+        self.extend_paths()
 
         # Sanity check fields and build config dictionary
         config = self.create_config_dict()
@@ -103,3 +101,14 @@ class ConfigLoader:
                 raise ValueError(err_msg)
 
         return conf_dict
+
+    def extend_paths(self):
+        """
+        Extends the relative paths of  the ``conf_fields`` dictionary with ``data_dir``.
+
+        If an absolute path is given, it'll remain the same.
+        """
+
+        for key, field in self.conf_fields.items():
+            if field.get("path") is True and isinstance(field.get("value"), str):
+                self.conf_fields[key]["value"] = os.path.join(self.data_dir, self.conf_fields[key]["value"])

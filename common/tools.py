@@ -1,6 +1,7 @@
 import re
 import os
 import logging
+from pathlib import Path
 from common.constants import LOCATOR_LEN_HEX
 
 
@@ -50,26 +51,7 @@ def setup_data_folder(data_folder):
         data_folder (:obj:`str`): the path of the folder
     """
 
-    if not os.path.isdir(data_folder):
-        os.makedirs(data_folder, exist_ok=True)
-
-
-def extend_paths(base_path, config_fields):
-    """
-    Extends the relative paths of a given ``config_fields`` dictionary with a given ``base_path``.
-
-    Paths in the config file are based on DATA_PATH, this method extends them so they are all absolute.
-
-    Args:
-        base_path (:obj:`str`): the base path to prepend the other paths.
-        config_fields (:obj:`dict`): a dictionary of configuration fields containing a ``path`` flag, as follows:
-            {"field0": {"value": value_from_conf_file, "path": True, ...}}
-
-    """
-
-    for key, field in config_fields.items():
-        if field.get("path") is True:
-            config_fields[key]["value"] = os.path.join(base_path, config_fields[key]["value"])
+    Path(data_folder).mkdir(parents=True, exist_ok=True)
 
 
 def setup_logging(log_file_path, log_name_prefix):
