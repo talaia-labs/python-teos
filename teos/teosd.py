@@ -10,6 +10,7 @@ from common.cryptographer import Cryptographer
 from common.tools import setup_logging, setup_data_folder
 
 from teos.api import API
+from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
 from teos.carrier import Carrier
@@ -160,7 +161,9 @@ if __name__ == "__main__":
 
     try:
         opts, _ = getopt(
-            argv[1:], "", ["btcnetwork=", "btcrpcuser=", "btcrpcpassword=", "btcrpcconnect=", "btcrpcport=", "datadir="]
+            argv[1:],
+            "h",
+            ["btcnetwork=", "btcrpcuser=", "btcrpcpassword=", "btcrpcconnect=", "btcrpcport=", "datadir=", "help"],
         )
         for opt, arg in opts:
             if opt in ["--btcnetwork"]:
@@ -178,6 +181,8 @@ if __name__ == "__main__":
                     exit("btcrpcport must be an integer")
             if opt in ["--datadir"]:
                 DATA_DIR = os.path.expanduser(arg)
+            if opt in ["-h", "--help"]:
+                exit(show_usage())
 
     except GetoptError as e:
         exit(e)
