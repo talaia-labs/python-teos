@@ -191,3 +191,31 @@ def test_build_invalid_data(conf_file_conf):
 
     with pytest.raises(ValueError):
         conf_loader.build_config()
+
+
+def test_create_config_dict():
+    # create_config_dict should create a dictionary with the config fields in ConfigLoader.config_fields as long as
+    # the type of the field "value" matches the type in "type". The conf source does not matter here.
+    foo_data_dir = "foo/"
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, {})
+    config = conf_loader.create_config_dict()
+
+    assert isinstance(config, dict)
+    for k, v in config.items():
+        assert k in config
+        assert isinstance(v, default_conf_copy[k].get("type"))
+
+
+def test_create_config_dict_invalid_type():
+    # If any type does not match the expected one, we should get a ValueError
+    foo_data_dir = "foo/"
+    default_conf_copy = deepcopy(DEFAULT_CONF)
+
+    # Modify a field so the type does not match
+    default_conf_copy["FOO_STR_2"]["value"] = 1234
+
+    conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, {})
+
+    with pytest.raises(ValueError):
+        conf_loader.create_config_dict()
