@@ -11,7 +11,7 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from cli.help import help_add_appointment, help_get_appointment
+from cli.help import show_usage, help_add_appointment, help_get_appointment
 from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
 
 import common.cryptographer
@@ -382,22 +382,6 @@ def get_appointment(locator, get_appointment_endpoint):
         logger.error("The request timed out")
 
 
-def show_usage():
-    return (
-        "USAGE: "
-        "\n\tpython teos_cli.py [global options] command [command options] [arguments]"
-        "\n\nCOMMANDS:"
-        "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
-        "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
-        "\n\thelp \t\t\tShows a list of commands or help for a specific command."
-        "\n\nGLOBAL OPTIONS:"
-        "\n\t-s, --server \tAPI server where to send the requests. Defaults to localhost (modifiable in conf file)."
-        "\n\t-p, --port \tAPI port where to send the requests. Defaults to 9814 (modifiable in conf file)."
-        "\n\t-d, --debug \tshows debug information and stores it in teos_cli.log."
-        "\n\t-h --help \tshows this message."
-    )
-
-
 def main(args, command_line_conf):
     # Loads config and sets up the data folder and log file
     config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
@@ -478,7 +462,7 @@ if __name__ == "__main__":
                     try:
                         command_line_conf["TEOS_PORT"] = int(arg)
                     except ValueError:
-                        exit("port must be an integer")
+                        sys.exit("port must be an integer")
 
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())

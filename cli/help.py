@@ -1,3 +1,19 @@
+def show_usage():
+    return (
+        "USAGE: "
+        "\n\tpython teos_cli.py [global options] command [command options] [arguments]"
+        "\n\nCOMMANDS:"
+        "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
+        "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
+        "\n\thelp \t\t\tShows a list of commands or help for a specific command."
+        "\n\nGLOBAL OPTIONS:"
+        "\n\t-s, --server \tAPI server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
+        "\n\t-p, --port \tAPI port where to send the requests. Defaults to '9814' (modifiable in conf file)."
+        "\n\t-d, --debug \tshows debug information and stores it in teos_cli.log."
+        "\n\t-h --help \tshows this message."
+    )
+
+
 def help_add_appointment():
     return (
         "NAME:"
