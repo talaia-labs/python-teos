@@ -28,6 +28,10 @@ from common.constants import LOCATOR_LEN_BYTES
 
 
 TEOS_API = "http://{}:{}".format(HOST, PORT)
+add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
+get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
+get_all_appointment_endpoint = "{}/get_all_appointments".format(TEOS_API)
+
 MULTIPLE_APPOINTMENTS = 10
 
 appointments = []
@@ -68,7 +72,7 @@ def new_appt_data():
 
 
 def add_appointment(new_appt_data):
-    r = requests.post(url=TEOS_API, json=json.dumps(new_appt_data), timeout=5)
+    r = requests.post(url=add_appointment_endpoint, json=json.dumps(new_appt_data), timeout=5)
 
     if r.status_code == 200:
         appointments.append(new_appt_data["appointment"])
@@ -88,7 +92,7 @@ def test_add_appointment(run_api, run_bitcoind, new_appt_data):
 
 
 def test_request_random_appointment():
-    r = requests.get(url=TEOS_API + "/get_appointment?locator=" + get_random_value_hex(LOCATOR_LEN_BYTES))
+    r = requests.get(url="{}?locator={}".format(get_appointment_endpoint, get_random_value_hex(LOCATOR_LEN_BYTES)))
     assert r.status_code == 200
 
     received_appointments = json.loads(r.content)
@@ -123,7 +127,7 @@ def test_add_too_many_appointment(new_appt_data):
 
 
 def test_get_all_appointments_watcher():
-    r = requests.get(url=TEOS_API + "/get_all_appointments")
+    r = requests.get(url=get_all_appointment_endpoint)
     assert r.status_code == 200 and r.reason == "OK"
 
     received_appointments = json.loads(r.content)
@@ -147,7 +151,7 @@ def test_get_all_appointments_responder():
     generate_blocks(6)
 
     # Get all appointments
-    r = requests.get(url=TEOS_API + "/get_all_appointments")
+    r = requests.get(url=get_all_appointment_endpoint)
     received_appointments = json.loads(r.content)
 
     # Make sure there is not pending locator in the watcher
@@ -164,7 +168,7 @@ def test_request_appointment_watcher(new_appt_data):
     assert r.status_code == 200
 
     # Next we can request it
-    r = requests.get(url=TEOS_API + "/get_appointment?locator=" + new_appt_data["appointment"]["locator"])
+    r = requests.get(url="{}?locator={}".format(get_appointment_endpoint, new_appt_data["appointment"]["locator"]))
     assert r.status_code == 200
 
     # Each locator may point to multiple appointments, check them all
@@ -173,7 +177,7 @@ def test_request_appointment_watcher(new_appt_data):
     # Take the status out and leave the received appointments ready to compare
     appointment_status = [appointment.pop("status") for appointment in received_appointments]
 
-    # Check that the appointment is within the received appoints
+    # Check that the appointment is within the received appointments
     assert new_appt_data["appointment"] in received_appointments
 
     # Check that all the appointments are being watched
@@ -191,7 +195,7 @@ def test_request_appointment_responder(new_appt_data):
     # Generate a block to trigger the watcher
     generate_block()
 
-    r = requests.get(url=TEOS_API + "/get_appointment?locator=" + new_appt_data["appointment"]["locator"])
+    r = requests.get(url="{}?locator={}".format(get_appointment_endpoint, new_appt_data["appointment"]["locator"]))
     assert r.status_code == 200
 
     received_appointments = json.loads(r.content)

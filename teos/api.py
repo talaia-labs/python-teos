@@ -189,7 +189,7 @@ class API:
         """
 
         routes = {
-            "/": (self.add_appointment, ["POST"]),
+            "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["GET"]),
             "/get_all_appointments": (self.get_all_appointments, ["GET"]),
         }

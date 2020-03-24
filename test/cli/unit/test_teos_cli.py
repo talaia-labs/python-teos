@@ -24,11 +24,9 @@ dummy_sk = PrivateKey()
 dummy_pk = dummy_sk.public_key
 another_sk = PrivateKey()
 
-
-# Replace the key in the module with a key we control for the tests
-teos_cli.teos_public_key = dummy_pk
-# Replace endpoint with dummy one
-teos_endpoint = "http://{}:{}/".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
+teos_url = "http://{}:{}".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
+add_appointment_endpoint = "{}/add_appointment".format(teos_url)
+get_appointment_endpoint = "{}/get_appointment".format(teos_url)
 
 dummy_appointment_request = {
     "tx": get_random_value_hex(192),
@@ -102,16 +100,17 @@ def test_load_keys():
 # TODO: 90-add-more-add-appointment-tests
 @responses.activate
 def test_add_appointment(monkeypatch):
+
     # Simulate a request to add_appointment for dummy_appointment, make sure that the right endpoint is requested
     # and the return value is True
     monkeypatch.setattr(teos_cli, "load_keys", load_dummy_keys)
 
     response = {"locator": dummy_appointment.locator, "signature": get_dummy_signature()}
-    responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)], teos_endpoint, config)
+    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)], teos_url, config)
 
     assert len(responses.calls) == 1
-    assert responses.calls[0].request.url == teos_endpoint
+    assert responses.calls[0].request.url == add_appointment_endpoint
     assert result
 
 
@@ -128,8 +127,8 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
         "signature": get_bad_signature(),  # Sign with a bad key
     }
 
-    responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)], teos_endpoint, config)
+    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+    result = teos_cli.add_appointment([json.dumps(dummy_appointment_request)], teos_url, config)
 
     shutil.rmtree(config.get("APPOINTMENTS_FOLDER_NAME"))
 
@@ -166,11 +165,11 @@ def test_post_appointment():
         "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_pk),
     }
 
-    responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    response = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_endpoint)
+    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+    response = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_url)
 
     assert len(responses.calls) == 1
-    assert responses.calls[0].request.url == teos_endpoint
+    assert responses.calls[0].request.url == add_appointment_endpoint
     assert response
 
 
@@ -183,18 +182,18 @@ def test_process_post_appointment_response():
     }
 
     # A 200 OK with a correct json response should return the json of the response
-    responses.add(responses.POST, teos_endpoint, json=response, status=200)
-    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_endpoint)
+    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_url)
     assert teos_cli.process_post_appointment_response(r) == r.json()
 
     # If we modify the response code tor a rejection (lets say 404) we should get None
-    responses.replace(responses.POST, teos_endpoint, json=response, status=404)
-    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_endpoint)
+    responses.replace(responses.POST, add_appointment_endpoint, json=response, status=404)
+    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_url)
     assert teos_cli.process_post_appointment_response(r) is None
 
     # The same should happen if the response is not in json
-    responses.replace(responses.POST, teos_endpoint, status=404)
-    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_endpoint)
+    responses.replace(responses.POST, add_appointment_endpoint, status=404)
+    r = teos_cli.post_appointment(json.dumps(dummy_appointment_request), teos_url)
     assert teos_cli.process_post_appointment_response(r) is None
 
 
@@ -219,11 +218,10 @@ def test_get_appointment():
     # Response of get_appointment endpoint is an appointment with status added to it.
     dummy_appointment_full["status"] = "being_watched"
     response = dummy_appointment_full
-    get_appointment_endpoint = teos_endpoint + "get_appointment"
 
     request_url = "{}?locator={}".format(get_appointment_endpoint, response.get("locator"))
     responses.add(responses.GET, request_url, json=response, status=200)
-    result = teos_cli.get_appointment(response.get("locator"), get_appointment_endpoint)
+    result = teos_cli.get_appointment(response.get("locator"), teos_url)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == request_url
@@ -233,10 +231,9 @@ def test_get_appointment():
 @responses.activate
 def test_get_appointment_err():
     locator = get_random_value_hex(16)
-    get_appointment_endpoint = teos_endpoint + "get_appointment"
 
     # Test that get_appointment handles a connection error appropriately.
     request_url = "{}?locator={}".format(get_appointment_endpoint, locator)
     responses.add(responses.GET, request_url, body=ConnectionError())
 
-    assert not teos_cli.get_appointment(locator, get_appointment_endpoint)
+    assert not teos_cli.get_appointment(locator, teos_url)

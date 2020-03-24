@@ -109,9 +109,6 @@ def add_appointment(args, teos_url, config):
         error occurs during the process.
     """
 
-    # Currently the base_url is the same as the add_appointment_endpoint
-    add_appointment_endpoint = teos_url
-
     teos_pk, cli_sk, cli_pk_der = load_keys(
         config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
     )
@@ -159,7 +156,7 @@ def add_appointment(args, teos_url, config):
     data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
 
     # Send appointment to the server.
-    server_response = post_appointment(data, add_appointment_endpoint)
+    server_response = post_appointment(data, teos_url)
     if server_response is None:
         return False
 
@@ -233,19 +230,21 @@ def parse_add_appointment_args(args):
     return appointment_data
 
 
-def post_appointment(data, add_appointment_endpoint):
+def post_appointment(data, teos_url):
     """
     Sends appointment data to add_appointment endpoint to be processed by the tower.
 
     Args:
         data (:obj:`dict`): a dictionary containing three fields: an appointment, the client-side signature, and the
             der-encoded client public key.
-        add_appointment_endpoint (:obj:`str`): the teos endpoint where to send appointments to.
+        teos_url (:obj:`str`): the teos base url.
 
     Returns:
         :obj:`dict` or ``None``: a json-encoded dictionary with the server response if the data can be posted.
         None otherwise.
     """
+
+    add_appointment_endpoint = "{}/add_appointment".format(teos_url)
 
     logger.info("Sending appointment to the Eye of Satoshi")
 
@@ -342,29 +341,28 @@ def save_appointment_receipt(appointment, signature, config):
         return False
 
 
-def get_appointment(locator, get_appointment_endpoint):
+def get_appointment(locator, teos_url):
     """
     Gets information about an appointment from the tower.
 
     Args:
         locator (:obj:`str`): the appointment locator used to identify it.
-        get_appointment_endpoint (:obj:`str`): the teos endpoint where to get appointments from.
+        teos_url (:obj:`str`): the teos base url.
 
     Returns:
         :obj:`dict` or :obj:`None`: a dictionary containing thew appointment data if the locator is valid and the tower
         responds. ``None`` otherwise.
     """
 
+    get_appointment_endpoint = "{}/get_appointment".format(teos_url)
     valid_locator = check_locator_format(locator)
 
     if not valid_locator:
         logger.error("The provided locator is not valid", locator=locator)
         return None
 
-    parameters = "?locator={}".format(locator)
-
     try:
-        r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
+        r = requests.get(url="{}?locator={}".format(get_appointment_endpoint, locator), timeout=5)
         return r.json()
 
     except ConnectTimeout:
@@ -414,8 +412,7 @@ def main(args, command_line_conf):
                         if arg_opt in ["-h", "--help"]:
                             sys.exit(help_get_appointment())
 
-                        get_appointment_endpoint = "{}/get_appointment".format(teos_url)
-                        appointment_data = get_appointment(arg_opt, get_appointment_endpoint)
+                        appointment_data = get_appointment(arg_opt, teos_url)
                         if appointment_data:
                             print(appointment_data)
 
