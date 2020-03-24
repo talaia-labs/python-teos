@@ -72,7 +72,7 @@ def new_appt_data():
 
 
 def add_appointment(new_appt_data):
-    r = requests.post(url=add_appointment_endpoint, json=json.dumps(new_appt_data), timeout=5)
+    r = requests.post(url=add_appointment_endpoint, json=new_appt_data, timeout=5)
 
     if r.status_code == 200:
         appointments.append(new_appt_data["appointment"])

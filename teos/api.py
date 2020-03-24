@@ -1,5 +1,4 @@
 import os
-import json
 import logging
 from flask import Flask, request, abort, jsonify
 
@@ -55,7 +54,7 @@ class API:
 
         if request.is_json:
             # Check content type once if properly defined
-            request_data = json.loads(request.get_json())
+            request_data = request.get_json()
             appointment = self.inspector.inspect(
                 request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
             )

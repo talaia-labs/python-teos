@@ -249,7 +249,7 @@ def post_appointment(data, teos_url):
     logger.info("Sending appointment to the Eye of Satoshi")
 
     try:
-        return requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
+        return requests.post(url=add_appointment_endpoint, json=data, timeout=5)
 
     except ConnectTimeout:
         logger.error("Can't connect to the Eye of Satoshi's API. Connection timeout")

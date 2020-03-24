@@ -54,6 +54,9 @@ class Inspector:
             Errors are defined in :mod:`Errors <teos.errors>`.
         """
 
+        if appointment_data is None:
+            return errors.APPOINTMENT_EMPTY_FIELD, "empty appointment received"
+
         block_height = self.block_processor.get_block_count()
 
         if block_height is not None:
