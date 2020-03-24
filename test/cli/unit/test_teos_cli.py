@@ -3,6 +3,7 @@ import json
 import shutil
 import responses
 from coincurve import PrivateKey
+from requests.exceptions import ConnectionError
 
 import common.cryptographer
 from common.logger import Logger
@@ -235,7 +236,7 @@ def test_get_appointment_err():
     get_appointment_endpoint = teos_endpoint + "get_appointment"
 
     # Test that get_appointment handles a connection error appropriately.
-    request_url = "{}?locator=".format(get_appointment_endpoint, locator)
+    request_url = "{}?locator={}".format(get_appointment_endpoint, locator)
     responses.add(responses.GET, request_url, body=ConnectionError())
 
     assert not teos_cli.get_appointment(locator, get_appointment_endpoint)
