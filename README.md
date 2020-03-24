@@ -106,18 +106,18 @@ The script generates and stores a set of keys on disk (by default it outputs the
 
 The following command will generate a set of keys for `teos` and store it in the default data directory (`~/.teos`):
 ```
-python generate_keys.py -d ~./teos
+python generate_keys.py -d ~/.teos
 ``` 
 
 The following command will generate a set of keys for `teos_cli` and store it in the default data directory (`~/.teos_cli`):
 ```
-python generate_keys.py -n cli -d ~./teos_cli
+python generate_keys.py -n cli -d ~/.teos_cli
 ``` 
 
 Notice that `cli` needs a copy of the tower public key, so you should make a copy of that if you're using different data directories (as in this example):
 
 ```
-cp ~./teos/teos_pk.der ~./teos_cli/teos_pk.der 
+cp ~/.teos/teos_pk.der ~/.teos_cli/teos_pk.der 
 ```
 
 ## Contributing 
