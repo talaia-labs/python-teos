@@ -57,4 +57,7 @@ Code should be, at least, documented using docstrings. We use the [Sphinx Google
 ## Test Coverage
 We use [pytest](https://docs.pytest.org/en/latest/) to build and run tests. Tests should be provided to cover both positive and negative conditions. Test should cover both the proper execution as well as all the covered error paths. PR with no proper test coverage will be rejected. 
 
+## Signing Commits
+
+We require that all commits to be merge into master are signed. You can enable commit signing on GitHub by following [Signing commits](https://help.github.com/en/github/authenticating-to-github/signing-commits).
 
