@@ -2,16 +2,35 @@ import os
 import logging
 from flask import Flask, request, abort, jsonify
 
+import teos.errors as errors
 from teos import HOST, PORT, LOG_PREFIX
+
 from common.logger import Logger
 from common.appointment import Appointment
-
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
 
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
 logger = Logger(actor="API", log_name_prefix=LOG_PREFIX)
+
+
+# TODO: UNITTEST
+def get_remote_addr():
+    """
+    Gets the remote client ip address. The HTTP_X_REAL_IP field is tried first in case the server is behind a reverse
+     proxy.
+
+    Returns:
+        :obj:`str`: the IP address of the client.
+    """
+
+    # Getting the real IP if the server is behind a reverse proxy
+    remote_addr = request.environ.get("HTTP_X_REAL_IP")
+    if not remote_addr:
+        remote_addr = request.environ.get("REMOTE_ADDR")
+
+    return remote_addr
 
 
 class API:
@@ -24,9 +43,48 @@ class API:
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
     """
 
-    def __init__(self, inspector, watcher):
+    # TODO: UNITTEST
+    def __init__(self, inspector, watcher, gatekeeper):
         self.inspector = inspector
         self.watcher = watcher
+        self.gatekeeper = gatekeeper
+
+    # TODO: UNITTEST
+    def register(self):
+        remote_addr = get_remote_addr()
+
+        logger.info("Received register request", from_addr="{}".format(remote_addr))
+
+        if request.is_json:
+            request_data = request.get_json()
+            client_pk = request_data.get("public_key")
+
+            if client_pk:
+                try:
+                    rcode = HTTP_OK
+                    available_slots = self.gatekeeper.add_update_user(client_pk)
+                    response = {"public_key": client_pk, "available_slots": available_slots}
+
+                except ValueError as e:
+                    rcode = HTTP_BAD_REQUEST
+                    error = "Error {}: {}".format(errors.REGISTRATION_MISSING_FIELD, str(e))
+                    response = {"error": error}
+
+            else:
+                rcode = HTTP_BAD_REQUEST
+                error = "Error {}: public_key not found in register message".format(
+                    errors.REGISTRATION_WRONG_FIELD_FORMAT
+                )
+                response = {"error": error}
+
+        else:
+            rcode = HTTP_BAD_REQUEST
+            error = "appointment rejected. Request is not json encoded"
+            response = {"error": error}
+
+        logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
+
+        return jsonify(response), rcode
 
     def add_appointment(self):
         """
@@ -43,14 +101,9 @@ class API:
         """
 
         # Getting the real IP if the server is behind a reverse proxy
-        remote_addr = request.environ.get("HTTP_X_REAL_IP")
-        if not remote_addr:
-            remote_addr = request.environ.get("REMOTE_ADDR")
+        remote_addr = get_remote_addr()
 
         logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
-
-        # FIXME: Logging every request so we can get better understanding of bugs in the alpha
-        logger.debug("Request details", data="{}".format(request.data))
 
         if request.is_json:
             # Check content type once if properly defined
@@ -58,9 +111,6 @@ class API:
             appointment = self.inspector.inspect(
                 request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
             )
-
-            error = None
-            response = None
 
             if type(appointment) == Appointment:
                 appointment_added, signature = self.watcher.add_appointment(appointment)
@@ -72,29 +122,26 @@ class API:
                 else:
                     rcode = HTTP_SERVICE_UNAVAILABLE
                     error = "appointment rejected"
+                    response = {"error": error}
 
             elif type(appointment) == tuple:
                 rcode = HTTP_BAD_REQUEST
                 error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
+                response = {"error": error}
 
             else:
                 # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
                 rcode = HTTP_BAD_REQUEST
                 error = "appointment rejected. Request does not match the standard"
+                response = {"error": error}
 
         else:
             rcode = HTTP_BAD_REQUEST
             error = "appointment rejected. Request is not json encoded"
-            response = None
+            response = {"error": error}
 
-        logger.info(
-            "Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response, error=error
-        )
-
-        if error is None:
-            return jsonify(response), rcode
-        else:
-            return jsonify({"error": error}), rcode
+        logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
+        return jsonify(response), rcode
 
     # FIXME: THE NEXT TWO API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
     # ToDo: #17-add-api-keys
@@ -116,9 +163,7 @@ class API:
         """
 
         # Getting the real IP if the server is behind a reverse proxy
-        remote_addr = request.environ.get("HTTP_X_REAL_IP")
-        if not remote_addr:
-            remote_addr = request.environ.get("REMOTE_ADDR")
+        remote_addr = get_remote_addr()
 
         locator = request.args.get("locator")
         response = []
@@ -182,12 +227,14 @@ class API:
 
         return response
 
+    # TODO: UNITTEST
     def start(self):
         """
         This function starts the Flask server used to run the API. Adds all the routes to the functions listed above.
         """
 
         routes = {
+            "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["GET"]),
             "/get_all_appointments": (self.get_all_appointments, ["GET"]),

@@ -17,6 +17,7 @@ from teos.carrier import Carrier
 from teos.inspector import Inspector
 from teos.responder import Responder
 from teos.db_manager import DBManager
+from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.tools import can_connect_to_bitcoind, in_correct_network
@@ -150,7 +151,7 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher).start()
+            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, Gatekeeper()).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)

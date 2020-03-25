@@ -10,6 +10,7 @@ from teos.watcher import Watcher
 from teos.tools import bitcoin_cli
 from teos.inspector import Inspector
 from teos.responder import Responder
+from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 
 from test.teos.unit.conftest import (
@@ -55,7 +56,9 @@ def run_api(db_manager, carrier, block_processor):
     watcher.awake()
     chain_monitor.monitor_chain()
 
-    api_thread = Thread(target=API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher).start)
+    api_thread = Thread(
+        target=API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, Gatekeeper()).start
+    )
     api_thread.daemon = True
     api_thread.start()
 
