@@ -1,5 +1,6 @@
 import os
 import logging
+from math import ceil
 from flask import Flask, request, abort, jsonify
 
 import teos.errors as errors
@@ -7,7 +8,13 @@ from teos import HOST, PORT, LOG_PREFIX
 
 from common.logger import Logger
 from common.appointment import Appointment
-from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, LOCATOR_LEN_HEX
+from common.constants import (
+    HTTP_OK,
+    HTTP_BAD_REQUEST,
+    HTTP_SERVICE_UNAVAILABLE,
+    LOCATOR_LEN_HEX,
+    ENCRYPTED_BLOB_MAX_SIZE_HEX,
+)
 
 
 # ToDo: #5-add-async-to-api
@@ -34,6 +41,7 @@ def get_remote_addr():
 
 
 class API:
+    # FIXME: DOCS
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and server user requests.
 
@@ -49,7 +57,7 @@ class API:
         self.watcher = watcher
         self.gatekeeper = gatekeeper
 
-    # TODO: UNITTEST
+    # TODO: UNITTEST, DOCS
     def register(self):
         remote_addr = get_remote_addr()
 
@@ -86,6 +94,7 @@ class API:
 
         return jsonify(response), rcode
 
+    # FIXME: UNITTEST
     def add_appointment(self):
         """
         Main endpoint of the Watchtower.
@@ -108,20 +117,41 @@ class API:
         if request.is_json:
             # Check content type once if properly defined
             request_data = request.get_json()
-            appointment = self.inspector.inspect(
-                request_data.get("appointment"), request_data.get("signature"), request_data.get("public_key")
+
+            rcode, message = self.gatekeeper.identify_user(
+                request_data.get("appointment"), request_data.get("signature")
             )
 
-            if type(appointment) == Appointment:
-                appointment_added, signature = self.watcher.add_appointment(appointment)
+            if rcode:
+                rcode = HTTP_BAD_REQUEST
+                error = "appointment rejected. Error {}: {}".format(rcode, message)
+                return jsonify({"error": error}), rcode
 
-                if appointment_added:
-                    rcode = HTTP_OK
-                    response = {"locator": appointment.locator, "signature": signature}
+            else:
+                user_pk = message
+
+            appointment = self.inspector.inspect(request_data.get("appointment"))
+
+            if type(appointment) == Appointment:
+                # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+
+                if self.gatekeeper.get_slots(user_pk) >= required_slots:
+                    appointment_added, signature = self.watcher.add_appointment(appointment)
+
+                    if appointment_added:
+                        rcode = HTTP_OK
+                        response = {"locator": appointment.locator, "signature": signature}
+                        self.gatekeeper.fill_subscription_slots(user_pk, required_slots)
+
+                    else:
+                        rcode = HTTP_SERVICE_UNAVAILABLE
+                        error = "appointment rejected"
+                        response = {"error": error}
 
                 else:
-                    rcode = HTTP_SERVICE_UNAVAILABLE
-                    error = "appointment rejected"
+                    rcode = errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS
+                    error = "invalid signature or the user does not have enough slots available"
                     response = {"error": error}
 
             elif type(appointment) == tuple:

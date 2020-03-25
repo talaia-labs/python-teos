@@ -315,3 +315,22 @@ class Cryptographer:
         """
 
         return pk.point() == rpk.point()
+
+    # TODO: UNITTEST
+    @staticmethod
+    def get_compressed_pk(pk):
+        """
+        Computes a compressed, hex encoded, public key given a ``PublicKey`` object.
+
+        Args:
+            pk(:obj:`PublicKey`): a given public key.
+
+        Returns:
+            :obj:`str`: A compressed, hex encoded, public key (33-byte long)
+        """
+
+        if not isinstance(pk, PublicKey):
+            logger.error("The received data is not a PublicKey object")
+            return None
+
+        return hexlify(pk.format(compressed=True)).decode("utf-8")
