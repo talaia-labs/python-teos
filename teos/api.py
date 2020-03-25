@@ -4,6 +4,7 @@ from math import ceil
 from flask import Flask, request, abort, jsonify
 
 import teos.errors as errors
+from teos.gatekeeper import NotEnoughSlots
 from teos import HOST, PORT, LOG_PREFIX
 
 from common.logger import Logger
@@ -117,52 +118,60 @@ class API:
         if request.is_json:
             # Check content type once if properly defined
             request_data = request.get_json()
+            user_pk = self.gatekeeper.identify_user(request_data.get("appointment"), request_data.get("signature"))
 
-            rcode, message = self.gatekeeper.identify_user(
-                request_data.get("appointment"), request_data.get("signature")
-            )
+            if user_pk:
+                appointment = self.inspector.inspect(request_data.get("appointment"))
 
-            if rcode:
-                rcode = HTTP_BAD_REQUEST
-                error = "appointment rejected. Error {}: {}".format(rcode, message)
-                return jsonify({"error": error}), rcode
+                if type(appointment) == Appointment:
+                    # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+                    required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
-            else:
-                user_pk = message
+                    # Temporarily taking out slots to avoid abusing this via race conditions
+                    # DISCUSS: It may be worth using signals here to avoid race conditions anyway
+                    try:
+                        self.gatekeeper.fill_slots(user_pk, required_slots)
 
-            appointment = self.inspector.inspect(request_data.get("appointment"))
+                        appointment_added, signature = self.watcher.add_appointment(appointment)
 
-            if type(appointment) == Appointment:
-                # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                        if appointment_added:
+                            rcode = HTTP_OK
+                            response = {"locator": appointment.locator, "signature": signature}
 
-                if self.gatekeeper.get_slots(user_pk) >= required_slots:
-                    appointment_added, signature = self.watcher.add_appointment(appointment)
+                        else:
+                            # Adding back the slots since they were not used
+                            self.gatekeeper.free_slots(user_pk, required_slots)
+                            rcode = HTTP_SERVICE_UNAVAILABLE
+                            error = "appointment rejected"
+                            response = {"error": error}
 
-                    if appointment_added:
-                        rcode = HTTP_OK
-                        response = {"locator": appointment.locator, "signature": signature}
-                        self.gatekeeper.fill_subscription_slots(user_pk, required_slots)
-
-                    else:
-                        rcode = HTTP_SERVICE_UNAVAILABLE
-                        error = "appointment rejected"
+                    except NotEnoughSlots:
+                        # Adding back the slots since they were not used
+                        self.gatekeeper.free_slots(user_pk, required_slots)
+                        rcode = HTTP_BAD_REQUEST
+                        error = "appointment rejected. Error {}: {}".format(
+                            errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                            "Invalid signature or the user does not have enough slots available",
+                        )
                         response = {"error": error}
 
-                else:
-                    rcode = errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS
-                    error = "invalid signature or the user does not have enough slots available"
+                elif type(appointment) == tuple:
+                    rcode = HTTP_BAD_REQUEST
+                    error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
                     response = {"error": error}
 
-            elif type(appointment) == tuple:
-                rcode = HTTP_BAD_REQUEST
-                error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
-                response = {"error": error}
+                else:
+                    # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
+                    rcode = HTTP_BAD_REQUEST
+                    error = "appointment rejected. Request does not match the standard"
+                    response = {"error": error}
 
             else:
-                # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
                 rcode = HTTP_BAD_REQUEST
-                error = "appointment rejected. Request does not match the standard"
+                error = "appointment rejected. Error {}: {}".format(
+                    errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                    "Invalid signature or the user does not have enough slots available",
+                )
                 response = {"error": error}
 
         else:

@@ -1,13 +1,18 @@
 import re
 
-import teos.errors as errors
-
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
 SUBSCRIPTION_SLOTS = 1
 
+
 # TODO: UNITTEST, DOCS
+class NotEnoughSlots(ValueError):
+    """Raise this when trying to subtract more slots than a user has available"""
+
+    pass
+
+
 class Gatekeeper:
     def __init__(self):
         self.registered_users = {}
@@ -36,15 +41,6 @@ class Gatekeeper:
 
         return self.registered_users[user_pk]
 
-    def fill_subscription_slots(self, user_pk, n):
-        slots = self.registered_users.get(user_pk)
-
-        # FIXME: This looks pretty dangerous. I'm guessing race conditions can happen here.
-        if slots == n:
-            self.registered_users.pop(user_pk)
-        else:
-            self.registered_users[user_pk] -= n
-
     def identify_user(self, appointment_data, signature):
         """
         Checks if the provided user signature is comes from a registered user with available appointment slots.
@@ -54,33 +50,21 @@ class Gatekeeper:
             signature (:obj:`str`): the user's signature (hex encoded).
 
         Returns:
-            :obj:`tuple`: A tuple (return code, message) as follows:
-
-            - ``(0, None)`` if the user can be identified (recovered pk belongs to a registered user) and the user has
-                available slots.
-            - ``!= (0, None)`` otherwise.
-
-            The possible return errors are: ``APPOINTMENT_EMPTY_FIELD`` and ``APPOINTMENT_INVALID_SIGNATURE``.
+            :obj:`str` or `None`: a compressed key if it can be recovered from the signature and matches a registered
+            user. ``None`` otherwise.
         """
 
-        if signature is None:
-            rcode = errors.APPOINTMENT_EMPTY_FIELD
-            message = "empty signature received"
+        user_pk = None
 
-        else:
+        if signature is not None:
             appointment = Appointment.from_dict(appointment_data)
             rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-            compressed_user_pk = Cryptographer.get_compressed_pk(rpk)
+            compressed_pk = Cryptographer.get_compressed_pk(rpk)
 
-            if compressed_user_pk and compressed_user_pk in self.registered_users:
-                rcode = 0
-                message = compressed_user_pk
+            if compressed_pk in self.registered_users and self.registered_users.get(compressed_pk) > 0:
+                user_pk = compressed_pk
 
-            else:
-                rcode = errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS
-                message = "invalid signature or the user does not have enough slots available"
-
-        return rcode, message
+        return user_pk
 
     def get_slots(self, user_pk):
         """
@@ -95,3 +79,12 @@ class Gatekeeper:
         """
         slots = self.registered_users.get(user_pk)
         return slots if slots is not None else 0
+
+    def fill_slots(self, user_pk, n):
+        if n >= self.registered_users.get(user_pk):
+            self.registered_users[user_pk] -= n
+        else:
+            raise NotEnoughSlots("No enough empty slots")
+
+    def free_slots(self, user_pk, n):
+        self.registered_users[user_pk] += n
