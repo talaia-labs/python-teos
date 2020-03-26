@@ -265,7 +265,7 @@ class Cryptographer:
         Recovers an ECDSA public key from a given message and zbase32 signature.
 
         Args:
-            message(:obj:`bytes`): the data to be signed.
+            message(:obj:`bytes`): original message from where the signature was generated.
             zb32_sig(:obj:`str`): the zbase32 signature of the message.
 
         Returns:
