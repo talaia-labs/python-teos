@@ -121,7 +121,6 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
 
     # dummy keys for this test
     client_sk, client_pk = generate_keypair()
-    client_pk_hex = client_pk.format().hex()
 
     locator = compute_locator(dispute_txid)
     blob = Blob(dummy_appointment_data.get("tx"))
@@ -138,7 +137,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
 
     signature = Cryptographer.sign(Appointment.from_dict(appointment_data).serialize(), client_sk)
 
-    data = {"appointment": appointment_data, "signature": signature, "public_key": client_pk_hex}
+    data = {"appointment": appointment_data, "signature": signature}
 
     return data, dispute_tx.hex()
 
