@@ -115,7 +115,9 @@ class Watcher:
             self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
 
             if appointment.locator in self.locator_uuid_map:
-                self.locator_uuid_map[appointment.locator].append(uuid)
+                # If the uuid is already in the map it means this is an update.
+                if uuid not in self.locator_uuid_map[appointment.locator]:
+                    self.locator_uuid_map[appointment.locator].append(uuid)
 
             else:
                 self.locator_uuid_map[appointment.locator] = [uuid]
