@@ -1,5 +1,5 @@
 import pyzbase32
-from hashlib import sha256
+from hashlib import sha256, new
 from binascii import unhexlify, hexlify
 from coincurve.utils import int_to_bytes
 from coincurve import PrivateKey, PublicKey
@@ -23,6 +23,24 @@ def sha256d(message):
     """
 
     return sha256(sha256(message).digest()).digest()
+
+
+def hash_160(message):
+    """ Calculates the RIPEMD-160 hash of a given message.
+
+    Args:
+        message (:obj:`str`) the message to be hashed.
+
+    Returns:
+        :obj:`str`: the ripemd160 hash of the given message.
+    """
+
+    # Calculate the RIPEMD-160 hash of the given data.
+    md = new("ripemd160")
+    md.update(unhexlify(message))
+    h160 = md.hexdigest()
+
+    return h160
 
 
 def sigrec_encode(rsig_rid):
