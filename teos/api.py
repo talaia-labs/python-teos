@@ -4,18 +4,13 @@ from math import ceil
 from flask import Flask, request, abort, jsonify
 
 import teos.errors as errors
-from teos.gatekeeper import NotEnoughSlots
 from teos import HOST, PORT, LOG_PREFIX
+from teos.inspector import InspectionFailed
+from teos.gatekeeper import NotEnoughSlots, IdentificationFailure
 
 from common.logger import Logger
-from common.appointment import Appointment
-from common.constants import (
-    HTTP_OK,
-    HTTP_BAD_REQUEST,
-    HTTP_SERVICE_UNAVAILABLE,
-    LOCATOR_LEN_HEX,
-    ENCRYPTED_BLOB_MAX_SIZE_HEX,
-)
+from common.cryptographer import hash_160
+from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, ENCRYPTED_BLOB_MAX_SIZE_HEX
 
 
 # ToDo: #5-add-async-to-api
@@ -42,7 +37,6 @@ def get_remote_addr():
 
 
 class API:
-    # FIXME: DOCS
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and server user requests.
 
@@ -50,6 +44,7 @@ class API:
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
+        gatekeeper (:obj:`Watcher <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to gatekeep the API.
     """
 
     # TODO: UNITTEST
@@ -58,8 +53,22 @@ class API:
         self.watcher = watcher
         self.gatekeeper = gatekeeper
 
-    # TODO: UNITTEST, DOCS
+    # TODO: UNITTEST
     def register(self):
+        """
+        Registers a user by creating a subscription.
+
+        The user is identified by public key.
+
+        Currently subscriptions are free.
+
+        Returns:
+            :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted requests,
+            the ``rcode`` is always 200 and the response contains a json with the public key and number of slots in the
+            subscription. For rejected requests, the ``rcode`` is a 404 and the value contains an application specific
+            error, and an error message. Error messages can be found at :mod:`Errors <teos.errors>`.
+        """
+
         remote_addr = get_remote_addr()
 
         logger.info("Received register request", from_addr="{}".format(remote_addr))
@@ -105,9 +114,9 @@ class API:
 
         Returns:
             :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted
-            appointments, the ``rcode`` is always 0 and the response contains the signed receipt. For rejected
-            appointments, the ``rcode`` is a negative value and the response contains the error message. Error messages
-            can be found at :mod:`Errors <teos.errors>`.
+            appointments, the ``rcode`` is always 200 and the response contains the receipt signature. For rejected
+            appointments, the ``rcode`` is a 404 and the value contains an application specific error, and an error
+            message. Error messages can be found at :mod:`Errors <teos.errors>`.
         """
 
         # Getting the real IP if the server is behind a reverse proxy
@@ -116,57 +125,44 @@ class API:
         logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
 
         if request.is_json:
-            # Check content type once if properly defined
             request_data = request.get_json()
-            user_pk = self.gatekeeper.identify_user(request_data.get("appointment"), request_data.get("signature"))
 
-            if user_pk:
+            # We kind of have the chicken an the egg problem here. Data must be verified and the signature must be
+            # checked:
+            #
+            # - If we verify the data first, we may encounter that the signature is wrong and wasted some time.
+            # - If we check the signature first, we may need to verify some of the information or expose to build
+            #   appointments with potentially wrong data, which may be exploitable.
+            #
+            # The first approach seems safer since it only implies a bunch of pretty quick checks.
+
+            try:
                 appointment = self.inspector.inspect(request_data.get("appointment"))
+                user_pk = self.gatekeeper.identify_user(appointment.serialize(), request_data.get("signature"))
 
-                if type(appointment) == Appointment:
-                    # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-                    required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+                # Temporarily taking out slots to avoid abusing this via race conditions.
+                # DISCUSS: It may be worth using signals here to avoid race conditions anyway.
+                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                self.gatekeeper.fill_slots(user_pk, required_slots)
+                appointment_added, signature = self.watcher.add_appointment(appointment, user_pk)
 
-                    # Temporarily taking out slots to avoid abusing this via race conditions
-                    # DISCUSS: It may be worth using signals here to avoid race conditions anyway
-                    try:
-                        self.gatekeeper.fill_slots(user_pk, required_slots)
-
-                        appointment_added, signature = self.watcher.add_appointment(appointment)
-
-                        if appointment_added:
-                            rcode = HTTP_OK
-                            response = {"locator": appointment.locator, "signature": signature}
-
-                        else:
-                            # Adding back the slots since they were not used
-                            self.gatekeeper.free_slots(user_pk, required_slots)
-                            rcode = HTTP_SERVICE_UNAVAILABLE
-                            error = "appointment rejected"
-                            response = {"error": error}
-
-                    except NotEnoughSlots:
-                        # Adding back the slots since they were not used
-                        self.gatekeeper.free_slots(user_pk, required_slots)
-                        rcode = HTTP_BAD_REQUEST
-                        error = "appointment rejected. Error {}: {}".format(
-                            errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-                            "Invalid signature or the user does not have enough slots available",
-                        )
-                        response = {"error": error}
-
-                elif type(appointment) == tuple:
-                    rcode = HTTP_BAD_REQUEST
-                    error = "appointment rejected. Error {}: {}".format(appointment[0], appointment[1])
-                    response = {"error": error}
+                if appointment_added:
+                    rcode = HTTP_OK
+                    response = {"locator": appointment.locator, "signature": signature}
 
                 else:
-                    # We  should never end up here, since inspect only returns appointments or tuples. Just in case.
-                    rcode = HTTP_BAD_REQUEST
-                    error = "appointment rejected. Request does not match the standard"
-                    response = {"error": error}
+                    # Adding back the slots since they were not used
+                    self.gatekeeper.free_slots(user_pk, required_slots)
+                    rcode = HTTP_SERVICE_UNAVAILABLE
+                    response = {"error": "appointment rejected"}
 
-            else:
+            except InspectionFailed as e:
+                rcode = HTTP_BAD_REQUEST
+                error = "appointment rejected. Error {}: {}".format(e.erno, e.reason)
+                response = {"error": error}
+
+            except (IdentificationFailure, NotEnoughSlots) as e:
                 rcode = HTTP_BAD_REQUEST
                 error = "appointment rejected. Error {}: {}".format(
                     errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
@@ -204,40 +200,49 @@ class API:
         # Getting the real IP if the server is behind a reverse proxy
         remote_addr = get_remote_addr()
 
-        locator = request.args.get("locator")
-        response = []
+        if request.is_json:
+            request_data = request.get_json()
+            locator = request_data.get("locator")
 
-        logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
+            try:
+                self.inspector.check_locator(locator)
+                logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
-        # ToDo: #15-add-system-monitor
-        if not isinstance(locator, str) or len(locator) != LOCATOR_LEN_HEX:
-            response.append({"locator": locator, "status": "not_found"})
-            return jsonify(response)
+                message = "get appointment {}".format(locator).encode()
+                signature = request_data.get("signature")
+                user_pk = self.gatekeeper.identify_user(message, signature)
 
-        locator_map = self.watcher.db_manager.load_locator_map(locator)
-        triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
+                triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
+                uuid = hash_160("{}{}".format(locator, user_pk))
 
-        if locator_map is not None:
-            for uuid in locator_map:
-                if uuid not in triggered_appointments:
-                    appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
+                # If the appointment has been triggered, it should be in the locator (default else just in case).
+                if uuid in triggered_appointments:
+                    response = self.watcher.db_manager.load_responder_tracker(uuid)
+                    if response:
+                        response["status"] = "dispute_responded"
+                    else:
+                        response = {"locator": locator, "status": "not_found"}
 
-                    if appointment_data is not None:
-                        appointment_data["status"] = "being_watched"
-                        response.append(appointment_data)
+                # Otherwise it should be either in the watcher, or not in the system.
+                else:
+                    response = self.watcher.db_manager.load_watcher_appointment(uuid)
+                    if response:
+                        response["status"] = "being_watched"
+                    else:
+                        response = {"locator": locator, "status": "not_found"}
 
-                tracker_data = self.watcher.db_manager.load_responder_tracker(uuid)
+            except (InspectionFailed, IdentificationFailure):
+                response = {"locator": locator, "status": "not_found"}
 
-                if tracker_data is not None:
-                    tracker_data["status"] = "dispute_responded"
-                    response.append(tracker_data)
+            finally:
+                rcode = HTTP_OK
 
         else:
-            response.append({"locator": locator, "status": "not_found"})
+            rcode = HTTP_BAD_REQUEST
+            error = "appointment rejected. Request is not json encoded"
+            response = {"error": error}
 
-        response = jsonify(response)
-
-        return response
+        return jsonify(response), rcode
 
     def get_all_appointments(self):
         """
@@ -275,7 +280,7 @@ class API:
         routes = {
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
-            "/get_appointment": (self.get_appointment, ["GET"]),
+            "/get_appointment": (self.get_appointment, ["POST"]),
             "/get_all_appointments": (self.get_all_appointments, ["GET"]),
         }
 
