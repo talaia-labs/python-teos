@@ -1,4 +1,3 @@
-from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
@@ -6,7 +5,7 @@ import common.cryptographer
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
-from common.cryptographer import Cryptographer
+from common.cryptographer import Cryptographer, hash_160
 
 from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
@@ -77,7 +76,7 @@ class Watcher:
 
         return watcher_thread
 
-    def add_appointment(self, appointment):
+    def add_appointment(self, appointment, user_pk):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
@@ -96,6 +95,7 @@ class Watcher:
         Args:
             appointment (:obj:`Appointment <teos.appointment.Appointment>`): the appointment to be added to the
                 :obj:`Watcher`.
+            user_pk(:obj:`str`): the public key that identifies the user who sent the appointment (33-bytes hex str).
 
         Returns:
             :obj:`tuple`: A tuple signaling if the appointment has been added or not (based on ``max_appointments``).
@@ -108,7 +108,10 @@ class Watcher:
 
         if len(self.appointments) < self.max_appointments:
 
-            uuid = uuid4().hex
+            # The uuids are generated as the RIPMED160(locator||user_pubkey), that way the tower does not need to know
+            # anything about the user from this point on (no need to store user_pk in the database).
+            # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
+            uuid = hash_160("{}{}".format(appointment.locator, user_pk))
             self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
 
             if appointment.locator in self.locator_uuid_map:
