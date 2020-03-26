@@ -120,7 +120,9 @@ def test_add_appointment(watcher):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
-        added_appointment, sig = watcher.add_appointment(appointment)
+        user_pk = get_random_value_hex(33)
+
+        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
         assert Cryptographer.verify_rpk(
@@ -128,12 +130,24 @@ def test_add_appointment(watcher):
         )
 
         # Check that we can also add an already added appointment (same locator)
-        added_appointment, sig = watcher.add_appointment(appointment)
+        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
         assert Cryptographer.verify_rpk(
             watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
         )
+
+        # If two appointments with the same locator from the same user are added, they are overwritten, but if they come
+        # from different users, they are kept.
+        assert len(watcher.locator_uuid_map[appointment.locator]) == 1
+
+        different_user_pk = get_random_value_hex(33)
+        added_appointment, sig = watcher.add_appointment(appointment, different_user_pk)
+        assert added_appointment is True
+        assert Cryptographer.verify_rpk(
+            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        )
+        assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
 
 def test_add_too_many_appointments(watcher):
@@ -144,7 +158,9 @@ def test_add_too_many_appointments(watcher):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
-        added_appointment, sig = watcher.add_appointment(appointment)
+        user_pk = get_random_value_hex(33)
+
+        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
         assert Cryptographer.verify_rpk(
@@ -154,7 +170,8 @@ def test_add_too_many_appointments(watcher):
     appointment, dispute_tx = generate_dummy_appointment(
         start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
     )
-    added_appointment, sig = watcher.add_appointment(appointment)
+    user_pk = get_random_value_hex(33)
+    added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
     assert added_appointment is False
     assert sig is None
