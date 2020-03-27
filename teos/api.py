@@ -10,7 +10,13 @@ from teos.gatekeeper import NotEnoughSlots, IdentificationFailure
 
 from common.logger import Logger
 from common.cryptographer import hash_160
-from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, ENCRYPTED_BLOB_MAX_SIZE_HEX
+from common.constants import (
+    HTTP_OK,
+    HTTP_BAD_REQUEST,
+    HTTP_SERVICE_UNAVAILABLE,
+    HTTP_NOT_FOUND,
+    ENCRYPTED_BLOB_MAX_SIZE_HEX,
+)
 
 
 # ToDo: #5-add-async-to-api
@@ -162,11 +168,11 @@ class API:
                 error = "appointment rejected. Error {}: {}".format(e.erno, e.reason)
                 response = {"error": error}
 
-            except (IdentificationFailure, NotEnoughSlots) as e:
+            except (IdentificationFailure, NotEnoughSlots):
                 rcode = HTTP_BAD_REQUEST
                 error = "appointment rejected. Error {}: {}".format(
                     errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-                    "Invalid signature or the user does not have enough slots available",
+                    "Invalid signature or user does not have enough slots available",
                 )
                 response = {"error": error}
 
@@ -219,23 +225,25 @@ class API:
                 if uuid in triggered_appointments:
                     response = self.watcher.db_manager.load_responder_tracker(uuid)
                     if response:
+                        rcode = HTTP_OK
                         response["status"] = "dispute_responded"
                     else:
+                        rcode = HTTP_NOT_FOUND
                         response = {"locator": locator, "status": "not_found"}
 
                 # Otherwise it should be either in the watcher, or not in the system.
                 else:
                     response = self.watcher.db_manager.load_watcher_appointment(uuid)
                     if response:
+                        rcode = HTTP_OK
                         response["status"] = "being_watched"
                     else:
+                        rcode = HTTP_NOT_FOUND
                         response = {"locator": locator, "status": "not_found"}
 
             except (InspectionFailed, IdentificationFailure):
+                rcode = HTTP_NOT_FOUND
                 response = {"locator": locator, "status": "not_found"}
-
-            finally:
-                rcode = HTTP_OK
 
         else:
             rcode = HTTP_BAD_REQUEST
