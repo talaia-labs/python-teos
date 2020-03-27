@@ -42,6 +42,31 @@ def get_remote_addr():
     return remote_addr
 
 
+# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+def get_request_data_json(request):
+    """
+    Gets the content of a json POST request and makes sure ir decodes to a Python dictionary.
+
+    Args:
+        request (:obj:`Request`): the request sent by the user.
+
+    Returns:
+        :obj:`dict`: the dictionary parsed from the json request.
+
+    Raises:
+        :obj:`TypeError`: if the request is not json encoded or it does not decodes to a Python dictionary.
+    """
+
+    if request.is_json:
+        request_data = request.get_json()
+        if isinstance(request_data, dict):
+            return request_data
+        else:
+            raise TypeError("Invalid request content")
+    else:
+        raise TypeError("Request is not json encoded")
+
+
 class API:
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and server user requests.
@@ -77,34 +102,32 @@ class API:
         """
 
         remote_addr = get_remote_addr()
-
         logger.info("Received register request", from_addr="{}".format(remote_addr))
 
-        if request.is_json:
-            request_data = request.get_json()
-            client_pk = request_data.get("public_key")
+        # Check that data type and content are correct. Abort otherwise.
+        try:
+            request_data = get_request_data_json(request)
 
-            if client_pk:
-                try:
-                    rcode = HTTP_OK
-                    available_slots = self.gatekeeper.add_update_user(client_pk)
-                    response = {"public_key": client_pk, "available_slots": available_slots}
+        except TypeError as e:
+            logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
+            return abort(HTTP_BAD_REQUEST, e)
 
-                except ValueError as e:
-                    rcode = HTTP_BAD_REQUEST
-                    error = "Error {}: {}".format(errors.REGISTRATION_MISSING_FIELD, str(e))
-                    response = {"error": error}
+        client_pk = request_data.get("public_key")
 
-            else:
+        if client_pk:
+            try:
+                rcode = HTTP_OK
+                available_slots = self.gatekeeper.add_update_user(client_pk)
+                response = {"public_key": client_pk, "available_slots": available_slots}
+
+            except ValueError as e:
                 rcode = HTTP_BAD_REQUEST
-                error = "Error {}: public_key not found in register message".format(
-                    errors.REGISTRATION_WRONG_FIELD_FORMAT
-                )
+                error = "Error {}: {}".format(errors.REGISTRATION_MISSING_FIELD, str(e))
                 response = {"error": error}
 
         else:
             rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Request is not json encoded"
+            error = "Error {}: public_key not found in register message".format(errors.REGISTRATION_WRONG_FIELD_FORMAT)
             response = {"error": error}
 
         logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
@@ -127,58 +150,54 @@ class API:
 
         # Getting the real IP if the server is behind a reverse proxy
         remote_addr = get_remote_addr()
-
         logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
 
-        if request.is_json:
-            request_data = request.get_json()
+        # Check that data type and content are correct. Abort otherwise.
+        try:
+            request_data = get_request_data_json(request)
 
-            # We kind of have the chicken an the egg problem here. Data must be verified and the signature must be
-            # checked:
-            #
-            # - If we verify the data first, we may encounter that the signature is wrong and wasted some time.
-            # - If we check the signature first, we may need to verify some of the information or expose to build
-            #   appointments with potentially wrong data, which may be exploitable.
-            #
-            # The first approach seems safer since it only implies a bunch of pretty quick checks.
+        except TypeError as e:
+            return abort(HTTP_BAD_REQUEST, e)
 
-            try:
-                appointment = self.inspector.inspect(request_data.get("appointment"))
-                user_pk = self.gatekeeper.identify_user(appointment.serialize(), request_data.get("signature"))
+        # We kind of have the chicken an the egg problem here. Data must be verified and the signature must be checked:
+        # - If we verify the data first, we may encounter that the signature is wrong and wasted some time.
+        # - If we check the signature first, we may need to verify some of the information or expose to build
+        #   appointments with potentially wrong data, which may be exploitable.
+        #
+        # The first approach seems safer since it only implies a bunch of pretty quick checks.
 
-                # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-                # Temporarily taking out slots to avoid abusing this via race conditions.
-                # DISCUSS: It may be worth using signals here to avoid race conditions anyway.
-                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-                self.gatekeeper.fill_slots(user_pk, required_slots)
-                appointment_added, signature = self.watcher.add_appointment(appointment, user_pk)
+        try:
+            appointment = self.inspector.inspect(request_data.get("appointment"))
+            user_pk = self.gatekeeper.identify_user(appointment.serialize(), request_data.get("signature"))
 
-                if appointment_added:
-                    rcode = HTTP_OK
-                    response = {"locator": appointment.locator, "signature": signature}
+            # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+            # Temporarily taking out slots to avoid abusing this via race conditions.
+            # DISCUSS: It may be worth using signals here to avoid race conditions anyway.
+            required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+            self.gatekeeper.fill_slots(user_pk, required_slots)
+            appointment_added, signature = self.watcher.add_appointment(appointment, user_pk)
 
-                else:
-                    # Adding back the slots since they were not used
-                    self.gatekeeper.free_slots(user_pk, required_slots)
-                    rcode = HTTP_SERVICE_UNAVAILABLE
-                    response = {"error": "appointment rejected"}
+            if appointment_added:
+                rcode = HTTP_OK
+                response = {"locator": appointment.locator, "signature": signature}
 
-            except InspectionFailed as e:
-                rcode = HTTP_BAD_REQUEST
-                error = "appointment rejected. Error {}: {}".format(e.erno, e.reason)
-                response = {"error": error}
+            else:
+                # Adding back the slots since they were not used
+                self.gatekeeper.free_slots(user_pk, required_slots)
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": "appointment rejected"}
 
-            except (IdentificationFailure, NotEnoughSlots):
-                rcode = HTTP_BAD_REQUEST
-                error = "appointment rejected. Error {}: {}".format(
-                    errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-                    "Invalid signature or user does not have enough slots available",
-                )
-                response = {"error": error}
-
-        else:
+        except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Request is not json encoded"
+            error = "appointment rejected. Error {}: {}".format(e.erno, e.reason)
+            response = {"error": error}
+
+        except (IdentificationFailure, NotEnoughSlots):
+            rcode = HTTP_BAD_REQUEST
+            error = "appointment rejected. Error {}: {}".format(
+                errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                "Invalid signature or user does not have enough slots available",
+            )
             response = {"error": error}
 
         logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
@@ -204,49 +223,50 @@ class API:
         # Getting the real IP if the server is behind a reverse proxy
         remote_addr = get_remote_addr()
 
-        if request.is_json:
-            request_data = request.get_json()
-            locator = request_data.get("locator")
+        # Check that data type and content are correct. Abort otherwise.
+        try:
+            request_data = get_request_data_json(request)
 
-            try:
-                self.inspector.check_locator(locator)
-                logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
+        except TypeError as e:
+            logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
+            return abort(HTTP_BAD_REQUEST, e)
 
-                message = "get appointment {}".format(locator).encode()
-                signature = request_data.get("signature")
-                user_pk = self.gatekeeper.identify_user(message, signature)
+        locator = request_data.get("locator")
 
-                triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
-                uuid = hash_160("{}{}".format(locator, user_pk))
+        try:
+            self.inspector.check_locator(locator)
+            logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
-                # If the appointment has been triggered, it should be in the locator (default else just in case).
-                if uuid in triggered_appointments:
-                    response = self.watcher.db_manager.load_responder_tracker(uuid)
-                    if response:
-                        rcode = HTTP_OK
-                        response["status"] = "dispute_responded"
-                    else:
-                        rcode = HTTP_NOT_FOUND
-                        response = {"locator": locator, "status": "not_found"}
+            message = "get appointment {}".format(locator).encode()
+            signature = request_data.get("signature")
+            user_pk = self.gatekeeper.identify_user(message, signature)
 
-                # Otherwise it should be either in the watcher, or not in the system.
+            triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
+            uuid = hash_160("{}{}".format(locator, user_pk))
+
+            # If the appointment has been triggered, it should be in the locator (default else just in case).
+            if uuid in triggered_appointments:
+                response = self.watcher.db_manager.load_responder_tracker(uuid)
+                if response:
+                    rcode = HTTP_OK
+                    response["status"] = "dispute_responded"
                 else:
-                    response = self.watcher.db_manager.load_watcher_appointment(uuid)
-                    if response:
-                        rcode = HTTP_OK
-                        response["status"] = "being_watched"
-                    else:
-                        rcode = HTTP_NOT_FOUND
-                        response = {"locator": locator, "status": "not_found"}
+                    rcode = HTTP_NOT_FOUND
+                    response = {"locator": locator, "status": "not_found"}
 
-            except (InspectionFailed, IdentificationFailure):
-                rcode = HTTP_NOT_FOUND
-                response = {"locator": locator, "status": "not_found"}
+            # Otherwise it should be either in the watcher, or not in the system.
+            else:
+                response = self.watcher.db_manager.load_watcher_appointment(uuid)
+                if response:
+                    rcode = HTTP_OK
+                    response["status"] = "being_watched"
+                else:
+                    rcode = HTTP_NOT_FOUND
+                    response = {"locator": locator, "status": "not_found"}
 
-        else:
-            rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Request is not json encoded"
-            response = {"error": error}
+        except (InspectionFailed, IdentificationFailure):
+            rcode = HTTP_NOT_FOUND
+            response = {"locator": locator, "status": "not_found"}
 
         return jsonify(response), rcode
 
