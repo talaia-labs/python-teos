@@ -100,7 +100,7 @@ def fork(block_hash):
     requests.post(fork_endpoint, json={"parent": block_hash})
 
 
-def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
+def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_offset=30):
     if real_height:
         current_height = bitcoin_cli(bitcoind_connect_params).getblockcount()
 
@@ -119,9 +119,6 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "to_self_delay": 20,
     }
 
-    # dummy keys for this test
-    client_sk, client_pk = generate_keypair()
-
     locator = compute_locator(dispute_txid)
     blob = Blob(dummy_appointment_data.get("tx"))
 
@@ -135,19 +132,7 @@ def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_t
         "encrypted_blob": encrypted_blob,
     }
 
-    signature = Cryptographer.sign(Appointment.from_dict(appointment_data).serialize(), client_sk)
-
-    data = {"appointment": appointment_data, "signature": signature}
-
-    return data, dispute_tx.hex()
-
-
-def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_offset=30):
-    appointment_data, dispute_tx = generate_dummy_appointment_data(
-        real_height=real_height, start_time_offset=start_time_offset, end_time_offset=end_time_offset
-    )
-
-    return Appointment.from_dict(appointment_data["appointment"]), dispute_tx
+    return Appointment.from_dict(appointment_data), dispute_tx.hex()
 
 
 def generate_dummy_tracker():
