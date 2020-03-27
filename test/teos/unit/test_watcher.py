@@ -40,6 +40,9 @@ config = get_config()
 
 signing_key, public_key = generate_keypair()
 
+# Reduce the maximum number of appointments to something we can test faster
+MAX_APPOINTMENTS = 100
+
 
 @pytest.fixture(scope="session")
 def temp_db_manager():
@@ -59,12 +62,7 @@ def watcher(db_manager):
 
     responder = Responder(db_manager, carrier, block_processor)
     watcher = Watcher(
-        db_manager,
-        block_processor,
-        responder,
-        signing_key.to_der(),
-        config.get("MAX_APPOINTMENTS"),
-        config.get("EXPIRY_DELTA"),
+        db_manager, block_processor, responder, signing_key.to_der(), MAX_APPOINTMENTS, config.get("EXPIRY_DELTA")
     )
 
     chain_monitor = ChainMonitor(
@@ -154,7 +152,7 @@ def test_add_too_many_appointments(watcher):
     # Any appointment on top of those should fail
     watcher.appointments = dict()
 
-    for _ in range(config.get("MAX_APPOINTMENTS")):
+    for _ in range(MAX_APPOINTMENTS):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
