@@ -3,7 +3,6 @@ import re
 from common.cryptographer import Cryptographer
 
 
-# TODO: UNITTEST
 class NotEnoughSlots(ValueError):
     """Raise this when trying to subtract more slots than a user has available."""
 
@@ -103,12 +102,16 @@ class Gatekeeper:
         Args:
             user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
             n: the number of slots to fill.
+            n (:obj:`int`): the number of slots to fill.
 
         Raises:
             :obj:`<teos.gatekeeper.NotEnoughSlots>`: if the user subscription does not have enough slots.
         """
 
-        if n <= self.registered_users.get(user_pk):
+        # We are not making sure the value passed is a integer, but the value is computed by the API and rounded before
+        # passing it to the gatekeeper.
+        # DISCUSS: we may want to return a different exception if teh user does not exist
+        if user_pk in self.registered_users and n <= self.registered_users.get(user_pk):
             self.registered_users[user_pk] -= n
         else:
             raise NotEnoughSlots(user_pk, n)
@@ -122,4 +125,8 @@ class Gatekeeper:
             n: the number of slots to free.
         """
 
-        self.registered_users[user_pk] += n
+        # We are not making sure the value passed is a integer, but the value is computed by the API and rounded before
+        # passing it to the gatekeeper.
+        # DISCUSS: if the user does not exist we may want to log or return an exception.
+        if user_pk in self.registered_users:
+            self.registered_users[user_pk] += n
