@@ -255,3 +255,27 @@ def test_verify_pk_wrong():
     rpk = Cryptographer.recover_pk(message, zbase32_sig)
 
     assert not Cryptographer.verify_rpk(sk2.public_key, rpk)
+
+
+def test_get_compressed_pk():
+    sk, pk = generate_keypair()
+    compressed_pk = Cryptographer.get_compressed_pk(pk)
+
+    assert isinstance(compressed_pk, str) and len(compressed_pk) == 66
+    assert compressed_pk[:2] in ["02", "03"]
+
+
+def test_get_compressed_pk_wrong_key():
+    # pk should be properly initialized. Initializing from int will case it to not be recoverable
+    pk = PublicKey(0)
+    compressed_pk = Cryptographer.get_compressed_pk(pk)
+
+    assert compressed_pk is None
+
+
+def test_get_compressed_pk_wrong_type():
+    # Passing a value that is not a PublicKey will make it to fail too
+    pk = get_random_value_hex(33)
+    compressed_pk = Cryptographer.get_compressed_pk(pk)
+
+    assert compressed_pk is None

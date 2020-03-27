@@ -315,7 +315,7 @@ class Cryptographer:
             if "failed to recover ECDSA public key" in str(e):
                 logger.error("Cannot recover public key from signature".format(type(rsig_recid)))
             else:
-                logger.error("Unknown exception", error=e)
+                logger.error("Unknown exception", error=str(e))
 
             return None
 
@@ -334,7 +334,6 @@ class Cryptographer:
 
         return pk.point() == rpk.point()
 
-    # TODO: UNITTEST
     @staticmethod
     def get_compressed_pk(pk):
         """
@@ -351,4 +350,10 @@ class Cryptographer:
             logger.error("The received data is not a PublicKey object")
             return None
 
-        return hexlify(pk.format(compressed=True)).decode("utf-8")
+        try:
+            compressed_pk = pk.format(compressed=True)
+            return hexlify(compressed_pk).decode("utf-8")
+
+        except TypeError as e:
+            logger.error("PublicKey has invalid initializer", error=str(e))
+            return None
