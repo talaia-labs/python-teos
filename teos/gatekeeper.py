@@ -2,8 +2,6 @@ import re
 
 from common.cryptographer import Cryptographer
 
-SUBSCRIPTION_SLOTS = 1
-
 
 # TODO: UNITTEST
 class NotEnoughSlots(ValueError):
@@ -32,7 +30,8 @@ class Gatekeeper:
         registered_users (:obj:`dict`): a map of user_pk:appointment_slots.
     """
 
-    def __init__(self):
+    def __init__(self, default_slots):
+        self.default_slots = default_slots
         self.registered_users = {}
 
     @staticmethod
@@ -57,16 +56,16 @@ class Gatekeeper:
             user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
-            :obj:`int`: the number of avaiable slots in the user subscription.
+            :obj:`int`: the number of available slots in the user subscription.
         """
 
         if not self.check_user_pk(user_pk):
             raise ValueError("provided public key does not match expected format (33-byte hex string)")
 
         if user_pk not in self.registered_users:
-            self.registered_users[user_pk] = SUBSCRIPTION_SLOTS
+            self.registered_users[user_pk] = self.default_slots
         else:
-            self.registered_users[user_pk] += SUBSCRIPTION_SLOTS
+            self.registered_users[user_pk] += self.default_slots
 
         return self.registered_users[user_pk]
 

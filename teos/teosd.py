@@ -151,7 +151,8 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, Gatekeeper()).start()
+            gatekeeper = Gatekeeper(config.get("DEFAULT_SLOTS"))
+            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, gatekeeper).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
