@@ -83,7 +83,6 @@ class API:
         self.watcher = watcher
         self.gatekeeper = gatekeeper
 
-    # TODO: UNITTEST
     def register(self):
         """
         Registers a user by creating a subscription.
