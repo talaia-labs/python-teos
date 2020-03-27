@@ -169,19 +169,41 @@ class API:
             appointment = self.inspector.inspect(request_data.get("appointment"))
             user_pk = self.gatekeeper.identify_user(appointment.serialize(), request_data.get("signature"))
 
-            # An appointment will fill 1 slot per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-            # Temporarily taking out slots to avoid abusing this via race conditions.
+            # Check if the appointment is an update. Updates will return a summary.
+            appointment_uuid = hash_160("{}{}".format(appointment.locator, user_pk))
+            appointment_summary = self.watcher.get_appointment_summary(appointment_uuid)
+
+            # For updates we only reserve the slot difference provided the new one is bigger.
+            if appointment_summary:
+                size_diff = len(appointment.encrypted_blob.data) - appointment_summary.get("size")
+                slot_diff = ceil(size_diff / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                required_slots = slot_diff if slot_diff > 0 else 0
+
+            # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+            else:
+                slot_diff = 0
+                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+
+            # Slots are reserved before adding the appointments to prevent race conditions.
             # DISCUSS: It may be worth using signals here to avoid race conditions anyway.
-            required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
             self.gatekeeper.fill_slots(user_pk, required_slots)
+
             appointment_added, signature = self.watcher.add_appointment(appointment, user_pk)
 
             if appointment_added:
                 rcode = HTTP_OK
-                response = {"locator": appointment.locator, "signature": signature}
+                response = {
+                    "locator": appointment.locator,
+                    "signature": signature,
+                    "available_slots": self.gatekeeper.registered_users[user_pk],
+                }
+
+                # If the appointment is added and the update is smaller than the original, the difference is given back.
+                if slot_diff < 0:
+                    self.gatekeeper.free_slots(slot_diff)
 
             else:
-                # Adding back the slots since they were not used
+                # If the appointment is not added the reserved slots are given back
                 self.gatekeeper.free_slots(user_pk, required_slots)
                 rcode = HTTP_SERVICE_UNAVAILABLE
                 response = {"error": "appointment rejected"}

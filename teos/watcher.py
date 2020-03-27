@@ -76,6 +76,21 @@ class Watcher:
 
         return watcher_thread
 
+    def get_appointment_summary(self, uuid):
+        """
+        Returns the summary of an appointment. The summary consists of the data kept in memory:
+            locator, end_time, and size.
+
+        Args:
+            uuid (:obj:`str`): a 16-byte hex string identifying the appointment.
+
+        Returns:
+            :obj:`dict` or :obj:`None`: a dictionary with the appointment summary, or None if the appointment is not
+            found.
+        """
+
+        return self.appointments.get(uuid)
+
     def add_appointment(self, appointment, user_pk):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
@@ -112,7 +127,11 @@ class Watcher:
             # anything about the user from this point on (no need to store user_pk in the database).
             # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
             uuid = hash_160("{}{}".format(appointment.locator, user_pk))
-            self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
+            self.appointments[uuid] = {
+                "locator": appointment.locator,
+                "end_time": appointment.end_time,
+                "size": len(appointment.encrypted_blob.data),
+            }
 
             if appointment.locator in self.locator_uuid_map:
                 # If the uuid is already in the map it means this is an update.
