@@ -24,7 +24,7 @@ app = Flask(__name__)
 logger = Logger(actor="API", log_name_prefix=LOG_PREFIX)
 
 
-# TODO: UNITTEST
+# NOTCOVERED: not sure how to monkey path this one. May be related to #77
 def get_remote_addr():
     """
     Gets the remote client ip address. The HTTP_X_REAL_IP field is tried first in case the server is behind a reverse
@@ -53,7 +53,6 @@ class API:
         gatekeeper (:obj:`Watcher <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to gatekeep the API.
     """
 
-    # TODO: UNITTEST
     def __init__(self, inspector, watcher, gatekeeper):
         self.inspector = inspector
         self.watcher = watcher
@@ -64,9 +63,11 @@ class API:
         """
         Registers a user by creating a subscription.
 
-        The user is identified by public key.
+        Registration is pretty straightforward for now, since it does not require payments.
+        The amount of slots cannot be requested by the user yet either. This is linked to the previous point.
+        Users register by sending a public key to the proper endpoint. This is exploitable atm, but will be solved when
+        payments are introduced.
 
-        Currently subscriptions are free.
 
         Returns:
             :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted requests,
@@ -110,7 +111,6 @@ class API:
 
         return jsonify(response), rcode
 
-    # FIXME: UNITTEST
     def add_appointment(self):
         """
         Main endpoint of the Watchtower.
@@ -184,8 +184,6 @@ class API:
         logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
 
-    # FIXME: THE NEXT TWO API ENDPOINTS ARE FOR TESTING AND SHOULD BE REMOVED / PROPERLY MANAGED BEFORE PRODUCTION!
-    # ToDo: #17-add-api-keys
     def get_appointment(self):
         """
         Gives information about a given appointment state in the Watchtower.
@@ -279,7 +277,6 @@ class API:
 
         return response
 
-    # TODO: UNITTEST
     def start(self):
         """
         This function starts the Flask server used to run the API. Adds all the routes to the functions listed above.
@@ -295,7 +292,7 @@ class API:
         for url, params in routes.items():
             app.add_url_rule(url, view_func=params[0], methods=params[1])
 
-        # Setting Flask log to ERROR only so it does not mess with out logging. Also disabling flask initial messages
+        # Setting Flask log to ERROR only so it does not mess with our logging. Also disabling flask initial messages
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
