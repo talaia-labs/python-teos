@@ -6,6 +6,7 @@ def show_usage():
         "\n\tregister \tRegisters your user public key with the tower."
         "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
         "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
+        "\n\tget_all_appointments \tGets information about all appointments stored in the tower."
         "\n\thelp \t\t\tShows a list of commands or help for a specific command."
         "\n\nGLOBAL OPTIONS:"
         "\n\t-s, --server \tAPI server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
@@ -50,4 +51,15 @@ def help_get_appointment():
         "\n\tpython teos_cli.py get_appointment appointment_locator"
         "\n\nDESCRIPTION:"
         "\n\n\tGets json formatted data about an appointment from the tower.\n"
+    )
+
+
+def help_get_all_appointments():
+    return (
+        "NAME:"
+        "\tpython teos_cli get_all_appointments - Gets information about all appointments stored in the tower."
+        "\n\nUSAGE:"
+        "\tpython teos_cli get_all_appointments"
+        "\n\nDESCRIPTION:"
+        "\n\n\tGets information about all appointments stored in the tower.\n"
     )

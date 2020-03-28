@@ -104,8 +104,18 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 
 	python teos_cli.py get_appointment <appointment_locator>
 	
+### get_all_appointments
 
-	
+This command is used to get information about all the appointments stored in a Eye of Satoshi tower.
+
+**Responses**
+
+This command returns all appointments stored in the watchtower. More precisely, it returns all the "response_trackers" and "watchtower_appointments" in a dictionary. 
+
+#### Usage
+
+        python teos_cli.py get_all_appointments
+
 ### help
 
 Shows the list of commands or help about how to run a specific command.

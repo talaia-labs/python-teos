@@ -4,7 +4,8 @@ import shutil
 import responses
 from binascii import hexlify
 from coincurve import PrivateKey
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, Timeout
+from http.client import HTTPException
 
 import common.cryptographer
 from common.logger import Logger
@@ -31,6 +32,7 @@ teos_url = "http://{}:{}".format(config.get("TEOS_SERVER"), config.get("TEOS_POR
 add_appointment_endpoint = "{}/add_appointment".format(teos_url)
 register_endpoint = "{}/register".format(teos_url)
 get_appointment_endpoint = "{}/get_appointment".format(teos_url)
+get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
 
 dummy_appointment_data = {
     "tx": get_random_value_hex(192),
@@ -194,7 +196,7 @@ def test_post_request():
 
 @responses.activate
 def test_process_post_response():
-    # Let's first crete a response
+    # Let's first create a response
     response = {
         "locator": dummy_appointment.to_dict()["locator"],
         "signature": get_signature(dummy_appointment.serialize(), dummy_teos_sk),
@@ -257,3 +259,37 @@ def test_save_appointment_receipt(monkeypatch):
     assert any([dummy_appointment.locator in f for f in files])
 
     shutil.rmtree(appointments_folder)
+
+
+@responses.activate
+def test_get_all_appointments():
+    # Response of get_all_appointments endpoint is all appointments from watcher and responder.
+    dummy_appointment_dict["status"] = "being_watched"
+    response = {"watcher_appointments": dummy_appointment_dict, "responder_trackers": {}}
+
+    request_url = get_all_appointments_endpoint
+    responses.add(responses.GET, request_url, json=response, status=200)
+    result = teos_cli.get_all_appointments(teos_url)
+
+    assert len(responses.calls) == 1
+    assert responses.calls[0].request.url == request_url
+    assert json.loads(result).get("locator") == response.get("locator")
+
+
+@responses.activate
+def test_get_all_appointments_err():
+    # Test that get_all_appointments handles a connection error appropriately.
+    request_url = get_all_appointments_endpoint
+    responses.add(responses.GET, request_url, body=ConnectionError())
+
+    assert not teos_cli.get_all_appointments(teos_url)
+
+    # Test that get_all_appointments handles a timeout error appropriately.
+    responses.replace(responses.GET, request_url, body=Timeout())
+
+    assert not teos_cli.get_all_appointments(teos_url)
+
+    # Test that get_all_appointments handles a 404 error appropriately.
+    responses.replace(responses.GET, request_url, status=404)
+
+    assert teos_cli.get_all_appointments(teos_url) is None
