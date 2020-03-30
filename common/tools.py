@@ -1,8 +1,21 @@
 import re
-import os
 import logging
 from pathlib import Path
 from common.constants import LOCATOR_LEN_HEX
+
+
+def check_compressed_pk_format(compressed_pk):
+    """
+    Checks if a given value is a 33-byte hex encoded string.
+
+    Args:
+        compressed_pk(:obj:`str`): the value to be checked.
+
+    Returns:
+        :obj:`bool`: Whether or not the value matches the format.
+    """
+
+    return isinstance(compressed_pk, str) and re.match(r"^0[2-3][0-9A-Fa-f]{64}$", compressed_pk) is not None
 
 
 def check_sha256_hex_format(value):
