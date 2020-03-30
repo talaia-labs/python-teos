@@ -108,7 +108,7 @@ class API:
             request_data = get_request_data_json(request)
 
         except TypeError as e:
-            logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
+            logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
             return abort(HTTP_BAD_REQUEST, e)
 
         client_pk = request_data.get("public_key")
@@ -267,20 +267,20 @@ class API:
 
             # If the appointment has been triggered, it should be in the locator (default else just in case).
             if uuid in triggered_appointments:
-                response = self.watcher.db_manager.load_responder_tracker(uuid)
-                if response:
+                appointment_data = self.watcher.db_manager.load_responder_tracker(uuid)
+                if appointment_data:
                     rcode = HTTP_OK
-                    response["status"] = "dispute_responded"
+                    response = {"locator": locator, "status": "dispute_responded", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND
                     response = {"locator": locator, "status": "not_found"}
 
             # Otherwise it should be either in the watcher, or not in the system.
             else:
-                response = self.watcher.db_manager.load_watcher_appointment(uuid)
-                if response:
+                appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
+                if appointment_data:
                     rcode = HTTP_OK
-                    response["status"] = "being_watched"
+                    response = {"locator": locator, "status": "being_watched", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND
                     response = {"locator": locator, "status": "not_found"}
