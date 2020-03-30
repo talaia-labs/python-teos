@@ -1,6 +1,6 @@
 import os
 import logging
-from math import ceil
+from math import ceil, floor
 from flask import Flask, request, abort, jsonify
 
 import teos.errors as errors
@@ -175,8 +175,10 @@ class API:
 
             # For updates we only reserve the slot difference provided the new one is bigger.
             if appointment_summary:
-                size_diff = len(appointment.encrypted_blob.data) - appointment_summary.get("size")
-                slot_diff = ceil(size_diff / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                used_slots = ceil(appointment_summary.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                slot_diff = required_slots - used_slots
+
                 required_slots = slot_diff if slot_diff > 0 else 0
 
             # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
@@ -191,16 +193,16 @@ class API:
             appointment_added, signature = self.watcher.add_appointment(appointment, user_pk)
 
             if appointment_added:
+                # If the appointment is added and the update is smaller than the original, the difference is given back.
+                if slot_diff < 0:
+                    self.gatekeeper.free_slots(user_pk, abs(slot_diff))
+
                 rcode = HTTP_OK
                 response = {
                     "locator": appointment.locator,
                     "signature": signature,
                     "available_slots": self.gatekeeper.registered_users[user_pk],
                 }
-
-                # If the appointment is added and the update is smaller than the original, the difference is given back.
-                if slot_diff < 0:
-                    self.gatekeeper.free_slots(slot_diff)
 
             else:
                 # If the appointment is not added the reserved slots are given back
