@@ -82,6 +82,18 @@ class API:
         self.inspector = inspector
         self.watcher = watcher
         self.gatekeeper = gatekeeper
+        self.app = app
+
+        # Adds all the routes to the functions listed above.
+        routes = {
+            "/register": (self.register, ["POST"]),
+            "/add_appointment": (self.add_appointment, ["POST"]),
+            "/get_appointment": (self.get_appointment, ["POST"]),
+            "/get_all_appointments": (self.get_all_appointments, ["GET"]),
+        }
+
+        for url, params in routes.items():
+            app.add_url_rule(url, view_func=params[0], methods=params[1])
 
     def register(self):
         """
@@ -322,18 +334,8 @@ class API:
 
     def start(self):
         """
-        This function starts the Flask server used to run the API. Adds all the routes to the functions listed above.
+        This function starts the Flask server used to run the API.
         """
-
-        routes = {
-            "/register": (self.register, ["POST"]),
-            "/add_appointment": (self.add_appointment, ["POST"]),
-            "/get_appointment": (self.get_appointment, ["POST"]),
-            "/get_all_appointments": (self.get_all_appointments, ["GET"]),
-        }
-
-        for url, params in routes.items():
-            app.add_url_rule(url, view_func=params[0], methods=params[1])
 
         # Setting Flask log to ERROR only so it does not mess with our logging. Also disabling flask initial messages
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
