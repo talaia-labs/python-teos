@@ -216,7 +216,7 @@ class Cryptographer:
             return key
 
         except FileNotFoundError:
-            logger.error("Key file not found. Please check your settings")
+            logger.error("Key file not found at {}. Please check your settings".format(file_path))
             return None
 
         except IOError as e:
