@@ -39,8 +39,8 @@ class Watcher:
         expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Attributes:
-        appointments (:obj:`dict`): a dictionary containing a simplification of the appointments (:obj:`Appointment
-            <teos.appointment.Appointment>` instances) accepted by the tower (``locator`` and ``end_time``).
+        appointments (:obj:`dict`): a dictionary containing a summary of the appointments (:obj:`Appointment
+            <teos.appointment.Appointment>` instances) accepted by the tower (``locator``, ``end_time``, and ``size``).
             It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
@@ -71,6 +71,10 @@ class Watcher:
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
     def awake(self):
+        """
+        Starts a new thread to monitor the blockchain for channel breaches.
+        """
+
         watcher_thread = Thread(target=self.do_watch, daemon=True)
         watcher_thread.start()
 
@@ -88,7 +92,6 @@ class Watcher:
             :obj:`dict` or :obj:`None`: a dictionary with the appointment summary, or None if the appointment is not
             found.
         """
-
         return self.appointments.get(uuid)
 
     def add_appointment(self, appointment, user_pk):

@@ -112,6 +112,17 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.signing_key, PrivateKey)
 
 
+def test_get_appointment_summary(watcher):
+    # get_appointment_summary returns an appointment summary if found, else None.
+    random_uuid = get_random_value_hex(16)
+    appointment_summary = {"locator": get_random_value_hex(16), "end_time": 10, "size": 200}
+    watcher.appointments[random_uuid] = appointment_summary
+    assert watcher.get_appointment_summary(random_uuid) == appointment_summary
+
+    # Requesting a non-existing appointment
+    assert watcher.get_appointment_summary(get_random_value_hex(16)) is None
+
+
 def test_add_appointment(watcher):
     # We should be able to add appointments up to the limit
     for _ in range(10):
@@ -186,7 +197,7 @@ def test_do_watch(watcher, temp_db_manager):
     watcher.appointments = {}
 
     for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
+        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time, "size": 200}
         watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
         watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
