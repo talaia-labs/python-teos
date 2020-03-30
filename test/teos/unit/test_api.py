@@ -147,6 +147,7 @@ def test_add_appointment(api, appointment):
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment({"appointment": appointment.to_dict(), "signature": appointment_signature})
     assert r.status_code == HTTP_OK
+    assert r.json().get("available_slots") == 0
 
 
 def test_add_appointment_no_json(api, appointment):
@@ -225,6 +226,7 @@ def test_add_appointment_multiple_times_same_user(api, appointment, n=MULTIPLE_A
     for _ in range(n):
         r = add_appointment({"appointment": appointment.to_dict(), "signature": appointment_signature})
         assert r.status_code == HTTP_OK
+        assert r.json().get("available_slots") == n - 1
 
     # Since all updates came from the same user, only the last one is stored
     assert len(api.watcher.locator_uuid_map[appointment.locator]) == 1
@@ -237,12 +239,13 @@ def test_add_appointment_multiple_times_different_users(api, appointment, n=MULT
 
     # Add one slot per public key
     for pair in user_keys:
-        api.gatekeeper.registered_users[hexlify(pair[1].format(compressed=True)).decode("utf-8")] = 1
+        api.gatekeeper.registered_users[hexlify(pair[1].format(compressed=True)).decode("utf-8")] = 2
 
     # Send the appointments
     for signature in signatures:
         r = add_appointment({"appointment": appointment.to_dict(), "signature": signature})
         assert r.status_code == HTTP_OK
+        assert r.json().get("available_slots") == 1
 
     # Check that all the appointments have been added and that there are no duplicates
     assert len(set(api.watcher.locator_uuid_map[appointment.locator])) == n
@@ -298,13 +301,13 @@ def test_request_appointment_in_watcher(api, appointment):
     r = requests.post(url=get_appointment_endpoint, json=data, timeout=5)
     assert r.status_code == HTTP_OK
 
-    appointment_data = json.loads(r.content)
+    r_json = json.loads(r.content)
     # Check that the appointment is on the watcher
-    status = appointment_data.pop("status")
-    assert status == "being_watched"
+    assert r_json.get("status") == "being_watched"
 
     # Check the the sent appointment matches the received one
-    assert appointment.to_dict() == appointment_data
+    assert r_json.get("locator") == appointment.locator
+    assert appointment.to_dict() == r_json.get("appointment")
 
 
 def test_request_appointment_in_responder(api, appointment):
@@ -332,22 +335,20 @@ def test_request_appointment_in_responder(api, appointment):
     r = requests.post(url=get_appointment_endpoint, json=data, timeout=5)
     assert r.status_code == HTTP_OK
 
-    appointment_data = json.loads(r.content)
+    r_json = json.loads(r.content)
     # Check that the appointment is on the watcher
-    status = appointment_data.pop("status")
-    assert status == "dispute_responded"
+    assert r_json.get("status") == "dispute_responded"
 
     # Check the the sent appointment matches the received one
-    assert appointment.locator == appointment_data.get("locator")
+    assert appointment.locator == r_json.get("locator")
     assert appointment.encrypted_blob.data == Cryptographer.encrypt(
-        Blob(appointment_data.get("penalty_rawtx")), appointment_data.get("dispute_txid")
+        Blob(r_json.get("appointment").get("penalty_rawtx")), r_json.get("appointment").get("dispute_txid")
     )
 
     # Delete appointment so it does not mess up with future tests
     appointments.pop()
-    uuids = api.watcher.responder.tx_tracker_map.pop(appointment_data.get("penalty_txid"))
+    uuids = api.watcher.responder.tx_tracker_map.pop(r_json.get("appointment").get("penalty_txid"))
     api.watcher.responder.db_manager.delete_responder_tracker(uuids[0])
-    # api.watcher.responder.trackers.pop(uuids[0])
 
 
 def test_get_all_appointments_watcher():
