@@ -3,6 +3,7 @@ import logging
 
 from common.constants import LOCATOR_LEN_BYTES
 from common.tools import (
+    check_compressed_pk_format,
     check_sha256_hex_format,
     check_locator_format,
     compute_locator,
@@ -10,6 +11,34 @@ from common.tools import (
     setup_logging,
 )
 from test.common.unit.conftest import get_random_value_hex
+
+
+def test_check_compressed_pk_format():
+    wrong_values = [
+        None,
+        3,
+        15.23,
+        "",
+        {},
+        (),
+        object,
+        str,
+        get_random_value_hex(32),
+        get_random_value_hex(34),
+        "06" + get_random_value_hex(32),
+    ]
+
+    # check_user_pk must only accept values that is not a 33-byte hex string
+    for i in range(100):
+        if i % 2:
+            prefix = "02"
+        else:
+            prefix = "03"
+        assert check_compressed_pk_format(prefix + get_random_value_hex(32))
+
+    # check_user_pk must only accept values that is not a 33-byte hex string
+    for value in wrong_values:
+        assert not check_compressed_pk_format(value)
 
 
 def test_check_sha256_hex_format():

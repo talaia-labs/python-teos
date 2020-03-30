@@ -15,23 +15,9 @@ def test_init():
     assert isinstance(gatekeeper.registered_users, dict) and len(gatekeeper.registered_users) == 0
 
 
-def test_check_user_pk():
-    # check_user_pk must only accept values that is not a 33-byte hex string
-    for _ in range(100):
-        assert gatekeeper.check_user_pk(get_random_value_hex(33))
-
-
-def test_check_wrong_user_pk():
-    wrong_values = [None, 3, 15.23, "", {}, (), object, str, get_random_value_hex(32), get_random_value_hex(34)]
-
-    # check_user_pk must only accept values that is not a 33-byte hex string
-    for value in wrong_values:
-        assert not gatekeeper.check_user_pk(value)
-
-
 def test_add_update_user():
-    # add_update_user adds DEFAULT_SLOTS to a given user as long as the identifier is a 33-byte hex str
-    user_pk = get_random_value_hex(33)
+    # add_update_user adds DEFAULT_SLOTS to a given user as long as the identifier is {02, 03}| 32-byte hex str
+    user_pk = "02" + get_random_value_hex(32)
 
     for _ in range(10):
         current_slots = gatekeeper.registered_users.get(user_pk)
@@ -44,7 +30,7 @@ def test_add_update_user():
     # The same can be checked for multiple users
     for _ in range(10):
         # The user identifier is changed every call
-        user_pk = get_random_value_hex(33)
+        user_pk = "03" + get_random_value_hex(32)
 
         gatekeeper.add_update_user(user_pk)
         assert gatekeeper.registered_users.get(user_pk) == DEFAULT_SLOTS
@@ -53,6 +39,14 @@ def test_add_update_user():
 def test_add_update_user_wrong_pk():
     # Passing a wrong pk defaults to the errors in check_user_pk. We can try with one.
     wrong_pk = get_random_value_hex(32)
+
+    with pytest.raises(ValueError):
+        gatekeeper.add_update_user(wrong_pk)
+
+
+def test_add_update_user_wrong_pk_prefix():
+    # Prefixes must be 02 or 03, anything else should fail
+    wrong_pk = "04" + get_random_value_hex(32)
 
     with pytest.raises(ValueError):
         gatekeeper.add_update_user(wrong_pk)
@@ -115,7 +109,7 @@ def test_identify_user_wrong():
 
 def test_fill_slots():
     # Free slots will decrease the slot count of a user as long as he has enough slots, otherwise raise NotEnoughSlots
-    user_pk = get_random_value_hex(33)
+    user_pk = "02" + get_random_value_hex(32)
     gatekeeper.add_update_user(user_pk)
 
     gatekeeper.fill_slots(user_pk, DEFAULT_SLOTS - 1)
@@ -131,11 +125,11 @@ def test_fill_slots():
 
 def test_free_slots():
     # Free slots simply adds slots to the user as long as it exists.
-    user_pk = get_random_value_hex(33)
+    user_pk = "03" + get_random_value_hex(32)
     gatekeeper.add_update_user(user_pk)
-    gatekeeper.free_slots(user_pk, 33)
+    gatekeeper.free_slots(user_pk, 42)
 
-    assert gatekeeper.registered_users.get(user_pk) == DEFAULT_SLOTS + 33
+    assert gatekeeper.registered_users.get(user_pk) == DEFAULT_SLOTS + 42
 
     # Just making sure it does not crash for non-registered user
     assert gatekeeper.free_slots(get_random_value_hex(33), 10) is None
