@@ -1,5 +1,4 @@
 import os
-from teos.utils.auth_proxy import AuthServiceProxy
 
 HOST = "localhost"
 PORT = 9814

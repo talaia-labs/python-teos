@@ -172,6 +172,7 @@ class DBManager:
     def load_watcher_appointments(self, include_triggered=False):
         """
         Loads all the appointments from the database (all entries with the ``WATCHER_PREFIX`` prefix).
+
         Args:
             include_triggered (:obj:`bool`): Whether to include the appointments flagged as triggered or not. ``False``
                 by default.
@@ -289,7 +290,7 @@ class DBManager:
 
         current_locator_map = self.load_locator_map(locator)
 
-        if set(locator_map).issubset(current_locator_map) and len(locator_map) is not 0:
+        if set(locator_map).issubset(current_locator_map) and len(locator_map) != 0:
             key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
             self.db.put(key, json.dumps(locator_map).encode("utf-8"))
 

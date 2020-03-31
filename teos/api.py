@@ -1,6 +1,6 @@
 import os
 import logging
-from math import ceil, floor
+from math import ceil
 from flask import Flask, request, abort, jsonify
 
 import teos.errors as errors

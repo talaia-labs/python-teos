@@ -1,7 +1,7 @@
 import pytest
 from binascii import unhexlify
 
-from teos.errors import *
+import teos.errors as errors
 from teos import LOG_PREFIX
 from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
@@ -11,7 +11,7 @@ from common.logger import Logger
 from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
-from test.teos.unit.conftest import get_random_value_hex, generate_keypair, bitcoind_connect_params, get_config
+from test.teos.unit.conftest import get_random_value_hex, bitcoind_connect_params, get_config
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
@@ -53,7 +53,7 @@ def test_check_locator():
             inspector.check_locator(locator)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_WRONG_FIELD_SIZE
+            assert e.erno == errors.APPOINTMENT_WRONG_FIELD_SIZE
             raise e
 
     # Wrong size (too small)
@@ -63,7 +63,7 @@ def test_check_locator():
             inspector.check_locator(locator)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_WRONG_FIELD_SIZE
+            assert e.erno == errors.APPOINTMENT_WRONG_FIELD_SIZE
             raise e
 
     # Empty
@@ -73,7 +73,7 @@ def test_check_locator():
             inspector.check_locator(locator)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_EMPTY_FIELD
+            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong type (several types tested, it should do for anything that is not a string)
@@ -85,7 +85,7 @@ def test_check_locator():
                 inspector.check_locator(locator)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
     # Wrong format (no hex)
@@ -96,7 +96,7 @@ def test_check_locator():
                 inspector.check_locator(locator)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_FORMAT
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_FORMAT
                 raise e
 
 
@@ -116,7 +116,7 @@ def test_check_start_time():
                 inspector.check_start_time(start_time, current_time)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_FIELD_TOO_SMALL
+                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
                 raise e
 
     # Empty field
@@ -126,7 +126,7 @@ def test_check_start_time():
             inspector.check_start_time(start_time, current_time)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_EMPTY_FIELD
+            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong data type
@@ -137,7 +137,7 @@ def test_check_start_time():
                 inspector.check_start_time(start_time, current_time)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
 
@@ -158,7 +158,7 @@ def test_check_end_time():
                 inspector.check_end_time(end_time, start_time, current_time)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_FIELD_TOO_SMALL
+                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
                 raise e
 
     # End time too small (either same height as current block or in the past)
@@ -170,7 +170,7 @@ def test_check_end_time():
                 inspector.check_end_time(end_time, start_time, current_time)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_FIELD_TOO_SMALL
+                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
                 raise e
 
     # Empty field
@@ -180,7 +180,7 @@ def test_check_end_time():
             inspector.check_end_time(end_time, start_time, current_time)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_EMPTY_FIELD
+            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong data type
@@ -191,7 +191,7 @@ def test_check_end_time():
                 inspector.check_end_time(end_time, start_time, current_time)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
 
@@ -209,7 +209,7 @@ def test_check_to_self_delay():
                 inspector.check_to_self_delay(to_self_delay)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_FIELD_TOO_SMALL
+                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
                 raise e
 
     # Empty field
@@ -219,7 +219,7 @@ def test_check_to_self_delay():
             inspector.check_to_self_delay(to_self_delay)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_EMPTY_FIELD
+            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong data type
@@ -230,7 +230,7 @@ def test_check_to_self_delay():
                 inspector.check_to_self_delay(to_self_delay)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
 
@@ -251,7 +251,7 @@ def test_check_blob():
                 inspector.check_blob(encrypted_blob)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
     # Empty field
@@ -261,7 +261,7 @@ def test_check_blob():
             inspector.check_blob(encrypted_blob)
 
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_EMPTY_FIELD
+            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong format (no hex)
@@ -272,7 +272,7 @@ def test_check_blob():
                 inspector.check_blob(encrypted_blob)
 
             except InspectionFailed as e:
-                assert e.erno == APPOINTMENT_WRONG_FIELD_FORMAT
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_FORMAT
                 raise e
 
 
@@ -313,7 +313,7 @@ def test_inspect_wrong(run_bitcoind):
                 inspector.inspect(data)
             except InspectionFailed as e:
                 print(data)
-                assert e.erno == APPOINTMENT_WRONG_FIELD
+                assert e.erno == errors.APPOINTMENT_WRONG_FIELD
                 raise e
 
     # None data
@@ -321,5 +321,5 @@ def test_inspect_wrong(run_bitcoind):
         try:
             inspector.inspect(None)
         except InspectionFailed as e:
-            assert e.erno == APPOINTMENT_EMPTY_FIELD
+            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
             raise e

@@ -9,16 +9,9 @@ from teos.watcher import Watcher
 from teos.inspector import Inspector
 from teos.db_manager import DBManager
 from teos.gatekeeper import Gatekeeper
-from teos.chain_monitor import ChainMonitor
 from teos.responder import Responder, TransactionTracker
 
-from test.teos.unit.conftest import (
-    get_random_value_hex,
-    generate_dummy_appointment,
-    generate_keypair,
-    get_config,
-    bitcoind_feed_params,
-)
+from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_keypair, get_config
 
 from common.cryptographer import Cryptographer, hash_160
 from common.constants import (

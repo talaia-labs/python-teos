@@ -102,12 +102,12 @@ def test_setup_logging():
     f_log_suffix = "_file_log"
     c_log_suffix = "_console_log"
 
-    assert len(logging.getLogger(prefix + f_log_suffix).handlers) is 0
-    assert len(logging.getLogger(prefix + c_log_suffix).handlers) is 0
+    assert len(logging.getLogger(prefix + f_log_suffix).handlers) == 0
+    assert len(logging.getLogger(prefix + c_log_suffix).handlers) == 0
 
     setup_logging(log_file, prefix)
 
-    assert len(logging.getLogger(prefix + f_log_suffix).handlers) is 1
-    assert len(logging.getLogger(prefix + c_log_suffix).handlers) is 1
+    assert len(logging.getLogger(prefix + f_log_suffix).handlers) == 1
+    assert len(logging.getLogger(prefix + c_log_suffix).handlers) == 1
 
     os.remove(log_file)

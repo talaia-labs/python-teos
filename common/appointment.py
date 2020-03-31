@@ -10,12 +10,12 @@ class Appointment:
     The :class:`Appointment` contains the information regarding an appointment between a client and the Watchtower.
 
     Args:
-        locator (:mod:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
-            for the tower to decrypt and broadcast the penalty transaction.
+        locator (:mod:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
+            trigger for the tower to decrypt and broadcast the penalty transaction.
         start_time (:mod:`int`): The block height where the tower is hired to start watching for breaches.
         end_time (:mod:`int`): The block height where the tower will stop watching for breaches.
-        to_self_delay (:mod:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
-            covering.
+        to_self_delay (:mod:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment
+            is covering.
         encrypted_blob (:obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): An ``EncryptedBlob`` object
             containing an encrypted penalty transaction. The tower will decrypt it and broadcast the penalty transaction
             upon seeing a breach on the blockchain.

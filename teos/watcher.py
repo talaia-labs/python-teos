@@ -21,8 +21,8 @@ class Watcher:
 
     The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
     checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
-    :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the data
-    is passed to the :obj:`Responder <teos.responder.Responder>`.
+    :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the
+    data is passed to the :obj:`Responder <teos.responder.Responder>`.
 
     If an appointment reaches its end with no breach, the data is simply deleted.
 
@@ -225,7 +225,7 @@ class Watcher:
                     appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                if len(self.appointments) is 0:
+                if len(self.appointments) != 0:
                     logger.info("No more pending appointments")
 
             # Register the last processed block for the watcher

@@ -303,7 +303,7 @@ class Responder:
                 # Clear the receipts issued in this block
                 self.carrier.issued_receipts = {}
 
-                if len(self.trackers) is 0:
+                if len(self.trackers) != 0:
                     logger.info("No more pending trackers")
 
             # Register the last processed block for the responder

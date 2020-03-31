@@ -3,7 +3,6 @@ import sys
 import time
 import json
 import requests
-import binascii
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey

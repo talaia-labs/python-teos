@@ -159,8 +159,8 @@ class Cryptographer:
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-              encrypted_blob(:mod:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob`` potentially
-                containing a penalty transaction.
+              encrypted_blob(:mod:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob``
+                potentially containing a penalty transaction.
               secret (:mod:`str`): a value to used to derive the decryption key. Should be the dispute txid.
 
         Returns:

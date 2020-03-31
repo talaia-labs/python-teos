@@ -123,8 +123,9 @@ class Cleaner:
         """
         Deletes a completed appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
 
-        Currently, an appointment is only completed if it cannot make it to the (:obj:`Responder <teos.responder.Responder>`),
-        otherwise, it will be flagged as triggered and removed once the tracker is completed.
+        Currently, an appointment is only completed if it cannot make it to the
+        (:obj:`Responder <teos.responder.Responder>`), otherwise, it will be flagged as triggered and removed once the
+        tracker is completed.
 
         Args:
             completed_appointments (:obj:`list`): a list of appointments to be deleted.
