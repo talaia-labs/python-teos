@@ -26,7 +26,11 @@ class Builder:
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointments[uuid] = {"locator": data.get("locator"), "end_time": data.get("end_time")}
+            appointments[uuid] = {
+                "locator": data.get("locator"),
+                "end_time": data.get("end_time"),
+                "size": len(data.get("encrypted_blob")),
+            }
 
             if data.get("locator") in locator_uuid_map:
                 locator_uuid_map[data.get("locator")].append(uuid)
