@@ -30,7 +30,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 def register(compressed_pk, teos_url):
     if not check_compressed_pk_format(compressed_pk):
         logger.error("The cli public key is not valid")
-        return False
+        return None
 
     # Send request to the server.
     register_endpoint = "{}/register".format(teos_url)
@@ -383,7 +383,7 @@ def main(args, command_line_conf):
 
     keys = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY"))
     if keys is not None:
-        teos_pk, cli_sk, compress_cli_pk = keys
+        teos_pk, cli_sk, compressed_cli_pk = keys
 
         try:
             if args:
