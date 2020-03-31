@@ -17,8 +17,6 @@ END_TIME_DELTA = 10
 @pytest.fixture(scope="session")
 def bitcoin_cli():
     config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
-    print(config)
-    # btc_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
 
     return AuthServiceProxy(
         "http://%s:%s@%s:%d"
