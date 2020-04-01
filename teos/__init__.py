@@ -23,4 +23,5 @@ DEFAULT_CONF = {
     "LOG_FILE": {"value": "teos.log", "type": str, "path": True},
     "TEOS_SECRET_KEY": {"value": "teos_sk.der", "type": str, "path": True},
     "APPOINTMENTS_DB_PATH": {"value": "appointments", "type": str, "path": True},
+    "USERS_DB_PATH": {"value": "users", "type": str, "path": True},
 }

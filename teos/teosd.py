@@ -14,12 +14,13 @@ from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
 from teos.carrier import Carrier
+from teos.users_dbm import UsersDBM
 from teos.inspector import Inspector
 from teos.responder import Responder
-from teos.appointments_dbm import AppointmentsDBM
 from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
+from teos.appointments_dbm import AppointmentsDBM
 from teos.tools import can_connect_to_bitcoind, in_correct_network
 from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
@@ -151,7 +152,7 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            gatekeeper = Gatekeeper(config.get("DEFAULT_SLOTS"))
+            gatekeeper = Gatekeeper(UsersDBM(config.get("USERS_DB_PATH")), config.get("DEFAULT_SLOTS"))
             API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, gatekeeper).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))

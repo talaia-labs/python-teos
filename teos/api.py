@@ -213,7 +213,7 @@ class API:
                 response = {
                     "locator": appointment.locator,
                     "signature": signature,
-                    "available_slots": self.gatekeeper.registered_users[user_pk],
+                    "available_slots": self.gatekeeper.registered_users[user_pk].get("available_slots"),
                 }
 
             else:
