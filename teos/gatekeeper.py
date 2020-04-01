@@ -28,9 +28,10 @@ class Gatekeeper:
         registered_users (:obj:`dict`): a map of user_pk:appointment_slots.
     """
 
-    def __init__(self, default_slots):
+    def __init__(self, user_db, default_slots):
         self.default_slots = default_slots
-        self.registered_users = {}
+        self.user_db = user_db
+        self.registered_users = user_db.load_all_users()
 
     def add_update_user(self, user_pk):
         """
@@ -47,11 +48,13 @@ class Gatekeeper:
             raise ValueError("provided public key does not match expected format (33-byte hex string)")
 
         if user_pk not in self.registered_users:
-            self.registered_users[user_pk] = self.default_slots
+            self.registered_users[user_pk] = {"available_slots": self.default_slots}
         else:
-            self.registered_users[user_pk] += self.default_slots
+            self.registered_users[user_pk]["available_slots"] += self.default_slots
 
-        return self.registered_users[user_pk]
+        self.user_db.store_user(user_pk, self.registered_users[user_pk])
+
+        return self.registered_users[user_pk]["available_slots"]
 
     def identify_user(self, message, signature):
         """
@@ -95,9 +98,9 @@ class Gatekeeper:
 
         # We are not making sure the value passed is a integer, but the value is computed by the API and rounded before
         # passing it to the gatekeeper.
-        # DISCUSS: we may want to return a different exception if teh user does not exist
-        if user_pk in self.registered_users and n <= self.registered_users.get(user_pk):
-            self.registered_users[user_pk] -= n
+        # DISCUSS: we may want to return a different exception if the user does not exist
+        if user_pk in self.registered_users and n <= self.registered_users.get(user_pk).get("available_slots"):
+            self.registered_users[user_pk]["available_slots"] -= n
         else:
             raise NotEnoughSlots(user_pk, n)
 
@@ -114,4 +117,4 @@ class Gatekeeper:
         # passing it to the gatekeeper.
         # DISCUSS: if the user does not exist we may want to log or return an exception.
         if user_pk in self.registered_users:
-            self.registered_users[user_pk] += n
+            self.registered_users[user_pk]["available_slots"] += n
