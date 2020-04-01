@@ -43,6 +43,7 @@ def hash_160(message):
     return h160
 
 
+# NOTCOVERED
 def sigrec_encode(rsig_rid):
     """
     Encodes a pk-recoverable signature to be used in LN. ```rsig_rid`` can be obtained trough
@@ -63,6 +64,7 @@ def sigrec_encode(rsig_rid):
     return sigrec
 
 
+# NOTCOVERED
 def sigrec_decode(sigrec):
     """
     Decodes a pk-recoverable signature in the format used by LN to be input to ``PublicKey.from_signature_and_message``.
@@ -72,12 +74,18 @@ def sigrec_decode(sigrec):
 
     Returns:
         :obj:`bytes`: the decoded signature.
+
+    Raises:
+        :obj:`ValueError`: if the SigRec is not properly encoded (first byte is not 31 + recovery id)
     """
 
-    rid, rsig = int_to_bytes(sigrec[0] - 31), sigrec[1:]
-    rsig_rid = rsig + rid
+    int_rid, rsig = sigrec[0] - 31, sigrec[1:]
+    if int_rid < 0:
+        raise ValueError("Wrong SigRec")
+    else:
+        rid = int_to_bytes(int_rid)
 
-    return rsig_rid
+    return rsig + rid
 
 
 # FIXME: Common has not log file, so it needs to log in the same log as the caller. This is a temporary fix.
@@ -299,9 +307,9 @@ class Cryptographer:
             return None
 
         sigrec = pyzbase32.decode_bytes(zb32_sig)
-        rsig_recid = sigrec_decode(sigrec)
 
         try:
+            rsig_recid = sigrec_decode(sigrec)
             pk = PublicKey.from_signature_and_message(rsig_recid, LN_MESSAGE_PREFIX + message, hasher=sha256d)
             return pk
 
@@ -313,7 +321,7 @@ class Cryptographer:
 
         except Exception as e:
             if "failed to recover ECDSA public key" in str(e):
-                logger.error("Cannot recover public key from signature".format(type(rsig_recid)))
+                logger.error("Cannot recover public key from signature")
             else:
                 logger.error("Unknown exception", error=str(e))
 
