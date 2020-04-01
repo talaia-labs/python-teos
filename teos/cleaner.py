@@ -43,8 +43,8 @@ class Cleaner:
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be deleted.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         db_manager.delete_watcher_appointment(uuid)
@@ -61,8 +61,8 @@ class Cleaner:
         Args:
             uuids (:obj:`list`): a list of identifiers to be removed from the map.
             locator (:obj:`str`): the identifier of the map to be either updated or deleted.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         locator_map = db_manager.load_locator_map(locator)
@@ -95,8 +95,8 @@ class Cleaner:
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
                 appointments.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         locator_maps_to_update = {}
@@ -133,8 +133,8 @@ class Cleaner:
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
                 appointments.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
         locator_maps_to_update = {}
 
@@ -170,8 +170,8 @@ class Cleaner:
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
                 appointments.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         for uuid in triggered_appointments:
@@ -191,8 +191,8 @@ class Cleaner:
                 <teos.responder.Responder>` trackers.
             completed_trackers (:obj:`dict`): a dict of completed trackers to be deleted (uuid:confirmations).
             height (:obj:`int`): the block height at which the trackers were completed.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         locator_maps_to_update = {}

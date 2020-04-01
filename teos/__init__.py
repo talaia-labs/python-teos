@@ -22,5 +22,5 @@ DEFAULT_CONF = {
     "MIN_TO_SELF_DELAY": {"value": 20, "type": int},
     "LOG_FILE": {"value": "teos.log", "type": str, "path": True},
     "TEOS_SECRET_KEY": {"value": "teos_sk.der", "type": str, "path": True},
-    "DB_PATH": {"value": "appointments", "type": str, "path": True},
+    "APPOINTMENTS_DB_PATH": {"value": "appointments", "type": str, "path": True},
 }

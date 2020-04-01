@@ -30,7 +30,8 @@ class Watcher:
     :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
 
     Args:
-        db_manager (:obj:`DBManager <teos.db_manager>`): a ``DBManager`` instance to interact with the database.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+            to interact with the database.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
@@ -46,7 +47,8 @@ class Watcher:
             appointments with the same ``locator``.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
         populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
-        db_manager (:obj:`DBManager <teos.db_manager>`): A db manager instance to interact with the database.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+            to interact with the database.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
@@ -144,7 +146,7 @@ class Watcher:
             else:
                 self.locator_uuid_map[appointment.locator] = [uuid]
 
-            self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
             self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
             appointment_added = True

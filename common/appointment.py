@@ -81,19 +81,6 @@ class Appointment:
 
         return appointment
 
-    def to_json(self):
-        """
-        Exports an appointment as a deterministic json encoded string.
-
-        This method ensures that multiple invocations with the same data yield the same value. This is the format used
-        to store appointments in the database.
-
-        Returns:
-            :obj:`str`: A json-encoded str representing the appointment.
-        """
-
-        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
-
     def serialize(self):
         """
         Serializes an appointment to be signed.

@@ -89,16 +89,6 @@ class TransactionTracker:
 
         return tx_tracker
 
-    def to_json(self):
-        """
-        Exports a :obj:`TransactionTracker` as a json-encoded dictionary.
-
-        Returns:
-            :obj:`str`: A json-encoded dictionary containing the :obj:`TransactionTracker` data.
-        """
-
-        return json.dumps(self.to_dict())
-
 
 class Responder:
     """
@@ -107,8 +97,8 @@ class Responder:
     the blockchain.
 
     Args:
-        db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-            database.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+            to interact with the database.
 
     Attributes:
         trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
@@ -121,11 +111,11 @@ class Responder:
             has missed. Used to trigger rebroadcast if needed.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Responder` to receive block hashes from ``bitcoind``. It
         is populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
-        db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): A ``DBManager`` instance to interact with the
-            database.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+            to interact with the database.
         carrier (:obj:`Carrier <teos.carrier.Carrier>`): a ``Carrier`` instance to send transactions to bitcoind.
-        block_processor (:obj:`DBManager <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to get
-            data from bitcoind.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+            get data from bitcoind.
         last_known_block (:obj:`str`): the last block known by the ``Responder``.
 
     """
@@ -251,7 +241,7 @@ class Responder:
         if penalty_txid not in self.unconfirmed_txs and confirmations == 0:
             self.unconfirmed_txs.append(penalty_txid)
 
-        self.db_manager.store_responder_tracker(uuid, tracker.to_json())
+        self.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
         logger.info(
             "New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, appointment_end=appointment_end

@@ -16,7 +16,7 @@ from teos.builder import Builder
 from teos.carrier import Carrier
 from teos.inspector import Inspector
 from teos.responder import Responder
-from teos.db_manager import DBManager
+from teos.appointments_dbm import AppointmentsDBM
 from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
@@ -50,7 +50,7 @@ def main(command_line_conf):
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     logger.info("Starting TEOS")
-    db_manager = DBManager(config.get("DB_PATH"))
+    db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
 
     bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
     bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
