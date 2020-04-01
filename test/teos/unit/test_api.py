@@ -7,8 +7,8 @@ from teos import HOST, PORT
 import teos.errors as errors
 from teos.watcher import Watcher
 from teos.inspector import Inspector
-from teos.db_manager import DBManager
 from teos.gatekeeper import Gatekeeper
+from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
 from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_keypair, get_config
@@ -48,7 +48,7 @@ compressed_client_pk = hexlify(client_pk.format(compressed=True)).decode("utf-8"
 
 @pytest.fixture()
 def get_all_db_manager():
-    manager = DBManager("get_all_tmp_db")
+    manager = AppointmentsDBM("get_all_tmp_db")
     # Add last know block for the Responder in the db
 
     yield manager
@@ -396,7 +396,7 @@ def test_request_appointment_not_registered_user(client):
 def test_request_appointment_in_watcher(api, client, appointment):
     # Mock the appointment in the Watcher
     uuid = hash_160("{}{}".format(appointment.locator, compressed_client_pk))
-    api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+    api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
 
     # Next we can request it
     message = "get appointment {}".format(appointment.locator)
@@ -426,7 +426,7 @@ def test_request_appointment_in_responder(api, client, appointment):
 
     uuid = hash_160("{}{}".format(appointment.locator, compressed_client_pk))
     api.watcher.db_manager.create_triggered_appointment_flag(uuid)
-    api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_json())
+    api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_dict())
 
     # Request back the data
     message = "get appointment {}".format(appointment.locator)
@@ -464,14 +464,14 @@ def test_get_all_appointments_watcher(api, client, get_all_db_manager, appointme
         uuid = get_random_value_hex(16)
         appointment.locator = get_random_value_hex(16)
         non_triggered_appointments[uuid] = appointment.to_dict()
-        api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
 
     triggered_appointments = {}
     for _ in range(10):
         uuid = get_random_value_hex(16)
         appointment.locator = get_random_value_hex(16)
         triggered_appointments[uuid] = appointment.to_dict()
-        api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         api.watcher.db_manager.create_triggered_appointment_flag(uuid)
 
     # We should only get check the non-triggered appointments
@@ -508,7 +508,7 @@ def test_get_all_appointments_responder(api, client, get_all_db_manager):
         }
         tracker = TransactionTracker.from_dict(tracker_data)
         tx_trackers[uuid] = tracker.to_dict()
-        api.watcher.responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
+        api.watcher.responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
         api.watcher.db_manager.create_triggered_appointment_flag(uuid)
 
     # Get all appointments

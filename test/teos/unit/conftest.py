@@ -12,10 +12,10 @@ from bitcoind_mock.transaction import create_dummy_transaction
 
 from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
-from teos.db_manager import DBManager
 from teos import LOG_PREFIX, DEFAULT_CONF
 from teos.responder import TransactionTracker
 from teos.block_processor import BlockProcessor
+from teos.appointments_dbm import AppointmentsDBM
 
 import common.cryptographer
 from common.blob import Blob
@@ -53,7 +53,7 @@ def prng_seed():
 
 @pytest.fixture(scope="module")
 def db_manager():
-    manager = DBManager("test_db")
+    manager = AppointmentsDBM("test_db")
     # Add last know block for the Responder in the db
 
     yield manager

@@ -71,26 +71,6 @@ def test_to_dict(appointment_data):
     )
 
 
-def test_to_json(appointment_data):
-    appointment = Appointment(
-        appointment_data["locator"],
-        appointment_data["start_time"],
-        appointment_data["end_time"],
-        appointment_data["to_self_delay"],
-        appointment_data["encrypted_blob"],
-    )
-
-    dict_appointment = json.loads(appointment.to_json())
-
-    assert (
-        appointment_data["locator"] == dict_appointment["locator"]
-        and appointment_data["start_time"] == dict_appointment["start_time"]
-        and appointment_data["end_time"] == dict_appointment["end_time"]
-        and appointment_data["to_self_delay"] == dict_appointment["to_self_delay"]
-        and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
-    )
-
-
 def test_from_dict(appointment_data):
     # The appointment should be build if we don't miss any field
     appointment = Appointment.from_dict(appointment_data)

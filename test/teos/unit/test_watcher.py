@@ -9,8 +9,8 @@ from teos.carrier import Carrier
 from teos.watcher import Watcher
 from teos.tools import bitcoin_cli
 from teos.responder import Responder
-from teos.db_manager import DBManager
 from teos.chain_monitor import ChainMonitor
+from teos.appointments_dbm import AppointmentsDBM
 from teos.block_processor import BlockProcessor
 
 import common.cryptographer
@@ -47,7 +47,7 @@ MAX_APPOINTMENTS = 100
 @pytest.fixture(scope="session")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
-    db_manager = DBManager(db_name)
+    db_manager = AppointmentsDBM(db_name)
 
     yield db_manager
 
@@ -198,7 +198,7 @@ def test_do_watch(watcher, temp_db_manager):
 
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time, "size": 200}
-        watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
     do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
@@ -248,7 +248,7 @@ def test_filter_valid_breaches_random_data(watcher):
         dummy_appointment, _ = generate_dummy_appointment()
         uuid = uuid4().hex
         appointments[uuid] = {"locator": dummy_appointment.locator, "end_time": dummy_appointment.end_time}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
         watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
         locator_uuid_map[dummy_appointment.locator] = [uuid]
@@ -288,7 +288,7 @@ def test_filter_valid_breaches(watcher):
 
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
         watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
     watcher.locator_uuid_map = locator_uuid_map
