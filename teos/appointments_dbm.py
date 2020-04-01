@@ -103,9 +103,8 @@ class AppointmentsDBM(DBManager):
             Returns ``None`` otherwise.
         """
 
-        data = self.load_entry(key, prefix=WATCHER_PREFIX)
-
         try:
+            data = self.load_entry(key, prefix=WATCHER_PREFIX)
             data = json.loads(data)
         except (TypeError, json.decoder.JSONDecodeError):
             data = None
@@ -122,9 +121,8 @@ class AppointmentsDBM(DBManager):
             Returns ``None`` otherwise.
         """
 
-        data = self.load_entry(key, prefix=RESPONDER_PREFIX)
-
         try:
+            data = self.load_entry(key, prefix=RESPONDER_PREFIX)
             data = json.loads(data)
         except (TypeError, json.decoder.JSONDecodeError):
             data = None
@@ -171,10 +169,23 @@ class AppointmentsDBM(DBManager):
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be stored.
             appointment (:obj: `dict`): an appointment encoded as dictionary.
+
+        Returns:
+            :obj:`bool`: True if the appointment was stored in the db. False otherwise.
         """
 
-        self.create_entry(uuid, json.dumps(appointment), prefix=WATCHER_PREFIX)
-        logger.info("Adding appointment to Watchers's db", uuid=uuid)
+        try:
+            self.create_entry(uuid, json.dumps(appointment), prefix=WATCHER_PREFIX)
+            logger.info("Adding appointment to Watchers's db", uuid=uuid)
+            return True
+
+        except json.JSONDecodeError:
+            logger.info("Could't add appointment to db. Wrong appointment format.", uuid=uuid, appoinent=appointment)
+            return False
+
+        except TypeError:
+            logger.info("Could't add appointment to db.", uuid=uuid, appoinent=appointment)
+            return False
 
     def store_responder_tracker(self, uuid, tracker):
         """
@@ -183,10 +194,23 @@ class AppointmentsDBM(DBManager):
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be stored.
             tracker (:obj: `dict`): a tracker encoded as dictionary.
+
+        Returns:
+            :obj:`bool`: True if the tracker was stored in the db. False otherwise.
         """
 
-        self.create_entry(uuid, json.dumps(tracker), prefix=RESPONDER_PREFIX)
-        logger.info("Adding appointment to Responder's db", uuid=uuid)
+        try:
+            self.create_entry(uuid, json.dumps(tracker), prefix=RESPONDER_PREFIX)
+            logger.info("Adding tracker to Responder's db", uuid=uuid)
+            return True
+
+        except json.JSONDecodeError:
+            logger.info("Could't add tracker to db. Wrong tracker format.", uuid=uuid, tracker=tracker)
+            return False
+
+        except TypeError:
+            logger.info("Could't add tracker to db.", uuid=uuid, tracker=tracker)
+            return False
 
     def load_locator_map(self, locator):
         """
@@ -265,10 +289,19 @@ class AppointmentsDBM(DBManager):
 
         Args:
             locator (:obj:`str`): a 16-byte hex-encoded string identifying the map to delete.
+
+        Returns:
+            :obj:`bool`: True if the locator map was deleted from the database or it was non-existent, False otherwise.
         """
 
-        self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
-        logger.info("Deleting locator map from db", uuid=locator)
+        try:
+            self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
+            logger.info("Deleting locator map from db", locator=locator)
+            return True
+
+        except TypeError:
+            logger.info("Couldn't delete locator map from db, locator has wrong type", locator=locator)
+            return False
 
     def delete_watcher_appointment(self, uuid):
         """
@@ -276,10 +309,19 @@ class AppointmentsDBM(DBManager):
 
         Args:
            uuid (:obj:`str`): a 16-byte hex-encoded string identifying the appointment to be deleted.
+
+        Returns:
+            :obj:`bool`: True if the appointment was deleted from the database or it was non-existent, False otherwise.
         """
 
-        self.delete_entry(uuid, prefix=WATCHER_PREFIX)
-        logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+        try:
+            self.delete_entry(uuid, prefix=WATCHER_PREFIX)
+            logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+            return True
+
+        except TypeError:
+            logger.info("Couldn't delete appointment from db, uuid has wrong type", uuid=uuid)
+            return False
 
     def batch_delete_watcher_appointments(self, uuids):
         """
@@ -300,10 +342,19 @@ class AppointmentsDBM(DBManager):
 
         Args:
            uuid (:obj:`str`): a 16-byte hex-encoded string identifying the tracker to be deleted.
+
+        Returns:
+            :obj:`bool`: True if the tracker was deleted from the database or it was non-existent, False otherwise.
         """
 
-        self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
-        logger.info("Deleting appointment from Responder's db", uuid=uuid)
+        try:
+            self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
+            logger.info("Deleting tracker from Responder's db", uuid=uuid)
+            return True
+
+        except TypeError:
+            logger.info("Couldn't delete tracker from db, uuid has wrong type", uuid=uuid)
+            return False
 
     def batch_delete_responder_trackers(self, uuids):
         """
@@ -346,9 +397,17 @@ class AppointmentsDBM(DBManager):
 
         Args:
             block_hash (:obj:`str`): the block hash to be stored (32-byte hex-encoded)
+
+        Returns:
+            :obj:`bool`: True if the block hash was stored in the db. False otherwise.
         """
 
-        self.create_entry(WATCHER_LAST_BLOCK_KEY, block_hash)
+        try:
+            self.create_entry(WATCHER_LAST_BLOCK_KEY, block_hash)
+            return True
+
+        except (TypeError, json.JSONDecodeError):
+            return False
 
     def store_last_block_hash_responder(self, block_hash):
         """
@@ -356,9 +415,17 @@ class AppointmentsDBM(DBManager):
 
         Args:
             block_hash (:obj:`str`): the block hash to be stored (32-byte hex-encoded)
+
+        Returns:
+            :obj:`bool`: True if the block hash was stored in the db. False otherwise.
         """
 
-        self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)
+        try:
+            self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)
+            return True
+
+        except (TypeError, json.JSONDecodeError):
+            return False
 
     def create_triggered_appointment_flag(self, uuid):
         """
@@ -403,10 +470,19 @@ class AppointmentsDBM(DBManager):
 
         Args:
             uuid (:obj:`str`): the identifier of the flag to be removed.
+
+        Returns:
+            :obj:`bool`: True if the flag was deleted from the database or it was non-existent, False otherwise.
         """
 
-        self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
-        logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+        try:
+            self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
+            logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+            return True
+
+        except TypeError:
+            logger.info("Couldn't delete triggered flag from db, uuid has wrong type", uuid=uuid)
+            return False
 
     def batch_delete_triggered_appointment_flag(self, uuids):
         """

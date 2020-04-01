@@ -5,6 +5,7 @@ from teos import LOG_PREFIX
 from teos.db_manager import DBManager
 
 from common.logger import Logger
+from common.tools import check_compressed_pk_format
 
 logger = Logger(actor="UsersDBM", log_name_prefix=LOG_PREFIX)
 
@@ -43,10 +44,27 @@ class UsersDBM(DBManager):
         Args:
             user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
             user_data (:obj:`dict`): the user associated data, as a dictionary.
+
+        Returns:
+            :obj:`bool`: True if the user was stored in the database, false otherwise.
         """
 
-        self.create_entry(user_pk, json.dumps(user_data))
-        logger.info("Adding user to Gatekeeper's db", uuid=user_pk)
+        if check_compressed_pk_format(user_pk):
+            try:
+                self.create_entry(user_pk, json.dumps(user_data))
+                logger.info("Adding user to Gatekeeper's db", user_pk=user_pk)
+                return True
+
+            except json.JSONDecodeError:
+                logger.info("Could't add user to db. Wrong user data format.", user_pk=user_pk, user_data=user_data)
+                return False
+
+            except TypeError:
+                logger.info("Could't add user to db.", user_pk=user_pk, user_data=user_data)
+                return False
+        else:
+            logger.info("Could't add user to db. Wrong pk format.", user_pk=user_pk, user_data=user_data)
+            return False
 
     def load_user(self, user_pk):
         """
@@ -60,9 +78,8 @@ class UsersDBM(DBManager):
             Returns ``None`` otherwise.
         """
 
-        data = self.load_entry(user_pk)
-
         try:
+            data = self.load_entry(user_pk)
             data = json.loads(data)
         except (TypeError, json.decoder.JSONDecodeError):
             data = None
@@ -75,10 +92,19 @@ class UsersDBM(DBManager):
 
         Args:
            user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
+
+        Returns:
+            :obj:`bool`: True if the user was deleted from the database or it was non-existent, False otherwise.
         """
 
-        self.delete_entry(user_pk)
-        logger.info("Deleting user from Gatekeeper's db", uuid=user_pk)
+        try:
+            self.delete_entry(user_pk)
+            logger.info("Deleting user from Gatekeeper's db", uuid=user_pk)
+            return True
+
+        except TypeError:
+            logger.info("Cant delete user from db, user key has wrong type", uuid=user_pk)
+            return False
 
     def load_all_users(self):
         """
