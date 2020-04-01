@@ -12,6 +12,8 @@ from bitcoind_mock.transaction import create_dummy_transaction
 
 from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
+from teos.users_dbm import UsersDBM
+from teos.gatekeeper import Gatekeeper
 from teos import LOG_PREFIX, DEFAULT_CONF
 from teos.responder import TransactionTracker
 from teos.block_processor import BlockProcessor
@@ -63,6 +65,17 @@ def db_manager():
 
 
 @pytest.fixture(scope="module")
+def user_db_manager():
+    manager = UsersDBM("test_user_db")
+    # Add last know block for the Responder in the db
+
+    yield manager
+
+    manager.db.close()
+    rmtree("test_user_db")
+
+
+@pytest.fixture(scope="module")
 def carrier():
     return Carrier(bitcoind_connect_params)
 
@@ -70,6 +83,11 @@ def carrier():
 @pytest.fixture(scope="module")
 def block_processor():
     return BlockProcessor(bitcoind_connect_params)
+
+
+@pytest.fixture(scope="module")
+def gatekeeper(user_db_manager):
+    return Gatekeeper(user_db_manager, get_config().get("DEFAULT_SLOTS"))
 
 
 def generate_keypair():

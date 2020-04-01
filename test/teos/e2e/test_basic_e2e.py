@@ -328,11 +328,8 @@ def test_appointment_shutdown_teos_trigger_back_online(create_txs, bitcoin_cli):
 
     assert teos_pid != teosd_process.pid
 
-    # FIXME: We have to cheat here since users are not kept between restarts atm
-    sleep(1)
-    teos_cli.register(compressed_cli_pk, teos_base_endpoint)
-
     # Check that the appointment is still in the Watcher
+    sleep(1)
     appointment_info = get_appointment_info(locator)
 
     assert appointment_info is not None
@@ -376,11 +373,8 @@ def test_appointment_shutdown_teos_trigger_while_offline(create_txs, bitcoin_cli
     teosd_process = run_teosd()
     assert teos_pid != teosd_process.pid
 
-    # FIXME: We have to cheat here since users are not kept between restarts atm
-    sleep(1)
-    teos_cli.register(compressed_cli_pk, teos_base_endpoint)
-
     # The appointment should have been moved to the Responder
+    sleep(1)
     appointment_info = get_appointment_info(locator)
 
     assert appointment_info is not None

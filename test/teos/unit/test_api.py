@@ -58,13 +58,12 @@ def get_all_db_manager():
 
 
 @pytest.fixture(scope="module", autouse=True)
-def api(db_manager, carrier, block_processor, run_bitcoind):
+def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
     sk, pk = generate_keypair()
 
     responder = Responder(db_manager, carrier, block_processor)
     watcher = Watcher(db_manager, block_processor, responder, sk.to_der(), MAX_APPOINTMENTS, config.get("EXPIRY_DELTA"))
 
-    gatekeeper = Gatekeeper(config.get("DEFAULT_SLOTS"))
     api = API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, gatekeeper)
 
     return api
@@ -146,7 +145,7 @@ def test_register_json_no_inner_dict(client):
 
 def test_add_appointment(api, client, appointment):
     # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = 1
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
@@ -159,7 +158,7 @@ def test_add_appointment(api, client, appointment):
 
 def test_add_appointment_no_json(api, client, appointment):
     # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = 1
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
 
     # Properly formatted appointment
     r = client.post(add_appointment_endpoint, data="random_message")
@@ -168,7 +167,7 @@ def test_add_appointment_no_json(api, client, appointment):
 
 def test_add_appointment_json_no_inner_dict(api, client, appointment):
     # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = 1
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
 
     # Properly formatted appointment
     r = client.post(add_appointment_endpoint, json="random_message")
@@ -204,7 +203,7 @@ def test_add_appointment_not_registered(api, client, appointment):
 
 def test_add_appointment_registered_no_free_slots(api, client, appointment):
     # Empty the user slots
-    api.gatekeeper.registered_users[compressed_client_pk] = 0
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 0}
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
@@ -237,7 +236,7 @@ def test_add_appointment_multiple_times_same_user(api, client, appointment, n=MU
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
 
     # Simulate registering enough slots
-    api.gatekeeper.registered_users[compressed_client_pk] = n
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": n}
     for _ in range(n):
         r = add_appointment(
             client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -257,7 +256,8 @@ def test_add_appointment_multiple_times_different_users(api, client, appointment
 
     # Add one slot per public key
     for pair in user_keys:
-        api.gatekeeper.registered_users[hexlify(pair[1].format(compressed=True)).decode("utf-8")] = 2
+        tmp_compressed_pk = hexlify(pair[1].format(compressed=True)).decode("utf-8")
+        api.gatekeeper.registered_users[tmp_compressed_pk] = {"available_slots": 2}
 
     # Send the appointments
     for compressed_pk, signature in zip(compressed_pks, signatures):
@@ -271,7 +271,7 @@ def test_add_appointment_multiple_times_different_users(api, client, appointment
 
 def test_add_appointment_update_same_size(api, client, appointment):
     # Update an appointment by one of the same size and check that no additional slots are filled
-    api.gatekeeper.registered_users[compressed_client_pk] = 1
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     # # Since we will replace the appointment, we won't added to appointments
@@ -292,7 +292,7 @@ def test_add_appointment_update_same_size(api, client, appointment):
 
 def test_add_appointment_update_bigger(api, client, appointment):
     # Update an appointment by one bigger, and check additional slots are filled
-    api.gatekeeper.registered_users[compressed_client_pk] = 2
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 2}
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
@@ -320,7 +320,7 @@ def test_add_appointment_update_bigger(api, client, appointment):
 
 def test_add_appointment_update_smaller(api, client, appointment):
     # Update an appointment by one bigger, and check slots are freed
-    api.gatekeeper.registered_users[compressed_client_pk] = 2
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 2}
 
     # This should take 2 slots
     appointment.encrypted_blob.data = TWO_SLOTS_BLOTS
@@ -341,7 +341,7 @@ def test_add_appointment_update_smaller(api, client, appointment):
 
 def test_add_too_many_appointment(api, client):
     # Give slots to the user
-    api.gatekeeper.registered_users[compressed_client_pk] = 200
+    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 200}
 
     free_appointment_slots = MAX_APPOINTMENTS - len(api.watcher.appointments)
 
