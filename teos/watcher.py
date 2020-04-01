@@ -51,9 +51,10 @@ class Watcher:
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
-        signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
         max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
         expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
+        signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
+        last_known_block (:obj:`str`): the last block known by the ``Watcher``.
 
     Raises:
         ValueError: if `teos_sk_file` is not found.
@@ -70,6 +71,7 @@ class Watcher:
         self.max_appointments = max_appointments
         self.expiry_delta = expiry_delta
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
+        self.last_known_block = db_manager.load_last_block_hash_responder()
 
     def awake(self):
         watcher_thread = Thread(target=self.do_watch, daemon=True)
@@ -141,6 +143,11 @@ class Watcher:
         :obj:`Responder <teos.responder.Responder>` upon detecting a breach.
         """
 
+        # Distinguish fresh bootstraps from bootstraps from db
+        if self.last_known_block is None:
+            self.last_known_block = self.block_processor.get_best_block_hash()
+            self.db_manager.store_last_block_hash_watcher(self.last_known_block)
+
         while True:
             block_hash = self.block_queue.get()
             block = self.block_processor.get_block(block_hash)
@@ -203,6 +210,7 @@ class Watcher:
 
             # Register the last processed block for the watcher
             self.db_manager.store_last_block_hash_watcher(block_hash)
+            self.last_known_block = block.get("hash")
             self.block_queue.task_done()
 
     def get_breaches(self, txids):
