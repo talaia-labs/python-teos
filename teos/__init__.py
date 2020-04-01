@@ -9,7 +9,7 @@ LOG_PREFIX = "teos"
 # Default conf fields
 DEFAULT_CONF = {
     "BTC_RPC_USER": {"value": "user", "type": str},
-    "BTC_RPC_PASSWD": {"value": "passwd", "type": str},
+    "BTC_RPC_PASSWORD": {"value": "passwd", "type": str},
     "BTC_RPC_CONNECT": {"value": "127.0.0.1", "type": str},
     "BTC_RPC_PORT": {"value": 8332, "type": int},
     "BTC_NETWORK": {"value": "mainnet", "type": str},

@@ -173,7 +173,7 @@ if __name__ == "__main__":
             if opt in ["--btcrpcuser"]:
                 command_line_conf["BTC_RPC_USER"] = arg
             if opt in ["--btcrpcpassword"]:
-                command_line_conf["BTC_RPC_PASSWD"] = arg
+                command_line_conf["BTC_RPC_PASSWORD"] = arg
             if opt in ["--btcrpcconnect"]:
                 command_line_conf["BTC_RPC_CONNECT"] = arg
             if opt in ["--btcrpcport"]:

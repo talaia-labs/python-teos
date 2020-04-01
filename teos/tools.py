@@ -26,7 +26,7 @@ def bitcoin_cli(btc_connect_params):
         "http://%s:%s@%s:%d"
         % (
             btc_connect_params.get("BTC_RPC_USER"),
-            btc_connect_params.get("BTC_RPC_PASSWD"),
+            btc_connect_params.get("BTC_RPC_PASSWORD"),
             btc_connect_params.get("BTC_RPC_CONNECT"),
             btc_connect_params.get("BTC_RPC_PORT"),
         )

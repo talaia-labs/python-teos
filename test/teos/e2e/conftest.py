@@ -22,7 +22,7 @@ def bitcoin_cli():
         "http://%s:%s@%s:%d"
         % (
             config.get("BTC_RPC_USER"),
-            config.get("BTC_RPC_PASSWD"),
+            config.get("BTC_RPC_PASSWORD"),
             config.get("BTC_RPC_CONNECT"),
             config.get("BTC_RPC_PORT"),
         )
