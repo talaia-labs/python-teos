@@ -15,9 +15,10 @@ class _StructuredMessage:
 
 class Logger:
     """
-    The :class:`Logger` is the class in charge of logging events into the log file.
+    The :class:`Logger` is in charge of logging events into the log file.
 
     Args:
+        log_name_prefix (:obj:`str`): the prefix of the logger where the data will be stored in (server, client, ...).
         actor (:obj:`str`): the system actor that is logging the event (e.g. ``Watcher``, ``Cryptographer``, ...).
     """
 
@@ -52,7 +53,7 @@ class Logger:
 
         Args:
              msg (:obj:`str`): the message to be logged.
-             kwargs: a ``key:value`` collection parameters to be added to the output.
+             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
         """
 
         self.f_logger.info(self._create_file_message(msg, **kwargs))
@@ -64,7 +65,7 @@ class Logger:
 
         Args:
              msg (:obj:`str`): the message to be logged.
-             kwargs: a ``key:value`` collection parameters to be added to the output.
+             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
         """
 
         self.f_logger.debug(self._create_file_message(msg, **kwargs))
@@ -76,7 +77,7 @@ class Logger:
 
         Args:
              msg (:obj:`str`): the message to be logged.
-             kwargs: a ``key:value`` collection parameters to be added to the output.
+             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
         """
 
         self.f_logger.error(self._create_file_message(msg, **kwargs))
@@ -88,7 +89,7 @@ class Logger:
 
         Args:
              msg (:obj:`str`): the message to be logged.
-             kwargs: a ``key:value`` collection parameters to be added to the output.
+             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
         """
 
         self.f_logger.warning(self._create_file_message(msg, **kwargs))

@@ -7,7 +7,7 @@ logger = Logger(actor="Cleaner", log_name_prefix=LOG_PREFIX)
 
 class Cleaner:
     """
-    The :class:`Cleaner` is the class in charge of removing expired/completed data from the tower.
+    The :class:`Cleaner` is in charge of removing expired/completed data from the tower.
 
     Mutable objects (like dicts) are passed-by-reference in Python, so no return is needed for the Cleaner.
     """
@@ -15,15 +15,16 @@ class Cleaner:
     @staticmethod
     def delete_appointment_from_memory(uuid, appointments, locator_uuid_map):
         """
-        Deletes an appointment from memory (appointments and locator_uuid_map dictionaries). If the given appointment
-        does not share locator with any other, the map will completely removed, otherwise, the uuid will be removed from
-        the map.
+        Deletes an appointment from memory (``appointments`` and ``locator_uuid_map`` dictionaries). If the given
+        appointment does not share locator with any other, the map will completely removed, otherwise, the uuid will be
+        removed from the map.
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be deleted.
             appointments (:obj:`dict`): the appointments dictionary from where the appointment should be removed.
             locator_uuid_map (:obj:`dict`): the locator:uuid map from where the appointment should also be removed.
         """
+
         locator = appointments[uuid].get("locator")
 
         # Delete the appointment
@@ -136,6 +137,7 @@ class Cleaner:
             db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
                 to interact with the database.
         """
+
         locator_maps_to_update = {}
 
         for uuid in completed_appointments:
@@ -161,7 +163,7 @@ class Cleaner:
     @staticmethod
     def flag_triggered_appointments(triggered_appointments, appointments, locator_uuid_map, db_manager):
         """
-        Deletes a list of  triggered appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and flags them as
+        Deletes a list of triggered appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and flags them as
         triggered on disk.
 
         Args:

@@ -3,7 +3,7 @@ import plyvel
 
 class DBManager:
     """
-    The :class:`DBManager` is the class in charge of interacting with a database (``LevelDB``).
+    The :class:`DBManager` is in charge of interacting with a database (``LevelDB``).
     Keys and values are stored as bytes in the database but processed as strings by the manager.
 
     Args:

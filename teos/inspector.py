@@ -2,6 +2,7 @@ import re
 
 import common.cryptographer
 from common.logger import Logger
+from common.tools import is_locator
 from common.constants import LOCATOR_LEN_HEX
 from common.appointment import Appointment
 
@@ -50,11 +51,10 @@ class Inspector:
 
 
         Returns:
-            :obj:`Appointment <teos.appointment.Appointment>`: An appointment initialized with the
-            provided data.
+            :obj:`Appointment <teos.appointment.Appointment>`: An appointment initialized with the provided data.
 
         Raises:
-           :obj:`InspectionFailed <teos.inspector.InspectionFailed>`: if any of the fields is wrong.
+           :obj:`InspectionFailed`: if any of the fields is wrong.
         """
 
         if appointment_data is None:
@@ -64,7 +64,7 @@ class Inspector:
 
         block_height = self.block_processor.get_block_count()
         if block_height is None:
-            raise InspectionFailed(errors.UNKNOWN_JSON_RPC_EXCEPTION, "Unexpected error occurred")
+            raise InspectionFailed(errors.UNKNOWN_JSON_RPC_EXCEPTION, "unexpected error occurred")
 
         self.check_locator(appointment_data.get("locator"))
         self.check_start_time(appointment_data.get("start_time"), block_height)
@@ -79,13 +79,13 @@ class Inspector:
         """
         Checks if the provided ``locator`` is correct.
 
-        Locators must be 16-byte hex encoded strings.
+        Locators must be 16-byte hex-encoded strings.
 
         Args:
             locator (:obj:`str`): the locator to be checked.
 
         Raises:
-           :obj:`InspectionFailed <teos.inspector.InspectionFailed>`: if any of the fields is wrong.
+           :obj:`InspectionFailed`: if any of the fields is wrong.
         """
 
         if locator is None:
@@ -99,7 +99,7 @@ class Inspector:
         elif len(locator) != LOCATOR_LEN_HEX:
             raise InspectionFailed(errors.APPOINTMENT_WRONG_FIELD_SIZE, "wrong locator size ({})".format(len(locator)))
 
-        elif re.search(r"^[0-9A-Fa-f]+$", locator) is None:
+        elif not is_locator(locator):
             raise InspectionFailed(errors.APPOINTMENT_WRONG_FIELD_FORMAT, "wrong locator format ({})".format(locator))
 
     @staticmethod
@@ -114,11 +114,8 @@ class Inspector:
             block_height (:obj:`int`): the chain height.
 
         Raises:
-           :obj:`InspectionFailed <teos.inspector.InspectionFailed>`: if any of the fields is wrong.
+           :obj:`InspectionFailed`: if any of the fields is wrong.
         """
-
-        # TODO: What's too close to the current height is not properly defined. Right now any appointment that is in the
-        #       future will be accepted (even if it's only one block away).
 
         if start_time is None:
             raise InspectionFailed(errors.APPOINTMENT_EMPTY_FIELD, "empty start_time received")
@@ -156,7 +153,7 @@ class Inspector:
             block_height (:obj:`int`): the chain height.
 
         Raises:
-           :obj:`InspectionFailed <teos.inspector.InspectionFailed>`: if any of the fields is wrong.
+           :obj:`InspectionFailed`: if any of the fields is wrong.
         """
 
         # TODO: What's too close to the current height is not properly defined. Right now any appointment that ends in
@@ -193,11 +190,11 @@ class Inspector:
         To self delays must be greater or equal to ``MIN_TO_SELF_DELAY``.
 
         Args:
-            to_self_delay (:obj:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this
-                appointment is covering.
+            to_self_delay (:obj:`int`): The ``to_self_delay`` encoded in the ``csv`` of ``to_remote`` output of the
+                commitment transaction this appointment is covering.
 
         Raises:
-           :obj:`InspectionFailed <teos.inspector.InspectionFailed>`: if any of the fields is wrong.
+           :obj:`InspectionFailed`: if any of the fields is wrong.
         """
 
         if to_self_delay is None:
@@ -229,10 +226,10 @@ class Inspector:
         Checks if the provided ``encrypted_blob`` may be correct.
 
         Args:
-            encrypted_blob (:obj:`str`): the encrypted blob to be checked (hex encoded).
+            encrypted_blob (:obj:`str`): the encrypted blob to be checked (hex-encoded).
 
         Raises:
-           :obj:`InspectionFailed <teos.inspector.InspectionFailed>`: if any of the fields is wrong.
+           :obj:`InspectionFailed`: if any of the fields is wrong.
         """
 
         if encrypted_blob is None:

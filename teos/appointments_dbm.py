@@ -19,7 +19,7 @@ TRIGGERED_APPOINTMENTS_PREFIX = "ta"
 
 class AppointmentsDBM(DBManager):
     """
-    The :class:`AppointmentsDBM` is the class in charge of interacting with the appointments database (``LevelDB``).
+    The :class:`AppointmentsDBM` is in charge of interacting with the appointments database (``LevelDB``).
     Keys and values are stored as bytes in the database but processed as strings by the manager.
 
     The database is split in six prefixes:
@@ -36,8 +36,8 @@ class AppointmentsDBM(DBManager):
             database will be create if the specified path does not contain one.
 
     Raises:
-        ValueError: If the provided ``db_path`` is not a string.
-        plyvel.Error: If the db is currently unavailable (being used by another process).
+        :obj:`ValueError`: If the provided ``db_path`` is not a string.
+        :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
     """
 
     def __init__(self, db_path):
@@ -78,7 +78,11 @@ class AppointmentsDBM(DBManager):
 
     def get_last_known_block(self, key):
         """
-        Loads the last known block given a key (either ``WATCHER_LAST_BLOCK_KEY`` or ``RESPONDER_LAST_BLOCK_KEY``).
+        Loads the last known block given a key.
+
+        Args:
+            key (:obj:`str`): the identifier of the db to look into (either ``WATCHER_LAST_BLOCK_KEY`` or
+            ``RESPONDER_LAST_BLOCK_KEY``).
 
         Returns:
             :obj:`str` or :obj:`None`: A 16-byte hex-encoded str representing the last known block hash.
@@ -93,9 +97,12 @@ class AppointmentsDBM(DBManager):
 
         return last_block
 
-    def load_watcher_appointment(self, key):
+    def load_watcher_appointment(self, uuid):
         """
-        Loads an appointment from the database using ``WATCHER_PREFIX`` as prefix to the given ``key``.
+        Loads an appointment from the database using ``WATCHER_PREFIX`` as prefix to the given ``uuid``.
+
+        Args:
+            uuid (:obj:`str`): the appointment's unique identifier.
 
         Returns:
             :obj:`dict`: A dictionary containing the appointment data if they ``key`` is found.
@@ -104,16 +111,19 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            data = self.load_entry(key, prefix=WATCHER_PREFIX)
+            data = self.load_entry(uuid, prefix=WATCHER_PREFIX)
             data = json.loads(data)
         except (TypeError, json.decoder.JSONDecodeError):
             data = None
 
         return data
 
-    def load_responder_tracker(self, key):
+    def load_responder_tracker(self, uuid):
         """
-        Loads a tracker from the database using ``RESPONDER_PREFIX`` as a prefix to the given ``key``.
+        Loads a tracker from the database using ``RESPONDER_PREFIX`` as a prefix to the given ``uuid``.
+
+        Args:
+            uuid (:obj:`str`): the tracker's unique identifier.
 
         Returns:
             :obj:`dict`: A dictionary containing the tracker data if they ``key`` is found.
@@ -122,7 +132,7 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            data = self.load_entry(key, prefix=RESPONDER_PREFIX)
+            data = self.load_entry(uuid, prefix=RESPONDER_PREFIX)
             data = json.loads(data)
         except (TypeError, json.decoder.JSONDecodeError):
             data = None
@@ -134,7 +144,7 @@ class AppointmentsDBM(DBManager):
         Loads all the appointments from the database (all entries with the ``WATCHER_PREFIX`` prefix).
 
         Args:
-            include_triggered (:obj:`bool`): Whether to include the appointments flagged as triggered or not. ``False``
+            include_triggered (:obj:`bool`): whether to include the appointments flagged as triggered or not. ``False``
                 by default.
 
         Returns:
@@ -168,7 +178,7 @@ class AppointmentsDBM(DBManager):
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be stored.
-            appointment (:obj: `dict`): an appointment encoded as dictionary.
+            appointment (:obj:`dict`): an appointment encoded as dictionary.
 
         Returns:
             :obj:`bool`: True if the appointment was stored in the db. False otherwise.
@@ -193,7 +203,7 @@ class AppointmentsDBM(DBManager):
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be stored.
-            tracker (:obj: `dict`): a tracker encoded as dictionary.
+            tracker (:obj:`dict`): a tracker encoded as dictionary.
 
         Returns:
             :obj:`bool`: True if the tracker was stored in the db. False otherwise.

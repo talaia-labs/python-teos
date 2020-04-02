@@ -45,7 +45,7 @@ def get_remote_addr():
 # NOTCOVERED: not sure how to monkey path this one. May be related to #77
 def get_request_data_json(request):
     """
-    Gets the content of a json POST request and makes sure ir decodes to a Python dictionary.
+    Gets the content of a json POST request and makes sure it decodes to a dictionary.
 
     Args:
         request (:obj:`Request`): the request sent by the user.
@@ -54,7 +54,7 @@ def get_request_data_json(request):
         :obj:`dict`: the dictionary parsed from the json request.
 
     Raises:
-        :obj:`TypeError`: if the request is not json encoded or it does not decodes to a Python dictionary.
+        :obj:`TypeError`: if the request is not json encoded or it does not decodes to a dictionary.
     """
 
     if request.is_json:
@@ -69,13 +69,14 @@ def get_request_data_json(request):
 
 class API:
     """
-    The :class:`API` is in charge of the interface between the user and the tower. It handles and server user requests.
+    The :class:`API` is in charge of the interface between the user and the tower. It handles and serves user requests.
 
     Args:
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
-            the received data.
+            the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
-        gatekeeper (:obj:`Watcher <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to gatekeep the API.
+        gatekeeper (:obj:`Watcher <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the user
+            access.
     """
 
     def __init__(self, inspector, watcher, gatekeeper):
@@ -104,12 +105,11 @@ class API:
         Users register by sending a public key to the proper endpoint. This is exploitable atm, but will be solved when
         payments are introduced.
 
-
         Returns:
-            :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted requests,
-            the ``rcode`` is always 200 and the response contains a json with the public key and number of slots in the
-            subscription. For rejected requests, the ``rcode`` is a 404 and the value contains an application specific
-            error, and an error message. Error messages can be found at :mod:`Errors <teos.errors>`.
+            :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
+            requests, the ``rcode`` is always 200 and the response contains a json with the public key and number of
+            slots in the subscription. For rejected requests, the ``rcode`` is a 404 and the value contains an
+            application error, and an error message. Error messages can be found at :mod:`Errors <teos.errors>`.
         """
 
         remote_addr = get_remote_addr()
@@ -150,12 +150,12 @@ class API:
         Main endpoint of the Watchtower.
 
         The client sends requests (appointments) to this endpoint to request a job to the Watchtower. Requests must be
-        json encoded and contain an ``appointment`` field and optionally a ``signature`` and ``public_key`` fields.
+        json encoded and contain an ``appointment`` and ``signature`` fields.
 
         Returns:
-            :obj:`tuple`: A tuple containing the response (``json``) and response code (``int``). For accepted
-            appointments, the ``rcode`` is always 200 and the response contains the receipt signature. For rejected
-            appointments, the ``rcode`` is a 404 and the value contains an application specific error, and an error
+            :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
+            appointments, the ``rcode`` is always 200 and the response contains the receipt signature (json). For
+            rejected appointments, the ``rcode`` is a 404 and the value contains an application error, and an error
             message. Error messages can be found at :mod:`Errors <teos.errors>`.
         """
 
@@ -185,16 +185,16 @@ class API:
             appointment_uuid = hash_160("{}{}".format(appointment.locator, user_pk))
             appointment_summary = self.watcher.get_appointment_summary(appointment_uuid)
 
-            # For updates we only reserve the slot difference provided the new one is bigger.
             if appointment_summary:
                 used_slots = ceil(appointment_summary.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
                 required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
                 slot_diff = required_slots - used_slots
 
+                # For updates we only reserve the slot difference provided the new one is bigger.
                 required_slots = slot_diff if slot_diff > 0 else 0
 
-            # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
             else:
+                # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
                 slot_diff = 0
                 required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
@@ -245,7 +245,9 @@ class API:
         The information is requested by ``locator``.
 
         Returns:
-            :obj:`dict`: A json formatted dictionary containing information about the requested appointment.
+            :obj:`str`: A json formatted dictionary containing information about the requested appointment.
+
+            Returns not found if the user does not have the requested appointment or the locator is invalid.
 
             A ``status`` flag is added to the data provided by either the :obj:`Watcher <teos.watcher.Watcher>` or the
             :obj:`Responder <teos.responder.Responder>` that signals the status of the appointment.
@@ -312,10 +314,8 @@ class API:
         This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
 
         Returns:
-            :obj:`dict`: A json formatted dictionary containing all the appointments hold by the
-            :obj:`Watcher <teos.watcher.Watcher>` (``watcher_appointments``) and by the
-            :obj:`Responder <teos.responder.Responder>` (``responder_trackers``).
-
+            :obj:`str`: A json formatted dictionary containing all the appointments hold by the ``Watcher``
+            (``watcher_appointments``) and by the ``Responder>`` (``responder_trackers``).
         """
 
         # ToDo: #15-add-system-monitor

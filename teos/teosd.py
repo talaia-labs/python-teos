@@ -45,9 +45,10 @@ def main(command_line_conf):
     signal(SIGQUIT, handle_signals)
 
     # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+    data_dir = command_line_conf.get("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
-    setup_data_folder(DATA_DIR)
+    setup_data_folder(data_dir)
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     logger.info("Starting TEOS")
@@ -183,7 +184,7 @@ if __name__ == "__main__":
                 except ValueError:
                     exit("btcrpcport must be an integer")
             if opt in ["--datadir"]:
-                DATA_DIR = os.path.expanduser(arg)
+                command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
             if opt in ["-h", "--help"]:
                 exit(show_usage())
 

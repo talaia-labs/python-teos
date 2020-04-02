@@ -13,7 +13,7 @@ logger = Logger(actor="Responder", log_name_prefix=LOG_PREFIX)
 
 class TransactionTracker:
     """
-    A :class:`TransactionTracker` is used to monitor a ``penalty_tx``. Once the dispute is  seen by the
+    A :class:`TransactionTracker` is used to monitor a ``penalty_tx``. Once the dispute is seen by the
     :obj:`Watcher <teos.watcher.Watcher>` the penalty transaction is decrypted and the relevant appointment data is
     passed along to the :obj:`Responder`.
 
@@ -53,7 +53,7 @@ class TransactionTracker:
             :obj:`TransactionTracker`: A ``TransactionTracker`` instantiated with the provided data.
 
         Raises:
-            ValueError: if any of the required fields is missing.
+            :obj:`ValueError`: if any of the required fields is missing.
         """
 
         locator = tx_tracker_data.get("locator")
@@ -72,7 +72,7 @@ class TransactionTracker:
 
     def to_dict(self):
         """
-        Exports a :obj:`TransactionTracker` as a dictionary.
+        Encodes a :obj:`TransactionTracker` as a dictionary.
 
         Returns:
             :obj:`dict`: A dictionary containing the :obj:`TransactionTracker` data.
@@ -91,13 +91,16 @@ class TransactionTracker:
 
 class Responder:
     """
-    The :class:`Responder` is the class in charge of ensuring that channel breaches are dealt with. It does so handling
+    The :class:`Responder` is in charge of ensuring that channel breaches are dealt with. It does so handling
     the decrypted ``penalty_txs`` handed by the :obj:`Watcher <teos.watcher.Watcher>` and ensuring the they make it to
     the blockchain.
 
     Args:
         db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
             to interact with the database.
+        carrier (:obj:`Carrier <teos.carrier.Carrier>`): a ``Carrier`` instance to send transactions to bitcoind.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+            get data from bitcoind.
 
     Attributes:
         trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
@@ -116,7 +119,6 @@ class Responder:
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get data from bitcoind.
         last_known_block (:obj:`str`): the last block known by the ``Responder``.
-
     """
 
     def __init__(self, db_manager, carrier, block_processor):
@@ -131,6 +133,7 @@ class Responder:
         self.last_known_block = db_manager.load_last_block_hash_responder()
 
     def awake(self):
+        """Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth"""
         responder_thread = Thread(target=self.do_watch, daemon=True)
         responder_thread.start()
 
@@ -140,7 +143,7 @@ class Responder:
         """
         Whether the :obj:`Responder` is on sync with ``bitcoind`` or not. Used when recovering from a crash.
 
-        The Watchtower can be instantiated with fresh or with backed up data. In the later,  some triggers may have been
+        The Watchtower can be instantiated with fresh or with backed up data. In the later, some triggers may have been
         missed. In order to go back on sync both the :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder`
         need to perform the state transitions until they catch up.
 
@@ -205,9 +208,8 @@ class Responder:
         """
         Creates a :obj:`TransactionTracker` after successfully broadcasting a ``penalty_tx``.
 
-        A reduction of :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the
-        ``penalty_txid`` added to ``unconfirmed_txs`` if ``confirmations=0``. Finally, all the data is stored in the
-        database.
+        A summary of :obj:`TransactionTracker` is stored in ``trackers`` and ``tx_tracker_map`` and the ``penalty_txid``
+        added to ``unconfirmed_txs`` if ``confirmations=0``. Finally, all the data is stored in the database.
 
         Args:
             uuid (:obj:`str`): a unique identifier for the appointment.
@@ -248,7 +250,7 @@ class Responder:
 
     def do_watch(self):
         """
-        Monitors the blockchain whilst there are pending trackers.
+        Monitors the blockchain for reorgs and appointment ends.
 
         This is the main method of the :obj:`Responder` and triggers tracker cleaning, rebroadcasting, reorg managing,
         etc.
@@ -384,9 +386,9 @@ class Responder:
     def rebroadcast(self, txs_to_rebroadcast):
         """
         Rebroadcasts a ``penalty_tx`` that has missed too many confirmations. In the current approach this would loop
-        forever si the transaction keeps not getting it.
+        forever if the transaction keeps not getting it.
 
-        Potentially the fees could be bumped here if the transaction has some tower dedicated outputs (or allows it
+        Potentially, the fees could be bumped here if the transaction has some tower dedicated outputs (or allows it
         trough ``ANYONECANPAY`` or something similar).
 
         Args:

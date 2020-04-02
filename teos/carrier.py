@@ -36,12 +36,12 @@ class Receipt:
 
 class Carrier:
     """
-    The :class:`Carrier` is the class in charge of interacting with ``bitcoind`` to send/get transactions. It uses
-    :obj:`Receipt` objects to report about the sending outcome.
+    The :class:`Carrier` is in charge of interacting with ``bitcoind`` to send/get transactions. It uses :obj:`Receipt`
+    objects to report about the sending outcome.
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc passwd, host and port)
+            (rpc user, rpc password, host and port)
 
     Attributes:
         issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
@@ -135,18 +135,17 @@ class Carrier:
 
         Returns:
             :obj:`dict` or :obj:`None`: A dictionary with the transaction data if the transaction can be found on the
-            chain.
-            Returns ``None`` otherwise.
+            chain. ``None`` otherwise.
         """
 
         try:
             tx_info = bitcoin_cli(self.btc_connect_params).getrawtransaction(txid, 1)
+            return tx_info
 
         except JSONRPCException as e:
-            tx_info = None
             # While it's quite unlikely, the transaction that was already in the blockchain could have been
-            # reorged while we were querying bitcoind to get the confirmation count. In such a case we just
-            # restart the tracker
+            # reorged while we were querying bitcoind to get the confirmation count. In that case we just restart
+            # the tracker
             if e.error.get("code") == rpc_errors.RPC_INVALID_ADDRESS_OR_KEY:
                 logger.info("Transaction not found in mempool nor blockchain", txid=txid)
 
@@ -154,4 +153,4 @@ class Carrier:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
                 logger.error("JSONRPCException", method="Carrier.get_transaction", error=e.error)
 
-        return tx_info
+            return None

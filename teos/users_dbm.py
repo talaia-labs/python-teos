@@ -5,14 +5,14 @@ from teos import LOG_PREFIX
 from teos.db_manager import DBManager
 
 from common.logger import Logger
-from common.tools import check_compressed_pk_format
+from common.tools import is_compressed_pk
 
 logger = Logger(actor="UsersDBM", log_name_prefix=LOG_PREFIX)
 
 
 class UsersDBM(DBManager):
     """
-    The :class:`UsersDBM` is the class in charge of interacting with the users database (``LevelDB``).
+    The :class:`UsersDBM` is in charge of interacting with the users database (``LevelDB``).
     Keys and values are stored as bytes in the database but processed as strings by the manager.
 
     Args:
@@ -20,8 +20,8 @@ class UsersDBM(DBManager):
             database will be create if the specified path does not contain one.
 
     Raises:
-        ValueError: If the provided ``db_path`` is not a string.
-        plyvel.Error: If the db is currently unavailable (being used by another process).
+        :obj:`ValueError`: If the provided ``db_path`` is not a string.
+        :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
     """
 
     def __init__(self, db_path):
@@ -46,31 +46,33 @@ class UsersDBM(DBManager):
             user_data (:obj:`dict`): the user associated data, as a dictionary.
 
         Returns:
-            :obj:`bool`: True if the user was stored in the database, false otherwise.
+            :obj:`bool`: True if the user was stored in the database, False otherwise.
         """
 
-        if check_compressed_pk_format(user_pk):
+        if is_compressed_pk(user_pk):
             try:
                 self.create_entry(user_pk, json.dumps(user_data))
                 logger.info("Adding user to Gatekeeper's db", user_pk=user_pk)
                 return True
 
             except json.JSONDecodeError:
-                logger.info("Could't add user to db. Wrong user data format.", user_pk=user_pk, user_data=user_data)
+                logger.info("Could't add user to db. Wrong user data format", user_pk=user_pk, user_data=user_data)
                 return False
 
             except TypeError:
-                logger.info("Could't add user to db.", user_pk=user_pk, user_data=user_data)
+                logger.info("Could't add user to db", user_pk=user_pk, user_data=user_data)
                 return False
         else:
-            logger.info("Could't add user to db. Wrong pk format.", user_pk=user_pk, user_data=user_data)
+            logger.info("Could't add user to db. Wrong pk format", user_pk=user_pk, user_data=user_data)
             return False
 
     def load_user(self, user_pk):
         """
         Loads a user record from the database using the ``user_pk`` as identifier.
 
-        use_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
+        Args:
+
+            user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
 
         Returns:
             :obj:`dict`: A dictionary containing the appointment data if they ``key`` is found.

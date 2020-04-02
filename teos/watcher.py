@@ -16,8 +16,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 
 class Watcher:
     """
-    The :class:`Watcher` is the class in charge to watch for channel breaches for the appointments accepted by the
-    tower.
+    The :class:`Watcher` is in charge of watching for channel breaches for the appointments accepted by the tower.
 
     The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
     checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
@@ -36,7 +35,7 @@ class Watcher:
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
-        max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
+        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
         expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Attributes:
@@ -53,7 +52,7 @@ class Watcher:
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
-        max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
+        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
         expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Raises:
@@ -73,9 +72,7 @@ class Watcher:
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
     def awake(self):
-        """
-        Starts a new thread to monitor the blockchain for channel breaches.
-        """
+        """Starts a new thread to monitor the blockchain for channel breaches"""
 
         watcher_thread = Thread(target=self.do_watch, daemon=True)
         watcher_thread.start()
@@ -85,13 +82,13 @@ class Watcher:
     def get_appointment_summary(self, uuid):
         """
         Returns the summary of an appointment. The summary consists of the data kept in memory:
-            locator, end_time, and size.
+            {locator, end_time, and size}
 
         Args:
             uuid (:obj:`str`): a 16-byte hex string identifying the appointment.
 
         Returns:
-            :obj:`dict` or :obj:`None`: a dictionary with the appointment summary, or None if the appointment is not
+            :obj:`dict` or :obj:`None`: a dictionary with the appointment summary, or ``None`` if the appointment is not
             found.
         """
         return self.appointments.get(uuid)
@@ -100,8 +97,8 @@ class Watcher:
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
-        ``add_appointment`` is the entry point of the Watcher. Upon receiving a new appointment it will start monitoring
-        the blockchain (``do_watch``) until ``appointments`` is empty.
+        ``add_appointment`` is the entry point of the ``Watcher``. Upon receiving a new appointment it will start
+        monitoring the blockchain (``do_watch``) until ``appointments`` is empty.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
         :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` and pass the information to the
@@ -123,7 +120,6 @@ class Watcher:
 
             - ``(True, signature)`` if the appointment has been accepted.
             - ``(False, None)`` otherwise.
-
         """
 
         if len(self.appointments) < self.max_appointments:
@@ -164,7 +160,7 @@ class Watcher:
 
     def do_watch(self):
         """
-        Monitors the blockchain whilst there are pending appointments.
+        Monitors the blockchain for channel breaches.
 
         This is the main method of the :obj:`Watcher` and the one in charge to pass appointments to the
         :obj:`Responder <teos.responder.Responder>` upon detecting a breach.

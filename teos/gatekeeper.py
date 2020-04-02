@@ -1,9 +1,9 @@
-from common.tools import check_compressed_pk_format
+from common.tools import is_compressed_pk
 from common.cryptographer import Cryptographer
 
 
 class NotEnoughSlots(ValueError):
-    """Raise this when trying to subtract more slots than a user has available."""
+    """Raise this when trying to subtract more slots than a user has available"""
 
     def __init__(self, user_pk, requested_slots):
         self.user_pk = user_pk
@@ -21,8 +21,8 @@ class IdentificationFailure(Exception):
 
 class Gatekeeper:
     """
-    The Gatekeeper is in charge of managing the access to the tower. Only registered users are allowed to perform
-    actions.
+    The :class:`Gatekeeper` is in charge of managing the access to the tower. Only registered users are allowed to
+    perform actions.
 
     Attributes:
         registered_users (:obj:`dict`): a map of user_pk:appointment_slots.
@@ -44,7 +44,7 @@ class Gatekeeper:
             :obj:`int`: the number of available slots in the user subscription.
         """
 
-        if not check_compressed_pk_format(user_pk):
+        if not is_compressed_pk(user_pk):
             raise ValueError("provided public key does not match expected format (33-byte hex string)")
 
         if user_pk not in self.registered_users:
@@ -58,17 +58,17 @@ class Gatekeeper:
 
     def identify_user(self, message, signature):
         """
-        Checks if the provided user signature comes from a registered user.
+        Checks if a request comes from a registered user by ec-recovering their public key from a signed message.
 
         Args:
             message (:obj:`bytes`): byte representation of the original message from where the signature was generated.
-            signature (:obj:`str`): the user's signature (hex encoded).
+            signature (:obj:`str`): the user's signature (hex-encoded).
 
         Returns:
             :obj:`str`: a compressed key recovered from the signature and matching a registered user.
 
         Raises:
-            :obj:`<teos.gatekeeper.IdentificationFailure>`: if the user cannot be identified.
+            :obj:`IdentificationFailure`: if the user cannot be identified.
         """
 
         if isinstance(message, bytes) and isinstance(signature, str):
@@ -89,18 +89,16 @@ class Gatekeeper:
 
         Args:
             user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-            n: the number of slots to fill.
             n (:obj:`int`): the number of slots to fill.
 
         Raises:
-            :obj:`<teos.gatekeeper.NotEnoughSlots>`: if the user subscription does not have enough slots.
+            :obj:`NotEnoughSlots`: if the user subscription does not have enough slots.
         """
 
-        # We are not making sure the value passed is a integer, but the value is computed by the API and rounded before
-        # passing it to the gatekeeper.
         # DISCUSS: we may want to return a different exception if the user does not exist
         if user_pk in self.registered_users and n <= self.registered_users.get(user_pk).get("available_slots"):
             self.registered_users[user_pk]["available_slots"] -= n
+            self.user_db.store_user(user_pk, self.registered_users[user_pk])
         else:
             raise NotEnoughSlots(user_pk, n)
 
@@ -110,11 +108,10 @@ class Gatekeeper:
 
         Args:
             user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-            n: the number of slots to free.
+            n (:obj:`int`): the number of slots to free.
         """
 
-        # We are not making sure the value passed is a integer, but the value is computed by the API and rounded before
-        # passing it to the gatekeeper.
         # DISCUSS: if the user does not exist we may want to log or return an exception.
         if user_pk in self.registered_users:
             self.registered_users[user_pk]["available_slots"] += n
+            self.user_db.store_user(user_pk, self.registered_users[user_pk])
