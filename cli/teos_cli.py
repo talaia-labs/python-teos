@@ -10,7 +10,7 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from cli.help import show_usage, help_add_appointment, help_get_appointment
+from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register
 from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
 
 import common.cryptographer
@@ -21,14 +21,26 @@ from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_logging, setup_data_folder
-from common.tools import check_sha256_hex_format, check_locator_format, compute_locator, check_compressed_pk_format
+from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def register(compressed_pk, teos_url):
-    if not check_compressed_pk_format(compressed_pk):
+    """
+    Registers the user to the tower.
+
+    Args:
+        compressed_pk (:obj:`str`): a 33-byte hex-encoded compressed public key representing the user.
+        teos_url (:obj:`str`): the teos base url.
+
+    Returns:
+        :obj:`dict` or :obj:`None`: a dictionary containing the tower response if the registration succeeded. ``None``
+        otherwise.
+    """
+
+    if not is_compressed_pk(compressed_pk):
         logger.error("The cli public key is not valid")
         return None
 
@@ -45,8 +57,7 @@ def register(compressed_pk, teos_url):
 
 def add_appointment(appointment_data, cli_sk, teos_pk, teos_url, appointments_folder_path):
     """
-    Manages the add_appointment command, from argument parsing, trough sending the appointment to the tower, until
-    saving the appointment receipt.
+    Manages the add_appointment command.
 
     The life cycle of the function is as follows:
         - Check that the given commitment_txid is correct (proper format and not missing)
@@ -58,8 +69,6 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url, appointments_fo
         - Check the tower's response and signature
         - Store the receipt (appointment + signature) on disk
 
-    If any of the above-mentioned steps fails, the method returns false, otherwise it returns true.
-
     Args:
         appointment_data (:obj:`dict`): a dictionary containing the appointment data.
         cli_sk (:obj:`PrivateKey`): the client's private key.
@@ -69,7 +78,7 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url, appointments_fo
 
 
     Returns:
-        :obj:`bool`: True if the appointment is accepted by the tower and the receipt is properly stored, false if any
+        :obj:`bool`: True if the appointment is accepted by the tower and the receipt is properly stored. False if any
         error occurs during the process.
     """
 
@@ -77,7 +86,7 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url, appointments_fo
         logger.error("The provided appointment JSON is empty")
         return False
 
-    if not check_sha256_hex_format(appointment_data.get("tx_id")):
+    if not is_256b_hex_str(appointment_data.get("tx_id")):
         logger.error("The provided txid is not valid")
         return False
 
@@ -141,13 +150,13 @@ def get_appointment(locator, cli_sk, teos_pk, teos_url):
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`dict` or :obj:`None`: a dictionary containing thew appointment data if the locator is valid and the tower
+        :obj:`dict` or :obj:`None`: a dictionary containing the appointment data if the locator is valid and the tower
         responds. ``None`` otherwise.
     """
 
     # FIXME: All responses from the tower should be signed. Not using teos_pk atm.
 
-    valid_locator = check_locator_format(locator)
+    valid_locator = is_locator(locator)
 
     if not valid_locator:
         logger.error("The provided locator is not valid", locator=locator)
@@ -171,13 +180,14 @@ def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
     Loads all the keys required so sign, send, and verify the appointment.
 
     Args:
-        teos_pk_path (:obj:`str`): path to the TEOS public key file.
+        teos_pk_path (:obj:`str`): path to the tower public key file.
         cli_sk_path (:obj:`str`): path to the client private key file.
         cli_pk_path (:obj:`str`): path to the client public key file.
 
     Returns:
-        :obj:`tuple` or ``None``: a three item tuple containing a teos_pk object, cli_sk object and the cli_sk_der
-        encoded key if all keys can be loaded. ``None`` otherwise.
+        :obj:`tuple` or ``None``: a three-item tuple containing a ``PrivateKey``, a ``PublicKey`` and a ``str``
+        representing the tower pk, user sk and user compressed pk respectively if all keys can be loaded.
+        ``None`` otherwise.
     """
 
     if teos_pk_path is None:
@@ -228,7 +238,7 @@ def post_request(data, endpoint):
 
     Returns:
         :obj:`dict` or ``None``: a json-encoded dictionary with the server response if the data can be posted.
-        None otherwise.
+        ``None`` otherwise.
     """
 
     try:
@@ -251,14 +261,14 @@ def post_request(data, endpoint):
 
 def process_post_response(response):
     """
-    Processes the server response to an post request.
+    Processes the server response to a post request.
 
     Args:
-        response (:obj:`requests.models.Response`): a ``Response`` object obtained from the sent request.
+        response (:obj:`requests.models.Response`): a ``Response`` object obtained from the request.
 
     Returns:
-        :obj:`dict` or :obj:`None`: a dictionary containing the tower's response data if it can be properly parsed and
-        the response type is ``HTTP_OK``. ``None`` otherwise.
+        :obj:`dict` or :obj:`None`: a dictionary containing the tower's response data if the response type is
+        ``HTTP_OK`` and the response can be properly parsed. ``None`` otherwise.
     """
 
     if not response:
@@ -287,8 +297,8 @@ def parse_add_appointment_args(args):
     Parses the arguments of the add_appointment command.
 
     Args:
-        args (:obj:`list`): a list of arguments to pass to ``parse_add_appointment_args``. Must contain a json encoded
-            appointment, or the file option and the path to a file containing a json encoded appointment.
+        args (:obj:`list`): a list of command line arguments that must contain a json encoded appointment, or the file
+        option and the path to a file containing a json encoded appointment.
 
     Returns:
         :obj:`dict` or :obj:`None`: A dictionary containing the appointment data if it can be loaded. ``None``
@@ -332,7 +342,7 @@ def parse_add_appointment_args(args):
 
 def save_appointment_receipt(appointment, signature, appointments_folder_path):
     """
-    Saves an appointment receipt to disk. A receipt consists in an appointment and a signature from the tower.
+    Saves an appointment receipt to disk. A receipt consists of an appointment and a signature from the tower.
 
     Args:
         appointment (:obj:`Appointment <common.appointment.Appointment>`): the appointment to be saved on disk.
@@ -340,7 +350,7 @@ def save_appointment_receipt(appointment, signature, appointments_folder_path):
         appointments_folder_path (:obj:`str`): the path to the appointments folder.
 
     Returns:
-        :obj:`bool`: True if the appointment if properly saved, false otherwise.
+        :obj:`bool`: True if the appointment if properly saved. False otherwise.
 
     Raises:
         IOError: if an error occurs whilst writing the file on disk.
@@ -419,6 +429,9 @@ def main(args, command_line_conf):
                     elif command == "help":
                         if args:
                             command = args.pop(0)
+
+                            if command == "register":
+                                sys.exit(help_register())
 
                             if command == "add_appointment":
                                 sys.exit(help_add_appointment())
