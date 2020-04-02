@@ -1,4 +1,3 @@
-import json
 import struct
 import binascii
 from pytest import fixture

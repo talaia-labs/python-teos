@@ -7,7 +7,6 @@ from teos import HOST, PORT
 import teos.errors as errors
 from teos.watcher import Watcher
 from teos.inspector import Inspector
-from teos.gatekeeper import Gatekeeper
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 

@@ -1,4 +1,3 @@
-import json
 import pytest
 import random
 from uuid import uuid4

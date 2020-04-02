@@ -1,4 +1,3 @@
-import json
 import struct
 from binascii import unhexlify
 
