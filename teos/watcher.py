@@ -71,7 +71,7 @@ class Watcher:
         self.max_appointments = max_appointments
         self.expiry_delta = expiry_delta
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
-        self.last_known_block = db_manager.load_last_block_hash_responder()
+        self.last_known_block = db_manager.load_last_block_hash_watcher()
 
     def awake(self):
         """Starts a new thread to monitor the blockchain for channel breaches"""
