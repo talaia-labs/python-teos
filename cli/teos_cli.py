@@ -391,7 +391,7 @@ def main(args, command_line_conf):
 
                 if command in commands:
                     if command == "register":
-                        register_data = register(compress_cli_pk, teos_url)
+                        register_data = register(compressed_cli_pk, teos_url)
                         if register_data:
                             print(register_data)
 
