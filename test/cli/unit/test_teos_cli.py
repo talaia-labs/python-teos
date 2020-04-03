@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import responses
+from binascii import hexlify
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError
 
@@ -28,6 +29,7 @@ another_sk = PrivateKey.from_int(3)
 
 teos_url = "http://{}:{}".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
 add_appointment_endpoint = "{}/add_appointment".format(teos_url)
+register_endpoint = "{}/register".format(teos_url)
 get_appointment_endpoint = "{}/get_appointment".format(teos_url)
 
 dummy_appointment_data = {
@@ -56,11 +58,22 @@ def get_signature(message, sk):
     return Cryptographer.sign(message, sk)
 
 
-def test_register():
-    pass
-
-
 # TODO: 90-add-more-add-appointment-tests
+@responses.activate
+def test_register():
+    # Simulate a register response
+    compressed_pk_hex = hexlify(dummy_cli_compressed_pk).decode("utf-8")
+    response = {"public_key": compressed_pk_hex, "available_slots": 100}
+    responses.add(responses.POST, register_endpoint, json=response, status=200)
+    result = teos_cli.register(compressed_pk_hex, teos_url)
+
+    assert len(responses.calls) == 1
+    assert responses.calls[0].request.url == register_endpoint
+    assert result.get("public_key") == compressed_pk_hex and result.get("available_slots") == response.get(
+        "available_slots"
+    )
+
+
 @responses.activate
 def test_add_appointment():
     # Simulate a request to add_appointment for dummy_appointment, make sure that the right endpoint is requested
