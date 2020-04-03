@@ -1,19 +1,22 @@
 import os
 import json
 import shutil
+import pytest
 import responses
 from binascii import hexlify
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
 
+from common.blob import Blob
 import common.cryptographer
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-from common.blob import Blob
 import cli.teos_cli as teos_cli
+from cli.exceptions import InvalidParameter, InvalidKey, TowerResponseError
+
 from test.cli.unit.conftest import get_random_value_hex, get_config
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=teos_cli.LOG_PREFIX)
@@ -85,9 +88,7 @@ def test_add_appointment():
         "available_slots": 100,
     }
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment(
-        dummy_appointment_data, dummy_cli_sk, dummy_teos_pk, teos_url, config.get("APPOINTMENTS_FOLDER_NAME")
-    )
+    result = teos_cli.add_appointment(dummy_appointment_data, dummy_cli_sk, dummy_teos_pk, teos_url)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == add_appointment_endpoint
@@ -106,13 +107,9 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
     }
 
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment(
-        dummy_appointment_data, dummy_cli_sk, dummy_teos_pk, teos_url, config.get("APPOINTMENTS_FOLDER_NAME")
-    )
 
-    assert result is False
-
-    shutil.rmtree(config.get("APPOINTMENTS_FOLDER_NAME"))
+    with pytest.raises(TowerResponseError):
+        teos_cli.add_appointment(dummy_appointment_data, dummy_cli_sk, dummy_teos_pk, teos_url)
 
 
 @responses.activate
@@ -139,7 +136,8 @@ def test_get_appointment_err():
     # Test that get_appointment handles a connection error appropriately.
     responses.add(responses.POST, get_appointment_endpoint, body=ConnectionError())
 
-    assert not teos_cli.get_appointment(locator, dummy_cli_sk, dummy_teos_pk, teos_url)
+    with pytest.raises(ConnectionError):
+        teos_cli.get_appointment(locator, dummy_cli_sk, dummy_teos_pk, teos_url)
 
 
 def test_load_keys():
@@ -151,7 +149,7 @@ def test_load_keys():
         f.write(dummy_cli_sk.to_der())
     with open(public_key_file_path, "wb") as f:
         f.write(dummy_cli_compressed_pk)
-    with open(empty_file_path, "wb") as f:
+    with open(empty_file_path, "wb"):
         pass
 
     # Now we can test the function passing the using this files (we'll use the same pk for both)
@@ -159,25 +157,32 @@ def test_load_keys():
     assert isinstance(r, tuple)
     assert len(r) == 3
 
-    # If any param does not match we should get None as result
-    assert teos_cli.load_keys(None, private_key_file_path, public_key_file_path) is None
-    assert teos_cli.load_keys(public_key_file_path, None, public_key_file_path) is None
-    assert teos_cli.load_keys(public_key_file_path, private_key_file_path, None) is None
+    # If any param does not match the expected, we should get an InvalidKey exception
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(None, private_key_file_path, public_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(public_key_file_path, None, public_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(public_key_file_path, private_key_file_path, None)
 
     # The same should happen if we pass a public key where a private should be, for instance
-    assert teos_cli.load_keys(private_key_file_path, public_key_file_path, private_key_file_path) is None
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(private_key_file_path, public_key_file_path, private_key_file_path)
 
     # Same if any of the files is empty
-    assert teos_cli.load_keys(empty_file_path, private_key_file_path, public_key_file_path) is None
-    assert teos_cli.load_keys(public_key_file_path, empty_file_path, public_key_file_path) is None
-    assert teos_cli.load_keys(public_key_file_path, private_key_file_path, empty_file_path) is None
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(empty_file_path, private_key_file_path, public_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(public_key_file_path, empty_file_path, public_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(public_key_file_path, private_key_file_path, empty_file_path)
 
+    # Remove the tmp files
     os.remove(private_key_file_path)
     os.remove(public_key_file_path)
     os.remove(empty_file_path)
 
 
-# WIP: HERE
 @responses.activate
 def test_post_request():
     response = {
@@ -208,24 +213,23 @@ def test_process_post_response():
 
     # If we modify the response code for a rejection (lets say 404) we should get None
     responses.replace(responses.POST, add_appointment_endpoint, json=response, status=404)
-    r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
-    assert teos_cli.process_post_response(r) is None
+    with pytest.raises(TowerResponseError):
+        r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
+        teos_cli.process_post_response(r)
 
-    # The same should happen if the response is not in json
+    # The same should happen if the response is not in json independently of the return type
     responses.replace(responses.POST, add_appointment_endpoint, status=404)
-    r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
-    assert teos_cli.process_post_response(r) is None
+    with pytest.raises(TowerResponseError):
+        r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
+        teos_cli.process_post_response(r)
+
+    responses.replace(responses.POST, add_appointment_endpoint, status=200)
+    with pytest.raises(TowerResponseError):
+        r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
+        teos_cli.process_post_response(r)
 
 
 def test_parse_add_appointment_args():
-    # If no args are passed, function should fail.
-    appt_data = teos_cli.parse_add_appointment_args(None)
-    assert not appt_data
-
-    # If file doesn't exist, function should fail.
-    appt_data = teos_cli.parse_add_appointment_args(["-f", "nonexistent_file"])
-    assert not appt_data
-
     # If file exists and has data in it, function should work.
     with open("appt_test_file", "w") as f:
         json.dump(dummy_appointment_data, f)
@@ -233,11 +237,21 @@ def test_parse_add_appointment_args():
     appt_data = teos_cli.parse_add_appointment_args(["-f", "appt_test_file"])
     assert appt_data
 
-    os.remove("appt_test_file")
-
     # If appointment json is passed in, function should work.
     appt_data = teos_cli.parse_add_appointment_args([json.dumps(dummy_appointment_data)])
     assert appt_data
+
+    os.remove("appt_test_file")
+
+
+def test_parse_add_appointment_args_wrong():
+    # If no args are passed, function should fail.
+    with pytest.raises(InvalidParameter):
+        teos_cli.parse_add_appointment_args(None)
+
+    # If file doesn't exist, function should fail.
+    with pytest.raises(FileNotFoundError):
+        teos_cli.parse_add_appointment_args(["-f", "nonexistent_file"])
 
 
 def test_save_appointment_receipt(monkeypatch):
