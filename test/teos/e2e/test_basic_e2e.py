@@ -108,7 +108,6 @@ def test_appointment_life_cycle(bitcoin_cli):
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
-    assert appointment_info is not None
     assert appointment_info.get("status") == "being_watched"
     assert appointment_info.get("locator") == locator
     assert appointment_info.get("appointment") == appointment.to_dict()
@@ -122,9 +121,7 @@ def test_appointment_life_cycle(bitcoin_cli):
     # Trigger a breach and check again
     new_addr = bitcoin_cli.getnewaddress()
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
-
     appointment_info = get_appointment_info(locator)
-    assert appointment_info is not None
     assert appointment_info.get("status") == "dispute_responded"
     assert appointment_info.get("locator") == locator
 
@@ -201,7 +198,12 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
     new_addr = bitcoin_cli.getnewaddress()
     for _ in range(int(1.5 * END_TIME_DELTA) + 5):
         sleep(1)
+    for _ in range(END_TIME_DELTA):
         bitcoin_cli.generatetoaddress(1, new_addr)
+
+    # The appointment is no longer in the tower
+    with pytest.raises(TowerResponseError):
+        get_appointment_info(locator)
 
 
 def test_appointment_malformed_penalty(bitcoin_cli):
