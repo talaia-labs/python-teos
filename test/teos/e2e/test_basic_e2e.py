@@ -54,7 +54,7 @@ def add_appointment(appointment_data, sk=cli_sk):
 
 
 def test_commands_non_registered(bitcoin_cli, create_txs):
-    # All commands should failed if the user is not registered
+    # All commands should fail if the user is not registered
 
     # Add appointment
     commitment_tx, penalty_tx = create_txs

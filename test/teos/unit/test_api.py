@@ -388,7 +388,7 @@ def test_request_appointment_not_registered_user(client):
     tmp_sk, tmp_pk = generate_keypair()
 
     # The tower is designed so a not found appointment and a request from a non-registered user return the same error to
-    # prevent proving.
+    # prevent probing.
     test_request_random_appointment_registered_user(client, tmp_sk)
 
 

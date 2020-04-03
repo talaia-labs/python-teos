@@ -17,7 +17,7 @@ class UsersDBM(DBManager):
 
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
-            database will be create if the specified path does not contain one.
+            database will be created if the specified path does not contain one.
 
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
@@ -75,7 +75,7 @@ class UsersDBM(DBManager):
             user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
 
         Returns:
-            :obj:`dict`: A dictionary containing the appointment data if they ``key`` is found.
+            :obj:`dict`: A dictionary containing the appointment data if the ``key`` is found.
 
             Returns ``None`` otherwise.
         """

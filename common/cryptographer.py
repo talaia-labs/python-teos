@@ -13,7 +13,7 @@ LN_MESSAGE_PREFIX = b"Lightning Signed Message:"
 
 def sha256d(message):
     """
-    Compute the sha256 (double sha256) of a given by message.
+    Computes the double sha256 of a given by message.
 
     Args:
         message(:obj:`bytes`): the message to be used as input to the hash function.

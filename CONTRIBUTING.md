@@ -15,7 +15,7 @@ In additon, we use [flake8](https://flake8.pycqa.org/en/latest/) to detect style
 flake8 --max-line-length=120 {source_file_or_directory}
 ```
 
- Not all outputs from flake8 are mandatory. For instance, splitting **bullet points in docstrings (E501)** will cause issues when generating the docuementation, so we will leave that longer than the line lenght limit . Another example are **whitespaces before colons in inline fors (E203)**. `black` places them in that way, so we'll leave them like that.
+ Not all outputs from flake8 are mandatory. For instance, splitting **bullet points in docstrings (E501)** will cause issues when generating the documentation, so we will leave that longer than the line length limit . Another example are **whitespaces before colons in inline fors (E203)**. `black` places them in that way, so we'll leave them like that.
 
 On top of that, there are a few rules to also have in mind.
 

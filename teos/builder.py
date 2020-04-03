@@ -99,7 +99,7 @@ class Builder:
     def update_states(watcher, missed_blocks_watcher, missed_blocks_responder):
         """
         Updates the states of both the :mod:`Watcher <teos.watcher.Watcher>` and the
-        :mod:`Responder <teos.responder.Responder>`. If both have pending blocks to process they need to be updates at
+        :mod:`Responder <teos.responder.Responder>`. If both have pending blocks to process they need to be updated at
         the same time, block by block.
 
         If only one instance has to be updated, ``populate_block_queue`` should be used.

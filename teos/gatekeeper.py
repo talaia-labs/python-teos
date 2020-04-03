@@ -3,7 +3,7 @@ from common.cryptographer import Cryptographer
 
 
 class NotEnoughSlots(ValueError):
-    """Raise this when trying to subtract more slots than a user has available"""
+    """Raised when trying to subtract more slots than a user has available"""
 
     def __init__(self, user_pk, requested_slots):
         self.user_pk = user_pk
@@ -12,7 +12,7 @@ class NotEnoughSlots(ValueError):
 
 class IdentificationFailure(Exception):
     """
-    Raise this when a user can not be identified. Either the user public key cannot be recovered or the user is
+    Raised when a user can not be identified. Either the user public key cannot be recovered or the user is
     not found within the registered ones.
     """
 
@@ -45,7 +45,7 @@ class Gatekeeper:
         """
 
         if not is_compressed_pk(user_pk):
-            raise ValueError("provided public key does not match expected format (33-byte hex string)")
+            raise ValueError("Provided public key does not match expected format (33-byte hex string)")
 
         if user_pk not in self.registered_users:
             self.registered_users[user_pk] = {"available_slots": self.default_slots}

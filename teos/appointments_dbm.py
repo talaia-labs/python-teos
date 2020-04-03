@@ -33,7 +33,7 @@ class AppointmentsDBM(DBManager):
 
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
-            database will be create if the specified path does not contain one.
+            database will be created if the specified path does not contain one.
 
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
@@ -148,7 +148,7 @@ class AppointmentsDBM(DBManager):
                 by default.
 
         Returns:
-            :obj:`dict`: A dictionary with all the appointments stored in the database. An empty dictionary is there
+            :obj:`dict`: A dictionary with all the appointments stored in the database. An empty dictionary if there
             are none.
         """
 
@@ -453,7 +453,7 @@ class AppointmentsDBM(DBManager):
         Creates a flag that signals that an appointment has been triggered for every appointment in the given list
 
         Args:
-            uuids (:obj:`list`): a list of identifier for the appointments to flag.
+            uuids (:obj:`list`): a list of identifiers for the appointments to flag.
         """
 
         with self.db.write_batch() as b:
