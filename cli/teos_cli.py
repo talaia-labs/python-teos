@@ -263,7 +263,7 @@ def post_request(data, endpoint):
         return requests.post(url=endpoint, json=data, timeout=5)
 
     except Timeout:
-        message = "Can't connect to the Eye of Satoshi's API. Connection timeout"
+        message = "Cannot connect to the Eye of Satoshi's API. Connection timeout"
 
     except ConnectionError:
         message = "Cannot connect to the Eye of Satoshi's API. Server cannot be reached"
