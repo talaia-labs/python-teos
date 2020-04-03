@@ -281,9 +281,14 @@ class Cryptographer:
             logger.error("The value passed as sk is not a private key (EllipticCurvePrivateKey)")
             return None
 
-        rsig_rid = sk.sign_recoverable(LN_MESSAGE_PREFIX + message, hasher=sha256d)
-        sigrec = sigrec_encode(rsig_rid)
-        zb32_sig = pyzbase32.encode_bytes(sigrec).decode()
+        try:
+            rsig_rid = sk.sign_recoverable(LN_MESSAGE_PREFIX + message, hasher=sha256d)
+            sigrec = sigrec_encode(rsig_rid)
+            zb32_sig = pyzbase32.encode_bytes(sigrec).decode()
+
+        except ValueError:
+            logger.error("Couldn't sign the message")
+            return None
 
         return zb32_sig
 
