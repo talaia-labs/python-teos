@@ -1,7 +1,7 @@
 import os
 from teos.utils.auth_proxy import AuthServiceProxy
 
-HOST = "localhost"
+HOST = "0.0.0.0"
 PORT = 9814
 DATA_DIR = os.path.expanduser("~/.teos/")
 CONF_FILE_NAME = "teos.conf"
