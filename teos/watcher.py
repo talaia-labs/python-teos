@@ -1,5 +1,5 @@
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 
 import common.cryptographer
 from common.logger import Logger
@@ -70,6 +70,7 @@ class Watcher:
         self.max_appointments = max_appointments
         self.expiry_delta = expiry_delta
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
+        self.mutex = Lock()
 
     def awake(self):
         """Starts a new thread to monitor the blockchain for channel breaches"""
@@ -122,41 +123,101 @@ class Watcher:
             - ``(False, None)`` otherwise.
         """
 
-        if len(self.appointments) < self.max_appointments:
+        # Lock to prevent race conditions.
+        self.mutex.acquire()
 
+        try:
+            if len(self.appointments) < self.max_appointments:
+
+                # The uuids are generated as the RIPMED160(locator||user_pubkey), that way the tower does not need to know
+                # anything about the user from this point on (no need to store user_pk in the database).
+                # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
+                uuid = hash_160("{}{}".format(appointment.locator, user_pk))
+                self.appointments[uuid] = {
+                    "locator": appointment.locator,
+                    "end_time": appointment.end_time,
+                    "size": len(appointment.encrypted_blob.data),
+                }
+
+                if appointment.locator in self.locator_uuid_map:
+                    # If the uuid is already in the map it means this is an update.
+                    if uuid not in self.locator_uuid_map[appointment.locator]:
+                        self.locator_uuid_map[appointment.locator].append(uuid)
+
+                else:
+                    self.locator_uuid_map[appointment.locator] = [uuid]
+
+                self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+                self.db_manager.create_append_locator_map(appointment.locator, uuid)
+
+                appointment_added = True
+                signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
+
+                logger.info("New appointment accepted", locator=appointment.locator)
+
+            else:
+                appointment_added = False
+                signature = None
+
+                logger.info("Maximum appointments reached, appointment rejected", locator=appointment.locator)
+
+        finally:
+            # Unlock.
+            self.mutex.release()
+
+        return appointment_added, signature
+
+    def pop_appointment(self, locator, user_pk):
+        """
+        Pops an appointment from the memory (``appointments`` and
+        ``locator_uuid_map`` dictionaries) and deletes it from the appointments
+        database.
+
+        The ``Watcher``  will stop monitoring the blockchain (``do_watch``) for
+        the appointment.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex string identifying the appointment.
+            user_pk(:obj:`str`): the public key that identifies the user who
+                request the deletion (33-bytes hex str).
+
+        Returns:
+            :obj:`tuple`: A tuple with the appointment summary and signaling if
+                it has been deleted or not.
+            The structure looks as follows:
+
+            - ``(summary, signature)`` if the appointment was deleted.
+            - ``(None, None)`` otherwise (e.g. appointment did not exist).
+        """
+
+        # Lock to prevent race conditions.
+        self.mutex.acquire()
+
+        try:
             # The uuids are generated as the RIPMED160(locator||user_pubkey), that way the tower does not need to know
             # anything about the user from this point on (no need to store user_pk in the database).
             # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
-            uuid = hash_160("{}{}".format(appointment.locator, user_pk))
-            self.appointments[uuid] = {
-                "locator": appointment.locator,
-                "end_time": appointment.end_time,
-                "size": len(appointment.encrypted_blob.data),
-            }
+            uuid = hash_160("{}{}".format(locator, user_pk))
 
-            if appointment.locator in self.locator_uuid_map:
-                # If the uuid is already in the map it means this is an update.
-                if uuid not in self.locator_uuid_map[appointment.locator]:
-                    self.locator_uuid_map[appointment.locator].append(uuid)
+            appointment_summary = self.get_appointment_summary(uuid)
+
+            if appointment_summary:
+                # Delete appointment as "completed".
+                Cleaner.delete_completed_appointments([uuid], self.appointments, self.locator_uuid_map, self.db_manager)
+
+                message = "delete appointment {}".format(locator)
+                signature = Cryptographer.sign(message.encode(), self.signing_key)
+                logger.info("Appointment deleted", locator=locator)
 
             else:
-                self.locator_uuid_map[appointment.locator] = [uuid]
+                signature = None
+                logger.info("Deletion rejected", locator=locator)
 
-            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-            self.db_manager.create_append_locator_map(appointment.locator, uuid)
+        finally:
+            # Unlock.
+            self.mutex.release()
 
-            appointment_added = True
-            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
-
-            logger.info("New appointment accepted", locator=appointment.locator)
-
-        else:
-            appointment_added = False
-            signature = None
-
-            logger.info("Maximum appointments reached, appointment rejected", locator=appointment.locator)
-
-        return appointment_added, signature
+        return appointment_summary, signature
 
     def do_watch(self):
         """
@@ -174,57 +235,65 @@ class Watcher:
             if len(self.appointments) > 0 and block is not None:
                 txids = block.get("tx")
 
-                expired_appointments = [
-                    uuid
-                    for uuid, appointment_data in self.appointments.items()
-                    if block["height"] > appointment_data.get("end_time") + self.expiry_delta
-                ]
+                # Lock to prevent race conditions.
+                self.mutex.acquire()
 
-                Cleaner.delete_expired_appointments(
-                    expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
-                )
+                try:
+                    expired_appointments = [
+                        uuid
+                        for uuid, appointment_data in self.appointments.items()
+                        if block["height"] > appointment_data.get("end_time") + self.expiry_delta
+                    ]
 
-                valid_breaches, invalid_breaches = self.filter_valid_breaches(self.get_breaches(txids))
-
-                triggered_flags = []
-                appointments_to_delete = []
-
-                for uuid, breach in valid_breaches.items():
-                    logger.info(
-                        "Notifying responder and deleting appointment",
-                        penalty_txid=breach["penalty_txid"],
-                        locator=breach["locator"],
-                        uuid=uuid,
+                    Cleaner.delete_expired_appointments(
+                        expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                     )
 
-                    receipt = self.responder.handle_breach(
-                        uuid,
-                        breach["locator"],
-                        breach["dispute_txid"],
-                        breach["penalty_txid"],
-                        breach["penalty_rawtx"],
-                        self.appointments[uuid].get("end_time"),
-                        block_hash,
+                    valid_breaches, invalid_breaches = self.filter_valid_breaches(self.get_breaches(txids))
+
+                    triggered_flags = []
+                    appointments_to_delete = []
+
+                    for uuid, breach in valid_breaches.items():
+                        logger.info(
+                            "Notifying responder and deleting appointment",
+                            penalty_txid=breach["penalty_txid"],
+                            locator=breach["locator"],
+                            uuid=uuid,
+                        )
+
+                        receipt = self.responder.handle_breach(
+                            uuid,
+                            breach["locator"],
+                            breach["dispute_txid"],
+                            breach["penalty_txid"],
+                            breach["penalty_rawtx"],
+                            self.appointments[uuid].get("end_time"),
+                            block_hash,
+                        )
+
+                        # FIXME: Only necessary because of the triggered appointment approach. Fix if it changes.
+
+                        if receipt.delivered:
+                            Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
+                            triggered_flags.append(uuid)
+                        else:
+                            appointments_to_delete.append(uuid)
+
+                    # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
+                    appointments_to_delete.extend(invalid_breaches)
+                    self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
+
+                    Cleaner.delete_completed_appointments(
+                        appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                     )
 
-                    # FIXME: Only necessary because of the triggered appointment approach. Fix if it changes.
+                    if len(self.appointments) != 0:
+                        logger.info("No more pending appointments")
 
-                    if receipt.delivered:
-                        Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
-                        triggered_flags.append(uuid)
-                    else:
-                        appointments_to_delete.append(uuid)
-
-                # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
-                appointments_to_delete.extend(invalid_breaches)
-                self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
-
-                Cleaner.delete_completed_appointments(
-                    appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
-                )
-
-                if len(self.appointments) != 0:
-                    logger.info("No more pending appointments")
+                finally:
+                    # Unlock.
+                    self.mutex.release()
 
             # Register the last processed block for the watcher
             self.db_manager.store_last_block_hash_watcher(block_hash)
