@@ -4,14 +4,6 @@
 
 There are two ways of running `teos`: running it as a module or adding the library to the `PYTHONPATH` env variable.
 
-## Running `teos` as a docker container
-`teos` container can be build from Dockerfile attached to the repo. ENV variables are optional, if not set defaults are used.
-
-	git clone https://github.com/talaia-labs/python-teos
-	cd python-teos
-	docker build . -t teos
-    docker run -it -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> -e BTC_RPC_HOST=<hostname> -e BTC_RPC_PORT=<port> teos
-
 ## Running `teos` as a Module
 The **easiest** way to run `teos` is as a module. To do so you need to use `python -m`. From the teos parent directory run:
 
