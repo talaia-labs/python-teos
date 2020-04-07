@@ -3,7 +3,6 @@ from shutil import rmtree
 from binascii import hexlify
 
 from teos.api import API
-from teos import HOST, PORT
 import teos.errors as errors
 from teos.watcher import Watcher
 from teos.inspector import Inspector
@@ -22,8 +21,9 @@ from common.constants import (
     ENCRYPTED_BLOB_MAX_SIZE_HEX,
 )
 
+config = get_config()
 
-TEOS_API = "http://{}:{}".format(HOST, PORT)
+TEOS_API = "http://{}:{}".format(config.get("API_HOST"), config.get("API_PORT"))
 register_endpoint = "{}/register".format(TEOS_API)
 add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
 get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
@@ -37,8 +37,6 @@ TWO_SLOTS_BLOTS = "A" * ENCRYPTED_BLOB_MAX_SIZE_HEX + "AA"
 
 appointments = {}
 locator_dispute_tx_map = {}
-
-config = get_config()
 
 
 client_sk, client_pk = generate_keypair()
@@ -62,8 +60,8 @@ def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
 
     responder = Responder(db_manager, carrier, block_processor)
     watcher = Watcher(db_manager, block_processor, responder, sk.to_der(), MAX_APPOINTMENTS, config.get("EXPIRY_DELTA"))
-
-    api = API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, gatekeeper)
+    inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
+    api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher, gatekeeper)
 
     return api
 
