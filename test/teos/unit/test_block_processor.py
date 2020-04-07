@@ -1,6 +1,4 @@
-import pytest
-
-from test.teos.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork, bitcoind_connect_params
+from test.teos.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork
 
 
 hex_tx = (

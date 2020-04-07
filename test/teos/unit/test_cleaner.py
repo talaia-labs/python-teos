@@ -27,7 +27,7 @@ def set_up_appointments(db_manager, total_appointments):
         appointments[uuid] = {"locator": appointment.locator}
         locator_uuid_map[locator] = [uuid]
 
-        db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         db_manager.create_append_locator_map(locator, uuid)
 
         # Each locator can have more than one uuid assigned to it.
@@ -37,7 +37,7 @@ def set_up_appointments(db_manager, total_appointments):
             appointments[uuid] = {"locator": appointment.locator}
             locator_uuid_map[locator].append(uuid)
 
-            db_manager.store_watcher_appointment(uuid, appointment.to_json())
+            db_manager.store_watcher_appointment(uuid, appointment.to_dict())
             db_manager.create_append_locator_map(locator, uuid)
 
     return appointments, locator_uuid_map
@@ -60,7 +60,7 @@ def set_up_trackers(db_manager, total_trackers):
         trackers[uuid] = {"locator": tracker.locator, "penalty_txid": tracker.penalty_txid}
         tx_tracker_map[penalty_txid] = [uuid]
 
-        db_manager.store_responder_tracker(uuid, tracker.to_json())
+        db_manager.store_responder_tracker(uuid, tracker.to_dict())
         db_manager.create_append_locator_map(tracker.locator, uuid)
 
         # Each penalty_txid can have more than one uuid assigned to it.
@@ -70,7 +70,7 @@ def set_up_trackers(db_manager, total_trackers):
             trackers[uuid] = {"locator": tracker.locator, "penalty_txid": tracker.penalty_txid}
             tx_tracker_map[penalty_txid].append(uuid)
 
-            db_manager.store_responder_tracker(uuid, tracker.to_json())
+            db_manager.store_responder_tracker(uuid, tracker.to_dict())
             db_manager.create_append_locator_map(tracker.locator, uuid)
 
     return trackers, tx_tracker_map

@@ -33,7 +33,6 @@ The alpha release does not have authentication, payments nor rate limiting, ther
 
 - `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`.
 - `end_time` cannot be bigger than (roughtly) a month. That is `4320` blocks on top of `start_time`.
-- `encrypted_blob`s are limited to `2 kib`. 
 
 #### Appointment example
 

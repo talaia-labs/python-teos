@@ -26,7 +26,11 @@ class Builder:
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointments[uuid] = {"locator": data.get("locator"), "end_time": data.get("end_time")}
+            appointments[uuid] = {
+                "locator": data.get("locator"),
+                "end_time": data.get("end_time"),
+                "size": len(data.get("encrypted_blob")),
+            }
 
             if data.get("locator") in locator_uuid_map:
                 locator_uuid_map[data.get("locator")].append(uuid)
@@ -94,8 +98,9 @@ class Builder:
     @staticmethod
     def update_states(watcher, missed_blocks_watcher, missed_blocks_responder):
         """
-        Updates the states of both the :mod:`Watcher <teos.watcher.Watcher>` and the :mod:`Responder <teos.responder.Responder>`.
-        If both have pending blocks to process they need to be updates at the same time, block by block.
+        Updates the states of both the :mod:`Watcher <teos.watcher.Watcher>` and the
+        :mod:`Responder <teos.responder.Responder>`. If both have pending blocks to process they need to be updated at
+        the same time, block by block.
 
         If only one instance has to be updated, ``populate_block_queue`` should be used.
 
