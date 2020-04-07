@@ -26,7 +26,7 @@ from test.teos.e2e.conftest import (
 cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
-teos_base_endpoint = "http://{}:{}".format(cli_config.get("TEOS_SERVER"), cli_config.get("TEOS_PORT"))
+teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 

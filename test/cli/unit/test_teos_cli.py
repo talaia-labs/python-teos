@@ -30,7 +30,7 @@ dummy_teos_sk = PrivateKey.from_int(2)
 dummy_teos_pk = dummy_teos_sk.public_key
 another_sk = PrivateKey.from_int(3)
 
-teos_url = "http://{}:{}".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
+teos_url = "http://{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))
 add_appointment_endpoint = "{}/add_appointment".format(teos_url)
 register_endpoint = "{}/register".format(teos_url)
 get_appointment_endpoint = "{}/get_appointment".format(teos_url)

@@ -15,8 +15,8 @@ Refer to [INSTALL.md](INSTALL.md)
 	
 #### Global options
 
-- `-s, --server`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
-- `-p, --port` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
+- `--apiconnect`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
+- `-apiport` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
 - `-h --help`: 	shows a list of commands or help for a specific command.
 
 #### Commands
@@ -180,10 +180,10 @@ By default, `teos_cli` will connect to your local instance (running on localhost
 - mainnet endpoint = `teosmainnet.pisa.watch`
 
 ### Connecting to the mainnet instance
-Add `-s https://teosmainnet.pisa.watch` to your calls, for example:
+Add `--apiconnect https://teosmainnet.pisa.watch` to your calls, for example:
 
 ```
-python teos_cli.py -s https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
+python teos_cli.py --apiconnect https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
 ```
 
 You can also change the config file to avoid specifying the server every time:

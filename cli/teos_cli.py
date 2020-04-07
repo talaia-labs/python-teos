@@ -373,7 +373,7 @@ def main(command, args, command_line_conf):
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     # Set the teos url
-    teos_url = "{}:{}".format(config.get("TEOS_SERVER"), config.get("TEOS_PORT"))
+    teos_url = "{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))
     # If an http or https prefix if found, leaves the server as is. Otherwise defaults to http.
     if not teos_url.startswith("http"):
         teos_url = "http://" + teos_url
@@ -438,17 +438,17 @@ if __name__ == "__main__":
     commands = ["register", "add_appointment", "get_appointment", "help"]
 
     try:
-        opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])
+        opts, args = getopt(argv[1:], "h", ["apiconnect=", "apiport=", "help"])
 
         for opt, arg in opts:
-            if opt in ["-s", "--server"]:
+            if opt in ["--apiconnect"]:
                 if arg:
-                    command_line_conf["TEOS_SERVER"] = arg
+                    command_line_conf["API_CONNECT"] = arg
 
-            if opt in ["-p", "--port"]:
+            if opt in ["--apiport"]:
                 if arg:
                     try:
-                        command_line_conf["TEOS_PORT"] = int(arg)
+                        command_line_conf["API_PORT"] = int(arg)
                     except ValueError:
                         sys.exit("port must be an integer")
 

@@ -6,8 +6,8 @@ LOG_PREFIX = "cli"
 
 # Load config fields
 DEFAULT_CONF = {
-    "TEOS_SERVER": {"value": "localhost", "type": str},
-    "TEOS_PORT": {"value": 9814, "type": int},
+    "API_CONNECT": {"value": "localhost", "type": str},
+    "API_PORT": {"value": 9814, "type": int},
     "LOG_FILE": {"value": "teos_cli.log", "type": str, "path": True},
     "APPOINTMENTS_FOLDER_NAME": {"value": "appointment_receipts", "type": str, "path": True},
     "CLI_PUBLIC_KEY": {"value": "cli_pk.der", "type": str, "path": True},
