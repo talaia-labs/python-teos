@@ -2,18 +2,13 @@ import pytest
 from binascii import unhexlify
 
 import teos.errors as errors
-from teos import LOG_PREFIX
 from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
 
-import common.cryptographer
-from common.logger import Logger
 from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
 from test.teos.unit.conftest import get_random_value_hex, bitcoind_connect_params, get_config
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 NO_HEX_STRINGS = [
     "R" * LOCATOR_LEN_HEX,

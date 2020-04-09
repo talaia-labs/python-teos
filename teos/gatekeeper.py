@@ -1,5 +1,6 @@
 from common.tools import is_compressed_pk
 from common.cryptographer import Cryptographer
+from common.exceptions import InvalidParameter, InvalidKey, SignatureError
 
 
 class NotEnoughSlots(ValueError):
@@ -71,7 +72,7 @@ class Gatekeeper:
             :obj:`IdentificationFailure`: if the user cannot be identified.
         """
 
-        if isinstance(message, bytes) and isinstance(signature, str):
+        try:
             rpk = Cryptographer.recover_pk(message, signature)
             compressed_pk = Cryptographer.get_compressed_pk(rpk)
 
@@ -80,7 +81,7 @@ class Gatekeeper:
             else:
                 raise IdentificationFailure("User not found.")
 
-        else:
+        except (InvalidParameter, InvalidKey, SignatureError):
             raise IdentificationFailure("Wrong message or signature.")
 
     def fill_slots(self, user_pk, n):

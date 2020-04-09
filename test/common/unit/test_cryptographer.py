@@ -1,16 +1,11 @@
 import os
-from binascii import unhexlify
+from coincurve import PrivateKey, PublicKey
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
-from coincurve import PrivateKey, PublicKey
-import common.cryptographer
-from common.logger import Logger
 from common.cryptographer import Cryptographer
 from test.common.unit.conftest import get_random_value_hex
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
 data = "6097cdf52309b1b2124efeed36bd34f46dc1c25ad23ac86f28380f746254f777"
 key = "b2e984a570f6f49bc38ace178e09147b0aa296cbb7c92eb01412f7e2d07b5659"
@@ -185,7 +180,7 @@ def test_sign_ground_truth():
     sig = Cryptographer.sign(message, sk)
     rpk = Cryptographer.recover_pk(message, sig)
 
-    assert Cryptographer.verify_rpk(PublicKey(unhexlify(c_lightning_rpk)), rpk)
+    assert c_lightning_rpk == Cryptographer.get_compressed_pk(rpk)
 
 
 def test_sign_wrong_sk():
@@ -221,7 +216,7 @@ def test_recover_pk_ground_truth():
 
     rpk = Cryptographer.recover_pk(message, zsig)
 
-    assert Cryptographer.verify_rpk(PublicKey(unhexlify(org_pk)), rpk)
+    assert org_pk == Cryptographer.get_compressed_pk(rpk)
 
 
 def test_recover_pk_wrong_inputs():
@@ -239,27 +234,6 @@ def test_recover_pk_wrong_inputs():
     # Wrong input size or format
     assert Cryptographer.recover_pk(message, sig) is None
     assert Cryptographer.recover_pk(message, bytes(104)) is None
-
-
-def test_verify_pk():
-    sk, _ = generate_keypair()
-    message = b"Test message"
-
-    zbase32_sig = Cryptographer.sign(message, sk)
-    rpk = Cryptographer.recover_pk(message, zbase32_sig)
-
-    assert Cryptographer.verify_rpk(sk.public_key, rpk)
-
-
-def test_verify_pk_wrong():
-    sk, _ = generate_keypair()
-    sk2, _ = generate_keypair()
-    message = b"Test message"
-
-    zbase32_sig = Cryptographer.sign(message, sk)
-    rpk = Cryptographer.recover_pk(message, zbase32_sig)
-
-    assert not Cryptographer.verify_rpk(sk2.public_key, rpk)
 
 
 def test_get_compressed_pk():

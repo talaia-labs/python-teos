@@ -8,8 +8,6 @@ from coincurve import PrivateKey
 from cli.exceptions import TowerResponseError
 from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
-import common.cryptographer
-from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -25,7 +23,6 @@ from test.teos.e2e.conftest import (
 )
 
 cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
 teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
@@ -257,7 +254,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     # Check that the server has accepted the appointment
     signature = response_json.get("signature")
     rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-    assert Cryptographer.verify_rpk(teos_pk, rpk) is True
+    assert teos_pk == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
 
     # Trigger the appointment

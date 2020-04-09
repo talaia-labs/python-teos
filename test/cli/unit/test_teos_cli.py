@@ -7,8 +7,6 @@ from binascii import hexlify
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
 
-import common.cryptographer
-from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -17,8 +15,6 @@ import cli.teos_cli as teos_cli
 from cli.exceptions import InvalidParameter, InvalidKey, TowerResponseError
 
 from test.cli.unit.conftest import get_random_value_hex, get_config
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=teos_cli.LOG_PREFIX)
 
 config = get_config()
 

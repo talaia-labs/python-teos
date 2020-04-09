@@ -10,24 +10,20 @@ from bitcoind_mock.bitcoind import BitcoindMock
 from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
 from bitcoind_mock.transaction import create_dummy_transaction
 
+from teos import DEFAULT_CONF
 from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
 from teos.users_dbm import UsersDBM
 from teos.gatekeeper import Gatekeeper
-from teos import LOG_PREFIX, DEFAULT_CONF
 from teos.responder import TransactionTracker
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
 
-import common.cryptographer
-from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 # Set params to connect to regtest for testing
 DEFAULT_CONF["BTC_RPC_PORT"]["value"] = 18443

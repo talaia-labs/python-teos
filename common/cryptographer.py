@@ -7,13 +7,14 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from common.tools import is_256b_hex_str
+from common.exceptions import InvalidKey, InvalidParameter, SignatureError, EncryptionError
 
 LN_MESSAGE_PREFIX = b"Lightning Signed Message:"
 
 
 def sha256d(message):
     """
-    Computes the double sha256 of a given by message.
+    Computes the double sha256 of a given message.
 
     Args:
         message(:obj:`bytes`): the message to be used as input to the hash function.
@@ -87,10 +88,6 @@ def sigrec_decode(sigrec):
     return rsig + rid
 
 
-# FIXME: Common has not log file, so it needs to log in the same log as the caller. This is a temporary fix.
-logger = None
-
-
 class Cryptographer:
     """
     The :class:`Cryptographer` is in charge of all the cryptography in the tower.
@@ -99,63 +96,49 @@ class Cryptographer:
     @staticmethod
     def check_data_key_format(data, secret):
         """
-        Checks that the data and secret that will be used to by ``encrypt`` / ``decrypt`` are properly
-        formatted.
+        Checks that the data and secret that will be used to by ``encrypt`` / ``decrypt`` are properly formatted.
 
         Args:
               data(:obj:`str`): the data to be encrypted.
               secret(:obj:`str`): the secret used to derive the encryption key.
 
-        Returns:
-              :obj:`bool`: Whether or not the ``key`` and ``data`` are properly formatted.
-
         Raises:
-              :obj:`ValueError`: if either the ``key`` or ``data`` is not properly formatted.
+              :obj:`InvalidParameter`: if either the ``key`` and/or ``data`` are not properly formatted.
         """
 
         if len(data) % 2:
-            error = "Incorrect (Odd-length) value"
-            raise ValueError(error)
+            raise InvalidParameter("Incorrect (Odd-length) data", data=data)
 
         if not is_256b_hex_str(secret):
-            error = "Secret must be a 32-byte hex value (64 hex chars)"
-            raise ValueError(error)
-
-        return True
+            raise InvalidParameter("Secret must be a 32-byte hex value (64 hex chars)", secret=secret)
 
     @staticmethod
-    def encrypt(blob, secret):
+    def encrypt(message, secret):
         """
-        Encrypts a given :obj:`Blob <common.cli.blob.Blob>` data using ``CHACHA20POLY1305``.
+        Encrypts a given message data using ``CHACHA20POLY1305``.
 
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-              blob (:obj:`Blob <common.cli.blob.Blob>`): a ``Blob`` object containing a raw penalty transaction.
+              message (:obj:`str`): a message to be encrypted. Should be the hex-encoded commitment_tx.
               secret (:obj:`str`): a value to used to derive the encryption key. Should be the dispute txid.
 
         Returns:
-              :obj:`str`: The encrypted data (hex encoded).
+              :obj:`str`: The encrypted data (hex-encoded).
 
         Raises:
-              :obj:`ValueError`: if either the ``secret`` or ``blob`` is not properly formatted.
+              :obj:`InvalidParameter`: if either the ``key`` and/or ``data`` are not properly formatted.
         """
 
-        Cryptographer.check_data_key_format(blob.data, secret)
-
-        # Transaction to be encrypted
-        # FIXME: The blob data should contain more things that just the transaction. Leaving like this for now.
-        tx = unhexlify(blob.data)
+        Cryptographer.check_data_key_format(message, secret)
 
         # sk is the H(txid) (32-byte) and nonce is set to 0 (12-byte)
         sk = sha256(unhexlify(secret)).digest()
         nonce = bytearray(12)
 
-        logger.debug("Encrypting blob", sk=hexlify(sk).decode(), nonce=hexlify(nonce).decode(), blob=blob.data)
-
         # Encrypt the data
         cipher = ChaCha20Poly1305(sk)
-        encrypted_blob = cipher.encrypt(nonce=nonce, data=tx, associated_data=None)
+        encrypted_blob = cipher.encrypt(nonce=nonce, data=unhexlify(message), associated_data=None)
         encrypted_blob = hexlify(encrypted_blob).decode("utf8")
 
         return encrypted_blob
@@ -164,20 +147,20 @@ class Cryptographer:
     # ToDo: #20-test-tx-decrypting-edge-cases
     def decrypt(encrypted_blob, secret):
         """
-        Decrypts a given :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` using ``CHACHA20POLY1305``.
+        Decrypts a given encrypted_blob using ``CHACHA20POLY1305``.
 
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-            encrypted_blob(:obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob``
-                potentially containing a penalty transaction.
-            secret (:obj:`str`): a value to used to derive the decryption key. Should be the dispute txid.
+            encrypted_blob(:obj:`str`): an encrypted blob of data potentially containing a penalty transaction.
+            secret (:obj:`str`): a value used to derive the decryption key. Should be the dispute txid.
 
         Returns:
-              :obj:`str`: The decrypted data (hex encoded).
+              :obj:`str`: The decrypted data (hex-encoded).
 
         Raises:
-              :obj:`ValueError`: if either the ``secret`` or ``encrypted_blob`` is not properly formatted.
+              :obj:`InvalidParameter`: if either the ``key`` and/or ``data`` are not properly formatted.
+              :obj:`EncryptionError`: if the data cannot be decrypted with the given key.
         """
 
         Cryptographer.check_data_key_format(encrypted_blob, secret)
@@ -185,13 +168,6 @@ class Cryptographer:
         # sk is the H(txid) (32-byte) and nonce is set to 0 (12-byte)
         sk = sha256(unhexlify(secret)).digest()
         nonce = bytearray(12)
-
-        logger.info(
-            "Decrypting blob",
-            sk=hexlify(sk).decode(),
-            nonce=hexlify(nonce).decode(),
-            encrypted_blob=encrypted_blob.data,
-        )
 
         # Decrypt
         cipher = ChaCha20Poly1305(sk)
@@ -202,8 +178,7 @@ class Cryptographer:
             blob = hexlify(blob).decode("utf8")
 
         except InvalidTag:
-            blob = None
-            logger.error("Can't decrypt blob with the provided key")
+            raise EncryptionError("Can't decrypt blob with the provided key", blob=encrypted_blob, key=secret)
 
         return blob
 
@@ -216,12 +191,15 @@ class Cryptographer:
             file_path (:obj:`str`): the path to the key file to be loaded.
 
         Returns:
-            :obj:`bytes` or :obj:`None`: the key file data if the file can be found and read. ``None`` otherwise.
+            :obj:`bytes`: the key file data if the file can be found and read.
+
+        Raises:
+             :obj:`InvalidParameter`: if the file_path has wrong format or cannot be found.
+             :obj:`InvalidKey`: if the key cannot be loaded from the file. It covers temporary I/O errors.
         """
 
         if not isinstance(file_path, str):
-            logger.error("Key file path was expected, {} received".format(type(file_path)))
-            return None
+            raise InvalidParameter("Key file path was expected, {} received".format(type(file_path)))
 
         try:
             with open(file_path, "rb") as key_file:
@@ -229,12 +207,10 @@ class Cryptographer:
             return key
 
         except FileNotFoundError:
-            logger.error("Key file not found at {}. Please check your settings".format(file_path))
-            return None
+            raise InvalidParameter("Key file not found at {}. Please check your settings".format(file_path))
 
         except IOError as e:
-            logger.error("I/O error({}): {}".format(e.errno, e.strerror))
-            return None
+            raise InvalidKey("Key file cannot be loaded", exception=e)
 
     @staticmethod
     def load_private_key_der(sk_der):
@@ -245,50 +221,52 @@ class Cryptographer:
              sk_der(:obj:`str`): a private key encoded in ``DER`` format.
 
         Returns:
-             :obj:`PrivateKey` or :obj:`None`: A ``PrivateKey`` object. if the private key can be loaded. `None`
-             otherwise.
+             :obj:`PrivateKey`: A ``PrivateKey`` object if the private key can be loaded.
+
+        Raises:
+            :obj:`InvalidKey`: if a ``PrivateKey`` cannot be loaded from the given data.
         """
+
         try:
             sk = PrivateKey.from_der(sk_der)
             return sk
 
         except ValueError:
-            logger.error("The provided data cannot be deserialized (wrong size or format)")
+            raise InvalidKey("The provided key data cannot be deserialized (wrong size or format)")
 
         except TypeError:
-            logger.error("The provided data cannot be deserialized (wrong type)")
-
-        return None
+            raise InvalidKey("The provided key data cannot be deserialized (wrong type)")
 
     @staticmethod
     def sign(message, sk):
         """
-        Signs a given data using a given secret key using ECDSA over secp256k1.
+        Signs a given message with a given secret key using ECDSA over secp256k1.
 
         Args:
             message(:obj:`bytes`): the data to be signed.
-            sk(:obj:`PrivateKey`): the ECDSA secret key used to signed the data.
+            sk(:obj:`PrivateKey`): the ECDSA secret key to be used to sign the data.
 
         Returns:
-           :obj:`str` or :obj:`None`: The zbase32 signature of the given message is it can be signed. `None` otherwise.
+           :obj:`str`: The zbase32 signature of the given message is it can be signed.
+
+        Raises:
+             :obj:`InvalidParameter`: if the message and/or secret key have a wrong value.
+             :obj:`SignatureError`: if there is an error during the signing process.
         """
 
         if not isinstance(message, bytes):
-            logger.error("The message must be bytes. {} received".format(type(message)))
-            return None
+            raise InvalidParameter("Wrong value passed as message. Received {}, expected (bytes)".format(type(message)))
 
         if not isinstance(sk, PrivateKey):
-            logger.error("The value passed as sk is not a private key (PrivateKey)")
-            return None
+            raise InvalidParameter("Wrong value passed as sk. Received {}, expected (PrivateKey)".format(type(message)))
 
         try:
             rsig_rid = sk.sign_recoverable(LN_MESSAGE_PREFIX + message, hasher=sha256d)
             sigrec = sigrec_encode(rsig_rid)
             zb32_sig = pyzbase32.encode_bytes(sigrec).decode()
 
-        except ValueError:
-            logger.error("Couldn't sign the message")
-            return None
+        except ValueError as e:
+            raise SignatureError("Couldn't sign the message. " + str(e))
 
         return zb32_sig
 
@@ -302,16 +280,20 @@ class Cryptographer:
             zb32_sig(:obj:`str`): the zbase32 signature of the message.
 
         Returns:
-           :obj:`PublicKey` or :obj:`None`: The recovered public key if it can be recovered. `None` otherwise.
+           :obj:`PublicKey`: The public key if it can be recovered.
+
+        Raises:
+             :obj:`InvalidParameter`: if the message and/or signature have a wrong value.
+             :obj:`SignatureError`: if a public key cannot be recovered from the given signature.
         """
 
         if not isinstance(message, bytes):
-            logger.error("The message must be bytes. {} received".format(type(message)))
-            return None
+            raise InvalidParameter("Wrong value passed as message. Received {}, expected (bytes)".format(type(message)))
 
         if not isinstance(zb32_sig, str):
-            logger.error("The zbase32_sig must be str. {} received".format(type(zb32_sig)))
-            return None
+            raise InvalidParameter(
+                "Wrong value passed as zbase32_sig. Received {}, expected (str)".format(type(zb32_sig))
+            )
 
         sigrec = pyzbase32.decode_bytes(zb32_sig)
 
@@ -323,31 +305,13 @@ class Cryptographer:
         except ValueError as e:
             # Several errors fit here: Signature length != 65, wrong recover id and failed to parse signature.
             # All of them return raise ValueError.
-            logger.error(str(e))
-            return None
+            raise SignatureError("Cannot recover a public key from the given signature. " + str(e))
 
         except Exception as e:
             if "failed to recover ECDSA public key" in str(e):
-                logger.error("Cannot recover public key from signature")
+                raise SignatureError("Cannot recover a public key from the given signature")
             else:
-                logger.error("Unknown exception", error=str(e))
-
-            return None
-
-    @staticmethod
-    def verify_rpk(pk, rpk):
-        """
-        Verifies that that a recovered public key matches a given one.
-
-        Args:
-            pk(:obj:`PublicKey`): a given public key (provided by the user).
-            rpk(:obj:`PublicKey`): a public key recovered via ``recover_pk``.
-
-        Returns:
-            :obj:`bool`: True if the public keys match, False otherwise.
-        """
-
-        return pk.point() == rpk.point()
+                raise SignatureError("Unknown exception. " + str(e))
 
     @staticmethod
     def get_compressed_pk(pk):
@@ -358,18 +322,19 @@ class Cryptographer:
             pk(:obj:`PublicKey`): a given public key.
 
         Returns:
-            :obj:`str` or :obj:`None`: A compressed, hex-encoded, public key (33-byte long) if it can be compressed.
-            `None` oterwise.
+            :obj:`str`: A compressed, hex-encoded, public key (33-byte long) if it can be compressed.
+
+        Raises:
+             :obj:`InvalidParameter`: if the value passed as public key is not a PublicKey object.
+             :obj:`InvalidKey`: if the public key has not been properly created.
         """
 
         if not isinstance(pk, PublicKey):
-            logger.error("The received data is not a PublicKey object")
-            return None
+            raise InvalidParameter("Wrong value passed as pk. Received {}, expected (PublicKey)".format(type(pk)))
 
         try:
             compressed_pk = pk.format(compressed=True)
             return hexlify(compressed_pk).decode("utf-8")
 
         except TypeError as e:
-            logger.error("PublicKey has invalid initializer", error=str(e))
-            return None
+            raise InvalidKey("PublicKey has invalid initializer", error=str(e))

@@ -6,25 +6,24 @@ import requests
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey
-from requests import Timeout, ConnectionError
 from getopt import getopt, GetoptError
+from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
+from cli.exceptions import TowerResponseError
 from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
-from cli.exceptions import InvalidKey, InvalidParameter, TowerResponseError
 from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
 
-import common.cryptographer
 from common import constants
 from common.logger import Logger
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_logging, setup_data_folder
+from common.exceptions import InvalidKey, InvalidParameter, SignatureError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def register(compressed_pk, teos_url):
@@ -107,10 +106,6 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
     appointment = Appointment.from_dict(appointment_data)
     signature = Cryptographer.sign(appointment.serialize(), cli_sk)
 
-    # FIXME: the cryptographer should return exception we can capture
-    if not signature:
-        raise ValueError("The provided appointment cannot be signed")
-
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
     # Send appointment to the server.
@@ -124,7 +119,7 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
         raise TowerResponseError("The response does not contain the signature of the appointment")
 
     rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-    if not Cryptographer.verify_rpk(teos_pk, rpk):
+    if not teos_pk != Cryptographer.get_compressed_pk(rpk):
         raise TowerResponseError("The returned appointment's signature is invalid")
 
     logger.info("Appointment accepted and signed by the Eye of Satoshi")
@@ -467,7 +462,7 @@ def main(command, args, command_line_conf):
 
     except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
         logger.error(str(e))
-    except (InvalidKey, InvalidParameter, TowerResponseError) as e:
+    except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
         logger.error(e.reason, **e.kwargs)
     except Exception as e:
         logger.error("Unknown error occurred", error=str(e))

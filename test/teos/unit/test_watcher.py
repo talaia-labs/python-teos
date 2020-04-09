@@ -13,8 +13,6 @@ from teos.chain_monitor import ChainMonitor
 from teos.appointments_dbm import AppointmentsDBM
 from teos.block_processor import BlockProcessor
 
-import common.cryptographer
-from common.logger import Logger
 from common.tools import compute_locator
 from common.cryptographer import Cryptographer
 
@@ -27,9 +25,6 @@ from test.teos.unit.conftest import (
     bitcoind_feed_params,
     bitcoind_connect_params,
 )
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
-
 
 APPOINTMENTS = 5
 START_TIME_OFFSET = 1
@@ -134,16 +129,16 @@ def test_add_appointment(watcher):
         added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
-        assert Cryptographer.verify_rpk(
-            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+            Cryptographer.recover_pk(appointment.serialize(), sig)
         )
 
         # Check that we can also add an already added appointment (same locator)
         added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
-        assert Cryptographer.verify_rpk(
-            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+            Cryptographer.recover_pk(appointment.serialize(), sig)
         )
 
         # If two appointments with the same locator from the same user are added, they are overwritten, but if they come
@@ -153,8 +148,8 @@ def test_add_appointment(watcher):
         different_user_pk = get_random_value_hex(33)
         added_appointment, sig = watcher.add_appointment(appointment, different_user_pk)
         assert added_appointment is True
-        assert Cryptographer.verify_rpk(
-            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+            Cryptographer.recover_pk(appointment.serialize(), sig)
         )
         assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
@@ -172,8 +167,8 @@ def test_add_too_many_appointments(watcher):
         added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
-        assert Cryptographer.verify_rpk(
-            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+            Cryptographer.recover_pk(appointment.serialize(), sig)
         )
 
     appointment, dispute_tx = generate_dummy_appointment(

@@ -1,17 +1,17 @@
 from queue import Queue
 from threading import Thread
 
-import common.cryptographer
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
+from common.exceptions import EncryptionError
 from common.cryptographer import Cryptographer, hash_160
+from common.exceptions import InvalidParameter, SignatureError
 
 from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
 
 logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 class Watcher:
@@ -57,7 +57,7 @@ class Watcher:
         last_known_block (:obj:`str`): the last block known by the ``Watcher``.
 
     Raises:
-        ValueError: if `teos_sk_file` is not found.
+        :obj:`InvalidKey <common.exceptions.InvalidKey>`: if teos sk cannot be loaded.
 
     """
 
@@ -147,7 +147,14 @@ class Watcher:
             self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
             appointment_added = True
-            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
+
+            try:
+                signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
+
+            except (InvalidParameter, SignatureError):
+                # This should never happen since data is sanitized, just in case to avoid a crash
+                logger.error("Data couldn't be signed", appointment=appointment.to_dict())
+                signature = None
 
             logger.info("New appointment accepted", locator=appointment.locator)
 
@@ -297,7 +304,7 @@ class Watcher:
                     try:
                         penalty_rawtx = Cryptographer.decrypt(appointment.encrypted_blob, dispute_txid)
 
-                    except ValueError:
+                    except EncryptionError:
                         penalty_rawtx = None
 
                     penalty_tx = self.block_processor.decode_raw_transaction(penalty_rawtx)

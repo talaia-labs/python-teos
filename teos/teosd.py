@@ -3,7 +3,6 @@ from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-import common.cryptographer
 from common.logger import Logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
@@ -25,7 +24,6 @@ from teos.tools import can_connect_to_bitcoind, in_correct_network
 from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def handle_signals(signal_received, frame):
