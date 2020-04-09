@@ -20,7 +20,6 @@ from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
 
 import common.cryptographer
-from common.blob import Blob
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
@@ -138,9 +137,8 @@ def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_o
     }
 
     locator = compute_locator(dispute_txid)
-    blob = Blob(dummy_appointment_data.get("tx"))
 
-    encrypted_blob = Cryptographer.encrypt(blob, dummy_appointment_data.get("tx_id"))
+    encrypted_blob = Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id"))
 
     appointment_data = {
         "locator": locator,

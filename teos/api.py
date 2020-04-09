@@ -189,7 +189,7 @@ class API:
 
             if appointment_summary:
                 used_slots = ceil(appointment_summary.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                required_slots = ceil(len(appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
                 slot_diff = required_slots - used_slots
 
                 # For updates we only reserve the slot difference provided the new one is bigger.
@@ -198,7 +198,7 @@ class API:
             else:
                 # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
                 slot_diff = 0
-                required_slots = ceil(len(appointment.encrypted_blob.data) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+                required_slots = ceil(len(appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
             # Slots are reserved before adding the appointments to prevent race conditions.
             # DISCUSS: It may be worth using signals here to avoid race conditions anyway.

@@ -219,7 +219,7 @@ def test_add_appointment_registered_not_enough_free_slots(api, client, appointme
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
 
     # Let's create a big blob
-    appointment.encrypted_blob.data = TWO_SLOTS_BLOTS
+    appointment.encrypted_blob = TWO_SLOTS_BLOTS
 
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -279,7 +279,7 @@ def test_add_appointment_update_same_size(api, client, appointment):
 
     # The user has no additional slots, but it should be able to update
     # Let's just reverse the encrypted blob for example
-    appointment.encrypted_blob.data = appointment.encrypted_blob.data[::-1]
+    appointment.encrypted_blob = appointment.encrypted_blob[::-1]
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -298,7 +298,7 @@ def test_add_appointment_update_bigger(api, client, appointment):
     assert r.status_code == HTTP_OK and r.json.get("available_slots") == 1
 
     # The user has one slot, so it should be able to update as long as it only takes 1 additional slot
-    appointment.encrypted_blob.data = TWO_SLOTS_BLOTS
+    appointment.encrypted_blob = TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -307,7 +307,7 @@ def test_add_appointment_update_bigger(api, client, appointment):
 
     # Check that it'll fail if no enough slots are available
     # Double the size from before
-    appointment.encrypted_blob.data = TWO_SLOTS_BLOTS + TWO_SLOTS_BLOTS
+    appointment.encrypted_blob = TWO_SLOTS_BLOTS + TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -320,7 +320,7 @@ def test_add_appointment_update_smaller(api, client, appointment):
     api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 2}
 
     # This should take 2 slots
-    appointment.encrypted_blob.data = TWO_SLOTS_BLOTS
+    appointment.encrypted_blob = TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -328,7 +328,7 @@ def test_add_appointment_update_smaller(api, client, appointment):
     assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
 
     # Let's update with one just small enough
-    appointment.encrypted_blob.data = "A" * (ENCRYPTED_BLOB_MAX_SIZE_HEX - 2)
+    appointment.encrypted_blob = "A" * (ENCRYPTED_BLOB_MAX_SIZE_HEX - 2)
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk

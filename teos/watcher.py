@@ -20,8 +20,8 @@ class Watcher:
 
     The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
     checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
-    :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the
-    data is passed to the :obj:`Responder <teos.responder.Responder>`.
+    ``encrypted_blob`` of the corresponding appointment is decrypted and the data is passed to the
+    :obj:`Responder <teos.responder.Responder>`.
 
     If an appointment reaches its end with no breach, the data is simply deleted.
 
@@ -102,9 +102,8 @@ class Watcher:
         ``add_appointment`` is the entry point of the ``Watcher``. Upon receiving a new appointment it will start
         monitoring the blockchain (``do_watch``) until ``appointments`` is empty.
 
-        Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
-        :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` and pass the information to the
-        :obj:`Responder <teos.responder.Responder>`.
+        Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding ``encrypted_blob``
+        and pass the information to the :obj:`Responder <teos.responder.Responder>`.
 
         The tower may store multiple appointments with the same ``locator`` to avoid DoS attacks based on data
         rewriting. `locators`` should be derived from the ``dispute_txid``, but that task is performed by the user, and
@@ -133,7 +132,7 @@ class Watcher:
             self.appointments[uuid] = {
                 "locator": appointment.locator,
                 "end_time": appointment.end_time,
-                "size": len(appointment.encrypted_blob.data),
+                "size": len(appointment.encrypted_blob),
             }
 
             if appointment.locator in self.locator_uuid_map:
@@ -268,9 +267,8 @@ class Watcher:
         """
         Filters what of the found breaches contain valid transaction data.
 
-        The :obj:`Watcher` cannot if a given :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` contains a valid
-        transaction until a breach if seen. Blobs that contain arbitrary data are dropped and not sent to the
-        :obj:`Responder <teos.responder.Responder>`.
+        The :obj:`Watcher` cannot if a given ``encrypted_blob`` contains a valid transaction until a breach if seen.
+        Blobs that contain arbitrary data are dropped and not sent to the :obj:`Responder <teos.responder.Responder>`.
 
         Args:
             breaches (:obj:`dict`): a dictionary containing channel breaches (``locator:txid``).
@@ -292,8 +290,8 @@ class Watcher:
             for uuid in self.locator_uuid_map[locator]:
                 appointment = Appointment.from_dict(self.db_manager.load_watcher_appointment(uuid))
 
-                if appointment.encrypted_blob.data in decrypted_blobs:
-                    penalty_tx, penalty_rawtx = decrypted_blobs[appointment.encrypted_blob.data]
+                if appointment.encrypted_blob in decrypted_blobs:
+                    penalty_tx, penalty_rawtx = decrypted_blobs[appointment.encrypted_blob]
 
                 else:
                     try:
@@ -303,7 +301,7 @@ class Watcher:
                         penalty_rawtx = None
 
                     penalty_tx = self.block_processor.decode_raw_transaction(penalty_rawtx)
-                    decrypted_blobs[appointment.encrypted_blob.data] = (penalty_tx, penalty_rawtx)
+                    decrypted_blobs[appointment.encrypted_blob] = (penalty_tx, penalty_rawtx)
 
                 if penalty_tx is not None:
                     valid_breaches[uuid] = {

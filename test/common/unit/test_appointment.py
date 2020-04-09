@@ -3,11 +3,9 @@ import binascii
 from pytest import fixture
 
 from common.appointment import Appointment
-from common.encrypted_blob import EncryptedBlob
+from common.constants import LOCATOR_LEN_BYTES
 
 from test.common.unit.conftest import get_random_value_hex
-
-from common.constants import LOCATOR_LEN_BYTES
 
 
 # Not much to test here, adding it for completeness
@@ -46,7 +44,7 @@ def test_init_appointment(appointment_data):
         and appointment_data["start_time"] == appointment.start_time
         and appointment_data["end_time"] == appointment.end_time
         and appointment_data["to_self_delay"] == appointment.to_self_delay
-        and EncryptedBlob(appointment_data["encrypted_blob"]) == appointment.encrypted_blob
+        and appointment_data["encrypted_blob"] == appointment.encrypted_blob
     )
 
 
@@ -66,7 +64,7 @@ def test_to_dict(appointment_data):
         and appointment_data["start_time"] == dict_appointment["start_time"]
         and appointment_data["end_time"] == dict_appointment["end_time"]
         and appointment_data["to_self_delay"] == dict_appointment["to_self_delay"]
-        and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
+        and appointment_data["encrypted_blob"] == dict_appointment["encrypted_blob"]
     )
 
 
@@ -110,4 +108,4 @@ def test_serialize(appointment_data):
     assert struct.unpack(">I", start_time)[0] == appointment.start_time
     assert struct.unpack(">I", end_time)[0] == appointment.end_time
     assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
-    assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob.data
+    assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob

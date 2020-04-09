@@ -300,7 +300,7 @@ def test_inspect(run_bitcoind):
         and appointment.start_time == start_time
         and appointment.end_time == end_time
         and appointment.to_self_delay == to_self_delay
-        and appointment.encrypted_blob.data == encrypted_blob
+        and appointment.encrypted_blob == encrypted_blob
     )
 
 

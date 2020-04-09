@@ -278,7 +278,7 @@ def test_filter_valid_breaches(watcher):
     )
 
     dummy_appointment, _ = generate_dummy_appointment()
-    dummy_appointment.encrypted_blob.data = encrypted_blob
+    dummy_appointment.encrypted_blob = encrypted_blob
     dummy_appointment.locator = compute_locator(dispute_txid)
     uuid = uuid4().hex
 

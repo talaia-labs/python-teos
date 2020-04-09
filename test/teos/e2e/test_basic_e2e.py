@@ -9,7 +9,6 @@ from cli.exceptions import TowerResponseError
 from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 import common.cryptographer
-from common.blob import Blob
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
@@ -245,7 +244,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     # We can't use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
     # We will encrypt the blob using the random value and derive the locator from the commitment tx.
     appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
-    appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(penalty_tx), get_random_value_hex(32))
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(penalty_tx, get_random_value_hex(32))
     appointment = Appointment.from_dict(appointment_data)
 
     signature = Cryptographer.sign(appointment.serialize(), cli_sk)

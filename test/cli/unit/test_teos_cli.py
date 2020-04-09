@@ -7,7 +7,6 @@ from binascii import hexlify
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
 
-from common.blob import Blob
 import common.cryptographer
 from common.logger import Logger
 from common.tools import compute_locator
@@ -50,9 +49,7 @@ dummy_appointment_dict = {
     "start_time": dummy_appointment_data.get("start_time"),
     "end_time": dummy_appointment_data.get("end_time"),
     "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-    "encrypted_blob": Cryptographer.encrypt(
-        Blob(dummy_appointment_data.get("tx")), dummy_appointment_data.get("tx_id")
-    ),
+    "encrypted_blob": Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")),
 }
 
 dummy_appointment = Appointment.from_dict(dummy_appointment_dict)

@@ -180,7 +180,7 @@ class Cryptographer:
               :obj:`ValueError`: if either the ``secret`` or ``encrypted_blob`` is not properly formatted.
         """
 
-        Cryptographer.check_data_key_format(encrypted_blob.data, secret)
+        Cryptographer.check_data_key_format(encrypted_blob, secret)
 
         # sk is the H(txid) (32-byte) and nonce is set to 0 (12-byte)
         sk = sha256(unhexlify(secret)).digest()
@@ -195,7 +195,7 @@ class Cryptographer:
 
         # Decrypt
         cipher = ChaCha20Poly1305(sk)
-        data = unhexlify(encrypted_blob.data)
+        data = unhexlify(encrypted_blob)
 
         try:
             blob = cipher.decrypt(nonce=nonce, data=data, associated_data=None)

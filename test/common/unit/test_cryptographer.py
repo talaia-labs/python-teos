@@ -6,10 +6,8 @@ from cryptography.hazmat.primitives import serialization
 
 from coincurve import PrivateKey, PublicKey
 import common.cryptographer
-from common.blob import Blob
 from common.logger import Logger
 from common.cryptographer import Cryptographer
-from common.encrypted_blob import EncryptedBlob
 from test.common.unit.conftest import get_random_value_hex
 
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
@@ -61,7 +59,7 @@ def test_check_data_key_format():
 
 
 def test_encrypt_odd_length_data():
-    blob = Blob(get_random_value_hex(64)[-1])
+    blob = get_random_value_hex(64)[-1]
     key = get_random_value_hex(32)
 
     try:
@@ -73,7 +71,7 @@ def test_encrypt_odd_length_data():
 
 
 def test_encrypt_wrong_key_size():
-    blob = Blob(get_random_value_hex(64))
+    blob = get_random_value_hex(64)
     key = get_random_value_hex(31)
 
     try:
@@ -85,15 +83,13 @@ def test_encrypt_wrong_key_size():
 
 
 def test_encrypt():
-    blob = Blob(data)
-
-    assert Cryptographer.encrypt(blob, key) == encrypted_data
+    assert Cryptographer.encrypt(data, key) == encrypted_data
 
 
 def test_decrypt_invalid_tag():
     random_key = get_random_value_hex(32)
     random_encrypted_data = get_random_value_hex(64)
-    random_encrypted_blob = EncryptedBlob(random_encrypted_data)
+    random_encrypted_blob = random_encrypted_data
 
     # Trying to decrypt random data should result in an InvalidTag exception. Our decrypt function
     # returns None
@@ -104,7 +100,7 @@ def test_decrypt_invalid_tag():
 def test_decrypt_odd_length_data():
     random_key = get_random_value_hex(32)
     random_encrypted_data_odd = get_random_value_hex(64)[:-1]
-    random_encrypted_blob_odd = EncryptedBlob(random_encrypted_data_odd)
+    random_encrypted_blob_odd = random_encrypted_data_odd
 
     try:
         Cryptographer.decrypt(random_encrypted_blob_odd, random_key)
@@ -117,7 +113,7 @@ def test_decrypt_odd_length_data():
 def test_decrypt_wrong_key_size():
     random_key = get_random_value_hex(31)
     random_encrypted_data_odd = get_random_value_hex(64)
-    random_encrypted_blob_odd = EncryptedBlob(random_encrypted_data_odd)
+    random_encrypted_blob_odd = random_encrypted_data_odd
 
     try:
         Cryptographer.decrypt(random_encrypted_blob_odd, random_key)
@@ -129,7 +125,7 @@ def test_decrypt_wrong_key_size():
 
 def test_decrypt():
     # Valid data should run with no InvalidTag and verify
-    assert Cryptographer.decrypt(EncryptedBlob(encrypted_data), key) == data
+    assert Cryptographer.decrypt(encrypted_data, key) == data
 
 
 def test_load_key_file():

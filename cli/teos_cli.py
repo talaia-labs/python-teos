@@ -15,7 +15,6 @@ from cli.exceptions import InvalidKey, InvalidParameter, TowerResponseError
 from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
 
 import common.cryptographer
-from common.blob import Blob
 from common import constants
 from common.logger import Logger
 from common.appointment import Appointment
@@ -104,7 +103,7 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
         raise InvalidParameter("The provided data is missing the transaction")
 
     appointment_data["locator"] = compute_locator(tx_id)
-    appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(tx), tx_id)
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(tx, tx_id)
     appointment = Appointment.from_dict(appointment_data)
     signature = Cryptographer.sign(appointment.serialize(), cli_sk)
 

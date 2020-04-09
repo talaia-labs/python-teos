@@ -1,8 +1,6 @@
 import struct
 from binascii import unhexlify
 
-from common.encrypted_blob import EncryptedBlob
-
 
 class Appointment:
     """
@@ -15,9 +13,8 @@ class Appointment:
         end_time (:obj:`int`): The block height where the tower will stop watching for breaches.
         to_self_delay (:obj:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``to_remote`` output of the
             commitment transaction that this appointment is covering.
-        encrypted_blob (:obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): An ``EncryptedBlob`` object
-            containing an encrypted penalty transaction. The tower will decrypt it and broadcast the penalty transaction
-            upon seeing a breach on the blockchain.
+        encrypted_blob (:obj:`str`): An encrypted blob of data containing a penalty transaction. The tower will decrypt
+            it and broadcast the penalty transaction upon seeing a breach on the blockchain.
     """
 
     def __init__(self, locator, start_time, end_time, to_self_delay, encrypted_blob):
@@ -25,7 +22,7 @@ class Appointment:
         self.start_time = start_time  # ToDo: #4-standardize-appointment-fields
         self.end_time = end_time  # ToDo: #4-standardize-appointment-fields
         self.to_self_delay = to_self_delay
-        self.encrypted_blob = EncryptedBlob(encrypted_blob)
+        self.encrypted_blob = encrypted_blob
 
     @classmethod
     def from_dict(cls, appointment_data):
@@ -73,7 +70,7 @@ class Appointment:
             "start_time": self.start_time,
             "end_time": self.end_time,
             "to_self_delay": self.to_self_delay,
-            "encrypted_blob": self.encrypted_blob.data,
+            "encrypted_blob": self.encrypted_blob,
         }
 
         return appointment
@@ -95,5 +92,5 @@ class Appointment:
             + struct.pack(">I", self.start_time)
             + struct.pack(">I", self.end_time)
             + struct.pack(">I", self.to_self_delay)
-            + unhexlify(self.encrypted_blob.data)
+            + unhexlify(self.encrypted_blob)
         )
