@@ -1,5 +1,7 @@
-from common.tools import is_compressed_pk, is_locator
-from exceptions import InvalidParameter
+import re
+
+from common.tools import is_compressed_pk, is_locator, is_256b_hex_str
+from common.exceptions import InvalidParameter
 
 
 def parse_register_arguments(args, default_port):
@@ -72,3 +74,24 @@ def parse_get_appointment_arguments(args):
         raise InvalidParameter("The provided locator is not valid", locator=locator)
 
     return tower_id, locator
+
+
+def parse_add_appointment_arguments(kwargs):
+    # Arguments to add_appointment come from c-lightning and they have been sanitised. Checking this just in case.
+    commitment_txid = kwargs.get("commitment_txid")
+    penalty_tx = kwargs.get("penalty_tx")
+
+    if commitment_txid is None:
+        raise InvalidParameter("missing required parameter: commitment_txid")
+
+    if penalty_tx is None:
+        raise InvalidParameter("missing required parameter: penalty_tx")
+
+    if not is_256b_hex_str(commitment_txid):
+        raise InvalidParameter("commitment_txid has invalid format")
+
+    # Checking the basic stuff for the penalty transaction for now
+    if type(penalty_tx) is not str or re.search(r"^[0-9A-Fa-f]+$", penalty_tx) is None:
+        raise InvalidParameter("penalty_tx has invalid format")
+
+    return commitment_txid, penalty_tx
