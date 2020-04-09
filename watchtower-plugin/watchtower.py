@@ -64,7 +64,7 @@ def init(options, configuration, plugin):
         # TODO: Check how to make the plugin stop
 
 
-@plugin.method("register", desc="Register your public key with the tower")
+@plugin.method("registertower", desc="Register your public key with the tower")
 def register(plugin, *args):
     """
     Registers the user to the tower.
@@ -109,7 +109,7 @@ def register(plugin, *args):
         return response
 
     except (InvalidParameter, TowerConnectionError, TowerResponseError) as e:
-        plugin.log(str(e), level="error")
+        plugin.log(str(e), level="warn")
         return e.to_json()
 
 
@@ -146,7 +146,7 @@ def get_appointment(plugin, *args):
         return response
 
     except (InvalidParameter, TowerConnectionError, TowerResponseError) as e:
-        plugin.log(str(e), level="error")
+        plugin.log(str(e), level="warn")
         return e.to_json()
 
 
@@ -195,7 +195,7 @@ def add_appointment(plugin, **kwargs):
             plugin.wt_client.db_manager.store_tower_record(tower_id, plugin.wt_client.towers[tower_id])
 
     except (InvalidParameter, EncryptionError, SignatureError, TowerResponseError) as e:
-        plugin.log(str(e), level="error")
+        plugin.log(str(e), level="warn")
 
     return {"result": "continue"}
 
