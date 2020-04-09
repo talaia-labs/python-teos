@@ -1,4 +1,3 @@
-import json
 import pytest
 import random
 from uuid import uuid4
@@ -9,8 +8,8 @@ from threading import Thread
 
 from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
-from teos.db_manager import DBManager
 from teos.chain_monitor import ChainMonitor
+from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
 from common.constants import LOCATOR_LEN_HEX
@@ -36,7 +35,7 @@ def responder(db_manager, carrier, block_processor):
 @pytest.fixture(scope="session")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
-    db_manager = DBManager(db_name)
+    db_manager = AppointmentsDBM(db_name)
 
     yield db_manager
 
@@ -112,17 +111,6 @@ def test_on_sync_fail(responder, block_processor):
 def test_tracker_to_dict():
     tracker = create_dummy_tracker()
     tracker_dict = tracker.to_dict()
-
-    assert (
-        tracker.locator == tracker_dict["locator"]
-        and tracker.penalty_rawtx == tracker_dict["penalty_rawtx"]
-        and tracker.appointment_end == tracker_dict["appointment_end"]
-    )
-
-
-def test_tracker_to_json():
-    tracker = create_dummy_tracker()
-    tracker_dict = json.loads(tracker.to_json())
 
     assert (
         tracker.locator == tracker_dict["locator"]
@@ -295,7 +283,7 @@ def test_do_watch(temp_db_manager, carrier, block_processor):
 
         # We also need to store the info in the db
         responder.db_manager.create_triggered_appointment_flag(uuid)
-        responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
+        responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
     # Let's start to watch
     Thread(target=responder.do_watch, daemon=True).start()
@@ -472,7 +460,7 @@ def test_rebroadcast(db_manager, carrier, block_processor):
 
         # We need to add it to the db too
         responder.db_manager.create_triggered_appointment_flag(uuid)
-        responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
+        responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
         responder.tx_tracker_map[penalty_txid] = [uuid]
         responder.unconfirmed_txs.append(penalty_txid)

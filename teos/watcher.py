@@ -1,4 +1,3 @@
-from uuid import uuid4
 from queue import Queue
 from threading import Thread
 
@@ -6,7 +5,7 @@ import common.cryptographer
 from common.logger import Logger
 from common.tools import compute_locator
 from common.appointment import Appointment
-from common.cryptographer import Cryptographer
+from common.cryptographer import Cryptographer, hash_160
 
 from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
@@ -17,13 +16,12 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_
 
 class Watcher:
     """
-    The :class:`Watcher` is the class in charge to watch for channel breaches for the appointments accepted by the
-    tower.
+    The :class:`Watcher` is in charge of watching for channel breaches for the appointments accepted by the tower.
 
     The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
     checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
-    :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the data
-    is passed to the :obj:`Responder <teos.responder.Responder>`.
+    :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` of the corresponding appointment is decrypted and the
+    data is passed to the :obj:`Responder <teos.responder.Responder>`.
 
     If an appointment reaches its end with no breach, the data is simply deleted.
 
@@ -31,28 +29,30 @@ class Watcher:
     :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
 
     Args:
-        db_manager (:obj:`DBManager <teos.db_manager>`): a ``DBManager`` instance to interact with the database.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+            to interact with the database.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
-        max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
+        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
         expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Attributes:
-        appointments (:obj:`dict`): a dictionary containing a simplification of the appointments (:obj:`Appointment
-            <teos.appointment.Appointment>` instances) accepted by the tower (``locator`` and ``end_time``).
+        appointments (:obj:`dict`): a dictionary containing a summary of the appointments (:obj:`Appointment
+            <teos.appointment.Appointment>` instances) accepted by the tower (``locator``, ``end_time``, and ``size``).
             It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
         populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
-        db_manager (:obj:`DBManager <teos.db_manager>`): A db manager instance to interact with the database.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+            to interact with the database.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
-        max_appointments (:obj:`int`): the maximum ammount of appointments accepted by the ``Watcher`` at the same time.
+        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
         expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Raises:
@@ -72,17 +72,33 @@ class Watcher:
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
 
     def awake(self):
+        """Starts a new thread to monitor the blockchain for channel breaches"""
+
         watcher_thread = Thread(target=self.do_watch, daemon=True)
         watcher_thread.start()
 
         return watcher_thread
 
-    def add_appointment(self, appointment):
+    def get_appointment_summary(self, uuid):
+        """
+        Returns the summary of an appointment. The summary consists of the data kept in memory:
+            {locator, end_time, and size}
+
+        Args:
+            uuid (:obj:`str`): a 16-byte hex string identifying the appointment.
+
+        Returns:
+            :obj:`dict` or :obj:`None`: a dictionary with the appointment summary, or ``None`` if the appointment is not
+            found.
+        """
+        return self.appointments.get(uuid)
+
+    def add_appointment(self, appointment, user_pk):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
-        ``add_appointment`` is the entry point of the Watcher. Upon receiving a new appointment it will start monitoring
-        the blockchain (``do_watch``) until ``appointments`` is empty.
+        ``add_appointment`` is the entry point of the ``Watcher``. Upon receiving a new appointment it will start
+        monitoring the blockchain (``do_watch``) until ``appointments`` is empty.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding
         :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` and pass the information to the
@@ -96,6 +112,7 @@ class Watcher:
         Args:
             appointment (:obj:`Appointment <teos.appointment.Appointment>`): the appointment to be added to the
                 :obj:`Watcher`.
+            user_pk(:obj:`str`): the public key that identifies the user who sent the appointment (33-bytes hex str).
 
         Returns:
             :obj:`tuple`: A tuple signaling if the appointment has been added or not (based on ``max_appointments``).
@@ -103,21 +120,29 @@ class Watcher:
 
             - ``(True, signature)`` if the appointment has been accepted.
             - ``(False, None)`` otherwise.
-
         """
 
         if len(self.appointments) < self.max_appointments:
 
-            uuid = uuid4().hex
-            self.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
+            # The uuids are generated as the RIPMED160(locator||user_pubkey), that way the tower does not need to know
+            # anything about the user from this point on (no need to store user_pk in the database).
+            # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
+            uuid = hash_160("{}{}".format(appointment.locator, user_pk))
+            self.appointments[uuid] = {
+                "locator": appointment.locator,
+                "end_time": appointment.end_time,
+                "size": len(appointment.encrypted_blob.data),
+            }
 
             if appointment.locator in self.locator_uuid_map:
-                self.locator_uuid_map[appointment.locator].append(uuid)
+                # If the uuid is already in the map it means this is an update.
+                if uuid not in self.locator_uuid_map[appointment.locator]:
+                    self.locator_uuid_map[appointment.locator].append(uuid)
 
             else:
                 self.locator_uuid_map[appointment.locator] = [uuid]
 
-            self.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
             self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
             appointment_added = True
@@ -135,7 +160,7 @@ class Watcher:
 
     def do_watch(self):
         """
-        Monitors the blockchain whilst there are pending appointments.
+        Monitors the blockchain for channel breaches.
 
         This is the main method of the :obj:`Watcher` and the one in charge to pass appointments to the
         :obj:`Responder <teos.responder.Responder>` upon detecting a breach.
@@ -198,7 +223,7 @@ class Watcher:
                     appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                if len(self.appointments) is 0:
+                if len(self.appointments) != 0:
                     logger.info("No more pending appointments")
 
             # Register the last processed block for the watcher

@@ -3,7 +3,6 @@ import sys
 import time
 import json
 import requests
-import binascii
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey
@@ -11,7 +10,7 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from cli.help import show_usage, help_add_appointment, help_get_appointment
+from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register
 from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
 
 import common.cryptographer
@@ -22,10 +21,158 @@ from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_logging, setup_data_folder
-from common.tools import check_sha256_hex_format, check_locator_format, compute_locator
+from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
+
+
+def register(compressed_pk, teos_url):
+    """
+    Registers the user to the tower.
+
+    Args:
+        compressed_pk (:obj:`str`): a 33-byte hex-encoded compressed public key representing the user.
+        teos_url (:obj:`str`): the teos base url.
+
+    Returns:
+        :obj:`dict` or :obj:`None`: a dictionary containing the tower response if the registration succeeded. ``None``
+        otherwise.
+    """
+
+    if not is_compressed_pk(compressed_pk):
+        logger.error("The cli public key is not valid")
+        return None
+
+    # Send request to the server.
+    register_endpoint = "{}/register".format(teos_url)
+    data = {"public_key": compressed_pk}
+
+    logger.info("Registering in the Eye of Satoshi")
+    server_response = post_request(data, register_endpoint)
+    if server_response:
+        response_json = process_post_response(server_response)
+        return response_json
+
+
+def add_appointment(appointment_data, cli_sk, teos_pk, teos_url, appointments_folder_path):
+    """
+    Manages the add_appointment command.
+
+    The life cycle of the function is as follows:
+        - Check that the given commitment_txid is correct (proper format and not missing)
+        - Check that the transaction is correct (not missing)
+        - Create the appointment locator and encrypted blob from the commitment_txid and the penalty_tx
+        - Sign the appointment
+        - Send the appointment to the tower
+        - Wait for the response
+        - Check the tower's response and signature
+        - Store the receipt (appointment + signature) on disk
+
+    Args:
+        appointment_data (:obj:`dict`): a dictionary containing the appointment data.
+        cli_sk (:obj:`PrivateKey`): the client's private key.
+        teos_pk (:obj:`PublicKey`): the tower's public key.
+        teos_url (:obj:`str`): the teos base url.
+        appointments_folder_path (:obj:`str`): the path to the appointments folder.
+
+
+    Returns:
+        :obj:`bool`: True if the appointment is accepted by the tower and the receipt is properly stored. False if any
+        error occurs during the process.
+    """
+
+    if appointment_data is None:
+        logger.error("The provided appointment JSON is empty")
+        return False
+
+    if not is_256b_hex_str(appointment_data.get("tx_id")):
+        logger.error("The provided txid is not valid")
+        return False
+
+    tx_id = appointment_data.get("tx_id")
+    tx = appointment_data.get("tx")
+
+    if None not in [tx_id, tx]:
+        appointment_data["locator"] = compute_locator(tx_id)
+        appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(tx), tx_id)
+
+    else:
+        logger.error("Appointment data is missing some fields")
+        return False
+
+    appointment = Appointment.from_dict(appointment_data)
+    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
+
+    if not (appointment and signature):
+        return False
+
+    data = {"appointment": appointment.to_dict(), "signature": signature}
+
+    # Send appointment to the server.
+    add_appointment_endpoint = "{}/add_appointment".format(teos_url)
+    logger.info("Sending appointment to the Eye of Satoshi")
+    server_response = post_request(data, add_appointment_endpoint)
+    if server_response is None:
+        return False
+
+    response_json = process_post_response(server_response)
+
+    if response_json is None:
+        return False
+
+    signature = response_json.get("signature")
+    # Check that the server signed the appointment as it should.
+    if signature is None:
+        logger.error("The response does not contain the signature of the appointment")
+        return False
+
+    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    if not Cryptographer.verify_rpk(teos_pk, rpk):
+        logger.error("The returned appointment's signature is invalid")
+        return False
+
+    logger.info("Appointment accepted and signed by the Eye of Satoshi")
+    logger.info("Remaining slots: {}".format(response_json.get("available_slots")))
+
+    # All good, store appointment and signature
+    return save_appointment_receipt(appointment.to_dict(), signature, appointments_folder_path)
+
+
+def get_appointment(locator, cli_sk, teos_pk, teos_url):
+    """
+    Gets information about an appointment from the tower.
+
+    Args:
+        locator (:obj:`str`): the appointment locator used to identify it.
+        cli_sk (:obj:`PrivateKey`): the client's private key.
+        teos_pk (:obj:`PublicKey`): the tower's public key.
+        teos_url (:obj:`str`): the teos base url.
+
+    Returns:
+        :obj:`dict` or :obj:`None`: a dictionary containing the appointment data if the locator is valid and the tower
+        responds. ``None`` otherwise.
+    """
+
+    # FIXME: All responses from the tower should be signed. Not using teos_pk atm.
+
+    valid_locator = is_locator(locator)
+
+    if not valid_locator:
+        logger.error("The provided locator is not valid", locator=locator)
+        return None
+
+    message = "get appointment {}".format(locator)
+    signature = Cryptographer.sign(message.encode(), cli_sk)
+    data = {"locator": locator, "signature": signature}
+
+    # Send request to the server.
+    get_appointment_endpoint = "{}/get_appointment".format(teos_url)
+    logger.info("Sending appointment to the Eye of Satoshi")
+    server_response = post_request(data, get_appointment_endpoint)
+    response_json = process_post_response(server_response)
+
+    return response_json
 
 
 def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
@@ -33,13 +180,14 @@ def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
     Loads all the keys required so sign, send, and verify the appointment.
 
     Args:
-        teos_pk_path (:obj:`str`): path to the TEOS public key file.
+        teos_pk_path (:obj:`str`): path to the tower public key file.
         cli_sk_path (:obj:`str`): path to the client private key file.
         cli_pk_path (:obj:`str`): path to the client public key file.
 
     Returns:
-        :obj:`tuple` or ``None``: a three item tuple containing a teos_pk object, cli_sk object and the cli_sk_der
-        encoded key if all keys can be loaded. ``None`` otherwise.
+        :obj:`tuple` or ``None``: a three-item tuple containing a ``PrivateKey``, a ``PublicKey`` and a ``str``
+        representing the tower pk, user sk and user compressed pk respectively if all keys can be loaded.
+        ``None`` otherwise.
     """
 
     if teos_pk_path is None:
@@ -71,118 +219,77 @@ def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
 
     try:
         cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
-        PublicKey(cli_pk_der)
+        compressed_cli_pk = Cryptographer.get_compressed_pk(PublicKey(cli_pk_der))
 
     except ValueError:
         logger.error("Client public key is invalid or cannot be parsed")
         return None
 
-    return teos_pk, cli_sk, cli_pk_der
+    return teos_pk, cli_sk, compressed_cli_pk
 
 
-def add_appointment(args, teos_url, config):
+def post_request(data, endpoint):
     """
-    Manages the add_appointment command, from argument parsing, trough sending the appointment to the tower, until
-    saving the appointment receipt.
-
-    The life cycle of the function is as follows:
-        - Load the add_appointment arguments
-        - Check that the given commitment_txid is correct (proper format and not missing)
-        - Check that the transaction is correct (not missing)
-        - Create the appointment locator and encrypted blob from the commitment_txid and the penalty_tx
-        - Load the client private key and sign the appointment
-        - Send the appointment to the tower
-        - Wait for the response
-        - Check the tower's response and signature
-        - Store the receipt (appointment + signature) on disk
-
-    If any of the above-mentioned steps fails, the method returns false, otherwise it returns true.
+    Sends a post request to the tower.
 
     Args:
-        args (:obj:`list`): a list of arguments to pass to ``parse_add_appointment_args``. Must contain a json encoded
-            appointment, or the file option and the path to a file containing a json encoded appointment.
-        teos_url (:obj:`str`): the teos base url.
-        config (:obj:`dict`): a config dictionary following the format of :func:`create_config_dict <common.config_loader.ConfigLoader.create_config_dict>`.
+        data (:obj:`dict`): a dictionary containing the data to be posted.
+        endpoint (:obj:`str`): the endpoint to send the post request.
 
     Returns:
-        :obj:`bool`: True if the appointment is accepted by the tower and the receipt is properly stored, false if any
-        error occurs during the process.
+        :obj:`dict` or ``None``: a json-encoded dictionary with the server response if the data can be posted.
+        ``None`` otherwise.
     """
 
-    # Currently the base_url is the same as the add_appointment_endpoint
-    add_appointment_endpoint = teos_url
+    try:
+        return requests.post(url=endpoint, json=data, timeout=5)
 
-    teos_pk, cli_sk, cli_pk_der = load_keys(
-        config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
-    )
+    except ConnectTimeout:
+        logger.error("Can't connect to the Eye of Satoshi's API. Connection timeout")
+
+    except ConnectionError:
+        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
+
+    except (InvalidSchema, MissingSchema, InvalidURL):
+        logger.error("Invalid URL. No schema, or invalid schema, found ({})".format(endpoint))
+
+    except requests.exceptions.Timeout:
+        logger.error("The request timed out")
+
+    return None
+
+
+def process_post_response(response):
+    """
+    Processes the server response to a post request.
+
+    Args:
+        response (:obj:`requests.models.Response`): a ``Response`` object obtained from the request.
+
+    Returns:
+        :obj:`dict` or :obj:`None`: a dictionary containing the tower's response data if the response type is
+        ``HTTP_OK`` and the response can be properly parsed. ``None`` otherwise.
+    """
+
+    if not response:
+        return None
 
     try:
-        hex_pk_der = binascii.hexlify(cli_pk_der)
+        response_json = response.json()
 
-    except binascii.Error as e:
-        logger.error("Could not successfully encode public key as hex", error=str(e))
-        return False
+    except (json.JSONDecodeError, AttributeError):
+        logger.error(
+            "The server returned a non-JSON response", status_code=response.status_code, reason=response.reason
+        )
+        return None
 
-    if teos_pk is None:
-        return False
+    if response.status_code != constants.HTTP_OK:
+        logger.error(
+            "The server returned an error", status_code=response.status_code, reason=response.reason, data=response_json
+        )
+        return None
 
-    # Get appointment data from user.
-    appointment_data = parse_add_appointment_args(args)
-
-    if appointment_data is None:
-        logger.error("The provided appointment JSON is empty")
-        return False
-
-    valid_txid = check_sha256_hex_format(appointment_data.get("tx_id"))
-
-    if not valid_txid:
-        logger.error("The provided txid is not valid")
-        return False
-
-    tx_id = appointment_data.get("tx_id")
-    tx = appointment_data.get("tx")
-
-    if None not in [tx_id, tx]:
-        appointment_data["locator"] = compute_locator(tx_id)
-        appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(tx), tx_id)
-
-    else:
-        logger.error("Appointment data is missing some fields")
-        return False
-
-    appointment = Appointment.from_dict(appointment_data)
-    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
-
-    if not (appointment and signature):
-        return False
-
-    data = {"appointment": appointment.to_dict(), "signature": signature, "public_key": hex_pk_der.decode("utf-8")}
-
-    # Send appointment to the server.
-    server_response = post_appointment(data, add_appointment_endpoint)
-    if server_response is None:
-        return False
-
-    response_json = process_post_appointment_response(server_response)
-
-    if response_json is None:
-        return False
-
-    signature = response_json.get("signature")
-    # Check that the server signed the appointment as it should.
-    if signature is None:
-        logger.error("The response does not contain the signature of the appointment")
-        return False
-
-    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-    if not Cryptographer.verify_rpk(teos_pk, rpk):
-        logger.error("The returned appointment's signature is invalid")
-        return False
-
-    logger.info("Appointment accepted and signed by the Eye of Satoshi")
-
-    # All good, store appointment and signature
-    return save_appointment_receipt(appointment.to_dict(), signature, config)
+    return response_json
 
 
 def parse_add_appointment_args(args):
@@ -190,8 +297,8 @@ def parse_add_appointment_args(args):
     Parses the arguments of the add_appointment command.
 
     Args:
-        args (:obj:`list`): a list of arguments to pass to ``parse_add_appointment_args``. Must contain a json encoded
-            appointment, or the file option and the path to a file containing a json encoded appointment.
+        args (:obj:`list`): a list of command line arguments that must contain a json encoded appointment, or the file
+        option and the path to a file containing a json encoded appointment.
 
     Returns:
         :obj:`dict` or :obj:`None`: A dictionary containing the appointment data if it can be loaded. ``None``
@@ -233,102 +340,30 @@ def parse_add_appointment_args(args):
     return appointment_data
 
 
-def post_appointment(data, add_appointment_endpoint):
+def save_appointment_receipt(appointment, signature, appointments_folder_path):
     """
-    Sends appointment data to add_appointment endpoint to be processed by the tower.
-
-    Args:
-        data (:obj:`dict`): a dictionary containing three fields: an appointment, the client-side signature, and the
-            der-encoded client public key.
-        add_appointment_endpoint (:obj:`str`): the teos endpoint where to send appointments to.
-
-    Returns:
-        :obj:`dict` or ``None``: a json-encoded dictionary with the server response if the data can be posted.
-        None otherwise.
-    """
-
-    logger.info("Sending appointment to the Eye of Satoshi")
-
-    try:
-        return requests.post(url=add_appointment_endpoint, json=json.dumps(data), timeout=5)
-
-    except ConnectTimeout:
-        logger.error("Can't connect to the Eye of Satoshi's API. Connection timeout")
-        return None
-
-    except ConnectionError:
-        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
-        return None
-
-    except (InvalidSchema, MissingSchema, InvalidURL):
-        logger.error("Invalid URL. No schema, or invalid schema, found ({})".format(add_appointment_endpoint))
-
-    except requests.exceptions.Timeout:
-        logger.error("The request timed out")
-
-
-def process_post_appointment_response(response):
-    """
-    Processes the server response to an add_appointment request.
-
-    Args:
-        response (:obj:`requests.models.Response`): a ``Response`` object obtained from the sent request.
-
-    Returns:
-        :obj:`dict` or :obj:`None`: a dictionary containing the tower's response data if it can be properly parsed and
-        the response type is ``HTTP_OK``. ``None`` otherwise.
-    """
-
-    try:
-        response_json = response.json()
-
-    except json.JSONDecodeError:
-        logger.error(
-            "The server returned a non-JSON response", status_code=response.status_code, reason=response.reason
-        )
-        return None
-
-    if response.status_code != constants.HTTP_OK:
-        if "error" not in response_json:
-            logger.error(
-                "The server returned an error status code but no error description", status_code=response.status_code
-            )
-        else:
-            error = response_json["error"]
-            logger.error(
-                "The server returned an error status code with an error description",
-                status_code=response.status_code,
-                description=error,
-            )
-        return None
-
-    return response_json
-
-
-def save_appointment_receipt(appointment, signature, config):
-    """
-    Saves an appointment receipt to disk. A receipt consists in an appointment and a signature from the tower.
+    Saves an appointment receipt to disk. A receipt consists of an appointment and a signature from the tower.
 
     Args:
         appointment (:obj:`Appointment <common.appointment.Appointment>`): the appointment to be saved on disk.
         signature (:obj:`str`): the signature of the appointment performed by the tower.
-        config (:obj:`dict`): a config dictionary following the format of :func:`create_config_dict <common.config_loader.ConfigLoader.create_config_dict>`.
+        appointments_folder_path (:obj:`str`): the path to the appointments folder.
 
     Returns:
-        :obj:`bool`: True if the appointment if properly saved, false otherwise.
+        :obj:`bool`: True if the appointment if properly saved. False otherwise.
 
     Raises:
         IOError: if an error occurs whilst writing the file on disk.
     """
 
     # Create the appointments directory if it doesn't already exist
-    os.makedirs(config.get("APPOINTMENTS_FOLDER_NAME"), exist_ok=True)
+    os.makedirs(appointments_folder_path, exist_ok=True)
 
     timestamp = int(time.time())
     locator = appointment["locator"]
     uuid = uuid4().hex  # prevent filename collisions
 
-    filename = "{}/appointment-{}-{}-{}.json".format(config.get("APPOINTMENTS_FOLDER_NAME"), timestamp, locator, uuid)
+    filename = "{}/appointment-{}-{}-{}.json".format(appointments_folder_path, timestamp, locator, uuid)
     data = {"appointment": appointment, "signature": signature}
 
     try:
@@ -340,46 +375,6 @@ def save_appointment_receipt(appointment, signature, config):
     except IOError as e:
         logger.error("There was an error while saving the appointment", error=e)
         return False
-
-
-def get_appointment(locator, get_appointment_endpoint):
-    """
-    Gets information about an appointment from the tower.
-
-    Args:
-        locator (:obj:`str`): the appointment locator used to identify it.
-        get_appointment_endpoint (:obj:`str`): the teos endpoint where to get appointments from.
-
-    Returns:
-        :obj:`dict` or :obj:`None`: a dictionary containing thew appointment data if the locator is valid and the tower
-        responds. ``None`` otherwise.
-    """
-
-    valid_locator = check_locator_format(locator)
-
-    if not valid_locator:
-        logger.error("The provided locator is not valid", locator=locator)
-        return None
-
-    parameters = "?locator={}".format(locator)
-
-    try:
-        r = requests.get(url=get_appointment_endpoint + parameters, timeout=5)
-        return r.json()
-
-    except ConnectTimeout:
-        logger.error("Can't connect to the Eye of Satoshi's API. Connection timeout")
-        return None
-
-    except ConnectionError:
-        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
-        return None
-
-    except requests.exceptions.InvalidSchema:
-        logger.error("No transport protocol found. Have you missed http(s):// in the server url?")
-
-    except requests.exceptions.Timeout:
-        logger.error("The request timed out")
 
 
 def main(args, command_line_conf):
@@ -396,58 +391,73 @@ def main(args, command_line_conf):
     if not teos_url.startswith("http"):
         teos_url = "http://" + teos_url
 
-    try:
-        if args:
-            command = args.pop(0)
+    keys = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY"))
+    if keys is not None:
+        teos_pk, cli_sk, compressed_cli_pk = keys
 
-            if command in commands:
-                if command == "add_appointment":
-                    add_appointment(args, teos_url, config)
+        try:
+            if args:
+                command = args.pop(0)
 
-                elif command == "get_appointment":
-                    if not args:
-                        logger.error("No arguments were given")
+                if command in commands:
+                    if command == "register":
+                        register_data = register(compressed_cli_pk, teos_url)
+                        if register_data:
+                            print(register_data)
 
-                    else:
-                        arg_opt = args.pop(0)
+                    if command == "add_appointment":
+                        # Get appointment data from user.
+                        appointment_data = parse_add_appointment_args(args)
+                        add_appointment(
+                            appointment_data, cli_sk, teos_pk, teos_url, config.get("APPOINTMENTS_FOLDER_NAME")
+                        )
 
-                        if arg_opt in ["-h", "--help"]:
-                            sys.exit(help_get_appointment())
-
-                        get_appointment_endpoint = "{}/get_appointment".format(teos_url)
-                        appointment_data = get_appointment(arg_opt, get_appointment_endpoint)
-                        if appointment_data:
-                            print(appointment_data)
-
-                elif command == "help":
-                    if args:
-                        command = args.pop(0)
-
-                        if command == "add_appointment":
-                            sys.exit(help_add_appointment())
-
-                        elif command == "get_appointment":
-                            sys.exit(help_get_appointment())
+                    elif command == "get_appointment":
+                        if not args:
+                            logger.error("No arguments were given")
 
                         else:
-                            logger.error("Unknown command. Use help to check the list of available commands")
+                            arg_opt = args.pop(0)
 
-                    else:
-                        sys.exit(show_usage())
+                            if arg_opt in ["-h", "--help"]:
+                                sys.exit(help_get_appointment())
+
+                            appointment_data = get_appointment(arg_opt, cli_sk, teos_pk, teos_url)
+                            if appointment_data:
+                                print(appointment_data)
+
+                    elif command == "help":
+                        if args:
+                            command = args.pop(0)
+
+                            if command == "register":
+                                sys.exit(help_register())
+
+                            if command == "add_appointment":
+                                sys.exit(help_add_appointment())
+
+                            elif command == "get_appointment":
+                                sys.exit(help_get_appointment())
+
+                            else:
+                                logger.error("Unknown command. Use help to check the list of available commands")
+
+                        else:
+                            sys.exit(show_usage())
+
+                else:
+                    logger.error("Unknown command. Use help to check the list of available commands")
 
             else:
-                logger.error("Unknown command. Use help to check the list of available commands")
+                logger.error("No command provided. Use help to check the list of available commands")
 
-        else:
-            logger.error("No command provided. Use help to check the list of available commands")
-
-    except json.JSONDecodeError:
-        logger.error("Non-JSON encoded appointment passed as parameter")
+        except json.JSONDecodeError:
+            logger.error("Non-JSON encoded appointment passed as parameter")
 
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["add_appointment", "get_appointment", "help"]
+    commands = ["register", "add_appointment", "get_appointment", "help"]
 
     try:
         opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])
