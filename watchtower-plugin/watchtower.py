@@ -3,15 +3,18 @@ import os
 import plyvel
 from pyln.client import Plugin
 
+from common.tools import compute_locator
+from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
+from common.exceptions import InvalidParameter, SignatureError, EncryptionError
 
 import arg_parser
 from tower_info import TowerInfo
 from towers_dbm import TowersDBM
 from keys import generate_keys, load_keys
 from net.http import post_request, process_post_response
-from exceptions import TowerConnectionError, TowerResponseError, InvalidParameter
+from exceptions import TowerConnectionError, TowerResponseError
 
 
 DATA_DIR = os.path.expanduser("~/.watchtower/")
@@ -123,7 +126,7 @@ def get_appointment(plugin, *args):
         :obj:`dict`: a dictionary containing the appointment data.
     """
 
-    # FIXME: All responses from the tower should be signed. Not using teos_pk atm.
+    # FIXME: All responses from the tower should be signed.
 
     try:
         tower_id, locator = arg_parser.parse_get_appointment_arguments(args)
@@ -149,9 +152,51 @@ def get_appointment(plugin, *args):
 
 @plugin.hook("commitment_revocation")
 def add_appointment(plugin, **kwargs):
-    commitment_txid = kwargs.get("commitment_txid")
-    penalty_tx = kwargs.get("penalty_tx")
-    plugin.log("commitment_txid {}, penalty_tx: {}".format(commitment_txid, penalty_tx))
+    try:
+        # FIXME: start_time and end_time are temporary. Fix it on the tower side and remove it from there
+        block_height = plugin.rpc.getchaininfo().get("blockcount")
+        start_time = block_height + 1
+        end_time = block_height + 10
+
+        commitment_txid, penalty_tx = arg_parser.parse_add_appointment_arguments(kwargs)
+        appointment = Appointment(
+            locator=compute_locator(commitment_txid),
+            start_time=start_time,
+            end_time=end_time,
+            to_self_delay=20,
+            encrypted_blob=Cryptographer.encrypt(penalty_tx, commitment_txid),
+        )
+
+        signature = Cryptographer.sign(appointment.serialize(), plugin.wt_client.sk)
+        data = {"appointment": appointment.to_dict(), "signature": signature}
+
+        # Send appointment to the server.
+        # FIXME: sending the appointment to all registered towers atm. Some management would be nice.
+        for tower_id, tower in plugin.wt_client.towers.items():
+            plugin.log("Sending appointment to the Eye of Satoshi at {}".format(tower.endpoint))
+            add_appointment_endpoint = "{}/add_appointment".format(tower.endpoint)
+            response = process_post_response(post_request(data, add_appointment_endpoint))
+
+            signature = response.get("signature")
+            # Check that the server signed the appointment as it should.
+            if not signature:
+                raise TowerResponseError("The response does not contain the signature of the appointment")
+
+            rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+            if not tower_id != Cryptographer.get_compressed_pk(rpk):
+                raise TowerResponseError("The returned appointment's signature is invalid")
+
+            plugin.log("Appointment accepted and signed by the Eye of Satoshi at {}".format(tower.endpoint))
+            plugin.log("Remaining slots: {}".format(response.get("available_slots")))
+
+            # TODO: Not storing the whole appointments for now. The node should be able to recreate all the required
+            #       data if needed.
+            plugin.wt_client.towers[tower_id].appointments[appointment.locator] = signature
+            plugin.wt_client.db_manager.store_tower_record(tower_id, plugin.wt_client.towers[tower_id])
+
+    except (InvalidParameter, EncryptionError, SignatureError, TowerResponseError) as e:
+        plugin.log(str(e), level="error")
+
     return {"result": "continue"}
 
 
