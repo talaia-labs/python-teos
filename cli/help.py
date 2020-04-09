@@ -8,8 +8,8 @@ def show_usage():
         "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
         "\n\thelp \t\t\tShows a list of commands or help for a specific command."
         "\n\nGLOBAL OPTIONS:"
-        "\n\t-s, --server \tAPI server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
-        "\n\t-p, --port \tAPI port where to send the requests. Defaults to '9814' (modifiable in conf file)."
+        "\n\t--apiconnect \tAPI server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
+        "\n\t--apiport \tAPI port where to send the requests. Defaults to '9814' (modifiable in conf file)."
         "\n\t-d, --debug \tshows debug information and stores it in teos_cli.log."
         "\n\t-h --help \tshows this message."
     )
