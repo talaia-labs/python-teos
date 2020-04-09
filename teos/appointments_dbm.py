@@ -1,11 +1,10 @@
 import json
 import plyvel
 
-from teos.db_manager import DBManager
-
 from teos import LOG_PREFIX
 
 from common.logger import Logger
+from common.db_manager import DBManager
 
 logger = Logger(actor="AppointmentsDBM", log_name_prefix=LOG_PREFIX)
 

@@ -1,0 +1,6 @@
+pyln-client
+requests
+coincurve
+cryptography
+pyzbase32
+plyvel

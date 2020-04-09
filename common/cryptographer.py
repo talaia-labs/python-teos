@@ -278,7 +278,7 @@ class Cryptographer:
             return None
 
         if not isinstance(sk, PrivateKey):
-            logger.error("The value passed as sk is not a private key (EllipticCurvePrivateKey)")
+            logger.error("The value passed as sk is not a private key (PrivateKey)")
             return None
 
         try:
