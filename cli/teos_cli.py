@@ -166,7 +166,7 @@ def get_appointment(locator, cli_sk, teos_pk, teos_url):
 
     # Send request to the server.
     get_appointment_endpoint = "{}/get_appointment".format(teos_url)
-    logger.info("Sending appointment to the Eye of Satoshi")
+    logger.info("Requesting appointment from the Eye of Satoshi")
     response = process_post_response(post_request(data, get_appointment_endpoint))
 
     return response
@@ -469,7 +469,7 @@ def main(command, args, command_line_conf):
     except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
         logger.error(str(e))
     except (InvalidKey, InvalidParameter, TowerResponseError) as e:
-        logger.error(e.reason, **e.params)
+        logger.error(e.reason, **e.kwargs)
     except Exception as e:
         logger.error("Unknown error occurred", error=str(e))
 
