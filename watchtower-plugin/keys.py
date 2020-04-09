@@ -5,7 +5,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from exceptions import InvalidKey
+from common.exceptions import InvalidKey
 from common.cryptographer import Cryptographer
 
 
