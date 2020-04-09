@@ -45,7 +45,7 @@ def generate_keys(data_dir):
 
     # Create the output folder it it does not exist (and all the parents if they don't either)
     Path(data_dir).mkdir(parents=True, exist_ok=True)
-    sk_file_name = os.path.join(data_dir, "cli_sk.der")
+    sk_file_name = os.path.join(data_dir, "sk.der")
 
     if os.path.exists(sk_file_name):
         raise FileExistsError("The client key pair already exists")
@@ -78,7 +78,7 @@ def load_keys(data_dir):
     if not isinstance(data_dir, str):
         raise ValueError("Invalid data_dir. Please check your settings")
 
-    sk_file_path = os.path.join(data_dir, "cli_sk.der")
+    sk_file_path = os.path.join(data_dir, "sk.der")
 
     cli_sk_der = Cryptographer.load_key_file(sk_file_path)
     cli_sk = Cryptographer.load_private_key_der(cli_sk_der)

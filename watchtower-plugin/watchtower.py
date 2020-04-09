@@ -14,14 +14,14 @@ from net.http import post_request, process_post_response
 from exceptions import TowerConnectionError, TowerResponseError, InvalidParameter
 
 
-DATA_DIR = os.path.expanduser("~/.teos_cli/")
-CONF_FILE_NAME = "teos_cli.conf"
+DATA_DIR = os.path.expanduser("~/.watchtower/")
+CONF_FILE_NAME = "watchtower.conf"
 
 DEFAULT_CONF = {
     "DEFAULT_PORT": {"value": 9814, "type": int},
     "APPOINTMENTS_FOLDER_NAME": {"value": "appointment_receipts", "type": str, "path": True},
     "TOWERS_DB": {"value": "towers", "type": str, "path": True},
-    "CLI_PRIVATE_KEY": {"value": "cli_sk.der", "type": str, "path": True},
+    "PRIVATE_KEY": {"value": "sk.der", "type": str, "path": True},
 }
 
 
