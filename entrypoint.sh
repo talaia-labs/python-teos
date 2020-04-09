@@ -18,4 +18,13 @@ if [[ ! -z ${BTC_NETWORK} ]]; then
     START_COMMAND=$START_COMMAND" --btcnetwork=""$BTC_NETWORK"
 fi
 
+if [[ ! -z ${API_CONNECT} ]]; then
+    START_COMMAND=$START_COMMAND" --apiconnect=""$API_CONNECT"
+fi
+
+if [[ ! -z ${API_PORT} ]]; then
+    START_COMMAND=$START_COMMAND" --apiport=""$API_PORT"
+fi
+
+
 $START_COMMAND
