@@ -47,18 +47,18 @@ class WTClient:
 @plugin.init()
 def init(options, configuration, plugin):
     try:
+        user_sk, user_id = generate_keys(DATA_DIR)
         plugin.log("Generating a new key pair for the watchtower client. Keys stored at {}".format(DATA_DIR))
-        cli_sk, compressed_cli_pk = generate_keys(DATA_DIR)
 
     except FileExistsError:
         plugin.log("A key file for the watchtower client already exists. Loading it")
-        cli_sk, compressed_cli_pk = load_keys(DATA_DIR)
+        user_sk, user_id = load_keys(DATA_DIR)
 
-    plugin.log("Plugin watchtower client initialized")
+    plugin.log("Plugin watchtower client initialized. User id = {}".format(user_id))
     config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, {})
 
     try:
-        plugin.wt_client = WTClient(cli_sk, compressed_cli_pk, config_loader.build_config())
+        plugin.wt_client = WTClient(user_sk, user_id, config_loader.build_config())
     except plyvel.IOError:
         plugin.log("Cannot load towers db. Resource temporarily unavailable")
         # TODO: Check how to make the plugin stop
