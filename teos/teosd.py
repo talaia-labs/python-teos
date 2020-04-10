@@ -56,7 +56,7 @@ def main(command_line_conf):
     bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
 
     if not can_connect_to_bitcoind(bitcoind_connect_params):
-        logger.error("Can't connect to bitcoind. Shutting down")
+        logger.error("Cannot connect to bitcoind. Shutting down")
 
     elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
@@ -65,7 +65,7 @@ def main(command_line_conf):
         try:
             secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
             if not secret_key_der:
-                raise IOError("TEOS private key can't be loaded")
+                raise IOError("TEOS private key cannot be loaded")
 
             block_processor = BlockProcessor(bitcoind_connect_params)
             carrier = Carrier(bitcoind_connect_params)

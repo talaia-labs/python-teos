@@ -178,7 +178,7 @@ class Cryptographer:
             blob = hexlify(blob).decode("utf8")
 
         except InvalidTag:
-            raise EncryptionError("Can't decrypt blob with the provided key", blob=encrypted_blob, key=secret)
+            raise EncryptionError("Cannot decrypt blob with the provided key", blob=encrypted_blob, key=secret)
 
         return blob
 

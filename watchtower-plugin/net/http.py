@@ -26,10 +26,10 @@ def post_request(data, endpoint):
         return requests.post(url=endpoint, json=data, timeout=5)
 
     except ConnectTimeout:
-        message = "Can't connect to the Eye of Satoshi at {}. Connection timeout".format(endpoint)
+        message = "Cannot connect to the Eye of Satoshi at {}. Connection timeout".format(endpoint)
 
     except ConnectionError:
-        message = "Can't connect to the Eye of Satoshi at {}. Tower cannot be reached".format(endpoint)
+        message = "Cannot connect to the Eye of Satoshi at {}. Tower cannot be reached".format(endpoint)
 
     except (InvalidSchema, MissingSchema, InvalidURL):
         message = "Invalid URL. No schema, or invalid schema, found ({})".format(endpoint)

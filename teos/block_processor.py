@@ -99,7 +99,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             tx = None
-            logger.error("Can't build transaction from decoded data", error=e.error)
+            logger.error("Cannot build transaction from decoded data", error=e.error)
 
         return tx
 
