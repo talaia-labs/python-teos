@@ -60,8 +60,9 @@ def init(options, configuration, plugin):
     try:
         plugin.wt_client = WTClient(user_sk, user_id, config_loader.build_config())
     except plyvel.IOError:
+        error = "Cannot load towers db. Resource temporarily unavailable"
         plugin.log("Cannot load towers db. Resource temporarily unavailable")
-        # TODO: Check how to make the plugin stop
+        raise IOError(error)
 
 
 @plugin.method("registertower", desc="Register your public key with the tower")
