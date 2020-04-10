@@ -33,7 +33,7 @@ teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_
 teosd_process = run_teosd()
 
 teos_pk, cli_sk, compressed_cli_pk = teos_cli.load_keys(
-    cli_config.get("TEOS_PUBLIC_KEY"), cli_config.get("CLI_PRIVATE_KEY"), cli_config.get("CLI_PUBLIC_KEY")
+    cli_config.get("TEOS_PUBLIC_KEY"), cli_config.get("CLI_PRIVATE_KEY")
 )
 
 
@@ -238,7 +238,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     # The appointment data is built using a random 32-byte value.
     appointment_data = build_appointment_data(bitcoin_cli, get_random_value_hex(32), penalty_tx)
 
-    # We can't use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
+    # We cannot use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
     # We will encrypt the blob using the random value and derive the locator from the commitment tx.
     appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(penalty_tx, get_random_value_hex(32))

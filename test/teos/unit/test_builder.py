@@ -14,6 +14,7 @@ from test.teos.unit.conftest import (
     bitcoin_cli,
     get_config,
     bitcoind_connect_params,
+    generate_keypair,
 )
 
 config = get_config()
@@ -99,7 +100,7 @@ def test_update_states_empty_list(db_manager, carrier, block_processor):
         db_manager=db_manager,
         block_processor=block_processor,
         responder=Responder(db_manager, carrier, block_processor),
-        sk_der=None,
+        sk_der=generate_keypair()[0].to_der(),
         max_appointments=config.get("MAX_APPOINTMENTS"),
         expiry_delta=config.get("EXPIRY_DELTA"),
     )
@@ -120,7 +121,7 @@ def test_update_states_responder_misses_more(run_bitcoind, db_manager, carrier, 
         db_manager=db_manager,
         block_processor=block_processor,
         responder=Responder(db_manager, carrier, block_processor),
-        sk_der=None,
+        sk_der=generate_keypair()[0].to_der(),
         max_appointments=config.get("MAX_APPOINTMENTS"),
         expiry_delta=config.get("EXPIRY_DELTA"),
     )
@@ -145,7 +146,7 @@ def test_update_states_watcher_misses_more(db_manager, carrier, block_processor)
         db_manager=db_manager,
         block_processor=block_processor,
         responder=Responder(db_manager, carrier, block_processor),
-        sk_der=None,
+        sk_der=generate_keypair()[0].to_der(),
         max_appointments=config.get("MAX_APPOINTMENTS"),
         expiry_delta=config.get("EXPIRY_DELTA"),
     )
