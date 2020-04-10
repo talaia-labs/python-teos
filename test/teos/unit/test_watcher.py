@@ -9,8 +9,8 @@ from teos.carrier import Carrier
 from teos.watcher import Watcher
 from teos.tools import bitcoin_cli
 from teos.responder import Responder
-from teos.db_manager import DBManager
 from teos.chain_monitor import ChainMonitor
+from teos.appointments_dbm import AppointmentsDBM
 from teos.block_processor import BlockProcessor
 
 import common.cryptographer
@@ -40,11 +40,14 @@ config = get_config()
 
 signing_key, public_key = generate_keypair()
 
+# Reduce the maximum number of appointments to something we can test faster
+MAX_APPOINTMENTS = 100
+
 
 @pytest.fixture(scope="session")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
-    db_manager = DBManager(db_name)
+    db_manager = AppointmentsDBM(db_name)
 
     yield db_manager
 
@@ -59,12 +62,7 @@ def watcher(db_manager):
 
     responder = Responder(db_manager, carrier, block_processor)
     watcher = Watcher(
-        db_manager,
-        block_processor,
-        responder,
-        signing_key.to_der(),
-        config.get("MAX_APPOINTMENTS"),
-        config.get("EXPIRY_DELTA"),
+        db_manager, block_processor, responder, signing_key.to_der(), MAX_APPOINTMENTS, config.get("EXPIRY_DELTA")
     )
 
     chain_monitor = ChainMonitor(
@@ -114,13 +112,26 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.signing_key, PrivateKey)
 
 
+def test_get_appointment_summary(watcher):
+    # get_appointment_summary returns an appointment summary if found, else None.
+    random_uuid = get_random_value_hex(16)
+    appointment_summary = {"locator": get_random_value_hex(16), "end_time": 10, "size": 200}
+    watcher.appointments[random_uuid] = appointment_summary
+    assert watcher.get_appointment_summary(random_uuid) == appointment_summary
+
+    # Requesting a non-existing appointment
+    assert watcher.get_appointment_summary(get_random_value_hex(16)) is None
+
+
 def test_add_appointment(watcher):
     # We should be able to add appointments up to the limit
     for _ in range(10):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
-        added_appointment, sig = watcher.add_appointment(appointment)
+        user_pk = get_random_value_hex(33)
+
+        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
         assert Cryptographer.verify_rpk(
@@ -128,23 +139,37 @@ def test_add_appointment(watcher):
         )
 
         # Check that we can also add an already added appointment (same locator)
-        added_appointment, sig = watcher.add_appointment(appointment)
+        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
         assert Cryptographer.verify_rpk(
             watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
         )
 
+        # If two appointments with the same locator from the same user are added, they are overwritten, but if they come
+        # from different users, they are kept.
+        assert len(watcher.locator_uuid_map[appointment.locator]) == 1
+
+        different_user_pk = get_random_value_hex(33)
+        added_appointment, sig = watcher.add_appointment(appointment, different_user_pk)
+        assert added_appointment is True
+        assert Cryptographer.verify_rpk(
+            watcher.signing_key.public_key, Cryptographer.recover_pk(appointment.serialize(), sig)
+        )
+        assert len(watcher.locator_uuid_map[appointment.locator]) == 2
+
 
 def test_add_too_many_appointments(watcher):
     # Any appointment on top of those should fail
     watcher.appointments = dict()
 
-    for _ in range(config.get("MAX_APPOINTMENTS")):
+    for _ in range(MAX_APPOINTMENTS):
         appointment, dispute_tx = generate_dummy_appointment(
             start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
         )
-        added_appointment, sig = watcher.add_appointment(appointment)
+        user_pk = get_random_value_hex(33)
+
+        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
         assert added_appointment is True
         assert Cryptographer.verify_rpk(
@@ -154,7 +179,8 @@ def test_add_too_many_appointments(watcher):
     appointment, dispute_tx = generate_dummy_appointment(
         start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
     )
-    added_appointment, sig = watcher.add_appointment(appointment)
+    user_pk = get_random_value_hex(33)
+    added_appointment, sig = watcher.add_appointment(appointment, user_pk)
 
     assert added_appointment is False
     assert sig is None
@@ -171,8 +197,8 @@ def test_do_watch(watcher, temp_db_manager):
     watcher.appointments = {}
 
     for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
-        watcher.db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time, "size": 200}
+        watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
     do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
@@ -222,7 +248,7 @@ def test_filter_valid_breaches_random_data(watcher):
         dummy_appointment, _ = generate_dummy_appointment()
         uuid = uuid4().hex
         appointments[uuid] = {"locator": dummy_appointment.locator, "end_time": dummy_appointment.end_time}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
         watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
         locator_uuid_map[dummy_appointment.locator] = [uuid]
@@ -262,7 +288,7 @@ def test_filter_valid_breaches(watcher):
 
     for uuid, appointment in appointments.items():
         watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_json())
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
         watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
     watcher.locator_uuid_map = locator_uuid_map

@@ -14,11 +14,13 @@ from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
 from teos.carrier import Carrier
+from teos.users_dbm import UsersDBM
 from teos.inspector import Inspector
 from teos.responder import Responder
-from teos.db_manager import DBManager
+from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
+from teos.appointments_dbm import AppointmentsDBM
 from teos.tools import can_connect_to_bitcoind, in_correct_network
 from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
@@ -43,13 +45,14 @@ def main(command_line_conf):
     signal(SIGQUIT, handle_signals)
 
     # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+    data_dir = command_line_conf.get("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
-    setup_data_folder(DATA_DIR)
+    setup_data_folder(data_dir)
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     logger.info("Starting TEOS")
-    db_manager = DBManager(config.get("DB_PATH"))
+    db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
 
     bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
     bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
@@ -150,7 +153,8 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher).start()
+            gatekeeper = Gatekeeper(UsersDBM(config.get("USERS_DB_PATH")), config.get("DEFAULT_SLOTS"))
+            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, gatekeeper).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
@@ -171,7 +175,7 @@ if __name__ == "__main__":
             if opt in ["--btcrpcuser"]:
                 command_line_conf["BTC_RPC_USER"] = arg
             if opt in ["--btcrpcpassword"]:
-                command_line_conf["BTC_RPC_PASSWD"] = arg
+                command_line_conf["BTC_RPC_PASSWORD"] = arg
             if opt in ["--btcrpcconnect"]:
                 command_line_conf["BTC_RPC_CONNECT"] = arg
             if opt in ["--btcrpcport"]:
@@ -180,7 +184,7 @@ if __name__ == "__main__":
                 except ValueError:
                     exit("btcrpcport must be an integer")
             if opt in ["--datadir"]:
-                DATA_DIR = os.path.expanduser(arg)
+                command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
             if opt in ["-h", "--help"]:
                 exit(show_usage())
 

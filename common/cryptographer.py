@@ -1,19 +1,19 @@
 import pyzbase32
-from hashlib import sha256
+from hashlib import sha256, new
 from binascii import unhexlify, hexlify
 from coincurve.utils import int_to_bytes
 from coincurve import PrivateKey, PublicKey
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
-from common.tools import check_sha256_hex_format
+from common.tools import is_256b_hex_str
 
 LN_MESSAGE_PREFIX = b"Lightning Signed Message:"
 
 
 def sha256d(message):
     """
-    Compute the sha245d (double sha256) of a given by message.
+    Computes the double sha256 of a given by message.
 
     Args:
         message(:obj:`bytes`): the message to be used as input to the hash function.
@@ -25,12 +25,30 @@ def sha256d(message):
     return sha256(sha256(message).digest()).digest()
 
 
+def hash_160(message):
+    """ Calculates the RIPEMD-160 hash of a given message.
+
+    Args:
+        message (:obj:`str`) the message to be hashed.
+
+    Returns:
+        :obj:`str`: the ripemd160 hash of the given message.
+    """
+
+    # Calculate the RIPEMD-160 hash of the given data.
+    md = new("ripemd160")
+    md.update(unhexlify(message))
+    h160 = md.hexdigest()
+
+    return h160
+
+
+# NOTCOVERED
 def sigrec_encode(rsig_rid):
     """
-    Encodes a pk-recoverable signature to be used in LN. ```rsig_rid`` can be obtained trough
+    Encodes a pk-recoverable signature to be used in LN. ``rsig_rid`` can be obtained trough
     ``PrivateKey.sign_recoverable``. The required format has the recovery id as the last byte, and for signing LN
-    messages we need it as the first.
-    From: https://twitter.com/rusty_twit/status/1182102005914800128
+    messages we need it as the first. From: https://twitter.com/rusty_twit/status/1182102005914800128
 
     Args:
         rsig_rid(:obj:`bytes`): the signature to be encoded.
@@ -45,6 +63,7 @@ def sigrec_encode(rsig_rid):
     return sigrec
 
 
+# NOTCOVERED
 def sigrec_decode(sigrec):
     """
     Decodes a pk-recoverable signature in the format used by LN to be input to ``PublicKey.from_signature_and_message``.
@@ -54,12 +73,18 @@ def sigrec_decode(sigrec):
 
     Returns:
         :obj:`bytes`: the decoded signature.
+
+    Raises:
+        :obj:`ValueError`: if the SigRec is not properly encoded (first byte is not 31 + recovery id)
     """
 
-    rid, rsig = int_to_bytes(sigrec[0] - 31), sigrec[1:]
-    rsig_rid = rsig + rid
+    int_rid, rsig = sigrec[0] - 31, sigrec[1:]
+    if int_rid < 0:
+        raise ValueError("Wrong SigRec")
+    else:
+        rid = int_to_bytes(int_rid)
 
-    return rsig_rid
+    return rsig + rid
 
 
 # FIXME: Common has not log file, so it needs to log in the same log as the caller. This is a temporary fix.
@@ -68,7 +93,7 @@ logger = None
 
 class Cryptographer:
     """
-    The :class:`Cryptographer` is the class in charge of all the cryptography in the tower.
+    The :class:`Cryptographer` is in charge of all the cryptography in the tower.
     """
 
     @staticmethod
@@ -78,21 +103,21 @@ class Cryptographer:
         formatted.
 
         Args:
-              data(:mod:`str`): the data to be encrypted.
-              secret(:mod:`str`): the secret used to derive the encryption key.
+              data(:obj:`str`): the data to be encrypted.
+              secret(:obj:`str`): the secret used to derive the encryption key.
 
         Returns:
               :obj:`bool`: Whether or not the ``key`` and ``data`` are properly formatted.
 
         Raises:
-              ValueError: if either the ``key`` or ``data`` is not properly formatted.
+              :obj:`ValueError`: if either the ``key`` or ``data`` is not properly formatted.
         """
 
         if len(data) % 2:
             error = "Incorrect (Odd-length) value"
             raise ValueError(error)
 
-        if not check_sha256_hex_format(secret):
+        if not is_256b_hex_str(secret):
             error = "Secret must be a 32-byte hex value (64 hex chars)"
             raise ValueError(error)
 
@@ -101,16 +126,19 @@ class Cryptographer:
     @staticmethod
     def encrypt(blob, secret):
         """
-        Encrypts a given :mod:`Blob <common.cli.blob.Blob>` data using ``CHACHA20POLY1305``.
+        Encrypts a given :obj:`Blob <common.cli.blob.Blob>` data using ``CHACHA20POLY1305``.
 
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-              blob (:mod:`Blob <common.cli.blob.Blob>`): a ``Blob`` object containing a raw penalty transaction.
-              secret (:mod:`str`): a value to used to derive the encryption key. Should be the dispute txid.
+              blob (:obj:`Blob <common.cli.blob.Blob>`): a ``Blob`` object containing a raw penalty transaction.
+              secret (:obj:`str`): a value to used to derive the encryption key. Should be the dispute txid.
 
         Returns:
               :obj:`str`: The encrypted data (hex encoded).
+
+        Raises:
+              :obj:`ValueError`: if either the ``secret`` or ``blob`` is not properly formatted.
         """
 
         Cryptographer.check_data_key_format(blob.data, secret)
@@ -136,17 +164,20 @@ class Cryptographer:
     # ToDo: #20-test-tx-decrypting-edge-cases
     def decrypt(encrypted_blob, secret):
         """
-        Decrypts a given :mod:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` using ``CHACHA20POLY1305``.
+        Decrypts a given :obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>` using ``CHACHA20POLY1305``.
 
         ``SHA256(secret)`` is used as ``key``, and ``0 (12-byte)`` as ``iv``.
 
         Args:
-              encrypted_blob(:mod:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob`` potentially
-                containing a penalty transaction.
-              secret (:mod:`str`): a value to used to derive the decryption key. Should be the dispute txid.
+            encrypted_blob(:obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): an ``EncryptedBlob``
+                potentially containing a penalty transaction.
+            secret (:obj:`str`): a value to used to derive the decryption key. Should be the dispute txid.
 
         Returns:
               :obj:`str`: The decrypted data (hex encoded).
+
+        Raises:
+              :obj:`ValueError`: if either the ``secret`` or ``encrypted_blob`` is not properly formatted.
         """
 
         Cryptographer.check_data_key_format(encrypted_blob.data, secret)
@@ -198,7 +229,7 @@ class Cryptographer:
             return key
 
         except FileNotFoundError:
-            logger.error("Key file not found. Please check your settings")
+            logger.error("Key file not found at {}. Please check your settings".format(file_path))
             return None
 
         except IOError as e:
@@ -208,17 +239,14 @@ class Cryptographer:
     @staticmethod
     def load_private_key_der(sk_der):
         """
-        Creates a :mod:`PrivateKey` object from a given ``DER`` encoded private key.
+        Creates a :obj:`PrivateKey` from a given ``DER`` encoded private key.
 
         Args:
-             sk_der(:mod:`str`): a private key encoded in ``DER`` format.
+             sk_der(:obj:`str`): a private key encoded in ``DER`` format.
 
         Returns:
-             :mod:`PrivateKey`: A ``PrivateKey`` object.
-
-        Raises:
-            ValueError: if the provided ``pk_der`` data cannot be deserialized (wrong size or format).
-            TypeError: if the provided ``pk_der`` data is not a string.
+             :obj:`PrivateKey` or :obj:`None`: A ``PrivateKey`` object. if the private key can be loaded. `None`
+             otherwise.
         """
         try:
             sk = PrivateKey.from_der(sk_der)
@@ -235,14 +263,14 @@ class Cryptographer:
     @staticmethod
     def sign(message, sk):
         """
-        Signs a given data using a given secret key using ECDSA.
+        Signs a given data using a given secret key using ECDSA over secp256k1.
 
         Args:
             message(:obj:`bytes`): the data to be signed.
             sk(:obj:`PrivateKey`): the ECDSA secret key used to signed the data.
 
         Returns:
-           :obj:`str`: The zbase32 signature of the given message.
+           :obj:`str` or :obj:`None`: The zbase32 signature of the given message is it can be signed. `None` otherwise.
         """
 
         if not isinstance(message, bytes):
@@ -253,9 +281,14 @@ class Cryptographer:
             logger.error("The value passed as sk is not a private key (EllipticCurvePrivateKey)")
             return None
 
-        rsig_rid = sk.sign_recoverable(LN_MESSAGE_PREFIX + message, hasher=sha256d)
-        sigrec = sigrec_encode(rsig_rid)
-        zb32_sig = pyzbase32.encode_bytes(sigrec).decode()
+        try:
+            rsig_rid = sk.sign_recoverable(LN_MESSAGE_PREFIX + message, hasher=sha256d)
+            sigrec = sigrec_encode(rsig_rid)
+            zb32_sig = pyzbase32.encode_bytes(sigrec).decode()
+
+        except ValueError:
+            logger.error("Couldn't sign the message")
+            return None
 
         return zb32_sig
 
@@ -265,11 +298,11 @@ class Cryptographer:
         Recovers an ECDSA public key from a given message and zbase32 signature.
 
         Args:
-            message(:obj:`bytes`): the data to be signed.
+            message(:obj:`bytes`): original message from where the signature was generated.
             zb32_sig(:obj:`str`): the zbase32 signature of the message.
 
         Returns:
-           :obj:`PublicKey`: The recovered public key.
+           :obj:`PublicKey` or :obj:`None`: The recovered public key if it can be recovered. `None` otherwise.
         """
 
         if not isinstance(message, bytes):
@@ -281,9 +314,9 @@ class Cryptographer:
             return None
 
         sigrec = pyzbase32.decode_bytes(zb32_sig)
-        rsig_recid = sigrec_decode(sigrec)
 
         try:
+            rsig_recid = sigrec_decode(sigrec)
             pk = PublicKey.from_signature_and_message(rsig_recid, LN_MESSAGE_PREFIX + message, hasher=sha256d)
             return pk
 
@@ -295,9 +328,9 @@ class Cryptographer:
 
         except Exception as e:
             if "failed to recover ECDSA public key" in str(e):
-                logger.error("Cannot recover public key from signature".format(type(rsig_recid)))
+                logger.error("Cannot recover public key from signature")
             else:
-                logger.error("Unknown exception", error=e)
+                logger.error("Unknown exception", error=str(e))
 
             return None
 
@@ -315,3 +348,28 @@ class Cryptographer:
         """
 
         return pk.point() == rpk.point()
+
+    @staticmethod
+    def get_compressed_pk(pk):
+        """
+        Computes a compressed, hex-encoded, public key given a ``PublicKey``.
+
+        Args:
+            pk(:obj:`PublicKey`): a given public key.
+
+        Returns:
+            :obj:`str` or :obj:`None`: A compressed, hex-encoded, public key (33-byte long) if it can be compressed.
+            `None` oterwise.
+        """
+
+        if not isinstance(pk, PublicKey):
+            logger.error("The received data is not a PublicKey object")
+            return None
+
+        try:
+            compressed_pk = pk.format(compressed=True)
+            return hexlify(compressed_pk).decode("utf-8")
+
+        except TypeError as e:
+            logger.error("PublicKey has invalid initializer", error=str(e))
+            return None

@@ -1,11 +1,24 @@
 import re
-import os
 import logging
 from pathlib import Path
 from common.constants import LOCATOR_LEN_HEX
 
 
-def check_sha256_hex_format(value):
+def is_compressed_pk(value):
+    """
+    Checks if a given value is a 33-byte hex-encoded string starting by 02 or 03.
+
+    Args:
+        value(:obj:`str`): the value to be checked.
+
+    Returns:
+        :obj:`bool`: Whether or not the value matches the format.
+    """
+
+    return isinstance(value, str) and re.match(r"^0[2-3][0-9A-Fa-f]{64}$", value) is not None
+
+
+def is_256b_hex_str(value):
     """
     Checks if a given value is a 32-byte hex encoded string.
 
@@ -18,7 +31,7 @@ def check_sha256_hex_format(value):
     return isinstance(value, str) and re.match(r"^[0-9A-Fa-f]{64}$", value) is not None
 
 
-def check_locator_format(value):
+def is_locator(value):
     """
     Checks if a given value is a 16-byte hex encoded string.
 
@@ -48,7 +61,7 @@ def setup_data_folder(data_folder):
     Create a data folder for either the client or the server side if the folder does not exists.
 
     Args:
-        data_folder (:obj:`str`): the path of the folder
+        data_folder (:obj:`str`): the path of the folder.
     """
 
     Path(data_folder).mkdir(parents=True, exist_ok=True)
@@ -56,9 +69,12 @@ def setup_data_folder(data_folder):
 
 def setup_logging(log_file_path, log_name_prefix):
     """
-    Setups a couple of loggers (console and file) given a prefix and a file path. The log names are:
+    Setups a couple of loggers (console and file) given a prefix and a file path.
 
-    prefix | _file_log and prefix | _console_log
+    The log names are:
+
+        prefix | _file_log
+        prefix | _console_log
 
     Args:
         log_file_path (:obj:`str`): the path of the file to output the file log.
@@ -67,10 +83,10 @@ def setup_logging(log_file_path, log_name_prefix):
 
     if not isinstance(log_file_path, str):
         print(log_file_path)
-        raise ValueError("Wrong log file path.")
+        raise ValueError("Wrong log file path")
 
     if not isinstance(log_name_prefix, str):
-        raise ValueError("Wrong log file name.")
+        raise ValueError("Wrong log file name")
 
     # Create the file logger
     f_logger = logging.getLogger("{}_file_log".format(log_name_prefix))

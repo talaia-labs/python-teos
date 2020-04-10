@@ -5,7 +5,7 @@ from threading import Thread, Event, Condition
 
 from teos.chain_monitor import ChainMonitor
 
-from test.teos.unit.conftest import get_random_value_hex, generate_block, bitcoind_connect_params, bitcoind_feed_params
+from test.teos.unit.conftest import get_random_value_hex, generate_block, bitcoind_feed_params
 
 
 def test_init(run_bitcoind, block_processor):
@@ -64,8 +64,8 @@ def test_update_state(block_processor):
 
 def test_monitor_chain_polling(db_manager, block_processor):
     # Try polling with the Watcher
-    wq = Queue()
-    chain_monitor = ChainMonitor(Queue(), Queue(), block_processor, bitcoind_feed_params)
+    watcher_queue = Queue()
+    chain_monitor = ChainMonitor(watcher_queue, Queue(), block_processor, bitcoind_feed_params)
     chain_monitor.best_tip = block_processor.get_best_block_hash()
     chain_monitor.polling_delta = 0.1
 

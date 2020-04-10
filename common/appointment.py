@@ -1,4 +1,3 @@
-import json
 import struct
 from binascii import unhexlify
 
@@ -10,18 +9,17 @@ class Appointment:
     The :class:`Appointment` contains the information regarding an appointment between a client and the Watchtower.
 
     Args:
-        locator (:mod:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a trigger
-            for the tower to decrypt and broadcast the penalty transaction.
-        start_time (:mod:`int`): The block height where the tower is hired to start watching for breaches.
-        end_time (:mod:`int`): The block height where the tower will stop watching for breaches.
-        to_self_delay (:mod:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``htlc`` that this appointment is
-            covering.
+        locator (:obj:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
+            trigger for the tower to decrypt and broadcast the penalty transaction.
+        start_time (:obj:`int`): The block height where the tower is hired to start watching for breaches.
+        end_time (:obj:`int`): The block height where the tower will stop watching for breaches.
+        to_self_delay (:obj:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``to_remote`` output of the
+            commitment transaction that this appointment is covering.
         encrypted_blob (:obj:`EncryptedBlob <common.encrypted_blob.EncryptedBlob>`): An ``EncryptedBlob`` object
             containing an encrypted penalty transaction. The tower will decrypt it and broadcast the penalty transaction
             upon seeing a breach on the blockchain.
     """
 
-    # DISCUSS: 35-appointment-checks
     def __init__(self, locator, start_time, end_time, to_self_delay, encrypted_blob):
         self.locator = locator
         self.start_time = start_time  # ToDo: #4-standardize-appointment-fields
@@ -37,7 +35,7 @@ class Appointment:
         This method is useful to load data from a database.
 
         Args:
-            appointment_data (:mod:`dict`): a dictionary containing the following keys:
+            appointment_data (:obj:`dict`): a dictionary containing the following keys:
                 ``{locator, start_time, end_time, to_self_delay, encrypted_blob}``
 
         Returns:
@@ -63,11 +61,10 @@ class Appointment:
 
     def to_dict(self):
         """
-        Exports an appointment as a dictionary.
+        Encodes an appointment as a dictionary.
 
         Returns:
             :obj:`dict`: A dictionary containing the appointment attributes.
-
         """
 
         # ToDO: #3-improve-appointment-structure
@@ -81,19 +78,6 @@ class Appointment:
 
         return appointment
 
-    def to_json(self):
-        """
-        Exports an appointment as a deterministic json encoded string.
-
-        This method ensures that multiple invocations with the same data yield the same value. This is the format used
-        to store appointments in the database.
-
-        Returns:
-            :obj:`str`: A json-encoded str representing the appointment.
-        """
-
-        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
-
     def serialize(self):
         """
         Serializes an appointment to be signed.
@@ -104,7 +88,7 @@ class Appointment:
         All values are big endian.
 
         Returns:
-              :mod:`bytes`: The serialized data to be signed.
+              :obj:`bytes`: The serialized data to be signed.
         """
         return (
             unhexlify(self.locator)

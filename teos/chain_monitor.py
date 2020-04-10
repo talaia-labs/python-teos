@@ -10,8 +10,8 @@ logger = Logger(actor="ChainMonitor", log_name_prefix=LOG_PREFIX)
 
 class ChainMonitor:
     """
-    The :class:`ChainMonitor` is the class in charge of monitoring the blockchain (via ``bitcoind``) to detect new
-    blocks on top of the best chain. If a new best block is spotted, the chain monitor will notify the
+    The :class:`ChainMonitor` is in charge of monitoring the blockchain (via ``bitcoind``) to detect new blocks on top
+    of the best chain. If a new best block is spotted, the chain monitor will notify the
     :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>` using ``Queues``.
 
     The :class:`ChainMonitor` monitors the chain using two methods: ``zmq`` and ``polling``. Blocks are only notified
@@ -34,7 +34,6 @@ class ChainMonitor:
         watcher_queue (:obj:`Queue`): a queue to send new best tips to the :obj:`Watcher <teos.watcher.Watcher>`.
         responder_queue (:obj:`Queue`): a queue to send new best tips to the
             :obj:`Responder <teos.responder.Responder>`.
-
         polling_delta (:obj:`int`): time between polls (in seconds).
         max_block_window_size (:obj:`int`): max size of last_tips.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a blockProcessor instance.
@@ -75,7 +74,6 @@ class ChainMonitor:
 
         Args:
             block_hash (:obj:`str`): the new block hash to be sent to the subscribers.
-            block_hash (:obj:`str`): the new block hash to be sent to the subscribers.
         """
 
         self.watcher_queue.put(block_hash)
@@ -90,7 +88,7 @@ class ChainMonitor:
             block_hash (:obj:`block_hash`): the new best tip.
 
         Returns:
-            (:obj:`bool`): ``True`` is the state was successfully updated, ``False`` otherwise.
+            :obj:`bool`: True is the state was successfully updated, False otherwise.
         """
 
         if block_hash != self.best_tip and block_hash not in self.last_tips:
