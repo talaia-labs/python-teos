@@ -3,26 +3,26 @@ import json
 import shutil
 import pytest
 import responses
-from binascii import hexlify
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
 
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
+from common.exceptions import InvalidParameter, InvalidKey
 
 import cli.teos_cli as teos_cli
-from cli.exceptions import InvalidParameter, InvalidKey, TowerResponseError
+from cli.exceptions import TowerResponseError
 
 from test.cli.unit.conftest import get_random_value_hex, get_config
 
 config = get_config()
 
 # dummy keys for the tests
-dummy_cli_sk = PrivateKey.from_int(1)
-dummy_cli_compressed_pk = dummy_cli_sk.public_key.format(compressed=True)
+dummy_user_sk = PrivateKey.from_int(1)
+dummy_user_id = Cryptographer.get_compressed_pk(dummy_user_sk.public_key)
 dummy_teos_sk = PrivateKey.from_int(2)
-dummy_teos_pk = dummy_teos_sk.public_key
+dummy_teos_id = Cryptographer.get_compressed_pk(dummy_teos_sk.public_key)
 another_sk = PrivateKey.from_int(3)
 
 teos_url = "http://{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))
@@ -59,14 +59,13 @@ def get_signature(message, sk):
 @responses.activate
 def test_register():
     # Simulate a register response
-    compressed_pk_hex = hexlify(dummy_cli_compressed_pk).decode("utf-8")
-    response = {"public_key": compressed_pk_hex, "available_slots": 100}
+    response = {"public_key": dummy_user_id, "available_slots": 100}
     responses.add(responses.POST, register_endpoint, json=response, status=200)
-    result = teos_cli.register(compressed_pk_hex, teos_url)
+    result = teos_cli.register(dummy_user_id, teos_url)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == register_endpoint
-    assert result.get("public_key") == compressed_pk_hex and result.get("available_slots") == response.get(
+    assert result.get("public_key") == dummy_user_id and result.get("available_slots") == response.get(
         "available_slots"
     )
 
@@ -81,7 +80,7 @@ def test_add_appointment():
         "available_slots": 100,
     }
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment(dummy_appointment_data, dummy_cli_sk, dummy_teos_pk, teos_url)
+    result = teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == add_appointment_endpoint
@@ -102,7 +101,7 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
 
     with pytest.raises(TowerResponseError):
-        teos_cli.add_appointment(dummy_appointment_data, dummy_cli_sk, dummy_teos_pk, teos_url)
+        teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
 
 
 @responses.activate
@@ -115,7 +114,7 @@ def test_get_appointment():
     }
 
     responses.add(responses.POST, get_appointment_endpoint, json=response, status=200)
-    result = teos_cli.get_appointment(dummy_appointment_dict.get("locator"), dummy_cli_sk, dummy_teos_pk, teos_url)
+    result = teos_cli.get_appointment(dummy_appointment_dict.get("locator"), dummy_user_sk, dummy_teos_id, teos_url)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == get_appointment_endpoint
@@ -130,7 +129,7 @@ def test_get_appointment_err():
     responses.add(responses.POST, get_appointment_endpoint, body=ConnectionError())
 
     with pytest.raises(ConnectionError):
-        teos_cli.get_appointment(locator, dummy_cli_sk, dummy_teos_pk, teos_url)
+        teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
 
 
 def test_load_keys():
@@ -139,36 +138,32 @@ def test_load_keys():
     public_key_file_path = "pk_test_file"
     empty_file_path = "empty_file"
     with open(private_key_file_path, "wb") as f:
-        f.write(dummy_cli_sk.to_der())
+        f.write(dummy_user_sk.to_der())
     with open(public_key_file_path, "wb") as f:
-        f.write(dummy_cli_compressed_pk)
+        f.write(dummy_user_sk.public_key.format(compressed=True))
     with open(empty_file_path, "wb"):
         pass
 
-    # Now we can test the function passing the using this files (we'll use the same pk for both)
-    r = teos_cli.load_keys(public_key_file_path, private_key_file_path, public_key_file_path)
+    # Now we can test the function passing the using this files
+    r = teos_cli.load_keys(public_key_file_path, private_key_file_path)
     assert isinstance(r, tuple)
     assert len(r) == 3
 
     # If any param does not match the expected, we should get an InvalidKey exception
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(None, private_key_file_path, public_key_file_path)
+        teos_cli.load_keys(None, private_key_file_path)
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, None, public_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, private_key_file_path, None)
+        teos_cli.load_keys(public_key_file_path, None)
 
     # The same should happen if we pass a public key where a private should be, for instance
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(private_key_file_path, public_key_file_path, private_key_file_path)
+        teos_cli.load_keys(private_key_file_path, public_key_file_path)
 
     # Same if any of the files is empty
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(empty_file_path, private_key_file_path, public_key_file_path)
+        teos_cli.load_keys(empty_file_path, private_key_file_path)
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, empty_file_path, public_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, private_key_file_path, empty_file_path)
+        teos_cli.load_keys(public_key_file_path, empty_file_path)
 
     # Remove the tmp files
     os.remove(private_key_file_path)
