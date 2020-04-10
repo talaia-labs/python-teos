@@ -457,7 +457,7 @@ def main(command, args, command_line_conf):
     except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
         logger.error(str(e))
     except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
-        logger.error(e.reason, **e.kwargs)
+        logger.error(e.msg, **e.kwargs)
     except Exception as e:
         logger.error("Unknown error occurred", error=str(e))
 
