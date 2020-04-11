@@ -15,7 +15,7 @@ def test_load_logs():
     # Create a temporary file with some test logs inside.
     with open("test_log_file", "w") as f:
         for log in test_log_data:
-            f.write("{}\n".format(log))
+            f.write(json.dumps(log) + "\n")
 
     # Make sure load_logs function returns the logs in list form. 
     log_data = load_logs("test_log_file")
@@ -30,12 +30,14 @@ def test_load_logs_err():
     with pytest.raises(FileNotFoundError):
         load_logs("nonexistent_log_file")
 
+    # TODO: Test if it raises an error if the file is empty.
+
 
 # NOTE/TODO: Elasticsearch needs to be running for this test to work.
 def test_index_logs():
     json_logs = []
     for log in test_log_data:
-        json_logs.append(json.dumps(log))
+        json_logs.append(log)
 
     response = index_logs(json_logs)
     
