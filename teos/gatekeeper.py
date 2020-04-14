@@ -1,19 +1,21 @@
+from math import ceil
+from threading import Lock
+
 from common.tools import is_compressed_pk
 from common.cryptographer import Cryptographer
+from common.constants import ENCRYPTED_BLOB_MAX_SIZE_HEX
 from common.exceptions import InvalidParameter, InvalidKey, SignatureError
 
 
 class NotEnoughSlots(ValueError):
     """Raised when trying to subtract more slots than a user has available"""
 
-    def __init__(self, user_pk, requested_slots):
-        self.user_pk = user_pk
-        self.requested_slots = requested_slots
+    pass
 
 
-class IdentificationFailure(Exception):
+class AuthenticationFailure(Exception):
     """
-    Raised when a user can not be identified. Either the user public key cannot be recovered or the user is
+    Raised when a user can not be authenticated. Either the user public key cannot be recovered or the user is
     not found within the registered ones.
     """
 
@@ -21,12 +23,12 @@ class IdentificationFailure(Exception):
 
 
 class UserInfo:
-    def __init__(self, available_slots, subscription_end_time, appointments=None):
+    def __init__(self, available_slots, subscription_expiry, appointments=None):
         self.available_slots = available_slots
-        self.subscription_end_time = subscription_end_time
+        self.subscription_expiry = subscription_expiry
 
         if not appointments:
-            self.appointments = {}
+            self.appointments = []
         else:
             self.appointments = appointments
 
@@ -34,9 +36,9 @@ class UserInfo:
     def from_dict(cls, user_data):
         available_slots = user_data.get("available_slots")
         appointments = user_data.get("appointments")
-        subscription_end_time = user_data.get("subscription_end_time")
+        subscription_expiry = user_data.get("subscription_expiry")
 
-        if any(v is None for v in [available_slots, appointments, subscription_end_time]):
+        if any(v is None for v in [available_slots, appointments, subscription_expiry]):
             raise ValueError("Wrong appointment data, some fields are missing")
 
         return cls(available_slots, subscription_expiry, appointments)
@@ -54,14 +56,16 @@ class Gatekeeper:
         registered_users (:obj:`dict`): a map of user_pk:UserInfo.
     """
 
-    def __init__(self, user_db, block_processor, default_slots, default_subscription_duration):
+    def __init__(self, user_db, block_processor, default_slots, default_subscription_duration, expiry_delta):
         self.default_slots = default_slots
-        self.block_processor = block_processor
         self.default_subscription_duration = default_subscription_duration
+        self.expiry_delta = expiry_delta
+        self.block_processor = block_processor
         self.user_db = user_db
         self.registered_users = {
             user_id: UserInfo.from_dict(user_data) for user_id, user_data in user_db.load_all_users().items()
         }
+        self.lock = Lock()
 
     def add_update_user(self, user_pk):
         """
@@ -91,9 +95,9 @@ class Gatekeeper:
 
         self.user_db.store_user(user_pk, self.registered_users[user_pk].to_dict())
 
-        return self.registered_users[user_pk].available_slots, self.registered_users[user_pk].subscription_end_time
+        return self.registered_users[user_pk].available_slots, self.registered_users[user_pk].subscription_expiry
 
-    def identify_user(self, message, signature):
+    def authenticate_user(self, message, signature):
         """
         Checks if a request comes from a registered user by ec-recovering their public key from a signed message.
 
@@ -105,7 +109,7 @@ class Gatekeeper:
             :obj:`str`: a compressed key recovered from the signature and matching a registered user.
 
         Raises:
-            :obj:`IdentificationFailure`: if the user cannot be identified.
+            :obj:`AuthenticationFailure`: if the user cannot be authenticated.
         """
 
         try:
@@ -115,40 +119,34 @@ class Gatekeeper:
             if compressed_pk in self.registered_users:
                 return compressed_pk
             else:
-                raise IdentificationFailure("User not found.")
+                raise AuthenticationFailure("User not found.")
 
         except (InvalidParameter, InvalidKey, SignatureError):
-            raise IdentificationFailure("Wrong message or signature.")
+            raise AuthenticationFailure("Wrong message or signature.")
 
-    def fill_slots(self, user_pk, n):
-        """
-        Fills a given number os slots of the user subscription.
-
-        Args:
-            user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-            n (:obj:`int`): the number of slots to fill.
-
-        Raises:
-            :obj:`NotEnoughSlots`: if the user subscription does not have enough slots.
-        """
-
-        # DISCUSS: we may want to return a different exception if the user does not exist
-        if user_pk in self.registered_users and n <= self.registered_users.get(user_pk).available_slots:
-            self.registered_users[user_pk].available_slots -= n
-            self.user_db.store_user(user_pk, self.registered_users[user_pk].to_dict())
+    def update_available_slots(self, user_id, new_appointment, old_appointment=None):
+        self.lock.acquire()
+        if old_appointment:
+            # For updates the difference between the existing appointment and the update is computed.
+            used_slots = ceil(new_appointment.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+            required_slots = ceil(old_appointment.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX) - used_slots
         else:
-            raise NotEnoughSlots(user_pk, n)
+            # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+            required_slots = ceil(new_appointment.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
-    def free_slots(self, user_pk, n):
-        """
-        Frees some slots of a user subscription.
+        if required_slots <= self.registered_users.get(user_id).available_slots:
+            # Filling / freeing slots depending on whether this is an update or not, and if it is bigger or smaller than
+            # the old appointment.
+            self.registered_users.get(user_id).available_slots -= required_slots
+        else:
+            self.lock.release()
+            raise NotEnoughSlots()
 
-        Args:
-            user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-            n (:obj:`int`): the number of slots to free.
-        """
+        self.lock.release()
+        return self.registered_users.get(user_id).available_slots
 
-        # DISCUSS: if the user does not exist we may want to log or return an exception.
-        if user_pk in self.registered_users:
-            self.registered_users[user_pk].available_slots += n
-            self.user_db.store_user(user_pk, self.registered_users[user_pk].to_dict())
+    def get_expiring_appointments(self, block_height):
+        expiring_appointments = []
+        for user_id, user_info in self.registered_users.items():
+            if block_height > user_info.subscription_expiry + self.expiry_delta:
+                expiring_appointments.extend(user_info.appointments)

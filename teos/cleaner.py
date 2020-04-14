@@ -87,7 +87,7 @@ class Cleaner:
     @staticmethod
     def delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager):
         """
-        Deletes appointments which ``end_time`` has been reached (with no trigger) both from memory
+        Deletes appointments which ``expiry`` has been reached (with no trigger) both from memory
         (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
 
         Args:
@@ -181,10 +181,10 @@ class Cleaner:
             db_manager.create_triggered_appointment_flag(uuid)
 
     @staticmethod
-    def delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager):
+    def delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager, expired=False):
         """
-        Deletes a completed tracker both from memory (:obj:`Responder <teos.responder.Responder>`) and disk (from the
-        Responder's and Watcher's databases).
+        Deletes completed/expired trackers both from memory (:obj:`Responder <teos.responder.Responder>`) and disk
+        (from the Responder's and Watcher's databases).
 
         Args:
             trackers (:obj:`dict`): a dictionary containing all the :obj:`Responder <teos.responder.Responder>`
@@ -195,17 +195,23 @@ class Cleaner:
             height (:obj:`int`): the block height at which the trackers were completed.
             db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
                 to interact with the database.
+            expired (:obj:`bool`): whether the trackers have expired or not. Defaults to False.
         """
 
         locator_maps_to_update = {}
 
-        for uuid, confirmations in completed_trackers.items():
-            logger.info(
-                "Appointment completed. Appointment ended after reaching enough confirmations",
-                uuid=uuid,
-                height=height,
-                confirmations=confirmations,
-            )
+        for uuid in completed_trackers:
+
+            if expired:
+                logger.info(
+                    "Appointment couldn't be completed. Expiry reached but penalty didn't make it to the chain",
+                    uuid=uuid,
+                    height=height,
+                )
+            else:
+                logger.info(
+                    "Appointment completed. Penalty transaction was irrevocably confirmed", uuid=uuid, height=height
+                )
 
             penalty_txid = trackers[uuid].get("penalty_txid")
             locator = trackers[uuid].get("locator")
@@ -229,6 +235,6 @@ class Cleaner:
             Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
 
         # Delete appointment from the db (from watchers's and responder's db) and remove flag
-        db_manager.batch_delete_responder_trackers(list(completed_trackers.keys()))
-        db_manager.batch_delete_watcher_appointments(list(completed_trackers.keys()))
-        db_manager.batch_delete_triggered_appointment_flag(list(completed_trackers.keys()))
+        db_manager.batch_delete_responder_trackers(completed_trackers)
+        db_manager.batch_delete_watcher_appointments(completed_trackers)
+        db_manager.batch_delete_triggered_appointment_flag(completed_trackers)

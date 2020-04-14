@@ -3,9 +3,9 @@ import re
 from common.logger import Logger
 from common.tools import is_locator
 from common.constants import LOCATOR_LEN_HEX
-from common.appointment import Appointment
 
 from teos import errors, LOG_PREFIX
+from teos.extended_appointment import ExtendedAppointment
 
 logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)
 
@@ -49,7 +49,8 @@ class Inspector:
 
 
         Returns:
-            :obj:`Appointment <teos.appointment.Appointment>`: An appointment initialized with the provided data.
+            :obj:`Extended <teos.extended_appointment.ExtendedAppointment>`: An appointment initialized with
+            the provided data.
 
         Raises:
            :obj:`InspectionFailed`: if any of the fields is wrong.
@@ -68,7 +69,13 @@ class Inspector:
         self.check_to_self_delay(appointment_data.get("to_self_delay"))
         self.check_blob(appointment_data.get("encrypted_blob"))
 
-        return Appointment.from_dict(appointment_data)
+        # Set user_id to None since we still don't know it, it'll be set by the API after querying the gatekeeper
+        return ExtendedAppointment(
+            appointment_data.get("locator"),
+            appointment_data.get("to_self_delay"),
+            appointment_data.get("encrypted_blob"),
+            user_id=None,
+        )
 
     @staticmethod
     def check_locator(locator):

@@ -7,19 +7,19 @@ class Builder:
     @staticmethod
     def build_appointments(appointments_data):
         """
-        Builds an appointments dictionary (``uuid: Appointment``) and a locator_uuid_map (``locator: uuid``) given a
-        dictionary of appointments from the database.
+        Builds an appointments dictionary (``uuid: ExtendedAppointment``) and a locator_uuid_map (``locator: uuid``)
+        given a dictionary of appointments from the database.
 
         Args:
             appointments_data (:obj:`dict`): a dictionary of dictionaries representing all the
                 :obj:`Watcher <teos.watcher.Watcher>` appointments stored in the database. The structure is as follows:
 
-                    ``{uuid: {locator: str, start_time: int, ...}, uuid: {locator:...}}``
+                    ``{uuid: {locator: str, ...}, uuid: {locator:...}}``
 
         Returns:
             :obj:`tuple`: A tuple with two dictionaries. ``appointments`` containing the appointment information in
-            :obj:`Appointment <teos.appointment.Appointment>` objects and ``locator_uuid_map`` containing a map of
-            appointment (``uuid:locator``).
+            :obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>` objects and ``locator_uuid_map``
+            containing a map of appointment (``uuid:locator``).
         """
 
         appointments = {}
@@ -28,7 +28,7 @@ class Builder:
         for uuid, data in appointments_data.items():
             appointments[uuid] = {
                 "locator": data.get("locator"),
-                "end_time": data.get("end_time"),
+                "user_id": data.get("user_id"),
                 "size": len(data.get("encrypted_blob")),
             }
 
@@ -67,7 +67,7 @@ class Builder:
             trackers[uuid] = {
                 "penalty_txid": data.get("penalty_txid"),
                 "locator": data.get("locator"),
-                "appointment_end": data.get("appointment_end"),
+                "user_id": data.get("user_id"),
             }
 
             if data.get("penalty_txid") in tx_tracker_map:

@@ -1,22 +1,16 @@
 import os
 import logging
-from math import ceil
 from flask import Flask, request, abort, jsonify
 
 from teos import LOG_PREFIX
 import teos.errors as errors
 from teos.inspector import InspectionFailed
-from teos.gatekeeper import NotEnoughSlots, IdentificationFailure
+from teos.watcher import AppointmentLimitReached
+from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 
 from common.logger import Logger
 from common.cryptographer import hash_160
-from common.constants import (
-    HTTP_OK,
-    HTTP_BAD_REQUEST,
-    HTTP_SERVICE_UNAVAILABLE,
-    HTTP_NOT_FOUND,
-    ENCRYPTED_BLOB_MAX_SIZE_HEX,
-)
+from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
 # ToDo: #5-add-async-to-api
@@ -130,11 +124,11 @@ class API:
         if client_pk:
             try:
                 rcode = HTTP_OK
-                available_slots, subscription_end_time = self.gatekeeper.add_update_user(client_pk)
+                available_slots, subscription_expiry = self.gatekeeper.add_update_user(client_pk)
                 response = {
                     "public_key": client_pk,
                     "available_slots": available_slots,
-                    "subscription_end_time": subscription_end_time,
+                    "subscription_expiry": subscription_expiry,
                 }
 
             except ValueError as e:
@@ -176,73 +170,27 @@ class API:
         except TypeError as e:
             return abort(HTTP_BAD_REQUEST, e)
 
-        # We kind of have the chicken an the egg problem here. Data must be verified and the signature must be checked:
-        # - If we verify the data first, we may encounter that the signature is wrong and wasted some time.
-        # - If we check the signature first, we may need to verify some of the information or expose to build
-        #   appointments with potentially wrong data, which may be exploitable.
-        #
-        # The first approach seems safer since it only implies a bunch of pretty quick checks.
-
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
-            user_pk = self.gatekeeper.identify_user(appointment.serialize(), request_data.get("signature"))
-
-            # Check if the appointment is an update. Updates will return a summary.
-            appointment_uuid = hash_160("{}{}".format(appointment.locator, user_pk))
-            appointment_summary = self.watcher.get_appointment_summary(appointment_uuid)
-
-            if appointment_summary:
-                used_slots = ceil(appointment_summary.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-                required_slots = ceil(len(appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-                slot_diff = required_slots - used_slots
-
-                # For updates we only reserve the slot difference provided the new one is bigger.
-                required_slots = slot_diff if slot_diff > 0 else 0
-
-            else:
-                # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-                slot_diff = 0
-                required_slots = ceil(len(appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-
-            # Slots are reserved before adding the appointments to prevent race conditions.
-            # DISCUSS: It may be worth using signals here to avoid race conditions anyway.
-            self.gatekeeper.fill_slots(user_pk, required_slots)
-
-            appointment_added, signature = self.watcher.add_appointment(
-                appointment, user_pk, self.gatekeeper.registered_users[user_pk].subscription_end_time
-            )
-
-            if appointment_added:
-                # If the appointment is added and the update is smaller than the original, the difference is given back.
-                if slot_diff < 0:
-                    self.gatekeeper.free_slots(user_pk, abs(slot_diff))
-
-                rcode = HTTP_OK
-                response = {
-                    "locator": appointment.locator,
-                    "signature": signature,
-                    "available_slots": self.gatekeeper.registered_users[user_pk].available_slots,
-                    "subscription_end_time": self.gatekeeper.registered_users[user_pk].subscription_end_time,
-                }
-
-            else:
-                # If the appointment is not added the reserved slots are given back
-                self.gatekeeper.free_slots(user_pk, required_slots)
-                rcode = HTTP_SERVICE_UNAVAILABLE
-                response = {"error": "appointment rejected"}
+            response = self.watcher.add_appointment(appointment, request_data.get("signature"))
+            rcode = HTTP_OK
 
         except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
             error = "appointment rejected. Error {}: {}".format(e.erno, e.reason)
             response = {"error": error}
 
-        except (IdentificationFailure, NotEnoughSlots):
+        except (AuthenticationFailure, NotEnoughSlots):
             rcode = HTTP_BAD_REQUEST
             error = "appointment rejected. Error {}: {}".format(
                 errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
                 "Invalid signature or user does not have enough slots available",
             )
             response = {"error": error}
+
+        except AppointmentLimitReached:
+            rcode = HTTP_SERVICE_UNAVAILABLE
+            response = {"error": "appointment rejected"}
 
         logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
@@ -285,7 +233,7 @@ class API:
 
             message = "get appointment {}".format(locator).encode()
             signature = request_data.get("signature")
-            user_pk = self.gatekeeper.identify_user(message, signature)
+            user_pk = self.gatekeeper.authenticate_user(message, signature)
 
             triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
             uuid = hash_160("{}{}".format(locator, user_pk))
@@ -295,8 +243,8 @@ class API:
                 appointment_data = self.watcher.db_manager.load_responder_tracker(uuid)
                 if appointment_data:
                     rcode = HTTP_OK
-                    # Remove expiry field from appointment data since it is an internal field
-                    appointment_data.pop("expiry")
+                    # Remove user_id field from appointment data since it is an internal field
+                    appointment_data.pop("user_id")
                     response = {"locator": locator, "status": "dispute_responded", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND
@@ -307,14 +255,14 @@ class API:
                 appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
                 if appointment_data:
                     rcode = HTTP_OK
-                    # Remove expiry field from appointment data since it is an internal field
-                    appointment_data.pop("expiry")
+                    # Remove user_id field from appointment data since it is an internal field
+                    appointment_data.pop("user_id")
                     response = {"locator": locator, "status": "being_watched", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND
                     response = {"locator": locator, "status": "not_found"}
 
-        except (InspectionFailed, IdentificationFailure):
+        except (InspectionFailed, AuthenticationFailure):
             rcode = HTTP_NOT_FOUND
             response = {"locator": locator, "status": "not_found"}
 

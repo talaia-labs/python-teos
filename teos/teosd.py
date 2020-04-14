@@ -70,14 +70,17 @@ def main(command_line_conf):
             block_processor = BlockProcessor(bitcoind_connect_params)
             carrier = Carrier(bitcoind_connect_params)
 
-            responder = Responder(db_manager, carrier, block_processor)
-            watcher = Watcher(
-                db_manager,
+            gatekeeper = Gatekeeper(
+                UsersDBM(config.get("USERS_DB_PATH")),
                 block_processor,
-                responder,
-                secret_key_der,
-                config.get("MAX_APPOINTMENTS"),
+                config.get("DEFAULT_SLOTS"),
+                config.get("DEFAULT_SUBSCRIPTION_DURATION"),
                 config.get("EXPIRY_DELTA"),
+            )
+
+            responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+            watcher = Watcher(
+                db_manager, gatekeeper, block_processor, responder, secret_key_der, config.get("MAX_APPOINTMENTS")
             )
 
             # Create the chain monitor and start monitoring the chain
@@ -151,12 +154,6 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            gatekeeper = Gatekeeper(
-                UsersDBM(config.get("USERS_DB_PATH")),
-                block_processor,
-                config.get("DEFAULT_SLOTS"),
-                config.get("DEFAULT_SUBSCRIPTION_DURATION"),
-            )
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
             API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher, gatekeeper).start()
         except Exception as e:

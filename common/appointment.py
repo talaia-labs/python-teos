@@ -25,14 +25,12 @@ class Appointment:
         """
         Builds an appointment from a dictionary.
 
-        This method is useful to load data from a database.
-
         Args:
             appointment_data (:obj:`dict`): a dictionary containing the following keys:
                 ``{locator, to_self_delay, encrypted_blob}``
 
         Returns:
-            :obj:`Appointment <teos.appointment.Appointment>`: An appointment initialized using the provided data.
+            :obj:`Appointment <common.appointment.Appointment>`: An appointment initialized using the provided data.
 
         Raises:
             ValueError: If one of the mandatory keys is missing in ``appointment_data``.
@@ -40,13 +38,13 @@ class Appointment:
 
         locator = appointment_data.get("locator")
         to_self_delay = appointment_data.get("to_self_delay")
-        encrypted_blob_data = appointment_data.get("encrypted_blob")
+        encrypted_blob = appointment_data.get("encrypted_blob")
 
-        if any(v is None for v in [locator, to_self_delay, encrypted_blob_data]):
+        if any(v is None for v in [locator, to_self_delay, encrypted_blob]):
             raise ValueError("Wrong appointment data, some fields are missing")
 
         else:
-            appointment = cls(locator, to_self_delay, encrypted_blob_data)
+            appointment = cls(locator, to_self_delay, encrypted_blob)
 
         return appointment
 
@@ -58,14 +56,7 @@ class Appointment:
             :obj:`dict`: A dictionary containing the appointment attributes.
         """
 
-        # ToDO: #3-improve-appointment-structure
-        appointment = {
-            "locator": self.locator,
-            "to_self_delay": self.to_self_delay,
-            "encrypted_blob": self.encrypted_blob,
-        }
-
-        return appointment
+        return self.__dict__
 
     def serialize(self):
         """

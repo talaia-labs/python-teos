@@ -3,15 +3,20 @@ from threading import Thread
 
 from common.logger import Logger
 from common.tools import compute_locator
-from common.appointment import Appointment
+from common.exceptions import BasicException
 from common.exceptions import EncryptionError
 from common.cryptographer import Cryptographer, hash_160
 from common.exceptions import InvalidParameter, SignatureError
 
 from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
+from teos.extended_appointment import ExtendedAppointment
 
 logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
+
+
+class AppointmentLimitReached(BasicException):
+    """Raised when the tower maximum appointment count has been reached"""
 
 
 class Watcher:
@@ -36,12 +41,11 @@ class Watcher:
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
         max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
-        expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
 
     Attributes:
-        appointments (:obj:`dict`): a dictionary containing a summary of the appointments (:obj:`Appointment
-            <teos.appointment.Appointment>` instances) accepted by the tower (``locator``, ``end_time``, and ``size``).
-            It's populated trough ``add_appointment``.
+        appointments (:obj:`dict`): a dictionary containing a summary of the appointments (:obj:`ExtendedAppointment
+            <teos.extended_appointment.ExtendedAppointment>` instances) accepted by the tower (``locator``,
+            ``user_id``, and ``size``). It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
@@ -61,15 +65,15 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, block_processor, responder, sk_der, max_appointments, expiry_delta):
+    def __init__(self, db_manager, gatekeeper, block_processor, responder, sk_der, max_appointments):
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.block_queue = Queue()
         self.db_manager = db_manager
+        self.gatekeeper = gatekeeper
         self.block_processor = block_processor
         self.responder = responder
         self.max_appointments = max_appointments
-        self.expiry_delta = expiry_delta
         self.signing_key = Cryptographer.load_private_key_der(sk_der)
         self.last_known_block = db_manager.load_last_block_hash_watcher()
 
@@ -81,21 +85,7 @@ class Watcher:
 
         return watcher_thread
 
-    def get_appointment_summary(self, uuid):
-        """
-        Returns the summary of an appointment. The summary consists of the data kept in memory:
-            {locator, end_time, and size}
-
-        Args:
-            uuid (:obj:`str`): a 16-byte hex string identifying the appointment.
-
-        Returns:
-            :obj:`dict` or :obj:`None`: a dictionary with the appointment summary, or ``None`` if the appointment is not
-            found.
-        """
-        return self.appointments.get(uuid)
-
-    def add_appointment(self, appointment, user_pk, end_time):
+    def add_appointment(self, appointment, signature):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
@@ -111,61 +101,63 @@ class Watcher:
         identified by ``uuid`` and stored in ``appointments`` and ``locator_uuid_map``.
 
         Args:
-            appointment (:obj:`Appointment <teos.appointment.Appointment>`): the appointment to be added to the
-                :obj:`Watcher`.
-            user_pk(:obj:`str`): the public key that identifies the user who sent the appointment (33-bytes hex str).
-            end_time (:obj:`int`): the block height where the tower will stop watching for breaches.
+            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the appointment to
+                be added to the :obj:`Watcher`.
+            signature (:obj:`str`): the user's appointment signature (hex-encoded).
 
         Returns:
-            :obj:`tuple`: A tuple signaling if the appointment has been added or not (based on ``max_appointments``).
-            The structure looks as follows:
+            :obj:`dict`: The tower response as a dict, containing: locator, signature, available_slots and
+            subscription_expiry.
 
-            - ``(True, signature)`` if the appointment has been accepted.
-            - ``(False, None)`` otherwise.
+        Raises:
+            :obj:`AppointmentLimitReached`: If the tower cannot hold more appointments (cap reached).
+            :obj:`AuthenticationFailure <teos.gatekeeper.AuthenticationFailure>`: If the user cannot be authenticated.
+            :obj:`NotEnoughSlots <teos.gatekeeper.NotEnoughSlots>`: If the user does not have enough available slots,
+            so the appointment is rejected
         """
 
-        if len(self.appointments) < self.max_appointments:
+        if len(self.appointments) >= self.max_appointments:
+            message = "Maximum appointments reached, appointment rejected"
+            logger.info(message, locator=appointment.locator)
+            raise AppointmentLimitReached(message)
 
-            # The uuids are generated as the RIPMED160(locator||user_pubkey), that way the tower does not need to know
-            # anything about the user from this point on (no need to store user_pk in the database).
-            # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
-            uuid = hash_160("{}{}".format(appointment.locator, user_pk))
-            self.appointments[uuid] = {
-                "locator": appointment.locator,
-                "end_time": end_time,
-                "size": len(appointment.encrypted_blob),
-            }
+        user_id = self.gatekeeper.authenticate_user(appointment.serialize(), signature)
 
-            if appointment.locator in self.locator_uuid_map:
-                # If the uuid is already in the map it means this is an update.
-                if uuid not in self.locator_uuid_map[appointment.locator]:
-                    self.locator_uuid_map[appointment.locator].append(uuid)
+        # The uuids are generated as the RIPMED160(locator||user_pubkey).
+        # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
+        uuid = hash_160("{}{}".format(appointment.locator, user_id))
+        appointment_dict = {"locator": appointment.locator, "user_id": user_id, "size": len(appointment.encrypted_blob)}
 
-            else:
-                self.locator_uuid_map[appointment.locator] = [uuid]
+        available_slots = self.gatekeeper.update_available_slots(user_id, appointment_dict, self.appointments.get(uuid))
+        self.gatekeeper.registered_users.appointments.append(uuid)
+        self.appointments[uuid] = appointment_dict
 
-            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict(), end_time)
-            self.db_manager.create_append_locator_map(appointment.locator, uuid)
-
-            appointment_added = True
-
-            try:
-                signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
-
-            except (InvalidParameter, SignatureError):
-                # This should never happen since data is sanitized, just in case to avoid a crash
-                logger.error("Data couldn't be signed", appointment=appointment.to_dict())
-                signature = None
-
-            logger.info("New appointment accepted", locator=appointment.locator)
-
+        if appointment.locator in self.locator_uuid_map:
+            # If the uuid is already in the map it means this is an update.
+            if uuid not in self.locator_uuid_map[appointment.locator]:
+                self.locator_uuid_map[appointment.locator].append(uuid)
         else:
-            appointment_added = False
+            self.locator_uuid_map[appointment.locator] = [uuid]
+
+        self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+        self.db_manager.create_append_locator_map(appointment.locator, uuid)
+
+        try:
+            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
+
+        except (InvalidParameter, SignatureError):
+            # This should never happen since data is sanitized, just in case to avoid a crash
+            logger.error("Data couldn't be signed", appointment=appointment.to_dict())
             signature = None
 
-            logger.info("Maximum appointments reached, appointment rejected", locator=appointment.locator)
+        logger.info("New appointment accepted", locator=appointment.locator)
 
-        return appointment_added, signature
+        return {
+            "locator": appointment.locator,
+            "signature": signature,
+            "available_slots": available_slots,
+            "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
+        }
 
     def do_watch(self):
         """
@@ -188,11 +180,7 @@ class Watcher:
             if len(self.appointments) > 0 and block is not None:
                 txids = block.get("tx")
 
-                expired_appointments = [
-                    uuid
-                    for uuid, appointment_data in self.appointments.items()
-                    if block["height"] > appointment_data.get("end_time") + self.expiry_delta
-                ]
+                expired_appointments = self.gatekeeper.get_expired_appointment(block["height"])
 
                 Cleaner.delete_expired_appointments(
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
@@ -217,7 +205,7 @@ class Watcher:
                         breach["dispute_txid"],
                         breach["penalty_txid"],
                         breach["penalty_rawtx"],
-                        self.appointments[uuid].get("end_time"),
+                        self.appointments[uuid].get("user_id"),
                         block_hash,
                     )
 
@@ -296,7 +284,7 @@ class Watcher:
 
         for locator, dispute_txid in breaches.items():
             for uuid in self.locator_uuid_map[locator]:
-                appointment = Appointment.from_dict(self.db_manager.load_watcher_appointment(uuid))
+                appointment = ExtendedAppointment.from_dict(self.db_manager.load_watcher_appointment(uuid))
 
                 if appointment.encrypted_blob in decrypted_blobs:
                     penalty_tx, penalty_rawtx = decrypted_blobs[appointment.encrypted_blob]
