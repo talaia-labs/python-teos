@@ -151,7 +151,12 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            gatekeeper = Gatekeeper(UsersDBM(config.get("USERS_DB_PATH")), config.get("DEFAULT_SLOTS"))
+            gatekeeper = Gatekeeper(
+                UsersDBM(config.get("USERS_DB_PATH")),
+                block_processor,
+                config.get("DEFAULT_SLOTS"),
+                config.get("DEFAULT_SUBSCRIPTION_DURATION"),
+            )
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
             API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher, gatekeeper).start()
         except Exception as e:

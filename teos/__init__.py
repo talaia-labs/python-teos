@@ -18,6 +18,7 @@ DEFAULT_CONF = {
     "FEED_PORT": {"value": 28332, "type": int},
     "MAX_APPOINTMENTS": {"value": 1000000, "type": int},
     "DEFAULT_SLOTS": {"value": 100, "type": int},
+    "DEFAULT_SUBSCRIPTION_DURATION": {"value": 4320, "type": int},
     "EXPIRY_DELTA": {"value": 6, "type": int},
     "MIN_TO_SELF_DELAY": {"value": 20, "type": int},
     "LOG_FILE": {"value": "teos.log", "type": str, "path": True},

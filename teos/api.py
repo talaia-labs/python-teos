@@ -130,8 +130,12 @@ class API:
         if client_pk:
             try:
                 rcode = HTTP_OK
-                available_slots = self.gatekeeper.add_update_user(client_pk)
-                response = {"public_key": client_pk, "available_slots": available_slots}
+                available_slots, subscription_end_time = self.gatekeeper.add_update_user(client_pk)
+                response = {
+                    "public_key": client_pk,
+                    "available_slots": available_slots,
+                    "subscription_end_time": subscription_end_time,
+                }
 
             except ValueError as e:
                 rcode = HTTP_BAD_REQUEST
@@ -204,7 +208,9 @@ class API:
             # DISCUSS: It may be worth using signals here to avoid race conditions anyway.
             self.gatekeeper.fill_slots(user_pk, required_slots)
 
-            appointment_added, signature = self.watcher.add_appointment(appointment, user_pk)
+            appointment_added, signature = self.watcher.add_appointment(
+                appointment, user_pk, self.gatekeeper.registered_users[user_pk].subscription_end_time
+            )
 
             if appointment_added:
                 # If the appointment is added and the update is smaller than the original, the difference is given back.
@@ -215,7 +221,8 @@ class API:
                 response = {
                     "locator": appointment.locator,
                     "signature": signature,
-                    "available_slots": self.gatekeeper.registered_users[user_pk].get("available_slots"),
+                    "available_slots": self.gatekeeper.registered_users[user_pk].available_slots,
+                    "subscription_end_time": self.gatekeeper.registered_users[user_pk].subscription_end_time,
                 }
 
             else:
@@ -288,6 +295,8 @@ class API:
                 appointment_data = self.watcher.db_manager.load_responder_tracker(uuid)
                 if appointment_data:
                     rcode = HTTP_OK
+                    # Remove expiry field from appointment data since it is an internal field
+                    appointment_data.pop("expiry")
                     response = {"locator": locator, "status": "dispute_responded", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND
@@ -298,6 +307,8 @@ class API:
                 appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
                 if appointment_data:
                     rcode = HTTP_OK
+                    # Remove expiry field from appointment data since it is an internal field
+                    appointment_data.pop("expiry")
                     response = {"locator": locator, "status": "being_watched", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND

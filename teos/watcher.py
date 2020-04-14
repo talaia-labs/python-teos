@@ -95,7 +95,7 @@ class Watcher:
         """
         return self.appointments.get(uuid)
 
-    def add_appointment(self, appointment, user_pk):
+    def add_appointment(self, appointment, user_pk, end_time):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
@@ -114,6 +114,7 @@ class Watcher:
             appointment (:obj:`Appointment <teos.appointment.Appointment>`): the appointment to be added to the
                 :obj:`Watcher`.
             user_pk(:obj:`str`): the public key that identifies the user who sent the appointment (33-bytes hex str).
+            end_time (:obj:`int`): the block height where the tower will stop watching for breaches.
 
         Returns:
             :obj:`tuple`: A tuple signaling if the appointment has been added or not (based on ``max_appointments``).
@@ -131,7 +132,7 @@ class Watcher:
             uuid = hash_160("{}{}".format(appointment.locator, user_pk))
             self.appointments[uuid] = {
                 "locator": appointment.locator,
-                "end_time": appointment.end_time,
+                "end_time": end_time,
                 "size": len(appointment.encrypted_blob),
             }
 
@@ -143,7 +144,7 @@ class Watcher:
             else:
                 self.locator_uuid_map[appointment.locator] = [uuid]
 
-            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict(), end_time)
             self.db_manager.create_append_locator_map(appointment.locator, uuid)
 
             appointment_added = True
