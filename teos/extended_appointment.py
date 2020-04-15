@@ -15,7 +15,7 @@ class ExtendedAppointment(Appointment):
 
         Args:
             appointment_data (:obj:`dict`): a dictionary containing the following keys:
-                ``{locator, to_self_delay, encrypted_blob, expiry}``
+                ``{locator, to_self_delay, encrypted_blob, user_id}``
 
         Returns:
             :obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`: An appointment initialized

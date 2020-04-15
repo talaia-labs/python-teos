@@ -1,5 +1,6 @@
 import struct
 import binascii
+import pytest
 from pytest import fixture
 
 from common.appointment import Appointment
@@ -29,8 +30,6 @@ def appointment_data():
 def test_init_appointment(appointment_data):
     # The appointment has no checks whatsoever, since the inspector is the one taking care or that, and the only one
     # creating appointments.
-    # DISCUSS: whether this makes sense by design or checks should be ported from the inspector to the appointment
-    #          35-appointment-checks
     appointment = Appointment(
         appointment_data["locator"],
         appointment_data["start_time"],
@@ -78,13 +77,9 @@ def test_from_dict(appointment_data):
         prev_val = appointment_data[key]
         appointment_data[key] = None
 
-        try:
+        with pytest.raises(ValueError, match="Wrong appointment data"):
             Appointment.from_dict(appointment_data)
-            assert False
-
-        except ValueError:
             appointment_data[key] = prev_val
-            assert True
 
 
 def test_serialize(appointment_data):
