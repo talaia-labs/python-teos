@@ -154,16 +154,9 @@ def get_appointment(plugin, *args):
 @plugin.hook("commitment_revocation")
 def add_appointment(plugin, **kwargs):
     try:
-        # FIXME: start_time and end_time are temporary. Fix it on the tower side and remove it from there
-        block_height = plugin.rpc.getchaininfo().get("blockcount")
-        start_time = block_height + 1
-        end_time = block_height + 10
-
         commitment_txid, penalty_tx = arg_parser.parse_add_appointment_arguments(kwargs)
         appointment = Appointment(
             locator=compute_locator(commitment_txid),
-            start_time=start_time,
-            end_time=end_time,
             to_self_delay=20,
             encrypted_blob=Cryptographer.encrypt(penalty_tx, commitment_txid),
         )
