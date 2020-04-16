@@ -116,6 +116,8 @@ class Responder:
         is populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
         db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
             to interact with the database.
+        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the
+            user access and subscription expiry.
         carrier (:obj:`Carrier <teos.carrier.Carrier>`): a ``Carrier`` instance to send transactions to bitcoind.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get data from bitcoind.
@@ -394,7 +396,7 @@ class Responder:
         """
 
         expired_trackers = [
-            uuid for uuid in self.gatekeeper.get_expired_appointment(height) if uuid in self.unconfirmed_txs
+            uuid for uuid in self.gatekeeper.get_expired_appointments(height) if uuid in self.unconfirmed_txs
         ]
 
         return expired_trackers
@@ -402,7 +404,7 @@ class Responder:
     def rebroadcast(self, txs_to_rebroadcast):
         """
         Rebroadcasts a ``penalty_tx`` that has missed too many confirmations. In the current approach this would loop
-        forever if the transaction keeps not getting it.
+        until the tracker expires if the penalty transactions keeps getting rejected due to fees.
 
         Potentially, the fees could be bumped here if the transaction has some tower dedicated outputs (or allows it
         trough ``ANYONECANPAY`` or something similar).

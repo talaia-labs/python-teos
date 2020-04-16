@@ -10,6 +10,7 @@ from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 
 from common.logger import Logger
 from common.cryptographer import hash_160
+from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
@@ -48,7 +49,7 @@ def get_request_data_json(request):
         :obj:`dict`: the dictionary parsed from the json request.
 
     Raises:
-        :obj:`TypeError`: if the request is not json encoded or it does not decodes to a dictionary.
+        :obj:`InvalidParameter`: if the request is not json encoded or it does not decodes to a dictionary.
     """
 
     if request.is_json:
@@ -56,9 +57,9 @@ def get_request_data_json(request):
         if isinstance(request_data, dict):
             return request_data
         else:
-            raise TypeError("Invalid request content")
+            raise InvalidParameter("Invalid request content")
     else:
-        raise TypeError("Request is not json encoded")
+        raise InvalidParameter("Request is not json encoded")
 
 
 class API:
@@ -112,7 +113,7 @@ class API:
         try:
             request_data = get_request_data_json(request)
 
-        except TypeError as e:
+        except InvalidParameter as e:
             logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
             return abort(HTTP_BAD_REQUEST, e)
 
@@ -128,7 +129,7 @@ class API:
                     "subscription_expiry": subscription_expiry,
                 }
 
-            except ValueError as e:
+            except InvalidParameter as e:
                 rcode = HTTP_BAD_REQUEST
                 error = "Error {}: {}".format(errors.REGISTRATION_MISSING_FIELD, str(e))
                 response = {"error": error}
@@ -164,7 +165,7 @@ class API:
         try:
             request_data = get_request_data_json(request)
 
-        except TypeError as e:
+        except InvalidParameter as e:
             return abort(HTTP_BAD_REQUEST, e)
 
         try:
@@ -218,7 +219,7 @@ class API:
         try:
             request_data = get_request_data_json(request)
 
-        except TypeError as e:
+        except InvalidParameter as e:
             logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
             return abort(HTTP_BAD_REQUEST, e)
 

@@ -52,6 +52,8 @@ class Watcher:
         populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
         db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
             to interact with the database.
+        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the
+            user access and subscription expiry.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
@@ -129,7 +131,7 @@ class Watcher:
         appointment_dict = {"locator": appointment.locator, "user_id": user_id, "size": len(appointment.encrypted_blob)}
 
         available_slots = self.gatekeeper.update_available_slots(user_id, appointment_dict, self.appointments.get(uuid))
-        self.gatekeeper.registered_users.appointments.append(uuid)
+        self.gatekeeper.registered_users[user_id].appointments.append(uuid)
         self.appointments[uuid] = appointment_dict
 
         if appointment.locator in self.locator_uuid_map:
@@ -180,7 +182,9 @@ class Watcher:
             if len(self.appointments) > 0 and block is not None:
                 txids = block.get("tx")
 
-                expired_appointments = self.gatekeeper.get_expired_appointment(block["height"])
+                expired_appointments = self.gatekeeper.get_expired_appointments(block["height"])
+                # Make sure we only try to delete what is on the Watcher (some appointments may have been triggered)
+                expired_appointments = list(set(expired_appointments).intersection(self.appointments.keys()))
 
                 Cleaner.delete_expired_appointments(
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
