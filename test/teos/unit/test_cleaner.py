@@ -23,7 +23,7 @@ def set_up_appointments(db_manager, total_appointments):
         uuid = uuid4().hex
         locator = get_random_value_hex(LOCATOR_LEN_BYTES)
 
-        appointment = Appointment(locator, None, None, None, None)
+        appointment = Appointment(locator, None, None)
         appointments[uuid] = {"locator": appointment.locator}
         locator_uuid_map[locator] = [uuid]
 
@@ -156,7 +156,8 @@ def test_flag_triggered_appointments(db_manager):
         assert set(triggered_appointments).issubset(db_appointments)
 
 
-def test_delete_completed_trackers_db_match(db_manager):
+def test_delete_trackers_db_match(db_manager):
+    # Completed and expired trackers are deleted using the same method. The only difference is the logging message
     height = 0
 
     for _ in range(ITERATIONS):
@@ -165,12 +166,12 @@ def test_delete_completed_trackers_db_match(db_manager):
 
         completed_trackers = {tracker: 6 for tracker in selected_trackers}
 
-        Cleaner.delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
+        Cleaner.delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
 
         assert not set(completed_trackers).issubset(trackers.keys())
 
 
-def test_delete_completed_trackers_no_db_match(db_manager):
+def test_delete_trackers_no_db_match(db_manager):
     height = 0
 
     for _ in range(ITERATIONS):
@@ -203,5 +204,5 @@ def test_delete_completed_trackers_no_db_match(db_manager):
         completed_trackers = {tracker: 6 for tracker in selected_trackers}
 
         # We should be able to delete the correct ones and not fail in the others
-        Cleaner.delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
+        Cleaner.delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
         assert not set(completed_trackers).issubset(trackers.keys())

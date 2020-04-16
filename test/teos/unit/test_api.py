@@ -6,6 +6,7 @@ from teos.api import API
 import teos.errors as errors
 from teos.watcher import Watcher
 from teos.inspector import Inspector
+from teos.gatekeeper import UserInfo
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
@@ -58,10 +59,10 @@ def get_all_db_manager():
 def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
     sk, pk = generate_keypair()
 
-    responder = Responder(db_manager, carrier, block_processor)
-    watcher = Watcher(db_manager, block_processor, responder, sk.to_der(), MAX_APPOINTMENTS, config.get("EXPIRY_DELTA"))
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+    watcher = Watcher(db_manager, gatekeeper, block_processor, responder, sk.to_der(), MAX_APPOINTMENTS)
     inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
-    api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher, gatekeeper)
+    api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher)
 
     return api
 
@@ -141,8 +142,8 @@ def test_register_json_no_inner_dict(client):
 
 
 def test_add_appointment(api, client, appointment):
-    # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
+    # Simulate the user registration (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
@@ -154,8 +155,8 @@ def test_add_appointment(api, client, appointment):
 
 
 def test_add_appointment_no_json(api, client, appointment):
-    # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
+    # Simulate the user registration (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Properly formatted appointment
     r = client.post(add_appointment_endpoint, data="random_message")
@@ -163,8 +164,8 @@ def test_add_appointment_no_json(api, client, appointment):
 
 
 def test_add_appointment_json_no_inner_dict(api, client, appointment):
-    # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
+    # Simulate the user registration (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Properly formatted appointment
     r = client.post(add_appointment_endpoint, json="random_message")
@@ -172,8 +173,8 @@ def test_add_appointment_json_no_inner_dict(api, client, appointment):
 
 
 def test_add_appointment_wrong(api, client, appointment):
-    # Simulate the user registration
-    api.gatekeeper.registered_users[compressed_client_pk] = 1
+    # Simulate the user registration (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Incorrect appointment
     appointment.to_self_delay = 0
@@ -199,8 +200,8 @@ def test_add_appointment_not_registered(api, client, appointment):
 
 
 def test_add_appointment_registered_no_free_slots(api, client, appointment):
-    # Empty the user slots
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 0}
+    # Empty the user slots (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=0, subscription_expiry=0)
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
@@ -212,8 +213,8 @@ def test_add_appointment_registered_no_free_slots(api, client, appointment):
 
 
 def test_add_appointment_registered_not_enough_free_slots(api, client, appointment):
-    # Give some slots to the user
-    api.gatekeeper.registered_users[compressed_client_pk] = 1
+    # Give some slots to the user (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
@@ -232,8 +233,8 @@ def test_add_appointment_multiple_times_same_user(api, client, appointment, n=MU
     # Multiple appointments with the same locator should be valid and counted as updates
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
 
-    # Simulate registering enough slots
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": n}
+    # Simulate registering enough slots (end time does not matter here)
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=n, subscription_expiry=0)
     for _ in range(n):
         r = add_appointment(
             client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
@@ -254,7 +255,7 @@ def test_add_appointment_multiple_times_different_users(api, client, appointment
     # Add one slot per public key
     for pair in user_keys:
         tmp_compressed_pk = hexlify(pair[1].format(compressed=True)).decode("utf-8")
-        api.gatekeeper.registered_users[tmp_compressed_pk] = {"available_slots": 2}
+        api.watcher.gatekeeper.registered_users[tmp_compressed_pk] = UserInfo(available_slots=2, subscription_expiry=0)
 
     # Send the appointments
     for compressed_pk, signature in zip(compressed_pks, signatures):
@@ -268,10 +269,10 @@ def test_add_appointment_multiple_times_different_users(api, client, appointment
 
 def test_add_appointment_update_same_size(api, client, appointment):
     # Update an appointment by one of the same size and check that no additional slots are filled
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 1}
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
-    # # Since we will replace the appointment, we won't added to appointments
+    # Since we will replace the appointment, we won't added to appointments
     r = add_appointment(
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, compressed_client_pk
     )
@@ -289,7 +290,7 @@ def test_add_appointment_update_same_size(api, client, appointment):
 
 def test_add_appointment_update_bigger(api, client, appointment):
     # Update an appointment by one bigger, and check additional slots are filled
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 2}
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=2, subscription_expiry=0)
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
     r = add_appointment(
@@ -317,8 +318,7 @@ def test_add_appointment_update_bigger(api, client, appointment):
 
 def test_add_appointment_update_smaller(api, client, appointment):
     # Update an appointment by one bigger, and check slots are freed
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 2}
-
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=2, subscription_expiry=0)
     # This should take 2 slots
     appointment.encrypted_blob = TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), client_sk)
@@ -338,7 +338,7 @@ def test_add_appointment_update_smaller(api, client, appointment):
 
 def test_add_too_many_appointment(api, client):
     # Give slots to the user
-    api.gatekeeper.registered_users[compressed_client_pk] = {"available_slots": 200}
+    api.watcher.gatekeeper.registered_users[compressed_client_pk] = UserInfo(available_slots=200, subscription_expiry=0)
 
     free_appointment_slots = MAX_APPOINTMENTS - len(api.watcher.appointments)
 
@@ -406,6 +406,8 @@ def test_request_appointment_in_watcher(api, client, appointment):
     assert r.json.get("status") == "being_watched"
 
     # Check the the sent appointment matches the received one
+    appointment_dict = appointment.to_dict()
+    appointment_dict.pop("user_id")
     assert r.json.get("locator") == appointment.locator
     assert appointment.to_dict() == r.json.get("appointment")
 
@@ -417,7 +419,7 @@ def test_request_appointment_in_responder(api, client, appointment):
         "dispute_txid": get_random_value_hex(32),
         "penalty_txid": get_random_value_hex(32),
         "penalty_rawtx": get_random_value_hex(250),
-        "appointment_end": appointment.end_time,
+        "user_id": get_random_value_hex(16),
     }
     tx_tracker = TransactionTracker.from_dict(tracker_data)
 
@@ -442,10 +444,9 @@ def test_request_appointment_in_responder(api, client, appointment):
     assert tx_tracker.dispute_txid == r.json.get("appointment").get("dispute_txid")
     assert tx_tracker.penalty_txid == r.json.get("appointment").get("penalty_txid")
     assert tx_tracker.penalty_rawtx == r.json.get("appointment").get("penalty_rawtx")
-    assert tx_tracker.appointment_end == r.json.get("appointment").get("appointment_end")
 
 
-def test_get_all_appointments_watcher(api, client, get_all_db_manager, appointment):
+def test_get_all_appointments_watcher(api, client, get_all_db_manager):
     # Let's reset the dbs so we can test this clean
     api.watcher.db_manager = get_all_db_manager
     api.watcher.responder.db_manager = get_all_db_manager
@@ -459,6 +460,7 @@ def test_get_all_appointments_watcher(api, client, get_all_db_manager, appointme
     non_triggered_appointments = {}
     for _ in range(10):
         uuid = get_random_value_hex(16)
+        appointment, _ = generate_dummy_appointment()
         appointment.locator = get_random_value_hex(16)
         non_triggered_appointments[uuid] = appointment.to_dict()
         api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
@@ -466,6 +468,7 @@ def test_get_all_appointments_watcher(api, client, get_all_db_manager, appointme
     triggered_appointments = {}
     for _ in range(10):
         uuid = get_random_value_hex(16)
+        appointment, _ = generate_dummy_appointment()
         appointment.locator = get_random_value_hex(16)
         triggered_appointments[uuid] = appointment.to_dict()
         api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
@@ -501,7 +504,7 @@ def test_get_all_appointments_responder(api, client, get_all_db_manager):
             "dispute_txid": get_random_value_hex(32),
             "penalty_txid": get_random_value_hex(32),
             "penalty_rawtx": get_random_value_hex(250),
-            "appointment_end": 20,
+            "user_id": get_random_value_hex(16),
         }
         tracker = TransactionTracker.from_dict(tracker_data)
         tx_trackers[uuid] = tracker.to_dict()

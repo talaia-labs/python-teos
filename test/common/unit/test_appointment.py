@@ -31,17 +31,11 @@ def test_init_appointment(appointment_data):
     # The appointment has no checks whatsoever, since the inspector is the one taking care or that, and the only one
     # creating appointments.
     appointment = Appointment(
-        appointment_data["locator"],
-        appointment_data["start_time"],
-        appointment_data["end_time"],
-        appointment_data["to_self_delay"],
-        appointment_data["encrypted_blob"],
+        appointment_data["locator"], appointment_data["to_self_delay"], appointment_data["encrypted_blob"]
     )
 
     assert (
         appointment_data["locator"] == appointment.locator
-        and appointment_data["start_time"] == appointment.start_time
-        and appointment_data["end_time"] == appointment.end_time
         and appointment_data["to_self_delay"] == appointment.to_self_delay
         and appointment_data["encrypted_blob"] == appointment.encrypted_blob
     )
@@ -49,19 +43,13 @@ def test_init_appointment(appointment_data):
 
 def test_to_dict(appointment_data):
     appointment = Appointment(
-        appointment_data["locator"],
-        appointment_data["start_time"],
-        appointment_data["end_time"],
-        appointment_data["to_self_delay"],
-        appointment_data["encrypted_blob"],
+        appointment_data["locator"], appointment_data["to_self_delay"], appointment_data["encrypted_blob"]
     )
 
     dict_appointment = appointment.to_dict()
 
     assert (
         appointment_data["locator"] == dict_appointment["locator"]
-        and appointment_data["start_time"] == dict_appointment["start_time"]
-        and appointment_data["end_time"] == dict_appointment["end_time"]
         and appointment_data["to_self_delay"] == dict_appointment["to_self_delay"]
         and appointment_data["encrypted_blob"] == dict_appointment["encrypted_blob"]
     )
@@ -94,13 +82,9 @@ def test_serialize(appointment_data):
     assert isinstance(serialized_appointment, bytes)
 
     locator = serialized_appointment[:16]
-    start_time = serialized_appointment[16:20]
-    end_time = serialized_appointment[20:24]
-    to_self_delay = serialized_appointment[24:28]
-    encrypted_blob = serialized_appointment[28:]
+    to_self_delay = serialized_appointment[16:20]
+    encrypted_blob = serialized_appointment[20:]
 
     assert binascii.hexlify(locator).decode() == appointment.locator
-    assert struct.unpack(">I", start_time)[0] == appointment.start_time
-    assert struct.unpack(">I", end_time)[0] == appointment.end_time
     assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
     assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob

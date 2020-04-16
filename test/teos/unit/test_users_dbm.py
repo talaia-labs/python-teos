@@ -1,7 +1,7 @@
-from teos.appointments_dbm import AppointmentsDBM
+from teos.users_dbm import UsersDBM
+from teos.gatekeeper import UserInfo
 
 from test.teos.unit.conftest import get_random_value_hex
-
 
 stored_users = {}
 
@@ -9,7 +9,7 @@ stored_users = {}
 def open_create_db(db_path):
 
     try:
-        db_manager = AppointmentsDBM(db_path)
+        db_manager = UsersDBM(db_path)
 
         return db_manager
 
@@ -20,17 +20,17 @@ def open_create_db(db_path):
 def test_store_user(user_db_manager):
     # Store user should work as long as the user_pk is properly formatted and data is a dictionary
     user_pk = "02" + get_random_value_hex(32)
-    user_data = {"available_slots": 42}
-    stored_users[user_pk] = user_data
-    assert user_db_manager.store_user(user_pk, user_data) is True
+    user_info = UserInfo(available_slots=42, subscription_expiry=100)
+    stored_users[user_pk] = user_info.to_dict()
+    assert user_db_manager.store_user(user_pk, user_info.to_dict()) is True
 
     # Wrong pks should return False on adding
     user_pk = "04" + get_random_value_hex(32)
-    user_data = {"available_slots": 42}
-    assert user_db_manager.store_user(user_pk, user_data) is False
+    user_info = UserInfo(available_slots=42, subscription_expiry=100)
+    assert user_db_manager.store_user(user_pk, user_info.to_dict()) is False
 
     # Same for wrong types
-    assert user_db_manager.store_user(42, user_data) is False
+    assert user_db_manager.store_user(42, user_info.to_dict()) is False
 
     # And for wrong type user data
     assert user_db_manager.store_user(user_pk, 42) is False
@@ -71,9 +71,9 @@ def test_load_all_users(user_db_manager):
     # Adding some and checking we get them all
     for i in range(10):
         user_pk = "02" + get_random_value_hex(32)
-        user_data = {"available_slots": i}
-        user_db_manager.store_user(user_pk, user_data)
-        stored_users[user_pk] = user_data
+        user_info = UserInfo(available_slots=42, subscription_expiry=100)
+        user_db_manager.store_user(user_pk, user_info.to_dict())
+        stored_users[user_pk] = user_info.to_dict()
 
     all_users = user_db_manager.load_all_users()
 
