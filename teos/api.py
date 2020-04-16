@@ -69,16 +69,13 @@ class API:
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
-        gatekeeper (:obj:`Watcher <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the user
-            access.
     """
 
-    def __init__(self, host, port, inspector, watcher, gatekeeper):
+    def __init__(self, host, port, inspector, watcher):
         self.host = host
         self.port = port
         self.inspector = inspector
         self.watcher = watcher
-        self.gatekeeper = gatekeeper
         self.app = app
 
         # Adds all the routes to the functions listed above.
@@ -124,7 +121,7 @@ class API:
         if client_pk:
             try:
                 rcode = HTTP_OK
-                available_slots, subscription_expiry = self.gatekeeper.add_update_user(client_pk)
+                available_slots, subscription_expiry = self.watcher.gatekeeper.add_update_user(client_pk)
                 response = {
                     "public_key": client_pk,
                     "available_slots": available_slots,
@@ -233,7 +230,7 @@ class API:
 
             message = "get appointment {}".format(locator).encode()
             signature = request_data.get("signature")
-            user_pk = self.gatekeeper.authenticate_user(message, signature)
+            user_pk = self.watcher.gatekeeper.authenticate_user(message, signature)
 
             triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
             uuid = hash_160("{}{}".format(locator, user_pk))
