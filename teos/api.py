@@ -67,6 +67,8 @@ class API:
     The :class:`API` is in charge of the interface between the user and the tower. It handles and serves user requests.
 
     Args:
+        host (:obj:`str`): the hostname to listen on.
+        port (:obj:`int`): the port of the webserver.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
@@ -95,7 +97,8 @@ class API:
         Registers a user by creating a subscription.
 
         Registration is pretty straightforward for now, since it does not require payments.
-        The amount of slots cannot be requested by the user yet either. This is linked to the previous point.
+        The amount of slots and expiry of the subscription cannot be requested by the user yet either. This is linked to
+        the previous point.
         Users register by sending a public key to the proper endpoint. This is exploitable atm, but will be solved when
         payments are introduced.
 
@@ -115,7 +118,7 @@ class API:
 
         except InvalidParameter as e:
             logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
-            return abort(HTTP_BAD_REQUEST, e)
+            return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
 
         client_pk = request_data.get("public_key")
 
@@ -153,8 +156,8 @@ class API:
         Returns:
             :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
             appointments, the ``rcode`` is always 200 and the response contains the receipt signature (json). For
-            rejected appointments, the ``rcode`` is a 404 and the value contains an application error, and an error
-            message. Error messages can be found at :mod:`Errors <teos.errors>`.
+            rejected appointments, the ``rcode`` contains an application error, and an error message. Error messages can
+            be found at :mod:`Errors <teos.errors>`.
         """
 
         # Getting the real IP if the server is behind a reverse proxy
@@ -166,7 +169,7 @@ class API:
             request_data = get_request_data_json(request)
 
         except InvalidParameter as e:
-            return abort(HTTP_BAD_REQUEST, e)
+            return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
 
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
@@ -221,7 +224,7 @@ class API:
 
         except InvalidParameter as e:
             logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
-            return abort(HTTP_BAD_REQUEST, e)
+            return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
 
         locator = request_data.get("locator")
 
@@ -292,9 +295,7 @@ class API:
         return response
 
     def start(self):
-        """
-        This function starts the Flask server used to run the API.
-        """
+        """ This function starts the Flask server used to run the API """
 
         # Setting Flask log to ERROR only so it does not mess with our logging. Also disabling flask initial messages
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
