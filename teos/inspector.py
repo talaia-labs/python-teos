@@ -47,7 +47,6 @@ class Inspector:
         Args:
             appointment_data (:obj:`dict`): a dictionary containing the appointment data.
 
-
         Returns:
             :obj:`Extended <teos.extended_appointment.ExtendedAppointment>`: An appointment initialized with
             the provided data.
@@ -141,7 +140,6 @@ class Inspector:
                 ),
             )
 
-    # ToDo: #6-define-checks-encrypted-blob
     @staticmethod
     def check_blob(encrypted_blob):
         """

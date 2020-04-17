@@ -1,13 +1,13 @@
 class Builder:
     """
-    The :class:`Builder` class is in charge of reconstructing data loaded from the database and build the data
-    structures of the :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>`.
+    The :class:`Builder` class is in charge of reconstructing data loaded from the appointments database and build the
+    data structures of the :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>`.
     """
 
     @staticmethod
     def build_appointments(appointments_data):
         """
-        Builds an appointments dictionary (``uuid: ExtendedAppointment``) and a locator_uuid_map (``locator: uuid``)
+        Builds an appointments dictionary (``uuid:ExtendedAppointment``) and a locator_uuid_map (``locator:uuid``)
         given a dictionary of appointments from the database.
 
         Args:
@@ -43,7 +43,7 @@ class Builder:
     @staticmethod
     def build_trackers(tracker_data):
         """
-        Builds a tracker dictionary (``uuid: TransactionTracker``) and a tx_tracker_map (``penalty_txid: uuid``) given
+        Builds a tracker dictionary (``uuid:TransactionTracker``) and a tx_tracker_map (``penalty_txid:uuid``) given
         a dictionary of trackers from the database.
 
         Args:
@@ -85,8 +85,8 @@ class Builder:
         :mod:`Responder <teos.responder.Responder>` using backed up data.
 
         Args:
-            block_queue (:obj:`Queue`): a ``Queue``
-            missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (do to a crash or shutdown).
+            block_queue (:obj:`Queue`): a ``Queue``.
+            missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (due to a crash or shutdown).
 
         Returns:
             :obj:`Queue`: A ``Queue`` containing all the missed blocks hashes.

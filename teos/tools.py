@@ -8,7 +8,6 @@ Tools is a module with general methods that can used by different entities in th
 """
 
 
-# NOTCOVERED
 def bitcoin_cli(btc_connect_params):
     """
     An ``http`` connection with ``bitcoind`` using the ``json-rpc`` interface.
