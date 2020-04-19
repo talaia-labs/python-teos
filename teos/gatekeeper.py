@@ -27,6 +27,7 @@ class UserInfo:
         self.available_slots = available_slots
         self.subscription_expiry = subscription_expiry
 
+        # FIXME: this list is currently never wiped
         if not appointments:
             self.appointments = []
         else:
@@ -139,17 +140,17 @@ class Gatekeeper:
         """
         Updates (add/removes) slots from a user subscription.
 
-        Slots are removed if a new subscription is given, or an update is given with a new subscription bigger than the
+        Slots are removed if a new appointment is given, or an update is given with an appointment bigger than the
         old one.
 
         Slots are added if an update is given but the new appointment is smaller than the old one.
 
         Args:
             user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-            new_appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the new
-                appointment the user is requesting to add.
-            old_appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the old
-                appointment the user wants to replace. Optional.
+            new_appointment (:obj:`dict`): the summary of new appointment the user is requesting
+                to add.
+            old_appointment (:obj:`dict`): the summary old appointment the user wants to replace.
+                Optional.
 
         Returns:
             :obj:`int`: the number of remaining appointment slots.
@@ -180,7 +181,7 @@ class Gatekeeper:
 
     def get_expired_appointments(self, block_height):
         """
-        Gets a list of appointments that are expiring at a given block height.
+        Gets a list of appointments that expire at a given block height.
 
         Args:
             block_height: the block height that wants to be checked.

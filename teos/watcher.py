@@ -23,7 +23,7 @@ class Watcher:
     """
     The :class:`Watcher` is in charge of watching for channel breaches for the appointments accepted by the tower.
 
-    The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received block,
+    The :class:`Watcher` keeps track of the accepted appointments in ``appointments`` and, for new received blocks,
     checks if any breach has happened by comparing the txids with the appointment locators. If a breach is seen, the
     ``encrypted_blob`` of the corresponding appointment is decrypted and the data is passed to the
     :obj:`Responder <teos.responder.Responder>`.
@@ -115,7 +115,7 @@ class Watcher:
             :obj:`AppointmentLimitReached`: If the tower cannot hold more appointments (cap reached).
             :obj:`AuthenticationFailure <teos.gatekeeper.AuthenticationFailure>`: If the user cannot be authenticated.
             :obj:`NotEnoughSlots <teos.gatekeeper.NotEnoughSlots>`: If the user does not have enough available slots,
-            so the appointment is rejected
+            so the appointment is rejected.
         """
 
         if len(self.appointments) >= self.max_appointments:
@@ -129,6 +129,7 @@ class Watcher:
         # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
         uuid = hash_160("{}{}".format(appointment.locator, user_id))
 
+        # The third argument is the previous version of the same appointment (optional, returns None if missing)
         available_slots = self.gatekeeper.update_available_slots(
             user_id, appointment.get_summary(), self.appointments.get(uuid)
         )
@@ -140,6 +141,7 @@ class Watcher:
             if uuid not in self.locator_uuid_map[appointment.locator]:
                 self.locator_uuid_map[appointment.locator].append(uuid)
         else:
+            # Otherwise two users have sent an appointment with the same locator, so we need to store both.
             self.locator_uuid_map[appointment.locator] = [uuid]
 
         self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
@@ -191,7 +193,7 @@ class Watcher:
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
-                valid_breaches, invalid_breaches = self.filter_valid_breaches(self.get_breaches(txids))
+                valid_breaches, invalid_breaches = self.filter_breaches(self.get_breaches(txids))
 
                 triggered_flags = []
                 appointments_to_delete = []
@@ -264,9 +266,9 @@ class Watcher:
 
         return breaches
 
-    def filter_valid_breaches(self, breaches):
+    def filter_breaches(self, breaches):
         """
-        Filters what of the found breaches contain valid transaction data.
+        Filters the valid from the invalid channel breaches.
 
         The :obj:`Watcher` cannot if a given ``encrypted_blob`` contains a valid transaction until a breach if seen.
         Blobs that contain arbitrary data are dropped and not sent to the :obj:`Responder <teos.responder.Responder>`.

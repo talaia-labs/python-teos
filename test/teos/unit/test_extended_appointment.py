@@ -41,6 +41,14 @@ def test_init_appointment(appointment_data):
     )
 
 
+def test_get_summary(appointment_data):
+    assert ExtendedAppointment.from_dict(appointment_data).get_summary() == {
+        "locator": appointment_data["locator"],
+        "user_id": appointment_data["user_id"],
+        "size": len(appointment_data["encrypted_blob"]),
+    }
+
+
 def test_from_dict(appointment_data):
     # The appointment should be build if we don't miss any field
     appointment = ExtendedAppointment.from_dict(appointment_data)

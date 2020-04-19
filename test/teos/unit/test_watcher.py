@@ -8,11 +8,11 @@ from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
 from teos.responder import Responder
 from teos.gatekeeper import UserInfo
-from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.appointments_dbm import AppointmentsDBM
 from teos.block_processor import BlockProcessor
 from teos.watcher import Watcher, AppointmentLimitReached
+from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots
 
 from common.tools import compute_locator
 from common.cryptographer import Cryptographer
@@ -95,11 +95,36 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
+    assert isinstance(watcher.db_manager, AppointmentsDBM)
+    assert isinstance(watcher.gatekeeper, Gatekeeper)
     assert isinstance(watcher.block_processor, BlockProcessor)
     assert isinstance(watcher.responder, Responder)
     assert isinstance(watcher.max_appointments, int)
-    assert isinstance(watcher.gatekeeper, Gatekeeper)
     assert isinstance(watcher.signing_key, PrivateKey)
+
+
+def test_add_appointment_non_registered(watcher):
+    # Appointments from non-registered users should fail
+    user_sk, user_pk = generate_keypair()
+
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    with pytest.raises(AuthenticationFailure, match="User not found"):
+        watcher.add_appointment(appointment, appointment_signature)
+
+
+def test_add_appointment_no_slots(watcher):
+    # Appointments from register users with no available slots should aso fail
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=0, subscription_expiry=10)
+
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    with pytest.raises(NotEnoughSlots):
+        watcher.add_appointment(appointment, appointment_signature)
 
 
 def test_add_appointment(watcher):
@@ -184,7 +209,7 @@ def test_do_watch(watcher, temp_db_manager):
     watcher.appointments = {}
     watcher.gatekeeper.registered_users = {}
 
-    # Simulate a register
+    # Simulate a register (times out in 10 bocks)
     user_id = get_random_value_hex(16)
     watcher.gatekeeper.registered_users[user_id] = UserInfo(
         available_slots=100, subscription_expiry=watcher.block_processor.get_block_count() + 10
@@ -215,6 +240,8 @@ def test_do_watch(watcher, temp_db_manager):
 
     assert len(watcher.appointments) == 0
 
+    # FIXME: We should also add cases where the transactions are invalid. bitcoind_mock needs to be extended for this.
+
 
 def test_get_breaches(watcher, txids, locator_uuid_map):
     watcher.locator_uuid_map = locator_uuid_map
@@ -235,7 +262,7 @@ def test_get_breaches_random_data(watcher, locator_uuid_map):
     assert len(potential_breaches) == 0
 
 
-def test_filter_valid_breaches_random_data(watcher):
+def test_filter_breaches_random_data(watcher):
     appointments = {}
     locator_uuid_map = {}
     breaches = {}
@@ -256,7 +283,7 @@ def test_filter_valid_breaches_random_data(watcher):
     watcher.locator_uuid_map = locator_uuid_map
     watcher.appointments = appointments
 
-    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
 
     # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
     assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
@@ -289,7 +316,7 @@ def test_filter_valid_breaches(watcher):
 
     watcher.locator_uuid_map = locator_uuid_map
 
-    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
 
     # We have "triggered" a single breach and it was valid.
     assert len(invalid_breaches) == 0 and len(valid_breaches) == 1
