@@ -128,11 +128,12 @@ class Watcher:
         # The uuids are generated as the RIPMED160(locator||user_pubkey).
         # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
         uuid = hash_160("{}{}".format(appointment.locator, user_id))
-        appointment_dict = {"locator": appointment.locator, "user_id": user_id, "size": len(appointment.encrypted_blob)}
 
-        available_slots = self.gatekeeper.update_available_slots(user_id, appointment_dict, self.appointments.get(uuid))
+        available_slots = self.gatekeeper.update_available_slots(
+            user_id, appointment.get_summary(), self.appointments.get(uuid)
+        )
         self.gatekeeper.registered_users[user_id].appointments.append(uuid)
-        self.appointments[uuid] = appointment_dict
+        self.appointments[uuid] = appointment.get_summary()
 
         if appointment.locator in self.locator_uuid_map:
             # If the uuid is already in the map it means this is an update.

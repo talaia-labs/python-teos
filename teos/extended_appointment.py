@@ -6,6 +6,15 @@ class ExtendedAppointment(Appointment):
         super().__init__(locator, to_self_delay, encrypted_blob)
         self.user_id = user_id
 
+    def get_summary(self):
+        """
+        Returns the summary of an appointment, consisting on the locator, the user_id and the appointment size.
+
+        Returns:
+            :obj:`dict`: the appointment summary.
+        """
+        return {"locator": self.locator, "user_id": self.user_id, "size": len(self.encrypted_blob)}
+
     @classmethod
     def from_dict(cls, appointment_data):
         """
