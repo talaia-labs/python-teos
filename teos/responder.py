@@ -259,6 +259,7 @@ class Responder:
         # Distinguish fresh bootstraps from bootstraps from db
         if self.last_known_block is None:
             self.last_known_block = self.block_processor.get_best_block_hash()
+            self.db_manager.store_last_block_hash_responder(self.last_known_block)
 
         while True:
             block_hash = self.block_queue.get()
