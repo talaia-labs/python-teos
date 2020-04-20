@@ -38,7 +38,7 @@ def prng_seed():
 def setup_node(bitcoin_cli):
     # This method will create a new address a mine bitcoin so the node can be used for testing
     new_addr = bitcoin_cli.getnewaddress()
-    bitcoin_cli.generatetoaddress(101, new_addr)
+    bitcoin_cli.generatetoaddress(106, new_addr)
 
 
 @pytest.fixture()
@@ -58,6 +58,31 @@ def create_txs(bitcoin_cli):
     signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
 
     return signed_commitment_tx, signed_penalty_tx
+
+
+@pytest.fixture()
+def create_five_txs(bitcoin_cli):
+    utxos = bitcoin_cli.listunspent()
+
+    signed_commitment_txs = []
+    signed_penalty_txs = []
+
+    for i in range(5):
+        if len(utxos) == 0:
+            raise ValueError("There're no UTXOs.")
+
+        utxo = utxos.pop(0)
+        while utxo.get("amount") < Decimal(2 / pow(10, 5)):
+            utxo = utxos.pop(0)
+
+        signed_commitment_tx = create_commitment_tx(bitcoin_cli, utxo)
+
+        signed_commitment_txs.append(signed_commitment_tx)
+        decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx)
+
+        signed_penalty_txs.append(create_penalty_tx(bitcoin_cli, decoded_commitment_tx))
+
+    return signed_commitment_txs, signed_penalty_txs
 
 
 def run_teosd():

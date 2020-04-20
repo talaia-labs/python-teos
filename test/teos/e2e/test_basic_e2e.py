@@ -1,3 +1,4 @@
+import json
 from time import sleep
 from riemann.tx import Tx
 from binascii import hexlify
@@ -27,6 +28,7 @@ common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 teos_base_endpoint = "http://{}:{}".format(cli_config.get("TEOS_SERVER"), cli_config.get("TEOS_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
+teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
 
 # Run teosd
 teosd_process = run_teosd()
@@ -51,6 +53,11 @@ def add_appointment(appointment_data, sk=cli_sk):
     return teos_cli.add_appointment(
         appointment_data, sk, teos_pk, teos_base_endpoint, cli_config.get("APPOINTMENTS_FOLDER_NAME")
     )
+
+
+def get_all_appointments():
+    r = teos_cli.get_all_appointments(teos_base_endpoint)
+    return json.loads(r)
 
 
 def test_commands_non_registered(bitcoin_cli, create_txs):
@@ -101,12 +108,22 @@ def test_appointment_life_cycle(bitcoin_cli, create_txs):
     assert appointment_info is not None
     assert appointment_info.get("status") == "being_watched"
 
+    all_appointments = get_all_appointments()
+    watching = all_appointments.get("watcher_appointments")
+    responding = all_appointments.get("responder_trackers")
+    assert len(watching) == 1 and len(responding) == 0
+
     new_addr = bitcoin_cli.getnewaddress()
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
 
     appointment_info = get_appointment_info(locator)
     assert appointment_info is not None
     assert appointment_info.get("status") == "dispute_responded"
+
+    all_appointments = get_all_appointments()
+    watching = all_appointments.get("watcher_appointments")
+    responding = all_appointments.get("responder_trackers")
+    assert len(watching) == 0 and len(responding) == 1
 
     # It can be also checked by ensuring that the penalty transaction made it to the network
     penalty_tx_id = bitcoin_cli.decoderawtransaction(penalty_tx).get("txid")
@@ -127,6 +144,52 @@ def test_appointment_life_cycle(bitcoin_cli, create_txs):
         bitcoin_cli.generatetoaddress(1, new_addr)
 
     assert get_appointment_info(locator) is None
+
+
+def test_multiple_appointments_life_cycle(bitcoin_cli, create_five_txs):
+    # Tests that get_all_appointments returns all the appointments the tower is storing at various stages in the appointment lifecycle.
+    appointments = []
+
+    commitment_txs, penalty_txs = create_five_txs
+
+    # Create five appointments.
+    for i in range(5):
+        appointment = {}
+
+        appointment["commitment_tx"] = commitment_txs[i]
+        appointment["penalty_tx"] = penalty_txs[i]
+        commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_txs[i]).get("txid")
+        appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_txs[i])
+        appointment["appointment_data"] = appointment_data
+        locator = compute_locator(commitment_tx_id)
+        appointment["locator"] = locator
+
+        appointments.append(appointment)
+
+    # Send all of them to watchtower.
+    for appt in appointments:
+        add_appointment(appt.get("appointment_data"))
+
+    # Two of these appointments are breached, and the watchtower responds to them.
+    for i in range(2):
+        new_addr = bitcoin_cli.getnewaddress()
+        broadcast_transaction_and_mine_block(bitcoin_cli, appointments[i]["commitment_tx"], new_addr)
+        bitcoin_cli.generatetoaddress(3, new_addr)
+        sleep(1)
+
+    # Test that they all show up in get_all_appointments at the correct stages.
+    all_appointments = get_all_appointments()
+    watching = all_appointments.get("watcher_appointments")
+    responding = all_appointments.get("responder_trackers")
+    assert len(watching) == 3 and len(responding) == 2
+
+    # Now let's mine some blocks so these appointments reach the end of their lifecycle.
+    # Since we are running all the nodes remotely data may take more time than normal, and some confirmations may be
+    # missed, so we generate more than enough confirmations and add some delays.
+    new_addr = bitcoin_cli.getnewaddress()
+    for _ in range(int(1.5 * END_TIME_DELTA) + 5):
+        sleep(1)
+        bitcoin_cli.generatetoaddress(1, new_addr)
 
 
 def test_appointment_malformed_penalty(bitcoin_cli, create_txs):

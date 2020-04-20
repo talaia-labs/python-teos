@@ -10,7 +10,7 @@ from getopt import getopt, GetoptError
 from requests import ConnectTimeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register
+from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
 from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
 
 import common.cryptographer
@@ -173,6 +173,39 @@ def get_appointment(locator, cli_sk, teos_pk, teos_url):
     response_json = process_post_response(server_response)
 
     return response_json
+
+
+def get_all_appointments(teos_url):
+    """ 
+    Gets information about all appointments stored in the tower, if the user requesting the data is an administrator.
+
+    Args:
+        teos_url (:obj:`str`): the teos base url.
+
+    Returns:
+        :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
+        responds. 
+    """
+
+    get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
+
+    try:
+        response = requests.get(url=get_all_appointments_endpoint, timeout=5)
+
+        if response.status_code != constants.HTTP_OK:
+            logger.error("The server returned an error", status_code=response.status_code, reason=response.reason)
+            return None
+
+        response_json = json.dumps(response.json(), indent=4, sort_keys=True)
+        return response_json
+
+    except ConnectionError:
+        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
+        return None
+
+    except requests.exceptions.Timeout:
+        logger.error("The request timed out")
+        return None
 
 
 def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
@@ -426,6 +459,11 @@ def main(args, command_line_conf):
                             if appointment_data:
                                 print(appointment_data)
 
+                    elif command == "get_all_appointments":
+                        appointment_data = get_all_appointments(teos_url)
+                        if appointment_data:
+                            print(appointment_data)
+
                     elif command == "help":
                         if args:
                             command = args.pop(0)
@@ -442,6 +480,9 @@ def main(args, command_line_conf):
                             else:
                                 logger.error("Unknown command. Use help to check the list of available commands")
 
+                        elif command == "get_all_appointments":
+                            sys.exit(help_get_all_appointments())
+
                         else:
                             sys.exit(show_usage())
 
@@ -457,7 +498,7 @@ def main(args, command_line_conf):
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["register", "add_appointment", "get_appointment", "help"]
+    commands = ["register", "add_appointment", "get_appointment", "get_all_appointments", "help"]
 
     try:
         opts, args = getopt(argv[1:], "s:p:h", ["server", "port", "help"])
