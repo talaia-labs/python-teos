@@ -59,7 +59,7 @@ def help_get_all_appointments():
         "NAME:"
         "\tpython teos_cli get_all_appointments - Gets information about all appointments stored in the tower."
         "\n\nUSAGE:"
-        "\tpython teos_cli get_all_appointments"
+        "\tpython teos_cli.py get_all_appointments"
         "\n\nDESCRIPTION:"
         "\n\n\tGets information about all appointments stored in the tower.\n"
     )

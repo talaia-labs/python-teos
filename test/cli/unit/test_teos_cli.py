@@ -5,7 +5,6 @@ import responses
 from binascii import hexlify
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
-from http.client import HTTPException
 
 import common.cryptographer
 from common.logger import Logger

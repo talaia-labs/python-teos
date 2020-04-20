@@ -180,7 +180,7 @@ def get_all_appointments(teos_url):
     Gets information about all appointments stored in the tower, if the user requesting the data is an administrator.
 
     Args:
-        get_all_appointments_endpoint (:obj:`str`): the teos endpoint from which all appointments can be retrieved.
+        teos_url (:obj:`str`): the teos base url.
 
     Returns:
         :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
@@ -193,7 +193,7 @@ def get_all_appointments(teos_url):
         response = requests.get(url=get_all_appointments_endpoint, timeout=5)
 
         if response.status_code != constants.HTTP_OK:
-            logger.error("The server returned a 'not found' error")
+            logger.error("The server returned an error", status_code=response.status_code, reason=response.reason)
             return None
 
         response_json = json.dumps(response.json(), indent=4, sort_keys=True)
