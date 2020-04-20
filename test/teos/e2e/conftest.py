@@ -41,48 +41,32 @@ def setup_node(bitcoin_cli):
     bitcoin_cli.generatetoaddress(106, new_addr)
 
 
-@pytest.fixture()
-def create_txs(bitcoin_cli):
+def create_txs(bitcoin_cli, n=1):
     utxos = bitcoin_cli.listunspent()
 
-    if len(utxos) == 0:
-        raise ValueError("There're no UTXOs.")
-
-    utxo = utxos.pop(0)
-    while utxo.get("amount") < Decimal(2 / pow(10, 5)):
-        utxo = utxos.pop(0)
-
-    signed_commitment_tx = create_commitment_tx(bitcoin_cli, utxo)
-    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx)
-
-    signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
-
-    return signed_commitment_tx, signed_penalty_tx
-
-
-@pytest.fixture()
-def create_five_txs(bitcoin_cli):
-    utxos = bitcoin_cli.listunspent()
+    if len(utxos) < n:
+        raise ValueError("There're no enough UTXOs.")
 
     signed_commitment_txs = []
     signed_penalty_txs = []
 
-    for i in range(5):
-        if len(utxos) == 0:
-            raise ValueError("There're no UTXOs.")
-
+    for _ in range(n):
         utxo = utxos.pop(0)
         while utxo.get("amount") < Decimal(2 / pow(10, 5)):
             utxo = utxos.pop(0)
 
         signed_commitment_tx = create_commitment_tx(bitcoin_cli, utxo)
-
-        signed_commitment_txs.append(signed_commitment_tx)
         decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx)
 
-        signed_penalty_txs.append(create_penalty_tx(bitcoin_cli, decoded_commitment_tx))
+        signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
 
-    return signed_commitment_txs, signed_penalty_txs
+        signed_commitment_txs.append(signed_commitment_tx)
+        signed_penalty_txs.append(signed_penalty_tx)
+
+    if len(signed_penalty_txs) > 1:
+        return signed_commitment_txs, signed_penalty_txs
+    else:
+        return signed_commitment_txs[0], signed_penalty_txs[0]
 
 
 def run_teosd():
