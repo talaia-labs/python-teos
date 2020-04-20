@@ -28,7 +28,7 @@ from test.teos.e2e.conftest import (
 cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
 common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix="")
 
-teos_base_endpoint = "http://{}:{}".format(cli_config.get("TEOS_SERVER"), cli_config.get("TEOS_PORT"))
+teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
@@ -108,7 +108,6 @@ def test_appointment_life_cycle(bitcoin_cli):
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
-    assert appointment_info is not None
     assert appointment_info.get("status") == "being_watched"
     assert appointment_info.get("locator") == locator
     assert appointment_info.get("appointment") == appointment.to_dict()
@@ -122,9 +121,7 @@ def test_appointment_life_cycle(bitcoin_cli):
     # Trigger a breach and check again
     new_addr = bitcoin_cli.getnewaddress()
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
-
     appointment_info = get_appointment_info(locator)
-    assert appointment_info is not None
     assert appointment_info.get("status") == "dispute_responded"
     assert appointment_info.get("locator") == locator
 
@@ -162,15 +159,16 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
 
     # Create five appointments.
     for commitment_tx, penalty_tx in zip(commitment_txs, penalty_txs):
-        appointment = {}
-
-        appointment["commitment_tx"] = commitment_tx
-        appointment["penalty_tx"] = penalty_tx
         commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
         appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
-        appointment["appointment_data"] = appointment_data
+
         locator = compute_locator(commitment_tx_id)
-        appointment["locator"] = locator
+        appointment = {
+            "locator": locator,
+            "commitment_tx": commitment_tx,
+            "penalty_tx": penalty_tx,
+            "appointment_data": appointment_data,
+        }
 
         appointments.append(appointment)
 
@@ -195,13 +193,15 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
     responder_locators = [appointment["locator"] for uuid, appointment in responding.items()]
     assert set(responder_locators) == set(breached_appointments)
 
-    # Now let's mine some blocks so these appointments reach the end of their lifecycle.
-    # Since we are running all the nodes remotely data may take more time than normal, and some confirmations may be
-    # missed, so we generate more than enough confirmations and add some delays.
     new_addr = bitcoin_cli.getnewaddress()
-    for _ in range(int(1.5 * END_TIME_DELTA) + 5):
-        sleep(1)
+    # Now let's mine some blocks so the appointment reaches its end.
+    for _ in range(END_TIME_DELTA):
         bitcoin_cli.generatetoaddress(1, new_addr)
+
+    # The appointment is no longer in the tower
+    with pytest.raises(TowerResponseError):
+        for appointment in appointments:
+            get_appointment_info(appointment["locator"])
 
 
 def test_appointment_malformed_penalty(bitcoin_cli):

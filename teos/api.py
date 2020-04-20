@@ -3,8 +3,8 @@ import logging
 from math import ceil
 from flask import Flask, request, abort, jsonify
 
+from teos import LOG_PREFIX
 import teos.errors as errors
-from teos import HOST, PORT, LOG_PREFIX
 from teos.inspector import InspectionFailed
 from teos.gatekeeper import NotEnoughSlots, IdentificationFailure
 
@@ -79,7 +79,9 @@ class API:
             access.
     """
 
-    def __init__(self, inspector, watcher, gatekeeper):
+    def __init__(self, host, port, inspector, watcher, gatekeeper):
+        self.host = host
+        self.port = port
         self.inspector = inspector
         self.watcher = watcher
         self.gatekeeper = gatekeeper
@@ -341,4 +343,4 @@ class API:
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
-        app.run(host=HOST, port=PORT)
+        app.run(host=self.host, port=self.port)
