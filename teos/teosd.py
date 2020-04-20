@@ -154,7 +154,8 @@ def main(command_line_conf):
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
             gatekeeper = Gatekeeper(UsersDBM(config.get("USERS_DB_PATH")), config.get("DEFAULT_SLOTS"))
-            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher, gatekeeper).start()
+            inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
+            API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher, gatekeeper).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
@@ -167,9 +168,23 @@ if __name__ == "__main__":
         opts, _ = getopt(
             argv[1:],
             "h",
-            ["btcnetwork=", "btcrpcuser=", "btcrpcpassword=", "btcrpcconnect=", "btcrpcport=", "datadir=", "help"],
+            [
+                "apiconnect=",
+                "apiport=",
+                "btcnetwork=",
+                "btcrpcuser=",
+                "btcrpcpassword=",
+                "btcrpcconnect=",
+                "btcrpcport=",
+                "datadir=",
+                "help",
+            ],
         )
         for opt, arg in opts:
+            if opt in ["--apibind"]:
+                command_line_conf["API_BIND"] = arg
+            if opt in ["--apiport"]:
+                command_line_conf["API_PORT"] = arg
             if opt in ["--btcnetwork"]:
                 command_line_conf["BTC_NETWORK"] = arg
             if opt in ["--btcrpcuser"]:

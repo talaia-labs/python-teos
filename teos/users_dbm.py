@@ -75,7 +75,7 @@ class UsersDBM(DBManager):
             user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
 
         Returns:
-            :obj:`dict`: A dictionary containing the appointment data if the ``key`` is found.
+            :obj:`dict`: A dictionary containing the user data if the ``key`` is found.
 
             Returns ``None`` otherwise.
         """
@@ -105,7 +105,7 @@ class UsersDBM(DBManager):
             return True
 
         except TypeError:
-            logger.info("Cant delete user from db, user key has wrong type", uuid=user_pk)
+            logger.info("Cannot delete user from db, user key has wrong type", uuid=user_pk)
             return False
 
     def load_all_users(self):

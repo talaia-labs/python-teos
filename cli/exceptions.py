@@ -2,7 +2,7 @@ class InvalidParameter(ValueError):
     """Raised when a command line parameter is invalid (either missing or wrong)"""
 
     def __init__(self, msg, **kwargs):
-        self.msg = msg
+        self.reason = msg
         self.kwargs = kwargs
 
 

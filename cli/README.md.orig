@@ -15,8 +15,8 @@ Refer to [INSTALL.md](INSTALL.md)
 	
 #### Global options
 
-- `--apiconnect`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
-- `-apiport` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
+- `-s, --server`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
+- `-p, --port` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
 - `-h --help`: 	shows a list of commands or help for a specific command.
 
 #### Commands
@@ -156,11 +156,19 @@ or
 
 ## Example
 1. Register with the tower.
+<<<<<<< HEAD
 
 ```
 python teos_cli.py register
 ```
 
+=======
+
+```
+python teos_cli.py register
+```
+
+>>>>>>> Adds register docs and removes API readme
 2. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not correspond to a valid transaction. However it can be used to interact with the Eye of Satoshi's API.
 
     ```
@@ -191,10 +199,10 @@ By default, `teos_cli` will connect to your local instance (running on localhost
 - mainnet endpoint = `teosmainnet.pisa.watch`
 
 ### Connecting to the mainnet instance
-Add `--apiconnect https://teosmainnet.pisa.watch` to your calls, for example:
+Add `-s https://teosmainnet.pisa.watch` to your calls, for example:
 
 ```
-python teos_cli.py --apiconnect https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
+python teos_cli.py -s https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
 ```
 
 You can also change the config file to avoid specifying the server every time:
