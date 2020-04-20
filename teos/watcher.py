@@ -124,6 +124,8 @@ class Watcher:
             raise AppointmentLimitReached(message)
 
         user_id = self.gatekeeper.authenticate_user(appointment.serialize(), signature)
+        # The user_id needs to be added to the ExtendedAppointment once the former has been authenticated
+        appointment.user_id = user_id
 
         # The uuids are generated as the RIPMED160(locator||user_pubkey).
         # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
