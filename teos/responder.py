@@ -89,6 +89,16 @@ class TransactionTracker:
 
         return tx_tracker
 
+    def get_summary(self):
+        """
+        Returns the summary of a tracker, consisting on the locator, the user_id and the penalty_txid.
+
+        Returns:
+            :obj:`dict`: the appointment summary.
+        """
+
+        return {"locator": self.locator, "user_id": self.user_id, "penalty_txid": self.penalty_txid}
+
 
 class Responder:
     """
@@ -226,7 +236,7 @@ class Responder:
         tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
 
         # We only store the penalty_txid, locator and user_id in memory. The rest is dumped into the db.
-        self.trackers[uuid] = {"penalty_txid": tracker.penalty_txid, "locator": locator, "user_id": user_id}
+        self.trackers[uuid] = tracker.get_summary()
 
         if penalty_txid in self.tx_tracker_map:
             self.tx_tracker_map[penalty_txid].append(uuid)
@@ -376,7 +386,6 @@ class Responder:
                     checked_txs[tracker_data.get("penalty_txid")] = tx
 
                     if confirmations is not None and confirmations >= IRREVOCABLY_RESOLVED:
-                        # The end of the appointment has been reached
                         completed_trackers.append(uuid)
 
         return completed_trackers
@@ -396,14 +405,16 @@ class Responder:
         """
 
         expired_trackers = [
-            uuid for uuid in self.gatekeeper.get_expired_appointments(height) if uuid in self.unconfirmed_txs
+            uuid
+            for uuid in self.gatekeeper.get_expired_appointments(height)
+            if self.trackers[uuid].get("penalty_txid") in self.unconfirmed_txs
         ]
 
         return expired_trackers
 
     def rebroadcast(self, txs_to_rebroadcast):
         """
-        Rebroadcasts a ``penalty_tx`` that has missed too many confirmations. In the current approach this would loop
+        Rebroadcasts a ``penalty_tx`` that has missed too many confirmations. In the current approach this will loop
         until the tracker expires if the penalty transactions keeps getting rejected due to fees.
 
         Potentially, the fees could be bumped here if the transaction has some tower dedicated outputs (or allows it
