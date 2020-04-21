@@ -190,8 +190,9 @@ class Gatekeeper:
             :obj:`list`: a list of appointment uuids that will expire at ``block_height``.
         """
         expired_appointments = []
-        for user_id, user_info in self.registered_users.items():
-            if block_height == user_info.subscription_expiry + self.expiry_delta:
-                expired_appointments.extend(user_info.appointments)
+        # Avoiding dictionary changed size during iteration
+        for user_id in list(self.registered_users.keys()):
+            if block_height == self.registered_users[user_id].subscription_expiry + self.expiry_delta:
+                expired_appointments.extend(self.registered_users[user_id].appointments)
 
         return expired_appointments

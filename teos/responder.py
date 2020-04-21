@@ -337,7 +337,6 @@ class Responder:
         for tx in self.unconfirmed_txs:
             if tx in self.missed_confirmations:
                 self.missed_confirmations[tx] += 1
-
             else:
                 self.missed_confirmations[tx] = 1
 
@@ -374,16 +373,18 @@ class Responder:
         #        the responder.
         checked_txs = {}
 
-        for uuid, tracker_data in self.trackers.items():
-            if tracker_data.get("penalty_txid") not in self.unconfirmed_txs:
-                if tracker_data.get("penalty_txid") not in checked_txs:
-                    tx = self.carrier.get_transaction(tracker_data.get("penalty_txid"))
+        # Avoiding dictionary changed size during iteration
+        for uuid in list(self.trackers.keys()):
+            penalty_txid = self.trackers[uuid].get("penalty_txid")
+            if penalty_txid not in self.unconfirmed_txs:
+                if penalty_txid not in checked_txs:
+                    tx = self.carrier.get_transaction(penalty_txid)
                 else:
-                    tx = checked_txs.get(tracker_data.get("penalty_txid"))
+                    tx = checked_txs.get(penalty_txid)
 
                 if tx is not None:
                     confirmations = tx.get("confirmations")
-                    checked_txs[tracker_data.get("penalty_txid")] = tx
+                    checked_txs[penalty_txid] = tx
 
                     if confirmations is not None and confirmations >= IRREVOCABLY_RESOLVED:
                         completed_trackers.append(uuid)
@@ -464,7 +465,8 @@ class Responder:
 
         """
 
-        for uuid in self.trackers.keys():
+        # Avoiding dictionary changed size during iteration
+        for uuid in list(self.trackers.keys()):
             tracker = TransactionTracker.from_dict(self.db_manager.load_responder_tracker(uuid))
 
             # First we check if the dispute transaction is known (exists either in mempool or blockchain)
