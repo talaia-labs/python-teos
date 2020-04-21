@@ -37,42 +37,42 @@ class UsersDBM(DBManager):
 
             raise e
 
-    def store_user(self, user_pk, user_data):
+    def store_user(self, user_id, user_data):
         """
         Stores a user record to the database. ``user_pk`` is used as identifier.
 
         Args:
-            user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
+            user_id (:obj:`str`): a 33-byte hex-encoded string identifying the user.
             user_data (:obj:`dict`): the user associated data, as a dictionary.
 
         Returns:
             :obj:`bool`: True if the user was stored in the database, False otherwise.
         """
 
-        if is_compressed_pk(user_pk):
+        if is_compressed_pk(user_id):
             try:
-                self.create_entry(user_pk, json.dumps(user_data))
-                logger.info("Adding user to Gatekeeper's db", user_pk=user_pk)
+                self.create_entry(user_id, json.dumps(user_data))
+                logger.info("Adding user to Gatekeeper's db", user_id=user_id)
                 return True
 
             except json.JSONDecodeError:
-                logger.info("Could't add user to db. Wrong user data format", user_pk=user_pk, user_data=user_data)
+                logger.info("Could't add user to db. Wrong user data format", user_id=user_id, user_data=user_data)
                 return False
 
             except TypeError:
-                logger.info("Could't add user to db", user_pk=user_pk, user_data=user_data)
+                logger.info("Could't add user to db", user_id=user_id, user_data=user_data)
                 return False
         else:
-            logger.info("Could't add user to db. Wrong pk format", user_pk=user_pk, user_data=user_data)
+            logger.info("Could't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
             return False
 
-    def load_user(self, user_pk):
+    def load_user(self, user_id):
         """
         Loads a user record from the database using the ``user_pk`` as identifier.
 
         Args:
 
-            user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
+            user_id (:obj:`str`): a 33-byte hex-encoded string identifying the user.
 
         Returns:
             :obj:`dict`: A dictionary containing the user data if the ``key`` is found.
@@ -81,31 +81,31 @@ class UsersDBM(DBManager):
         """
 
         try:
-            data = self.load_entry(user_pk)
+            data = self.load_entry(user_id)
             data = json.loads(data)
         except (TypeError, json.decoder.JSONDecodeError):
             data = None
 
         return data
 
-    def delete_user(self, user_pk):
+    def delete_user(self, user_id):
         """
         Deletes a user record from the database.
 
         Args:
-           user_pk (:obj:`str`): a 33-byte hex-encoded string identifying the user.
+           user_id (:obj:`str`): a 33-byte hex-encoded string identifying the user.
 
         Returns:
             :obj:`bool`: True if the user was deleted from the database or it was non-existent, False otherwise.
         """
 
         try:
-            self.delete_entry(user_pk)
-            logger.info("Deleting user from Gatekeeper's db", uuid=user_pk)
+            self.delete_entry(user_id)
+            logger.info("Deleting user from Gatekeeper's db", uuid=user_id)
             return True
 
         except TypeError:
-            logger.info("Cannot delete user from db, user key has wrong type", uuid=user_pk)
+            logger.info("Cannot delete user from db, user key has wrong type", uuid=user_id)
             return False
 
     def load_all_users(self):
@@ -122,7 +122,7 @@ class UsersDBM(DBManager):
 
         for k, v in self.db.iterator():
             # Get uuid and appointment_data from the db
-            user_pk = k.decode("utf-8")
-            data[user_pk] = json.loads(v)
+            user_id = k.decode("utf-8")
+            data[user_id] = json.loads(v)
 
         return data

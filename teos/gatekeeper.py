@@ -76,12 +76,12 @@ class Gatekeeper:
         }
         self.lock = Lock()
 
-    def add_update_user(self, user_pk):
+    def add_update_user(self, user_id):
         """
         Adds a new user or updates the subscription of an existing one, by adding additional slots.
 
         Args:
-            user_pk(:obj:`str`): the public key that identifies the user (33-bytes hex str).
+            user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
             :obj:`tuple`: a tuple with the number of available slots in the user subscription and the subscription
@@ -91,23 +91,23 @@ class Gatekeeper:
             :obj:`InvalidParameter`: if the user_pk does not match the expected format.
         """
 
-        if not is_compressed_pk(user_pk):
+        if not is_compressed_pk(user_id):
             raise InvalidParameter("Provided public key does not match expected format (33-byte hex string)")
 
-        if user_pk not in self.registered_users:
-            self.registered_users[user_pk] = UserInfo(
+        if user_id not in self.registered_users:
+            self.registered_users[user_id] = UserInfo(
                 self.default_slots, self.block_processor.get_block_count() + self.default_subscription_duration
             )
         else:
             # FIXME: For now new calls to register add default_slots to the current count and reset the expiry time
-            self.registered_users[user_pk].available_slots += self.default_slots
-            self.registered_users[user_pk].subscription_expiry = (
+            self.registered_users[user_id].available_slots += self.default_slots
+            self.registered_users[user_id].subscription_expiry = (
                 self.block_processor.get_block_count() + self.default_subscription_duration
             )
 
-        self.user_db.store_user(user_pk, self.registered_users[user_pk].to_dict())
+        self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
 
-        return self.registered_users[user_pk].available_slots, self.registered_users[user_pk].subscription_expiry
+        return self.registered_users[user_id].available_slots, self.registered_users[user_id].subscription_expiry
 
     def authenticate_user(self, message, signature):
         """
@@ -126,10 +126,10 @@ class Gatekeeper:
 
         try:
             rpk = Cryptographer.recover_pk(message, signature)
-            compressed_pk = Cryptographer.get_compressed_pk(rpk)
+            user_id = Cryptographer.get_compressed_pk(rpk)
 
-            if compressed_pk in self.registered_users:
-                return compressed_pk
+            if user_id in self.registered_users:
+                return user_id
             else:
                 raise AuthenticationFailure("User not found.")
 

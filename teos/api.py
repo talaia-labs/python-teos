@@ -120,14 +120,14 @@ class API:
             logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
             return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
 
-        client_pk = request_data.get("public_key")
+        user_id = request_data.get("public_key")
 
-        if client_pk:
+        if user_id:
             try:
                 rcode = HTTP_OK
-                available_slots, subscription_expiry = self.watcher.gatekeeper.add_update_user(client_pk)
+                available_slots, subscription_expiry = self.watcher.gatekeeper.add_update_user(user_id)
                 response = {
-                    "public_key": client_pk,
+                    "public_key": user_id,
                     "available_slots": available_slots,
                     "subscription_expiry": subscription_expiry,
                 }
@@ -234,10 +234,10 @@ class API:
 
             message = "get appointment {}".format(locator).encode()
             signature = request_data.get("signature")
-            user_pk = self.watcher.gatekeeper.authenticate_user(message, signature)
+            user_id = self.watcher.gatekeeper.authenticate_user(message, signature)
 
             triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
-            uuid = hash_160("{}{}".format(locator, user_pk))
+            uuid = hash_160("{}{}".format(locator, user_id))
 
             # If the appointment has been triggered, it should be in the locator (default else just in case).
             if uuid in triggered_appointments:

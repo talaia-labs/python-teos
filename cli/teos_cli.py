@@ -57,7 +57,7 @@ def register(user_id, teos_url):
     return response
 
 
-def add_appointment(appointment_data, cli_sk, teos_id, teos_url):
+def add_appointment(appointment_data, user_sk, teos_id, teos_url):
     """
     Manages the add_appointment command.
 
@@ -72,7 +72,7 @@ def add_appointment(appointment_data, cli_sk, teos_id, teos_url):
 
     Args:
         appointment_data (:obj:`dict`): a dictionary containing the appointment data.
-        cli_sk (:obj:`PrivateKey`): the client's private key.
+        user_sk (:obj:`PrivateKey`): the user's private key.
         teos_id (:obj:`str`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
 
@@ -104,7 +104,7 @@ def add_appointment(appointment_data, cli_sk, teos_id, teos_url):
     appointment_data["locator"] = compute_locator(tx_id)
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(tx, tx_id)
     appointment = Appointment.from_dict(appointment_data)
-    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
+    signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
@@ -128,13 +128,13 @@ def add_appointment(appointment_data, cli_sk, teos_id, teos_url):
     return appointment, signature
 
 
-def get_appointment(locator, cli_sk, teos_id, teos_url):
+def get_appointment(locator, user_sk, teos_id, teos_url):
     """
     Gets information about an appointment from the tower.
 
     Args:
         locator (:obj:`str`): the appointment locator used to identify it.
-        cli_sk (:obj:`PrivateKey`): the client's private key.
+        user_sk (:obj:`PrivateKey`): the user's private key.
         teos_id (:obj:`PublicKey`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
 
@@ -155,7 +155,7 @@ def get_appointment(locator, cli_sk, teos_id, teos_url):
         raise InvalidParameter("The provided locator is not valid", locator=locator)
 
     message = "get appointment {}".format(locator)
-    signature = Cryptographer.sign(message.encode(), cli_sk)
+    signature = Cryptographer.sign(message.encode(), user_sk)
     data = {"locator": locator, "signature": signature}
 
     # Send request to the server.
@@ -199,13 +199,13 @@ def get_all_appointments(teos_url):
         return None
 
 
-def load_keys(teos_pk_path, cli_sk_path):
+def load_keys(teos_pk_path, user_sk_path):
     """
     Loads all the keys required so sign, send, and verify the appointment.
 
     Args:
-        teos_pk_path (:obj:`str`): path to the tower public key file.
-        cli_sk_path (:obj:`str`): path to the client private key file.
+        teos_pk_path (:obj:`str`): path to the tower's public key file.
+        user_sk_path (:obj:`str`): path to the user's private key file.
 
     Returns:
         :obj:`tuple`: a three-item tuple containing a ``str``, a ``PrivateKey`` and a ``str``
@@ -218,7 +218,7 @@ def load_keys(teos_pk_path, cli_sk_path):
     if not teos_pk_path:
         raise InvalidKey("TEOS's public key file not found. Please check your settings")
 
-    if not cli_sk_path:
+    if not user_sk_path:
         raise InvalidKey("Client's private key file not found. Please check your settings")
 
     try:
@@ -229,19 +229,19 @@ def load_keys(teos_pk_path, cli_sk_path):
         raise InvalidKey("TEOS public key cannot be loaded")
 
     try:
-        cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
-        cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
+        user_sk_der = Cryptographer.load_key_file(user_sk_path)
+        user_sk = Cryptographer.load_private_key_der(user_sk_der)
 
     except (InvalidParameter, InvalidKey):
         raise InvalidKey("Client private key is invalid or cannot be parsed")
 
     try:
-        client_id = Cryptographer.get_compressed_pk(cli_sk.public_key)
+        user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
     except (InvalidParameter, InvalidKey):
         raise InvalidKey("Client public key cannot be loaded")
 
-    return teos_id, cli_sk, client_id
+    return teos_id, user_sk, user_id
 
 
 def post_request(data, endpoint):
@@ -402,15 +402,15 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        teos_id, cli_sk, client_id = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"))
+        teos_id, user_sk, user_id = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"))
 
         if command == "register":
-            register_data = register(client_id, teos_url)
+            register_data = register(user_id, teos_url)
             logger.info("Registration succeeded. Available slots: {}".format(register_data.get("available_slots")))
 
         if command == "add_appointment":
             appointment_data = parse_add_appointment_args(args)
-            appointment, signature = add_appointment(appointment_data, cli_sk, teos_id, teos_url)
+            appointment, signature = add_appointment(appointment_data, user_sk, teos_id, teos_url)
             save_appointment_receipt(appointment.to_dict(), signature, config.get("APPOINTMENTS_FOLDER_NAME"))
 
         elif command == "get_appointment":
@@ -423,7 +423,7 @@ def main(command, args, command_line_conf):
                 if arg_opt in ["-h", "--help"]:
                     sys.exit(help_get_appointment())
 
-                appointment_data = get_appointment(arg_opt, cli_sk, teos_id, teos_url)
+                appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
                 if appointment_data:
                     print(appointment_data)
 
