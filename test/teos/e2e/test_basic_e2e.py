@@ -13,6 +13,8 @@ from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
 from teos import DEFAULT_CONF as TEOS_CONF
+from teos import DATA_DIR as TEOS_DATA_DIR
+from teos import CONF_FILE_NAME as TEOS_CONF_FILE_NAME
 from teos.utils.auth_proxy import JSONRPCException
 
 from test.teos.e2e.conftest import (
@@ -25,7 +27,8 @@ from test.teos.e2e.conftest import (
 )
 
 cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
-EXPIRY_DELTA = TEOS_CONF.get("EXPIRY_DELTA").get("value")
+teos_config = get_config(TEOS_DATA_DIR, TEOS_CONF_FILE_NAME, TEOS_CONF)
+
 
 teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
@@ -94,14 +97,15 @@ def test_commands_registered(bitcoin_cli):
 
 def test_appointment_life_cycle(bitcoin_cli):
     # First of all we need to register
-    teos_cli.register(user_id, teos_base_endpoint)
+    response = teos_cli.register(user_id, teos_base_endpoint)
+    available_slots = response.get("available_slots")
 
     # After that we can build an appointment and send it to the tower
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
-    appointment, available_slots = add_appointment(appointment_data)
+    appointment, signature = add_appointment(appointment_data)
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
@@ -139,11 +143,16 @@ def test_appointment_life_cycle(bitcoin_cli):
         assert False
 
     # Now let's mine some blocks so the appointment reaches its end. We need 100 + EXPIRY_DELTA -1
-    bitcoin_cli.generatetoaddress(100 + EXPIRY_DELTA - 1, new_addr)
+    bitcoin_cli.generatetoaddress(100 + teos_config.get("EXPIRY_DELTA") - 1, new_addr)
 
     # The appointment is no longer in the tower
     with pytest.raises(TowerResponseError):
         get_appointment_info(locator)
+
+    # Check that the appointment is not in the Gatekeeper by checking the available slots (should have increase by 1)
+    # We can do so by topping up the subscription (FIXME: find a better way to check this).
+    response = teos_cli.register(user_id, teos_base_endpoint)
+    assert response.get("available_slots") == available_slots + teos_config.get("DEFAULT_SLOTS") + 1
 
 
 def test_multiple_appointments_life_cycle(bitcoin_cli):
@@ -191,7 +200,7 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
 
     new_addr = bitcoin_cli.getnewaddress()
     # Now let's mine some blocks so the appointment reaches its end. We need 100 + EXPIRY_DELTA -1
-    bitcoin_cli.generatetoaddress(100 + EXPIRY_DELTA - 1, new_addr)
+    bitcoin_cli.generatetoaddress(100 + teos_config.get("EXPIRY_DELTA") - 1, new_addr)
 
     # The appointment is no longer in the tower
     with pytest.raises(TowerResponseError):
