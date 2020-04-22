@@ -45,7 +45,6 @@ def test_get_summary(appointment_data):
     assert ExtendedAppointment.from_dict(appointment_data).get_summary() == {
         "locator": appointment_data["locator"],
         "user_id": appointment_data["user_id"],
-        "size": len(appointment_data["encrypted_blob"]),
     }
 
 

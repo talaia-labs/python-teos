@@ -47,7 +47,6 @@ def test_build_appointments():
         assert uuid in appointments_data.keys()
         assert appointments_data[uuid].get("locator") == appointment.get("locator")
         assert appointments_data[uuid].get("user_id") == appointment.get("user_id")
-        assert len(appointments_data[uuid].get("encrypted_blob")) == appointment.get("size")
         assert uuid in locator_uuid_map[appointment.get("locator")]
 
 

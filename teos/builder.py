@@ -1,3 +1,7 @@
+from teos.responder import TransactionTracker
+from teos.extended_appointment import ExtendedAppointment
+
+
 class Builder:
     """
     The :class:`Builder` class is in charge of reconstructing data loaded from the appointments database and build the
@@ -26,17 +30,14 @@ class Builder:
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointments[uuid] = {
-                "locator": data.get("locator"),
-                "user_id": data.get("user_id"),
-                "size": len(data.get("encrypted_blob")),
-            }
+            appointment = ExtendedAppointment.from_dict(data)
+            appointments[uuid] = appointment.get_summary()
 
-            if data.get("locator") in locator_uuid_map:
-                locator_uuid_map[data.get("locator")].append(uuid)
+            if appointment.locator in locator_uuid_map:
+                locator_uuid_map[appointment.locator].append(uuid)
 
             else:
-                locator_uuid_map[data.get("locator")] = [uuid]
+                locator_uuid_map[appointment.locator] = [uuid]
 
         return appointments, locator_uuid_map
 
@@ -64,17 +65,14 @@ class Builder:
         tx_tracker_map = {}
 
         for uuid, data in tracker_data.items():
-            trackers[uuid] = {
-                "penalty_txid": data.get("penalty_txid"),
-                "locator": data.get("locator"),
-                "user_id": data.get("user_id"),
-            }
+            tracker = TransactionTracker.from_dict(data)
+            trackers[uuid] = tracker.get_summary()
 
-            if data.get("penalty_txid") in tx_tracker_map:
-                tx_tracker_map[data.get("penalty_txid")].append(uuid)
+            if tracker.penalty_txid in tx_tracker_map:
+                tx_tracker_map[tracker.penalty_txid].append(uuid)
 
             else:
-                tx_tracker_map[data.get("penalty_txid")] = [uuid]
+                tx_tracker_map[tracker.penalty_txid] = [uuid]
 
         return trackers, tx_tracker_map
 

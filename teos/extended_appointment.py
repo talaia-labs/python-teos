@@ -13,7 +13,7 @@ class ExtendedAppointment(Appointment):
         Returns:
             :obj:`dict`: the appointment summary.
         """
-        return {"locator": self.locator, "user_id": self.user_id, "size": len(self.encrypted_blob)}
+        return {"locator": self.locator, "user_id": self.user_id}
 
     @classmethod
     def from_dict(cls, appointment_data):
