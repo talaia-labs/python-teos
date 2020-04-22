@@ -238,3 +238,32 @@ class Cleaner:
         db_manager.batch_delete_responder_trackers(completed_trackers)
         db_manager.batch_delete_watcher_appointments(completed_trackers)
         db_manager.batch_delete_triggered_appointment_flag(completed_trackers)
+
+    @staticmethod
+    def delete_gatekeeper_appointments(gatekeeper, appointment_to_delete):
+        """
+        Deletes a list of expired / completed appointments of a given user both from memory and the UserDB.
+
+        Args:
+            gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control
+            the user access and subscription expiry.
+            appointment_to_delete (:obj:`dict`): uuid:user_id dict containing the appointments to delete
+            (expired + completed)
+        """
+
+        user_ids = []
+        # Remove appointments from memory
+        for uuid, user_id in appointment_to_delete.items():
+            if user_id in gatekeeper.registered_users and uuid in gatekeeper.registered_users[user_id].appointments:
+                # Remove the appointment from the appointment list and update the available slots
+                gatekeeper.lock.acquire()
+                freed_slots = gatekeeper.registered_users[user_id].appointments.pop(uuid)
+                gatekeeper.registered_users[user_id].available_slots += freed_slots
+                gatekeeper.lock.release()
+
+                if user_id not in user_ids:
+                    user_ids.append(user_id)
+
+        # Store the updated users in the DB
+        for user_id in user_ids:
+            gatekeeper.user_db.store_user(user_id, gatekeeper.registered_users[user_id].to_dict())
