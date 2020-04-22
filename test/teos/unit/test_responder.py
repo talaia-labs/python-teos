@@ -307,7 +307,8 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor):
         responder.tx_tracker_map[tracker.penalty_txid] = [uuid]
         responder.missed_confirmations[tracker.penalty_txid] = 0
         responder.unconfirmed_txs.append(tracker.penalty_txid)
-        responder.gatekeeper.registered_users[tracker.user_id].appointments.append(uuid)
+        # Assuming the appointment only took a single slot
+        responder.gatekeeper.registered_users[tracker.user_id].appointments[uuid] = 1
 
         # We also need to store the info in the db
         responder.db_manager.create_triggered_appointment_flag(uuid)
@@ -337,11 +338,17 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor):
     generate_blocks_w_delay(100 - CONFIRMATIONS_BEFORE_RETRY - 2)
     assert len(responder.unconfirmed_txs) == 0
     assert len(responder.trackers) == 15
+    # Check they are not in the Gatekeeper either
+    for tracker in trackers[:5]:
+        assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
 
     # CONFIRMATIONS_BEFORE_RETRY additional blocks should complete the rest
     generate_blocks_w_delay(CONFIRMATIONS_BEFORE_RETRY)
     assert len(responder.unconfirmed_txs) == 0
     assert len(responder.trackers) == 0
+    # Check they are not in the Gatekeeper either
+    for tracker in trackers[5:]:
+        assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
 
 
 def test_check_confirmations(db_manager, gatekeeper, carrier, block_processor):
@@ -480,14 +487,16 @@ def test_get_expired_trackers(responder):
         dummy_tracker.user_id = user1_id
         expired_unconfirmed_trackers_15[uuid] = dummy_tracker
         responder.unconfirmed_txs.append(dummy_tracker.penalty_txid)
-        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments.append(uuid)
+        # Assume the appointment only took a single slot
+        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
 
     for _ in range(10):
         uuid = uuid4().hex
         dummy_tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
         dummy_tracker.user_id = user1_id
         expired_confirmed_trackers_15[uuid] = dummy_tracker
-        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments.append(uuid)
+        # Assume the appointment only took a single slot
+        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
 
     for _ in range(10):
         uuid = uuid4().hex
@@ -495,7 +504,8 @@ def test_get_expired_trackers(responder):
         dummy_tracker.user_id = user2_id
         expired_unconfirmed_trackers_16[uuid] = dummy_tracker
         responder.unconfirmed_txs.append(dummy_tracker.penalty_txid)
-        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments.append(uuid)
+        # Assume the appointment only took a single slot
+        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
 
     all_trackers = {}
     all_trackers.update(expired_confirmed_trackers_15)

@@ -273,23 +273,27 @@ class Responder:
             if len(self.trackers) > 0 and block is not None:
                 txids = block.get("tx")
 
+                completed_trackers = self.get_completed_trackers()
+                expired_trackers = self.get_expired_trackers(block.get("height"))
+                trackers_to_delete_gatekeeper = {
+                    uuid: self.trackers[uuid].get("user_id") for uuid in completed_trackers + expired_trackers
+                }
+
                 if self.last_known_block == block.get("previousblockhash"):
                     self.check_confirmations(txids)
                     Cleaner.delete_trackers(
-                        self.get_completed_trackers(),
-                        block.get("height"),
-                        self.trackers,
-                        self.tx_tracker_map,
-                        self.db_manager,
+                        completed_trackers, block.get("height"), self.trackers, self.tx_tracker_map, self.db_manager
                     )
                     Cleaner.delete_trackers(
-                        self.get_expired_trackers(block.get("height")),
+                        expired_trackers,
                         block.get("height"),
                         self.trackers,
                         self.tx_tracker_map,
                         self.db_manager,
                         expired=True,
                     )
+                    Cleaner.delete_gatekeeper_appointments(self.gatekeeper, trackers_to_delete_gatekeeper)
+
                     self.rebroadcast(self.get_txs_to_rebroadcast())
 
                 # NOTCOVERED
