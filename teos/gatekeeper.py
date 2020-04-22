@@ -27,9 +27,9 @@ class UserInfo:
         self.available_slots = available_slots
         self.subscription_expiry = subscription_expiry
 
-        # FIXME: this list is currently never wiped
         if not appointments:
-            self.appointments = []
+            # A dictionary of the form uuid:required_slots for each user appointment
+            self.appointments = {}
         else:
             self.appointments = appointments
 
@@ -136,21 +136,20 @@ class Gatekeeper:
         except (InvalidParameter, InvalidKey, SignatureError):
             raise AuthenticationFailure("Wrong message or signature.")
 
-    def update_available_slots(self, user_id, new_appointment, old_appointment=None):
+    def add_update_appointment(self, user_id, uuid, appointment):
         """
-        Updates (add/removes) slots from a user subscription.
+        Adds (or updates) an appointment to a user subscription. The user slots are updated accordingly.
 
-        Slots are removed if a new appointment is given, or an update is given with an appointment bigger than the
-        old one.
+        Slots are taken if a new appointment is given, or an update is given with an appointment bigger than the
+        existing one.
 
-        Slots are added if an update is given but the new appointment is smaller than the old one.
+        Slots are given back if an update is given but the new appointment is smaller than the existing one.
 
         Args:
-            user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-            new_appointment (:obj:`dict`): the summary of new appointment the user is requesting
-                to add.
-            old_appointment (:obj:`dict`): the summary old appointment the user wants to replace.
-                Optional.
+            user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
+            uuid (:obj:`str`): the appointment uuid.
+            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment`): the summary of new
+                appointment the user is requesting.
 
         Returns:
             :obj:`int`: the number of remaining appointment slots.
@@ -160,18 +159,21 @@ class Gatekeeper:
         """
 
         self.lock.acquire()
-        if old_appointment:
-            # For updates the difference between the existing appointment and the update is computed.
-            used_slots = ceil(old_appointment.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-            required_slots = ceil(new_appointment.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX) - used_slots
+        # For updates the difference between the existing appointment and the update is computed.
+        if uuid in self.registered_users[user_id].appointments:
+            used_slots = self.registered_users[user_id].appointments[uuid]
+
         else:
             # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-            required_slots = ceil(new_appointment.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+            used_slots = 0
 
-        if required_slots <= self.registered_users.get(user_id).available_slots:
+        required_slots = ceil(len(appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+
+        if required_slots - used_slots <= self.registered_users.get(user_id).available_slots:
             # Filling / freeing slots depending on whether this is an update or not, and if it is bigger or smaller than
             # the old appointment.
-            self.registered_users.get(user_id).available_slots -= required_slots
+            self.registered_users.get(user_id).appointments[uuid] = required_slots
+            self.registered_users.get(user_id).available_slots -= required_slots - used_slots
         else:
             self.lock.release()
             raise NotEnoughSlots()
@@ -189,6 +191,7 @@ class Gatekeeper:
         Returns:
             :obj:`list`: a list of appointment uuids that will expire at ``block_height``.
         """
+
         expired_appointments = []
         # Avoiding dictionary changed size during iteration
         for user_id in list(self.registered_users.keys()):

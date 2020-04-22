@@ -128,48 +128,47 @@ def test_identify_user_wrong(gatekeeper):
         gatekeeper.authenticate_user(message, signature.encode())
 
 
-def test_update_available_slots(gatekeeper):
-    # update_available_slots should decrease the slot count if a new appointment is added
+def test_add_update_appointment(gatekeeper):
+    # add_update_appointment should decrease the slot count if a new appointment is added
     # let's add a new user
     sk, pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(pk)
     gatekeeper.add_update_user(user_id)
 
-    # And now update the slots given an appointment
+    # And now update add a new appointment
     appointment, _ = generate_dummy_appointment()
-    gatekeeper.update_available_slots(user_id, appointment.get_summary())
+    appointment_uuid = get_random_value_hex(16)
+    remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment)
 
     # This is a standard size appointment, so it should have reduced the slots by one
-    assert gatekeeper.registered_users[user_id].available_slots == config.get("DEFAULT_SLOTS") - 1
+    assert appointment_uuid in gatekeeper.registered_users[user_id].appointments
+    assert remaining_slots == config.get("DEFAULT_SLOTS") - 1
 
-    # Updates can leave the count as it, decrease it, or increase it, depending on the appointment size (modulo
+    # Updates can leave the count as is, decrease it, or increase it, depending on the appointment size (modulo
     # ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
     # Appointments of the same size leave it as is
     appointment_same_size, _ = generate_dummy_appointment()
-    remaining_slots = gatekeeper.update_available_slots(
-        user_id, appointment.get_summary(), appointment_same_size.get_summary()
-    )
+    remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment)
+    assert appointment_uuid in gatekeeper.registered_users[user_id].appointments
     assert remaining_slots == config.get("DEFAULT_SLOTS") - 1
 
     # Bigger appointments decrease it
     appointment_x2_size = appointment_same_size
     appointment_x2_size.encrypted_blob = "A" * (ENCRYPTED_BLOB_MAX_SIZE_HEX + 1)
-    remaining_slots = gatekeeper.update_available_slots(
-        user_id, appointment_x2_size.get_summary(), appointment.get_summary()
-    )
+    remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment_x2_size)
+    assert appointment_uuid in gatekeeper.registered_users[user_id].appointments
     assert remaining_slots == config.get("DEFAULT_SLOTS") - 2
 
-    # Smaller appointments increase it (using the same data but flipped)
-    remaining_slots = gatekeeper.update_available_slots(
-        user_id, appointment.get_summary(), appointment_x2_size.get_summary()
-    )
+    # Smaller appointments increase it
+    remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment)
     assert remaining_slots == config.get("DEFAULT_SLOTS") - 1
 
     # If the appointment needs more slots than there's free, it should fail
     gatekeeper.registered_users[user_id].available_slots = 1
+    appointment_uuid = get_random_value_hex(16)
     with pytest.raises(NotEnoughSlots):
-        gatekeeper.update_available_slots(user_id, appointment_x2_size.get_summary())
+        gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment_x2_size)
 
 
 def test_get_expired_appointments(gatekeeper):
