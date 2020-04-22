@@ -217,8 +217,9 @@ def test_do_watch(watcher, temp_db_manager):
 
     # Add the appointments
     for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "user_id": user_id, "size": 200}
-        watcher.gatekeeper.registered_users[user_id].appointments.append(uuid)
+        watcher.appointments[uuid] = {"locator": appointment.locator, "user_id": user_id}
+        # Assume the appointment only takes one slot
+        watcher.gatekeeper.registered_users[user_id].appointments[uuid] = 1
         watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
@@ -237,8 +238,10 @@ def test_do_watch(watcher, temp_db_manager):
     # The rest of appointments will timeout after the subscription times-out (9 more blocks) + EXPIRY_DELTA
     # Wait for an additional block to be safe
     generate_blocks_w_delay(10 + config.get("EXPIRY_DELTA"))
-
     assert len(watcher.appointments) == 0
+
+    # Check that they are not in the Gatekeeper either, only the two that passed to the Responder should remain
+    assert len(watcher.gatekeeper.registered_users[user_id].appointments) == 2
 
     # FIXME: We should also add cases where the transactions are invalid. bitcoind_mock needs to be extended for this.
 

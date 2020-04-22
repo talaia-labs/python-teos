@@ -44,8 +44,8 @@ class Watcher:
 
     Attributes:
         appointments (:obj:`dict`): a dictionary containing a summary of the appointments (:obj:`ExtendedAppointment
-            <teos.extended_appointment.ExtendedAppointment>` instances) accepted by the tower (``locator``,
-            ``user_id``, and ``size``). It's populated trough ``add_appointment``.
+            <teos.extended_appointment.ExtendedAppointment>` instances) accepted by the tower (``locator`` and
+            ``user_id``). It's populated trough ``add_appointment``.
         locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
@@ -59,7 +59,6 @@ class Watcher:
         responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
         signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
         max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
-        expiry_delta (:obj:`int`): the additional time the ``Watcher`` will keep an expired appointment around.
         last_known_block (:obj:`str`): the last block known by the ``Watcher``.
 
     Raises:
@@ -131,11 +130,8 @@ class Watcher:
         # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
         uuid = hash_160("{}{}".format(appointment.locator, user_id))
 
-        # The third argument is the previous version of the same appointment (optional, returns None if missing)
-        available_slots = self.gatekeeper.update_available_slots(
-            user_id, appointment.get_summary(), self.appointments.get(uuid)
-        )
-        self.gatekeeper.registered_users[user_id].appointments.append(uuid)
+        # Add the appointment to the Gatekeeper
+        available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, appointment)
         self.appointments[uuid] = appointment.get_summary()
 
         if appointment.locator in self.locator_uuid_map:
@@ -191,6 +187,11 @@ class Watcher:
                 # Make sure we only try to delete what is on the Watcher (some appointments may have been triggered)
                 expired_appointments = list(set(expired_appointments).intersection(self.appointments.keys()))
 
+                # Keep track of the expired appointments before deleting them from memory
+                appointments_to_delete_gatekeeper = {
+                    uuid: self.appointments[uuid].get("user_id") for uuid in expired_appointments
+                }
+
                 Cleaner.delete_expired_appointments(
                     expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
@@ -230,9 +231,17 @@ class Watcher:
                 appointments_to_delete.extend(invalid_breaches)
                 self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
 
+                # Update the dictionary with the completed appointments
+                appointments_to_delete_gatekeeper.update(
+                    {uuid: self.appointments[uuid].get("user_id") for uuid in appointments_to_delete}
+                )
+
                 Cleaner.delete_completed_appointments(
                     appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                 )
+
+                # Remove expired and completed appointments from the Gatekeeper
+                Cleaner.delete_gatekeeper_appointments(self.gatekeeper, appointments_to_delete_gatekeeper)
 
                 if len(self.appointments) != 0:
                     logger.info("No more pending appointments")
