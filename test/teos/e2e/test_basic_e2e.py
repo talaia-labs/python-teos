@@ -11,9 +11,13 @@ from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
+
+from teos import DEFAULT_CONF as TEOS_CONF
+from teos import DATA_DIR as TEOS_DATA_DIR
+from teos import CONF_FILE_NAME as TEOS_CONF_FILE_NAME
 from teos.utils.auth_proxy import JSONRPCException
+
 from test.teos.e2e.conftest import (
-    END_TIME_DELTA,
     build_appointment_data,
     get_random_value_hex,
     create_penalty_tx,
@@ -23,6 +27,8 @@ from test.teos.e2e.conftest import (
 )
 
 cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
+teos_config = get_config(TEOS_DATA_DIR, TEOS_CONF_FILE_NAME, TEOS_CONF)
+
 
 teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
@@ -32,9 +38,7 @@ teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_
 # Run teosd
 teosd_process = run_teosd()
 
-teos_pk, cli_sk, compressed_cli_pk = teos_cli.load_keys(
-    cli_config.get("TEOS_PUBLIC_KEY"), cli_config.get("CLI_PRIVATE_KEY")
-)
+teos_id, user_sk, user_id = teos_cli.load_keys(cli_config.get("TEOS_PUBLIC_KEY"), cli_config.get("CLI_PRIVATE_KEY"))
 
 
 def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
@@ -43,13 +47,13 @@ def broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, addr):
     bitcoin_cli.generatetoaddress(1, addr)
 
 
-def get_appointment_info(locator, sk=cli_sk):
+def get_appointment_info(locator, sk=user_sk):
     sleep(1)  # Let's add a bit of delay so the state can be updated
-    return teos_cli.get_appointment(locator, sk, teos_pk, teos_base_endpoint)
+    return teos_cli.get_appointment(locator, sk, teos_id, teos_base_endpoint)
 
 
-def add_appointment(appointment_data, sk=cli_sk):
-    return teos_cli.add_appointment(appointment_data, sk, teos_pk, teos_base_endpoint)
+def add_appointment(appointment_data, sk=user_sk):
+    return teos_cli.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
 
 
 def get_all_appointments():
@@ -63,7 +67,7 @@ def test_commands_non_registered(bitcoin_cli):
     # Add appointment
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 
     with pytest.raises(TowerResponseError):
         assert add_appointment(appointment_data)
@@ -75,12 +79,12 @@ def test_commands_non_registered(bitcoin_cli):
 
 def test_commands_registered(bitcoin_cli):
     # Test registering and trying again
-    teos_cli.register(compressed_cli_pk, teos_base_endpoint)
+    teos_cli.register(user_id, teos_base_endpoint)
 
     # Add appointment
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 
     appointment, available_slots = add_appointment(appointment_data)
     assert isinstance(appointment, Appointment) and isinstance(available_slots, str)
@@ -93,14 +97,15 @@ def test_commands_registered(bitcoin_cli):
 
 def test_appointment_life_cycle(bitcoin_cli):
     # First of all we need to register
-    teos_cli.register(compressed_cli_pk, teos_base_endpoint)
+    response = teos_cli.register(user_id, teos_base_endpoint)
+    available_slots = response.get("available_slots")
 
     # After that we can build an appointment and send it to the tower
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
-    appointment, available_slots = add_appointment(appointment_data)
+    appointment, signature = add_appointment(appointment_data)
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
@@ -137,13 +142,17 @@ def test_appointment_life_cycle(bitcoin_cli):
         # If the transaction is not found.
         assert False
 
-    # Now let's mine some blocks so the appointment reaches its end.
-    for _ in range(END_TIME_DELTA):
-        bitcoin_cli.generatetoaddress(1, new_addr)
+    # Now let's mine some blocks so the appointment reaches its end. We need 100 + EXPIRY_DELTA -1
+    bitcoin_cli.generatetoaddress(100 + teos_config.get("EXPIRY_DELTA") - 1, new_addr)
 
     # The appointment is no longer in the tower
     with pytest.raises(TowerResponseError):
         get_appointment_info(locator)
+
+    # Check that the appointment is not in the Gatekeeper by checking the available slots (should have increase by 1)
+    # We can do so by topping up the subscription (FIXME: find a better way to check this).
+    response = teos_cli.register(user_id, teos_base_endpoint)
+    assert response.get("available_slots") == available_slots + teos_config.get("DEFAULT_SLOTS") + 1
 
 
 def test_multiple_appointments_life_cycle(bitcoin_cli):
@@ -156,7 +165,7 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
     # Create five appointments.
     for commitment_tx, penalty_tx in zip(commitment_txs, penalty_txs):
         commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-        appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+        appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 
         locator = compute_locator(commitment_tx_id)
         appointment = {
@@ -190,9 +199,8 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
     assert set(responder_locators) == set(breached_appointments)
 
     new_addr = bitcoin_cli.getnewaddress()
-    # Now let's mine some blocks so the appointment reaches its end.
-    for _ in range(END_TIME_DELTA):
-        bitcoin_cli.generatetoaddress(1, new_addr)
+    # Now let's mine some blocks so the appointment reaches its end. We need 100 + EXPIRY_DELTA -1
+    bitcoin_cli.generatetoaddress(100 + teos_config.get("EXPIRY_DELTA") - 1, new_addr)
 
     # The appointment is no longer in the tower
     with pytest.raises(TowerResponseError):
@@ -210,7 +218,7 @@ def test_appointment_malformed_penalty(bitcoin_cli):
     mod_penalty_tx = mod_penalty_tx.copy(tx_ins=[tx_in])
 
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, mod_penalty_tx.hex())
+    appointment_data = build_appointment_data(commitment_tx_id, mod_penalty_tx.hex())
     locator = compute_locator(commitment_tx_id)
 
     appointment, _ = add_appointment(appointment_data)
@@ -236,7 +244,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
 
     # The appointment data is built using a random 32-byte value.
-    appointment_data = build_appointment_data(bitcoin_cli, get_random_value_hex(32), penalty_tx)
+    appointment_data = build_appointment_data(get_random_value_hex(32), penalty_tx)
 
     # We cannot use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
     # We will encrypt the blob using the random value and derive the locator from the commitment tx.
@@ -244,7 +252,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(penalty_tx, get_random_value_hex(32))
     appointment = Appointment.from_dict(appointment_data)
 
-    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
+    signature = Cryptographer.sign(appointment.serialize(), user_sk)
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
     # Send appointment to the server.
@@ -254,7 +262,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     # Check that the server has accepted the appointment
     signature = response_json.get("signature")
     rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-    assert teos_pk == Cryptographer.get_compressed_pk(rpk)
+    assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
 
     # Trigger the appointment
@@ -273,7 +281,7 @@ def test_two_identical_appointments(bitcoin_cli):
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
 
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
     # Send the appointment twice
@@ -301,22 +309,22 @@ def test_two_identical_appointments(bitcoin_cli):
 #     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
 #     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
 #
-#     appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+#     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 #     locator = compute_locator(commitment_tx_id)
 #
 #     # tmp keys from a different user
-#     tmp_sk = PrivateKey()
-#     tmp_compressed_pk = hexlify(tmp_sk.public_key.format(compressed=True)).decode("utf-8")
-#     teos_cli.register(tmp_compressed_pk, teos_base_endpoint)
+#     tmp_user_sk = PrivateKey()
+#     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
+#     teos_cli.register(tmp_user_id, teos_base_endpoint)
 #
 #     # Send the appointment twice
 #     assert add_appointment(appointment_data) is True
-#     assert add_appointment(appointment_data, sk=tmp_sk) is True
+#     assert add_appointment(appointment_data, sk=tmp_user_sk) is True
 #
 #     # Check that we can get it from both users
 #     appointment_info = get_appointment_info(locator)
 #     assert appointment_info.get("status") == "being_watched"
-#     appointment_info = get_appointment_info(locator, sk=tmp_sk)
+#     appointment_info = get_appointment_info(locator, sk=tmp_user_sk)
 #     assert appointment_info.get("status") == "being_watched"
 #
 #     # Broadcast the commitment transaction and mine a block
@@ -326,7 +334,7 @@ def test_two_identical_appointments(bitcoin_cli):
 #     # The last appointment should have made it to the Responder
 #     sleep(1)
 #     appointment_info = get_appointment_info(locator)
-#     appointment_dup_info = get_appointment_info(locator, sk=tmp_sk)
+#     appointment_dup_info = get_appointment_info(locator, sk=tmp_user_sk)
 #
 #     # One of the two request must be None, while the other must be valid
 #     assert (appointment_info is None and appointment_dup_info is not None) or (
@@ -349,17 +357,17 @@ def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_
     new_addr = bitcoin_cli.getnewaddress()
     penalty_tx2 = create_penalty_tx(bitcoin_cli, decoded_commitment_tx, new_addr)
 
-    appointment1_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx1)
-    appointment2_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx2)
+    appointment1_data = build_appointment_data(commitment_tx_id, penalty_tx1)
+    appointment2_data = build_appointment_data(commitment_tx_id, penalty_tx2)
     locator = compute_locator(commitment_tx_id)
 
     # tmp keys for a different user
-    tmp_sk = PrivateKey()
-    tmp_compressed_pk = hexlify(tmp_sk.public_key.format(compressed=True)).decode("utf-8")
-    teos_cli.register(tmp_compressed_pk, teos_base_endpoint)
+    tmp_user_sk = PrivateKey()
+    tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
+    teos_cli.register(tmp_user_id, teos_base_endpoint)
 
     appointment, _ = add_appointment(appointment1_data)
-    appointment_2, _ = add_appointment(appointment2_data, sk=tmp_sk)
+    appointment_2, _ = add_appointment(appointment2_data, sk=tmp_user_sk)
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -370,7 +378,7 @@ def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_
     appointment_info = None
     with pytest.raises(TowerResponseError):
         appointment_info = get_appointment_info(locator)
-        appointment2_info = get_appointment_info(locator, sk=tmp_sk)
+        appointment2_info = get_appointment_info(locator, sk=tmp_user_sk)
 
     if appointment_info is None:
         appointment_info = appointment2_info
@@ -388,7 +396,7 @@ def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
 
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
     appointment, _ = add_appointment(appointment_data)
@@ -421,7 +429,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(bitcoin_cli):
 
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
-    appointment_data = build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx)
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
     appointment, _ = add_appointment(appointment_data)

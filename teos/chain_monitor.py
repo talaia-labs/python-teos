@@ -20,14 +20,14 @@ class ChainMonitor:
     Args:
         watcher_queue (:obj:`Queue`): the queue to be used to send blocks hashes to the ``Watcher``.
         responder_queue (:obj:`Queue`): the queue to be used to send blocks hashes to the ``Responder``.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a blockProcessor instance.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance.
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
     Attributes:
         best_tip (:obj:`str`): a block hash representing the current best tip.
         last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         terminate (:obj:`bool`): a flag to signal the termination of the :class:`ChainMonitor` (shutdown the tower).
-        check_tip (:obj:`Event`): an event that's triggered at fixed time intervals and controls the polling thread.
+        check_tip (:obj:`Event`): an event that is triggered at fixed time intervals and controls the polling thread.
         lock (:obj:`Condition`): a lock used to protect concurrent access to the queues and ``best_tip`` by the zmq and
             polling threads.
         zmqSubSocket (:obj:`socket`): a socket to connect to ``bitcoind`` via ``zmq``.

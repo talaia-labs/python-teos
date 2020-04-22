@@ -8,5 +8,8 @@ HTTP_BAD_REQUEST = 400
 HTTP_NOT_FOUND = 404
 HTTP_SERVICE_UNAVAILABLE = 503
 
+# LN general nomenclature
+IRREVOCABLY_RESOLVED = 100
+
 # Temporary constants, may be changed
 ENCRYPTED_BLOB_MAX_SIZE_HEX = 2 * 2048

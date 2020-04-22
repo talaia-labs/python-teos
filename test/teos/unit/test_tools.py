@@ -13,13 +13,7 @@ def test_can_connect_to_bitcoind():
     assert can_connect_to_bitcoind(bitcoind_connect_params) is True
 
 
-# def test_can_connect_to_bitcoind_bitcoin_not_running():
-#     # Kill the simulator thread and test the check fails
-#     bitcoind_process.kill()
-#     assert can_connect_to_bitcoind() is False
-
-
-def test_bitcoin_cli():
+def test_bitcoin_cli(run_bitcoind):
     try:
         bitcoin_cli(bitcoind_connect_params).help()
         assert True

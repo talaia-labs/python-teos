@@ -4,20 +4,21 @@ from shutil import rmtree
 from threading import Thread
 from coincurve import PrivateKey
 
-from teos import LOG_PREFIX
 from teos.carrier import Carrier
-from teos.watcher import Watcher
 from teos.tools import bitcoin_cli
 from teos.responder import Responder
+from teos.gatekeeper import UserInfo
 from teos.chain_monitor import ChainMonitor
 from teos.appointments_dbm import AppointmentsDBM
 from teos.block_processor import BlockProcessor
+from teos.watcher import Watcher, AppointmentLimitReached
+from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots
 
 from common.tools import compute_locator
 from common.cryptographer import Cryptographer
 
 from test.teos.unit.conftest import (
-    generate_blocks,
+    generate_blocks_w_delay,
     generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
@@ -27,8 +28,6 @@ from test.teos.unit.conftest import (
 )
 
 APPOINTMENTS = 5
-START_TIME_OFFSET = 1
-END_TIME_OFFSET = 1
 TEST_SET_SIZE = 200
 
 config = get_config()
@@ -51,14 +50,12 @@ def temp_db_manager():
 
 
 @pytest.fixture(scope="module")
-def watcher(db_manager):
+def watcher(db_manager, gatekeeper):
     block_processor = BlockProcessor(bitcoind_connect_params)
     carrier = Carrier(bitcoind_connect_params)
 
-    responder = Responder(db_manager, carrier, block_processor)
-    watcher = Watcher(
-        db_manager, block_processor, responder, signing_key.to_der(), MAX_APPOINTMENTS, config.get("EXPIRY_DELTA")
-    )
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+    watcher = Watcher(db_manager, gatekeeper, block_processor, responder, signing_key.to_der(), MAX_APPOINTMENTS)
 
     chain_monitor = ChainMonitor(
         watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
@@ -84,9 +81,7 @@ def create_appointments(n):
     dispute_txs = []
 
     for i in range(n):
-        appointment, dispute_tx = generate_dummy_appointment(
-            start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
-        )
+        appointment, dispute_tx = generate_dummy_appointment()
         uuid = uuid4().hex
 
         appointments[uuid] = appointment
@@ -100,85 +95,107 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
+    assert isinstance(watcher.db_manager, AppointmentsDBM)
+    assert isinstance(watcher.gatekeeper, Gatekeeper)
     assert isinstance(watcher.block_processor, BlockProcessor)
     assert isinstance(watcher.responder, Responder)
     assert isinstance(watcher.max_appointments, int)
-    assert isinstance(watcher.expiry_delta, int)
     assert isinstance(watcher.signing_key, PrivateKey)
 
 
-def test_get_appointment_summary(watcher):
-    # get_appointment_summary returns an appointment summary if found, else None.
-    random_uuid = get_random_value_hex(16)
-    appointment_summary = {"locator": get_random_value_hex(16), "end_time": 10, "size": 200}
-    watcher.appointments[random_uuid] = appointment_summary
-    assert watcher.get_appointment_summary(random_uuid) == appointment_summary
+def test_add_appointment_non_registered(watcher):
+    # Appointments from non-registered users should fail
+    user_sk, user_pk = generate_keypair()
 
-    # Requesting a non-existing appointment
-    assert watcher.get_appointment_summary(get_random_value_hex(16)) is None
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    with pytest.raises(AuthenticationFailure, match="User not found"):
+        watcher.add_appointment(appointment, appointment_signature)
+
+
+def test_add_appointment_no_slots(watcher):
+    # Appointments from register users with no available slots should aso fail
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=0, subscription_expiry=10)
+
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    with pytest.raises(NotEnoughSlots):
+        watcher.add_appointment(appointment, appointment_signature)
 
 
 def test_add_appointment(watcher):
-    # We should be able to add appointments up to the limit
-    for _ in range(10):
-        appointment, dispute_tx = generate_dummy_appointment(
-            start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
-        )
-        user_pk = get_random_value_hex(33)
+    # Simulate the user is registered
+    user_sk, user_pk = generate_keypair()
+    available_slots = 100
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=available_slots, subscription_expiry=10)
 
-        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
-        assert added_appointment is True
-        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(appointment.serialize(), sig)
-        )
+    response = watcher.add_appointment(appointment, appointment_signature)
+    assert response.get("locator") == appointment.locator
+    assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+        Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+    )
+    assert response.get("available_slots") == available_slots - 1
 
-        # Check that we can also add an already added appointment (same locator)
-        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
+    # Check that we can also add an already added appointment (same locator)
+    response = watcher.add_appointment(appointment, appointment_signature)
+    assert response.get("locator") == appointment.locator
+    assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+        Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+    )
+    # The slot count should not have been reduced and only one copy is kept.
+    assert response.get("available_slots") == available_slots - 1
+    assert len(watcher.locator_uuid_map[appointment.locator]) == 1
 
-        assert added_appointment is True
-        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(appointment.serialize(), sig)
-        )
+    # If two appointments with the same locator come from different users, they are kept.
+    another_user_sk, another_user_pk = generate_keypair()
+    another_user_id = Cryptographer.get_compressed_pk(another_user_pk)
+    watcher.gatekeeper.registered_users[another_user_id] = UserInfo(
+        available_slots=available_slots, subscription_expiry=10
+    )
 
-        # If two appointments with the same locator from the same user are added, they are overwritten, but if they come
-        # from different users, they are kept.
-        assert len(watcher.locator_uuid_map[appointment.locator]) == 1
-
-        different_user_pk = get_random_value_hex(33)
-        added_appointment, sig = watcher.add_appointment(appointment, different_user_pk)
-        assert added_appointment is True
-        assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(appointment.serialize(), sig)
-        )
-        assert len(watcher.locator_uuid_map[appointment.locator]) == 2
+    appointment_signature = Cryptographer.sign(appointment.serialize(), another_user_sk)
+    response = watcher.add_appointment(appointment, appointment_signature)
+    assert response.get("locator") == appointment.locator
+    assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
+        Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+    )
+    assert response.get("available_slots") == available_slots - 1
+    assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
 
 def test_add_too_many_appointments(watcher):
-    # Any appointment on top of those should fail
+    # Simulate the user is registered
+    user_sk, user_pk = generate_keypair()
+    available_slots = 100
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=available_slots, subscription_expiry=10)
+
+    # Appointments on top of the limit should be rejected
     watcher.appointments = dict()
 
-    for _ in range(MAX_APPOINTMENTS):
-        appointment, dispute_tx = generate_dummy_appointment(
-            start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
-        )
-        user_pk = get_random_value_hex(33)
+    for i in range(MAX_APPOINTMENTS):
+        appointment, dispute_tx = generate_dummy_appointment()
+        appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
-        added_appointment, sig = watcher.add_appointment(appointment, user_pk)
-
-        assert added_appointment is True
+        response = watcher.add_appointment(appointment, appointment_signature)
+        assert response.get("locator") == appointment.locator
         assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(appointment.serialize(), sig)
+            Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
         )
+        assert response.get("available_slots") == available_slots - (i + 1)
 
-    appointment, dispute_tx = generate_dummy_appointment(
-        start_time_offset=START_TIME_OFFSET, end_time_offset=END_TIME_OFFSET
-    )
-    user_pk = get_random_value_hex(33)
-    added_appointment, sig = watcher.add_appointment(appointment, user_pk)
-
-    assert added_appointment is False
-    assert sig is None
+    with pytest.raises(AppointmentLimitReached):
+        appointment, dispute_tx = generate_dummy_appointment()
+        appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+        watcher.add_appointment(appointment, appointment_signature)
 
 
 def test_do_watch(watcher, temp_db_manager):
@@ -190,9 +207,19 @@ def test_do_watch(watcher, temp_db_manager):
     # Set the data into the Watcher and in the db
     watcher.locator_uuid_map = locator_uuid_map
     watcher.appointments = {}
+    watcher.gatekeeper.registered_users = {}
 
+    # Simulate a register (times out in 10 bocks)
+    user_id = get_random_value_hex(16)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=100, subscription_expiry=watcher.block_processor.get_block_count() + 10
+    )
+
+    # Add the appointments
     for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time, "size": 200}
+        watcher.appointments[uuid] = {"locator": appointment.locator, "user_id": user_id}
+        # Assume the appointment only takes one slot
+        watcher.gatekeeper.registered_users[user_id].appointments[uuid] = 1
         watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
 
@@ -203,16 +230,20 @@ def test_do_watch(watcher, temp_db_manager):
     for dispute_tx in dispute_txs[:2]:
         bitcoin_cli(bitcoind_connect_params).sendrawtransaction(dispute_tx)
 
-    # After generating enough blocks, the number of appointments should have reduced by two
-    generate_blocks(START_TIME_OFFSET + END_TIME_OFFSET)
+    # After generating a block, the appointment count should have been reduced by 2 (two breaches)
+    generate_blocks_w_delay(1)
 
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
-    # The rest of appointments will timeout after the end (2) + EXPIRY_DELTA
+    # The rest of appointments will timeout after the subscription times-out (9 more blocks) + EXPIRY_DELTA
     # Wait for an additional block to be safe
-    generate_blocks(config.get("EXPIRY_DELTA") + START_TIME_OFFSET + END_TIME_OFFSET)
-
+    generate_blocks_w_delay(10 + config.get("EXPIRY_DELTA"))
     assert len(watcher.appointments) == 0
+
+    # Check that they are not in the Gatekeeper either, only the two that passed to the Responder should remain
+    assert len(watcher.gatekeeper.registered_users[user_id].appointments) == 2
+
+    # FIXME: We should also add cases where the transactions are invalid. bitcoind_mock needs to be extended for this.
 
 
 def test_get_breaches(watcher, txids, locator_uuid_map):
@@ -234,7 +265,7 @@ def test_get_breaches_random_data(watcher, locator_uuid_map):
     assert len(potential_breaches) == 0
 
 
-def test_filter_valid_breaches_random_data(watcher):
+def test_filter_breaches_random_data(watcher):
     appointments = {}
     locator_uuid_map = {}
     breaches = {}
@@ -242,7 +273,7 @@ def test_filter_valid_breaches_random_data(watcher):
     for i in range(TEST_SET_SIZE):
         dummy_appointment, _ = generate_dummy_appointment()
         uuid = uuid4().hex
-        appointments[uuid] = {"locator": dummy_appointment.locator, "end_time": dummy_appointment.end_time}
+        appointments[uuid] = {"locator": dummy_appointment.locator, "user_id": dummy_appointment.user_id}
         watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
         watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
@@ -255,7 +286,7 @@ def test_filter_valid_breaches_random_data(watcher):
     watcher.locator_uuid_map = locator_uuid_map
     watcher.appointments = appointments
 
-    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
 
     # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
     assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
@@ -282,13 +313,13 @@ def test_filter_valid_breaches(watcher):
     breaches = {dummy_appointment.locator: dispute_txid}
 
     for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "end_time": appointment.end_time}
+        watcher.appointments[uuid] = {"locator": appointment.locator, "user_id": appointment.user_id}
         watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
         watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
 
     watcher.locator_uuid_map = locator_uuid_map
 
-    valid_breaches, invalid_breaches = watcher.filter_valid_breaches(breaches)
+    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
 
     # We have "triggered" a single breach and it was valid.
     assert len(invalid_breaches) == 0 and len(valid_breaches) == 1

@@ -2,8 +2,10 @@ from queue import Queue
 from threading import Thread
 
 from teos import LOG_PREFIX
-from common.logger import Logger
 from teos.cleaner import Cleaner
+
+from common.logger import Logger
+from common.constants import IRREVOCABLY_RESOLVED
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
@@ -26,16 +28,15 @@ class TransactionTracker:
         dispute_txid (:obj:`str`): the id of the transaction that created the channel breach and triggered the penalty.
         penalty_txid (:obj:`str`): the id of the transaction that was encrypted under ``dispute_txid``.
         penalty_rawtx (:obj:`str`): the raw transaction that was broadcast as a consequence of the channel breach.
-        appointment_end (:obj:`int`): the block at which the tower will stop monitoring the blockchain for this
-            appointment.
+        user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
     """
 
-    def __init__(self, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end):
+    def __init__(self, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id):
         self.locator = locator
         self.dispute_txid = dispute_txid
         self.penalty_txid = penalty_txid
         self.penalty_rawtx = penalty_rawtx
-        self.appointment_end = appointment_end
+        self.user_id = user_id
 
     @classmethod
     def from_dict(cls, tx_tracker_data):
@@ -60,13 +61,13 @@ class TransactionTracker:
         dispute_txid = tx_tracker_data.get("dispute_txid")
         penalty_txid = tx_tracker_data.get("penalty_txid")
         penalty_rawtx = tx_tracker_data.get("penalty_rawtx")
-        appointment_end = tx_tracker_data.get("appointment_end")
+        user_id = tx_tracker_data.get("user_id")
 
-        if any(v is None for v in [locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end]):
+        if any(v is None for v in [locator, dispute_txid, penalty_txid, penalty_rawtx, user_id]):
             raise ValueError("Wrong transaction tracker data, some fields are missing")
 
         else:
-            tx_tracker = cls(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+            tx_tracker = cls(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
 
         return tx_tracker
 
@@ -83,10 +84,20 @@ class TransactionTracker:
             "dispute_txid": self.dispute_txid,
             "penalty_txid": self.penalty_txid,
             "penalty_rawtx": self.penalty_rawtx,
-            "appointment_end": self.appointment_end,
+            "user_id": self.user_id,
         }
 
         return tx_tracker
+
+    def get_summary(self):
+        """
+        Returns the summary of a tracker, consisting on the locator, the user_id and the penalty_txid.
+
+        Returns:
+            :obj:`dict`: the appointment summary.
+        """
+
+        return {"locator": self.locator, "user_id": self.user_id, "penalty_txid": self.penalty_txid}
 
 
 class Responder:
@@ -104,7 +115,7 @@ class Responder:
 
     Attributes:
         trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
-            required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``end_time``).
+            required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``user_id``).
             Each entry is identified by a ``uuid``.
         tx_tracker_map (:obj:`dict`): A ``penalty_txid:uuid`` map used to allow the :obj:`Responder` to deal with
             several trackers triggered by the same ``penalty_txid``.
@@ -115,19 +126,22 @@ class Responder:
         is populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
         db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
             to interact with the database.
+        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the
+            user access and subscription expiry.
         carrier (:obj:`Carrier <teos.carrier.Carrier>`): a ``Carrier`` instance to send transactions to bitcoind.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get data from bitcoind.
         last_known_block (:obj:`str`): the last block known by the ``Responder``.
     """
 
-    def __init__(self, db_manager, carrier, block_processor):
+    def __init__(self, db_manager, gatekeeper, carrier, block_processor):
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
         self.missed_confirmations = dict()
         self.block_queue = Queue()
         self.db_manager = db_manager
+        self.gatekeeper = gatekeeper
         self.carrier = carrier
         self.block_processor = block_processor
         self.last_known_block = db_manager.load_last_block_hash_responder()
@@ -169,7 +183,7 @@ class Responder:
 
         return synchronized
 
-    def handle_breach(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, block_hash):
+    def handle_breach(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, block_hash):
         """
         Requests the :obj:`Responder` to handle a channel breach. This is the entry point of the :obj:`Responder`.
 
@@ -179,8 +193,7 @@ class Responder:
             dispute_txid (:obj:`str`): the id of the transaction that created the channel breach.
             penalty_txid (:obj:`str`): the id of the decrypted transaction included in the appointment.
             penalty_rawtx (:obj:`str`): the raw transaction to be broadcast in response of the breach.
-            appointment_end (:obj:`int`): the block height at which the :obj:`Responder` will stop monitoring for this
-                penalty transaction.
+            user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
             block_hash (:obj:`str`): the block hash at which the breach was seen (used to see if we are on sync).
 
         Returns:
@@ -191,9 +204,7 @@ class Responder:
         receipt = self.carrier.send_transaction(penalty_rawtx, penalty_txid)
 
         if receipt.delivered:
-            self.add_tracker(
-                uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, receipt.confirmations
-            )
+            self.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, receipt.confirmations)
 
         else:
             # TODO: Add the missing reasons (e.g. RPC_VERIFY_REJECTED)
@@ -204,7 +215,7 @@ class Responder:
 
         return receipt
 
-    def add_tracker(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations=0):
+    def add_tracker(self, uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, confirmations=0):
         """
         Creates a :obj:`TransactionTracker` after successfully broadcasting a ``penalty_tx``.
 
@@ -217,20 +228,15 @@ class Responder:
             dispute_txid (:obj:`str`): the id of the transaction that created the channel breach.
             penalty_txid (:obj:`str`): the id of the decrypted transaction included in the appointment.
             penalty_rawtx (:obj:`str`): the raw transaction to be broadcast.
-            appointment_end (:obj:`int`): the block height at which the :obj:`Responder` will stop monitoring for the
-                tracker.
+            user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
             confirmations (:obj:`int`): the confirmation count of the ``penalty_tx``. In normal conditions it will be
                 zero, but if the transaction is already on the blockchain this won't be the case.
         """
 
-        tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+        tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
 
-        # We only store the penalty_txid, locator and appointment_end in memory. The rest is dumped into the db.
-        self.trackers[uuid] = {
-            "penalty_txid": tracker.penalty_txid,
-            "locator": locator,
-            "appointment_end": appointment_end,
-        }
+        # We only store the penalty_txid, locator and user_id in memory. The rest is dumped into the db.
+        self.trackers[uuid] = tracker.get_summary()
 
         if penalty_txid in self.tx_tracker_map:
             self.tx_tracker_map[penalty_txid].append(uuid)
@@ -244,9 +250,7 @@ class Responder:
 
         self.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
-        logger.info(
-            "New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, appointment_end=appointment_end
-        )
+        logger.info("New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, user_id=user_id)
 
     def do_watch(self):
         """
@@ -269,17 +273,28 @@ class Responder:
             if len(self.trackers) > 0 and block is not None:
                 txids = block.get("tx")
 
+                completed_trackers = self.get_completed_trackers()
+                expired_trackers = self.get_expired_trackers(block.get("height"))
+                trackers_to_delete_gatekeeper = {
+                    uuid: self.trackers[uuid].get("user_id") for uuid in completed_trackers + expired_trackers
+                }
+
                 if self.last_known_block == block.get("previousblockhash"):
                     self.check_confirmations(txids)
-
-                    height = block.get("height")
-                    completed_trackers = self.get_completed_trackers(height)
-                    Cleaner.delete_completed_trackers(
-                        completed_trackers, height, self.trackers, self.tx_tracker_map, self.db_manager
+                    Cleaner.delete_trackers(
+                        completed_trackers, block.get("height"), self.trackers, self.tx_tracker_map, self.db_manager
                     )
+                    Cleaner.delete_trackers(
+                        expired_trackers,
+                        block.get("height"),
+                        self.trackers,
+                        self.tx_tracker_map,
+                        self.db_manager,
+                        expired=True,
+                    )
+                    Cleaner.delete_gatekeeper_appointments(self.gatekeeper, trackers_to_delete_gatekeeper)
 
-                    txs_to_rebroadcast = self.get_txs_to_rebroadcast()
-                    self.rebroadcast(txs_to_rebroadcast)
+                    self.rebroadcast(self.get_txs_to_rebroadcast())
 
                 # NOTCOVERED
                 else:
@@ -295,7 +310,7 @@ class Responder:
                 # Clear the receipts issued in this block
                 self.carrier.issued_receipts = {}
 
-                if len(self.trackers) != 0:
+                if len(self.trackers) == 0:
                     logger.info("No more pending trackers")
 
             # Register the last processed block for the responder
@@ -326,7 +341,6 @@ class Responder:
         for tx in self.unconfirmed_txs:
             if tx in self.missed_confirmations:
                 self.missed_confirmations[tx] += 1
-
             else:
                 self.missed_confirmations[tx] = 1
 
@@ -349,26 +363,24 @@ class Responder:
 
         return txs_to_rebroadcast
 
-    def get_completed_trackers(self, height):
+    def get_completed_trackers(self):
         """
-        Gets the trackers that has already been fulfilled based on a given height (``end_time`` was reached with a
-        minimum confirmation count).
-
-        Args:
-            height (:obj:`int`): the height of the last received block.
+        Gets the trackers that has already been fulfilled based on a given height (the justice transaction is
+        irrevocably resolved).
 
         Returns:
-            :obj:`dict`: a dict (``uuid:confirmations``) of the completed trackers.
+            :obj:`list`: a list of completed trackers uuids.
         """
 
-        completed_trackers = {}
+        completed_trackers = []
+        # FIXME: This is here for duplicated penalties, we should be able to get rid of it once we prevent duplicates in
+        #        the responder.
         checked_txs = {}
 
-        for uuid, tracker_data in self.trackers.items():
-            appointment_end = tracker_data.get("appointment_end")
-            penalty_txid = tracker_data.get("penalty_txid")
-            if appointment_end <= height and penalty_txid not in self.unconfirmed_txs:
-
+        # Avoiding dictionary changed size during iteration
+        for uuid in list(self.trackers.keys()):
+            penalty_txid = self.trackers[uuid].get("penalty_txid")
+            if penalty_txid not in self.unconfirmed_txs:
                 if penalty_txid not in checked_txs:
                     tx = self.carrier.get_transaction(penalty_txid)
                 else:
@@ -378,16 +390,37 @@ class Responder:
                     confirmations = tx.get("confirmations")
                     checked_txs[penalty_txid] = tx
 
-                    if confirmations is not None and confirmations >= MIN_CONFIRMATIONS:
-                        # The end of the appointment has been reached
-                        completed_trackers[uuid] = confirmations
+                    if confirmations is not None and confirmations >= IRREVOCABLY_RESOLVED:
+                        completed_trackers.append(uuid)
 
         return completed_trackers
 
+    def get_expired_trackers(self, height):
+        """
+        Gets trackers than are expired due to the user subscription expiring.
+
+        Only gets those trackers which penalty transaction is not going trough (probably because of low fees), the rest
+        will be eventually completed once they are irrevocably resolved.
+
+        Args:
+            height (:obj:`int`): the height of the last received block.
+
+        Returns:
+            :obj:`list`: a list of the expired trackers uuids.
+        """
+
+        expired_trackers = [
+            uuid
+            for uuid in self.gatekeeper.get_expired_appointments(height)
+            if self.trackers[uuid].get("penalty_txid") in self.unconfirmed_txs
+        ]
+
+        return expired_trackers
+
     def rebroadcast(self, txs_to_rebroadcast):
         """
-        Rebroadcasts a ``penalty_tx`` that has missed too many confirmations. In the current approach this would loop
-        forever if the transaction keeps not getting it.
+        Rebroadcasts a ``penalty_tx`` that has missed too many confirmations. In the current approach this will loop
+        until the tracker expires if the penalty transactions keeps getting rejected due to fees.
 
         Potentially, the fees could be bumped here if the transaction has some tower dedicated outputs (or allows it
         trough ``ANYONECANPAY`` or something similar).
@@ -436,7 +469,8 @@ class Responder:
 
         """
 
-        for uuid in self.trackers.keys():
+        # Avoiding dictionary changed size during iteration
+        for uuid in list(self.trackers.keys()):
             tracker = TransactionTracker.from_dict(self.db_manager.load_responder_tracker(uuid))
 
             # First we check if the dispute transaction is known (exists either in mempool or blockchain)
@@ -465,7 +499,7 @@ class Responder:
                         tracker.dispute_txid,
                         tracker.penalty_txid,
                         tracker.penalty_rawtx,
-                        tracker.appointment_end,
+                        tracker.user_id,
                         block_hash,
                     )
 
