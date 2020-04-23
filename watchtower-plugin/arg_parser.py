@@ -4,45 +4,34 @@ from common.tools import is_compressed_pk, is_locator, is_256b_hex_str
 from common.exceptions import InvalidParameter
 
 
-def parse_register_arguments(args, default_port):
-    # Sanity checks
-    if len(args) == 0:
-        raise InvalidParameter("missing required parameter: tower_id")
-
-    if len(args) > 3:
-        raise InvalidParameter("too many parameters: got {}, expected 3".format(len(args)))
-
-    tower_id = args[0]
-
+def parse_register_arguments(tower_id, host, port, config):
     if not isinstance(tower_id, str):
-        raise InvalidParameter("tower id must be a compressed public key (33-byte hex value) " + str(args))
+        raise InvalidParameter(
+            "tower id must be a compressed public key (33-byte hex value) not {}".format(str(tower_id))
+        )
 
     # tower_id is of the form tower_id@[ip][:][port]
     if "@" in tower_id:
-        if len(args) == 1:
-            tower_id, tower_endpoint = tower_id.split("@")
+        if not (host and port):
+            tower_id, tower_netaddr = tower_id.split("@")
 
-            if not tower_endpoint:
+            if not tower_netaddr:
                 raise InvalidParameter("no tower endpoint was provided")
 
-            # Only host was specified
-            if ":" not in tower_endpoint:
-                tower_endpoint = "{}:{}".format(tower_endpoint, default_port)
-
-            # Colons where specified but no port, defaulting
-            elif tower_endpoint.endswith(":"):
-                tower_endpoint = "{}{}".format(tower_endpoint, default_port)
+            # Only host was specified or colons where specified but not port
+            if ":" not in tower_netaddr or tower_netaddr.endswith(":"):
+                tower_netaddr = "{}:{}".format(tower_netaddr, config.get("DEFAULT_PORT"))
 
         else:
             raise InvalidParameter("cannot specify host as both xxx@yyy and separate arguments")
 
     # host was specified, but no port, defaulting
-    elif len(args) == 2:
-        tower_endpoint = "{}:{}".format(args[1], default_port)
+    elif host:
+        tower_netaddr = "{}:{}".format(host, config.get("DEFAULT_PORT"))
 
     # host and port specified
-    elif len(args) == 3:
-        tower_endpoint = "{}:{}".format(args[1], args[2])
+    elif host and port:
+        tower_netaddr = "{}:{}".format(host, port)
 
     else:
         raise InvalidParameter("tower host is missing")
@@ -50,23 +39,10 @@ def parse_register_arguments(args, default_port):
     if not is_compressed_pk(tower_id):
         raise InvalidParameter("tower id must be a compressed public key (33-byte hex value)")
 
-    return tower_id, tower_endpoint
+    return tower_id, tower_netaddr
 
 
-def parse_get_appointment_arguments(args):
-    # Sanity checks
-    if len(args) == 0:
-        raise InvalidParameter("missing required parameter: tower_id")
-
-    if len(args) == 1:
-        raise InvalidParameter("missing required parameter: locator")
-
-    if len(args) > 2:
-        raise InvalidParameter("too many parameters: got {}, expected 2".format(len(args)))
-
-    tower_id = args[0]
-    locator = args[1]
-
+def parse_get_appointment_arguments(tower_id, locator):
     if not is_compressed_pk(tower_id):
         raise InvalidParameter("tower id must be a compressed public key (33-byte hex value)")
 
