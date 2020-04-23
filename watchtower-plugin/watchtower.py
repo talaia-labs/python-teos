@@ -161,6 +161,13 @@ def list_towers(plugin):
     return towers_info
 
 
+@plugin.method("gettowerinfo", desc="List all towers registered towers.")
+def get_tower_info(plugin, tower_id):
+    tower_info = plugin.wt_client.db_manager.load_tower_record(tower_id)
+
+    return {"id": tower_id, **tower_info}
+
+
 @plugin.hook("commitment_revocation")
 def add_appointment(plugin, **kwargs):
     try:
