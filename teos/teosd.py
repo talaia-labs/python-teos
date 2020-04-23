@@ -50,7 +50,6 @@ def main(command_line_conf):
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     logger.info("Starting TEOS")
-    db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
 
     bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
     bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
@@ -77,7 +76,7 @@ def main(command_line_conf):
                 config.get("DEFAULT_SUBSCRIPTION_DURATION"),
                 config.get("EXPIRY_DELTA"),
             )
-
+            db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
             responder = Responder(db_manager, gatekeeper, carrier, block_processor)
             watcher = Watcher(
                 db_manager, gatekeeper, block_processor, responder, secret_key_der, config.get("MAX_APPOINTMENTS")
