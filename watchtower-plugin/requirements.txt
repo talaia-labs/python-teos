@@ -1,6 +1,6 @@
 pyln-client
 requests
 coincurve
-cryptography
+cryptography==2.8
 pyzbase32
 plyvel
