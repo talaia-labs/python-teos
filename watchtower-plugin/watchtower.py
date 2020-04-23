@@ -41,7 +41,7 @@ class WTClient:
 
         # Populate the towers dict with data from the db
         for tower_id, tower_info in self.db_manager.load_all_tower_records().items():
-            self.towers[tower_id] = TowerInfo.from_dict(tower_info)
+            self.towers[tower_id] = TowerInfo.from_dict(tower_info).get_summary()
 
 
 @plugin.init()
@@ -65,19 +65,21 @@ def init(options, configuration, plugin):
         raise IOError(error)
 
 
-@plugin.method("registertower", desc="Register your public key with the tower")
-def register(plugin, *args):
+@plugin.method("registertower", desc="Register your public key (user id) with the tower.")
+def register(plugin, tower_id, host=None, port=None):
     """
     Registers the user to the tower.
 
     Args:
         plugin (:obj:`Plugin`): this plugin.
-        args (:obj:`list`): a list of arguments. Must contain the tower_id and endpoint.
+        tower_id (:obj:`str`): the identifier of the tower to connect to (a compressed public key).
+        host (:obj:`str`): the ip or hostname to connect to, optional.
+        host (:obj:`int`): the port to connect to, optional.
 
-    Accepted input formats:
+    Accepted tower_id formats:
         - tower_id@host:port
-        - tower_id@host (will default port to DEFAULT_PORT)
         - tower_id host port
+        - tower_id@host (will default port to DEFAULT_PORT)
         - tower_id host (will default port to DEFAULT_PORT)
 
     Returns:
@@ -85,16 +87,14 @@ def register(plugin, *args):
     """
 
     try:
-        tower_id, tower_endpoint = arg_parser.parse_register_arguments(
-            args, plugin.wt_client.config.get("DEFAULT_PORT")
-        )
+        tower_id, tower_netaddr = arg_parser.parse_register_arguments(tower_id, host, port, plugin.wt_client.config)
 
         # Defaulting to http hosts for now
-        if not tower_endpoint.startswith("http"):
-            tower_endpoint = "http://" + tower_endpoint
+        if not tower_netaddr.startswith("http"):
+            tower_netaddr = "http://" + tower_netaddr
 
         # Send request to the server.
-        register_endpoint = "{}/register".format(tower_endpoint)
+        register_endpoint = "{}/register".format(tower_netaddr)
         data = {"public_key": plugin.wt_client.user_id}
 
         plugin.log("Registering in the Eye of Satoshi")
@@ -103,8 +103,8 @@ def register(plugin, *args):
         plugin.log("Registration succeeded. Available slots: {}".format(response.get("available_slots")))
 
         # Save data
-        tower_info = TowerInfo(tower_endpoint, response.get("available_slots"))
-        plugin.wt_client.towers[tower_id] = tower_info
+        tower_info = TowerInfo(tower_netaddr, response.get("available_slots"))
+        plugin.wt_client.towers[tower_id] = tower_info.get_summary()
         plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
 
         return response
@@ -114,14 +114,15 @@ def register(plugin, *args):
         return e.to_json()
 
 
-@plugin.method("getappointment", desc="Gets appointment data from the tower given a locator")
-def get_appointment(plugin, *args):
+@plugin.method("getappointment", desc="Gets appointment data from the tower given the tower id and the locator.")
+def get_appointment(plugin, tower_id, locator):
     """
     Gets information about an appointment from the tower.
 
     Args:
         plugin (:obj:`Plugin`): this plugin.
-        args (:obj:`list`): a list of arguments. Must contain a single argument, the locator.
+        tower_id (:obj:`str`): the identifier of the tower to query.
+        locator (:obj:`str`): the appointment locator.
 
     Returns:
         :obj:`dict`: a dictionary containing the appointment data.
@@ -130,7 +131,7 @@ def get_appointment(plugin, *args):
     # FIXME: All responses from the tower should be signed.
 
     try:
-        tower_id, locator = arg_parser.parse_get_appointment_arguments(args)
+        tower_id, locator = arg_parser.parse_get_appointment_arguments(tower_id, locator)
 
         if tower_id not in plugin.wt_client.towers:
             raise InvalidParameter("tower_id is not within the registered towers", tower_id=tower_id)
@@ -140,7 +141,7 @@ def get_appointment(plugin, *args):
         data = {"locator": locator, "signature": signature}
 
         # Send request to the server.
-        get_appointment_endpoint = "{}/get_appointment".format(plugin.wt_client.towers[tower_id].endpoint)
+        get_appointment_endpoint = "{}/get_appointment".format(plugin.wt_client.towers[tower_id].get("netaddr"))
         plugin.log("Requesting appointment from the Eye of Satoshi at {}".format(get_appointment_endpoint))
 
         response = process_post_response(post_request(data, get_appointment_endpoint))
@@ -157,7 +158,7 @@ def add_appointment(plugin, **kwargs):
         commitment_txid, penalty_tx = arg_parser.parse_add_appointment_arguments(kwargs)
         appointment = Appointment(
             locator=compute_locator(commitment_txid),
-            to_self_delay=20,
+            to_self_delay=20,  # does not matter for now, any value 20-2^32-1 would do
             encrypted_blob=Cryptographer.encrypt(penalty_tx, commitment_txid),
         )
 
@@ -167,26 +168,41 @@ def add_appointment(plugin, **kwargs):
         # Send appointment to the server.
         # FIXME: sending the appointment to all registered towers atm. Some management would be nice.
         for tower_id, tower in plugin.wt_client.towers.items():
-            plugin.log("Sending appointment to the Eye of Satoshi at {}".format(tower.endpoint))
-            add_appointment_endpoint = "{}/add_appointment".format(tower.endpoint)
-            response = process_post_response(post_request(data, add_appointment_endpoint))
+            try:
+                plugin.log("Sending appointment to the Eye of Satoshi at {}".format(tower.get("netaddr")))
+                add_appointment_endpoint = "{}/add_appointment".format(tower.get("netaddr"))
+                response = process_post_response(post_request(data, add_appointment_endpoint))
 
-            signature = response.get("signature")
-            # Check that the server signed the appointment as it should.
-            if not signature:
-                raise TowerResponseError("The response does not contain the signature of the appointment")
+                signature = response.get("signature")
+                # Check that the server signed the appointment as it should.
+                if not signature:
+                    raise TowerResponseError("The response does not contain the signature of the appointment")
 
-            rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-            if not tower_id != Cryptographer.get_compressed_pk(rpk):
-                raise TowerResponseError("The returned appointment's signature is invalid")
+                rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+                if not tower_id != Cryptographer.get_compressed_pk(rpk):
+                    raise TowerResponseError("The returned appointment's signature is invalid")
 
-            plugin.log("Appointment accepted and signed by the Eye of Satoshi at {}".format(tower.endpoint))
-            plugin.log("Remaining slots: {}".format(response.get("available_slots")))
+                plugin.log("Appointment accepted and signed by the Eye of Satoshi at {}".format(tower.get("netaddr")))
+                plugin.log("Remaining slots: {}".format(response.get("available_slots")))
 
-            # TODO: Not storing the whole appointments for now. The node should be able to recreate all the required
-            #       data if needed.
-            plugin.wt_client.towers[tower_id].appointments[appointment.locator] = signature
-            plugin.wt_client.db_manager.store_tower_record(tower_id, plugin.wt_client.towers[tower_id])
+                # TODO: Not storing the whole appointments for now. The node can recreate all the data if needed.
+                # DISCUSS: It may be worth checking that the available slots match instead of blindly trusting.
+
+                # Update  TowersDB
+                tower_info = TowerInfo.from_dict(plugin.wt_client.db_manager.load_tower_record(tower_id))
+                tower_info.appointments[appointment.locator] = signature
+                tower_info.available_slots = response.get("available_slots")
+                plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
+
+                # Update memory
+                plugin.wt_client.towers[tower_id]["available_slots"] = response.get("available_slots")
+
+            except TowerConnectionError as e:
+                # TODO: Implement retry logic
+                plugin.log(str(e))
+
+            except TowerResponseError as e:
+                plugin.log(str(e))
 
     except (InvalidParameter, EncryptionError, SignatureError, TowerResponseError) as e:
         plugin.log(str(e), level="warn")
