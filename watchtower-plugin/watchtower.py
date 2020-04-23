@@ -152,6 +152,15 @@ def get_appointment(plugin, tower_id, locator):
         return e.to_json()
 
 
+@plugin.method("listtowers", desc="List all towers registered towers.")
+def list_towers(plugin):
+    towers_info = {"towers": []}
+    for k, v in plugin.wt_client.towers.items():
+        towers_info["towers"].append({"id": k, **v})
+
+    return towers_info
+
+
 @plugin.hook("commitment_revocation")
 def add_appointment(plugin, **kwargs):
     try:
@@ -208,11 +217,6 @@ def add_appointment(plugin, **kwargs):
         plugin.log(str(e), level="warn")
 
     return {"result": "continue"}
-
-
-@plugin.method("listtowers")
-def list_towers(plugin):
-    return {k: v.to_dict() for k, v in plugin.wt_client.towers.items()}
 
 
 plugin.run()
