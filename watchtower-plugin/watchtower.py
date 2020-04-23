@@ -184,6 +184,7 @@ def add_appointment(plugin, **kwargs):
         # Send appointment to the server.
         # FIXME: sending the appointment to all registered towers atm. Some management would be nice.
         for tower_id, tower in plugin.wt_client.towers.items():
+            tower_info = TowerInfo.from_dict(plugin.wt_client.db_manager.load_tower_record(tower_id))
             try:
                 plugin.log("Sending appointment to the Eye of Satoshi at {}".format(tower.get("netaddr")))
                 add_appointment_endpoint = "{}/add_appointment".format(tower.get("netaddr"))
@@ -204,18 +205,24 @@ def add_appointment(plugin, **kwargs):
                 # TODO: Not storing the whole appointments for now. The node can recreate all the data if needed.
                 # DISCUSS: It may be worth checking that the available slots match instead of blindly trusting.
 
-                # Update  TowersDB
-                tower_info = TowerInfo.from_dict(plugin.wt_client.db_manager.load_tower_record(tower_id))
                 tower_info.appointments[appointment.locator] = signature
                 tower_info.available_slots = response.get("available_slots")
-                plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
+                tower_info.status = "reachable"
 
-                # Update memory
-                plugin.wt_client.towers[tower_id]["available_slots"] = response.get("available_slots")
+                # Update memory and TowersDB
+                plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
+                plugin.wt_client.towers[tower_id] = tower_info.get_summary()
 
             except TowerConnectionError as e:
                 # TODO: Implement retry logic
                 plugin.log(str(e))
+                if e.kwargs.get("transitory"):
+                    tower_info.status = "temporarily unreachable"
+                else:
+                    tower_info.status = "unreachable"
+
+                plugin.wt_client.towers[tower_id] = tower_info.get_summary()
+                plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
 
             except TowerResponseError as e:
                 plugin.log(str(e))
