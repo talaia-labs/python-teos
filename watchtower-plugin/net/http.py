@@ -4,16 +4,38 @@ from requests import ConnectionError, ConnectTimeout
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
 from common import constants
+from common.appointment import Appointment
+from common.cryptographer import Cryptographer
+
 from exceptions import TowerConnectionError, TowerResponseError
 
 
-def post_request(data, endpoint):
+def send_appointment(tower_id, tower_info, appointment_dict, signature):
+    data = {"appointment": appointment_dict, "signature": signature}
+
+    add_appointment_endpoint = "{}/add_appointment".format(tower_info.netaddr)
+    response = process_post_response(post_request(data, add_appointment_endpoint, tower_id))
+
+    signature = response.get("signature")
+    # Check that the server signed the appointment as it should.
+    if not signature:
+        raise TowerResponseError("The response does not contain the signature of the appointment")
+
+    rpk = Cryptographer.recover_pk(Appointment.from_dict(appointment_dict).serialize(), signature)
+    if not tower_id != Cryptographer.get_compressed_pk(rpk):
+        raise TowerResponseError("The returned appointment's signature is invalid")
+
+    return response
+
+
+def post_request(data, endpoint, tower_id):
     """
     Sends a post request to the tower.
 
     Args:
         data (:obj:`dict`): a dictionary containing the data to be posted.
         endpoint (:obj:`str`): the endpoint to send the post request.
+        tower_id (:obj:`str`): the identifier of the tower to connect to (a compressed public key).
 
     Returns:
         :obj:`dict`: a json-encoded dictionary with the server response if the data can be posted.
@@ -26,13 +48,13 @@ def post_request(data, endpoint):
         return requests.post(url=endpoint, json=data, timeout=5)
 
     except ConnectTimeout:
-        message = "Cannot connect to the Eye of Satoshi at {}. Connection timeout".format(endpoint)
+        message = "Cannot connect to {}. Connection timeout".format(tower_id)
 
     except ConnectionError:
-        message = "Cannot connect to the Eye of Satoshi at {}. Tower cannot be reached".format(endpoint)
+        message = "Cannot connect to {}. Tower cannot be reached".format(tower_id)
 
     except (InvalidSchema, MissingSchema, InvalidURL):
-        message = "Invalid URL. No schema, or invalid schema, found ({})".format(endpoint)
+        message = "Invalid URL. No schema, or invalid schema, found (url={}, tower_id={}).".format(endpoint, tower_id)
 
     raise TowerConnectionError(message)
 
