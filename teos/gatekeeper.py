@@ -174,6 +174,8 @@ class Gatekeeper:
             # the old appointment.
             self.registered_users.get(user_id).appointments[uuid] = required_slots
             self.registered_users.get(user_id).available_slots -= required_slots - used_slots
+            self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
+
         else:
             self.lock.release()
             raise NotEnoughSlots()
