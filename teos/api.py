@@ -118,7 +118,7 @@ class API:
 
         except InvalidParameter as e:
             logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
-            return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
+            return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
         user_id = request_data.get("public_key")
 
@@ -134,13 +134,14 @@ class API:
 
             except InvalidParameter as e:
                 rcode = HTTP_BAD_REQUEST
-                error = "Error {}: {}".format(errors.REGISTRATION_MISSING_FIELD, str(e))
-                response = {"error": error}
+                response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
-            error = "Error {}: public_key not found in register message".format(errors.REGISTRATION_WRONG_FIELD_FORMAT)
-            response = {"error": error}
+            response = {
+                "error": "public_key not found in register message",
+                "error_code": errors.REGISTRATION_WRONG_FIELD_FORMAT,
+            }
 
         logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
 
@@ -169,7 +170,7 @@ class API:
             request_data = get_request_data_json(request)
 
         except InvalidParameter as e:
-            return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
+            return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
@@ -178,16 +179,14 @@ class API:
 
         except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Error {}: {}".format(e.erno, e.reason)
-            response = {"error": error}
+            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
 
         except (AuthenticationFailure, NotEnoughSlots):
             rcode = HTTP_BAD_REQUEST
-            error = "appointment rejected. Error {}: {}".format(
-                errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-                "Invalid signature or user does not have enough slots available",
-            )
-            response = {"error": error}
+            response = {
+                "error": "appointment rejected. Invalid signature or user does not have enough slots available",
+                "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+            }
 
         except AppointmentLimitReached:
             rcode = HTTP_SERVICE_UNAVAILABLE
@@ -224,7 +223,7 @@ class API:
 
         except InvalidParameter as e:
             logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
-            return jsonify({"error": str(e)}), HTTP_BAD_REQUEST
+            return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
         locator = request_data.get("locator")
 

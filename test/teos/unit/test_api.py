@@ -139,11 +139,13 @@ def test_register_wrong_client_pk(client):
 def test_register_no_json(client):
     r = client.post(register_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
+    assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_register_json_no_inner_dict(client):
     r = client.post(register_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
+    assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_add_appointment(api, client, appointment):
@@ -165,16 +167,18 @@ def test_add_appointment_no_json(api, client, appointment):
     r = client.post(add_appointment_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Request is not json encoded" in r.json.get("error")
+    assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_add_appointment_json_no_inner_dict(api, client, appointment):
     # Simulate the user registration (end time does not matter here)
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
 
-    # JSON data with no inner dict (invalid data foramat)
+    # JSON data with no inner dict (invalid data format)
     r = client.post(add_appointment_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Invalid request content" in r.json.get("error")
+    assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_add_appointment_wrong(api, client, appointment):
@@ -186,7 +190,7 @@ def test_add_appointment_wrong(api, client, appointment):
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_BAD_REQUEST
-    assert "Error {}:".format(errors.APPOINTMENT_FIELD_TOO_SMALL) in r.json.get("error")
+    assert errors.APPOINTMENT_FIELD_TOO_SMALL == r.json.get("error_code")
 
 
 def test_add_appointment_not_registered(api, client, appointment):
@@ -199,7 +203,7 @@ def test_add_appointment_not_registered(api, client, appointment):
         client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, tmp_compressed_pk
     )
     assert r.status_code == HTTP_BAD_REQUEST
-    assert "Error {}:".format(errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS) in r.json.get("error")
+    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
 def test_add_appointment_registered_no_free_slots(api, client, appointment):
@@ -210,7 +214,7 @@ def test_add_appointment_registered_no_free_slots(api, client, appointment):
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_BAD_REQUEST
-    assert "Error {}:".format(errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS) in r.json.get("error")
+    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
 def test_add_appointment_registered_not_enough_free_slots(api, client, appointment):
@@ -225,7 +229,7 @@ def test_add_appointment_registered_not_enough_free_slots(api, client, appointme
 
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_BAD_REQUEST
-    assert "Error {}:".format(errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS) in r.json.get("error")
+    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
 def test_add_appointment_multiple_times_same_user(api, client, appointment, n=MULTIPLE_APPOINTMENTS):
@@ -342,12 +346,14 @@ def test_get_appointment_no_json(api, client, appointment):
     r = client.post(add_appointment_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Request is not json encoded" in r.json.get("error")
+    assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_get_appointment_json_no_inner_dict(api, client, appointment):
     r = client.post(add_appointment_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Invalid request content" in r.json.get("error")
+    assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_get_random_appointment_registered_user(client, user_sk=user_sk):
