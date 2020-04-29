@@ -3,7 +3,7 @@ from shutil import rmtree
 from binascii import hexlify
 
 from teos.api import API
-import teos.errors as errors
+import common.errors as errors
 from teos.watcher import Watcher
 from teos.inspector import Inspector
 from teos.gatekeeper import UserInfo

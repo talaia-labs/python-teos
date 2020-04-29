@@ -4,7 +4,8 @@ from common.logger import Logger
 from common.tools import is_locator
 from common.constants import LOCATOR_LEN_HEX
 
-from teos import errors, LOG_PREFIX
+from teos import LOG_PREFIX
+from common import errors
 from teos.extended_appointment import ExtendedAppointment
 
 logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)

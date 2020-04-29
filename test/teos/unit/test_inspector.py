@@ -1,7 +1,7 @@
 import pytest
 from binascii import unhexlify
 
-import teos.errors as errors
+import common.errors as errors
 from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
 from teos.extended_appointment import ExtendedAppointment

@@ -3,7 +3,7 @@ from common.logger import Logger
 from teos.tools import bitcoin_cli
 import teos.rpc_errors as rpc_errors
 from teos.utils.auth_proxy import JSONRPCException
-from teos.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
+from common.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
 
 logger = Logger(actor="Carrier", log_name_prefix=LOG_PREFIX)
 

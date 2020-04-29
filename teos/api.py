@@ -3,7 +3,7 @@ import logging
 from flask import Flask, request, abort, jsonify
 
 from teos import LOG_PREFIX
-import teos.errors as errors
+import common.errors as errors
 from teos.inspector import InspectionFailed
 from teos.watcher import AppointmentLimitReached
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
