@@ -3,11 +3,64 @@ import requests
 from requests import ConnectionError, ConnectTimeout
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
+from common import errors
 from common import constants
 from common.appointment import Appointment
+from common.exceptions import SignatureError
 from common.cryptographer import Cryptographer
 
 from exceptions import TowerConnectionError, TowerResponseError
+
+
+def add_appointment(plugin, tower_id, tower_info, appointment_dict, signature):
+    try:
+        plugin.log("Sending appointment to {}".format(tower_id))
+        response = send_appointment(tower_id, tower_info, appointment_dict, signature)
+        plugin.log("Appointment accepted and signed by {}".format(tower_id))
+        plugin.log("Remaining slots: {}".format(response.get("available_slots")))
+
+        # TODO: Not storing the whole appointments for now. The node can recreate all the data if needed.
+        # DISCUSS: It may be worth checking that the available slots match instead of blindly trusting.
+
+        tower_info.appointments[appointment_dict.get("locator")] = response.get("signature")
+        tower_info.available_slots = response.get("available_slots")
+        tower_info.status = "reachable"
+
+    except SignatureError as e:
+        plugin.log("{} is misbehaving, not using it any longer".format(tower_id))
+        tower_info.status = "misbehaving"
+        tower_info.invalid_appointments.append((appointment_dict, e.kwargs.get("signature")))
+
+    except TowerConnectionError:
+        # All TowerConnectionError are transitory. The connection is tried on register, so the URL cannot be malformed.
+        # Flag appointment for retry
+        plugin.log("{} cannot be reached. Adding appointment to pending".format(tower_id))
+        tower_info.status = "temporarily unreachable"
+
+    except TowerResponseError as e:
+        data = e.kwargs.get("data")
+        status_code = e.kwargs.get("status_code")
+
+        if data and status_code == constants.HTTP_BAD_REQUEST:
+            if data.get("error_code") == errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS:
+                plugin.log("There is a subscription issue with {}. Adding appointment to pending".format(tower_id))
+                tower_info.status = "subscription error"
+
+            elif data.get("error_code") >= errors.INVALID_REQUEST_FORMAT:
+                plugin.log("Appointment sent to {} is invalid".format(tower_id))
+                tower_info.status = "reachable"
+                # DISCUSS: It may be worth backing up the data since otherwise the update is dropped
+
+        elif status_code == constants.HTTP_SERVICE_UNAVAILABLE:
+            # Flag appointment for retry
+            plugin.log("{} is temporarily unavailable. Adding appointment to pending".format(tower_id))
+            tower_info.status = "temporarily unreachable"
+
+        else:
+            # Log unexpected behaviour
+            plugin.log(str(e), level="warn")
+
+    return tower_info.status
 
 
 def send_appointment(tower_id, tower_info, appointment_dict, signature):
@@ -19,11 +72,13 @@ def send_appointment(tower_id, tower_info, appointment_dict, signature):
     signature = response.get("signature")
     # Check that the server signed the appointment as it should.
     if not signature:
-        raise TowerResponseError("The response does not contain the signature of the appointment")
+        raise SignatureError("The response does not contain the signature of the appointment", signature=None)
 
     rpk = Cryptographer.recover_pk(Appointment.from_dict(appointment_dict).serialize(), signature)
-    if not tower_id != Cryptographer.get_compressed_pk(rpk):
-        raise TowerResponseError("The returned appointment's signature is invalid")
+    if tower_id != Cryptographer.get_compressed_pk(rpk):
+        raise SignatureError(
+            "The returned appointment's signature is invalid", tower_id=tower_id, rpk=rpk, signature=signature
+        )
 
     return response
 
