@@ -66,6 +66,11 @@ def main(command_line_conf):
             if not secret_key_der:
                 raise IOError("TEOS private key cannot be loaded")
 
+            logger.info(
+                "tower_id = {}".format(
+                    Cryptographer.get_compressed_pk(Cryptographer.load_private_key_der(secret_key_der).public_key)
+                )
+            )
             block_processor = BlockProcessor(bitcoind_connect_params)
             carrier = Carrier(bitcoind_connect_params)
 
