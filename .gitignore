@@ -18,3 +18,5 @@ htmlcov
 docs/
 .teos
 .teos_cli
+
+/monitor/monitor.conf

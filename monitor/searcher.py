@@ -1,6 +1,7 @@
 import json
 import os
 from elasticsearch import Elasticsearch, helpers
+from elasticsearch.client import IndicesClient
 from elasticsearch.helpers.errors import BulkIndexError
 
 from common.logger import Logger
@@ -10,21 +11,45 @@ logger = Logger(actor="Searcher", log_name_prefix=LOG_PREFIX)
 
 
 class Searcher:
-    def __init__(self):
-         self.es = Elasticsearch()
+    def __init__(self, host, port, cloud_id=None, auth_user=None, auth_pw=None):
+         self.es_host = host
+         self.es_port = port
+         self.es_cloud_id = cloud_id
+         self.es_auth_user = auth_user
+         self.es_auth_pw = auth_pw
+         self.es = Elasticsearch(
+             cloud_id=self.es_cloud_id,
+             http_auth=(self.es_auth_user, self.es_auth_pw),
+         )
+         self.index_client = IndicesClient(self.es)
          # TODO: Pass the path through as a config option.
-         self.log_path = os.path.expanduser("~/.teos/teos.log") 
+         self.log_path = os.path.expanduser("~/.teos/teos_test.log") 
 
     def start(self):
         # Pull the watchtower logs into Elasticsearch.
-        log_data = self.load_logs(log_path)
-        self.index_logs(log_data)
+        # self.index_client.delete("logs")
+        # self.create_index("logs") 
+        # log_data = self.load_logs(self.log_path)
+        # self.index_logs(log_data)
 
         # Search for the data we need to visualize a graph.
 
         # self.search_logs("message", ["logs"])
-        # self.get_all_logs()
+        self.get_all_logs()
         # self.delete_all_by_index("logs")
+
+    def create_index(self, name):
+        body = {
+            "mappings": {
+                "properties": {
+                    "doc.time": {
+                        "type": "date",
+                        "format": "strict_date_optional_time||dd/MM/yyyy HH:mm:ss"
+                    }
+                }
+            }
+        }
+        self.index_client.create(name, body)
          
     # TODO: Logs are constantly being updated. Keep that data updated
     def load_logs(self, log_path):
@@ -48,12 +73,11 @@ class Searcher:
             for log in log_file:
                 log_data = json.loads(log.strip())
                 logs.append(log_data)
-    
+
         return logs
     
         # TODO: Throw an error if the file is empty or if data isn't JSON-y.
     
-   
     @staticmethod 
     def gen_log_data(log_data):
         """ 
@@ -68,11 +92,11 @@ class Searcher:
     
         for log in log_data:
             # We don't need to include errors (which had problems mapping anyway)
-            if 'error' in log:
-                continue
+            # if 'error' in log:
+            #    continue
             yield {
                 "_index": "logs",
-                "_type": "document",
+                # "_type": "document",
                 "doc": log
             }
     
@@ -93,15 +117,13 @@ class Searcher:
         """
     
         response = helpers.bulk(self.es, self.gen_log_data(log_data))
-        # print("response: ", response)
     
         # The response is a tuple of two items: 1) The number of items successfully indexed. 2) Any errors returned.
         if (response[0] <= 0):
             logger.error("None of the logs were indexed. Log data might be in the wrong form.") 
-    
+
         return response
-    
-    
+
     def search_logs(self, field, keyword, index):
         """ 
         Searches Elasticsearch for data with a certain field and keyword.
