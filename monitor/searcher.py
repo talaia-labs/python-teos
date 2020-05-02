@@ -11,6 +11,28 @@ logger = Logger(actor="Searcher", log_name_prefix=LOG_PREFIX)
 
 
 class Searcher:
+    """ 
+    The :class:`Searcher` is in charge of the monitor's Elasticsearch functionality for loading and searching through data.
+    
+    Args:
+        host (:obj:`str`): The host Elasticsearch is running on.
+        port (:obj:`int`): The port Elasticsearch is runnning on.
+        cloud_id (:obj:`str`): Elasticsearch cloud id, if Elasticsearch Cloud is being used.
+        auth_user (:obj:`str`): Elasticsearch Cloud username, if Elasticsearch Cloud is being used.
+        auth_pw (:obj:`str`): Elasticsearch Cloud password, if Elasticsearch Cloud is being used.
+
+    Attributes:
+        host (:obj:`str`): The host Elasticsearch is running on.
+        port (:obj:`int`): The port Elasticsearch is runnning on.
+        cloud_id (:obj:`str`): Elasticsearch cloud id, if Elasticsearch Cloud is being used.
+        auth_user (:obj:`str`): Elasticsearch Cloud username, if Elasticsearch Cloud is being used.
+        auth_pw (:obj:`str`): Elasticsearch Cloud password, if Elasticsearch Cloud is being used.
+        es (:obj:`Elasticsearch <elasticsearch.Elasticsearch>`): The Elasticsearch client for searching for data to be visualized.
+        index_client (:obj:`IndicesClient <elasticsearch.client.IndiciesClient>`): The index client where log data is stored.
+        log_path (:obj:`str`): The path to the log file where log file will be pulled from and analyzed by ES.
+    
+    """
+
     def __init__(self, host, port, cloud_id=None, auth_user=None, auth_pw=None):
          self.es_host = host
          self.es_port = port
@@ -26,9 +48,11 @@ class Searcher:
          self.log_path = os.path.expanduser("~/.teos/teos_test.log") 
 
     def start(self):
+        """Starts Elasticsearch and compiles data to be visualized in Kibana"""
+
         # Pull the watchtower logs into Elasticsearch.
         # self.index_client.delete("logs")
-        # self.create_index("logs") 
+        # self.create_log_index("logs") 
         # log_data = self.load_logs(self.log_path)
         # self.index_logs(log_data)
 
@@ -38,7 +62,15 @@ class Searcher:
         self.get_all_logs()
         # self.delete_all_by_index("logs")
 
-    def create_index(self, name):
+    def create_log_index(self, index):
+        """ 
+        Create index with a particular mapping.
+    
+        Args:
+            index (:obj:`str`): Index the mapping is in.
+
+        """
+
         body = {
             "mappings": {
                 "properties": {
@@ -49,7 +81,7 @@ class Searcher:
                 }
             }
         }
-        self.index_client.create(name, body)
+        self.index_client.create(index, body)
          
     # TODO: Logs are constantly being updated. Keep that data updated
     def load_logs(self, log_path):
