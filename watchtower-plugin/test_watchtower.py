@@ -16,6 +16,7 @@ tower_port = "1234"
 tower_sk = PrivateKey()
 tower_id = Cryptographer.get_compressed_pk(tower_sk.public_key)
 
+nodes = None, None
 mocked_return = None
 
 
@@ -62,6 +63,15 @@ def add_appointment_service_unavailable():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def towers_dict():
+    os.environ["TOWERS_DATA_DIR"] = "/tmp/watchtower"
+
+    yield
+
+    shutil.rmtree(os.environ["TOWERS_DATA_DIR"])
+
+
+@pytest.fixture(scope="session", autouse=True)
 def prng_seed():
     random.seed(0)
 
@@ -72,7 +82,7 @@ def get_random_value_hex(nbytes):
     return prv_hex.zfill(2 * nbytes)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def tower_mock():
     app = Flask(__name__)
 
@@ -96,7 +106,6 @@ def tower_mock():
 
     @app.route("/add_appointment", methods=["POST"])
     def add_appointment():
-
         if mocked_return == "success":
             appointment = Appointment.from_dict(request.get_json().get("appointment"))
             user_id = Cryptographer.get_compressed_pk(
@@ -120,7 +129,14 @@ def tower_mock():
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
     os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
-    yield app
+    Thread(target=app.run, kwargs={"host": tower_netaddr, "port": tower_port}, daemon=True).start()
+
+
+# nodes_factory is set as a function fixture, so need to work around it to reuse it
+@pytest.fixture(autouse=True)
+def init_nodes(node_factory):
+    global nodes
+    nodes = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
 
 
 def test_helpme_starts(node_factory):
@@ -135,13 +151,9 @@ def test_helpme_starts(node_factory):
     l1.start()
 
 
-def test_watchtower(node_factory, tower_mock):
+def test_watchtower():
     global mocked_return
-
-    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
-
-    # Start the tower mock in a different process
-    Thread(target=tower_mock.run, kwargs={"host": tower_netaddr, "port": tower_port}, daemon=True).start()
+    l1, l2 = nodes
 
     # Register a new tower
     l2.rpc.registertower("{}@{}:{}".format(tower_id, tower_netaddr, tower_port))
@@ -155,18 +167,17 @@ def test_watchtower(node_factory, tower_mock):
 
     # Force a new commitment
     mocked_return = "success"
-    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl1", "desc1")["bolt11"])
+    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl1", "desc")["bolt11"])
 
     # Check that the tower got it (list is not empty anymore)
     # FIXME: it would be great to check the ids, need to run as dev tho and its currently failing to compile
     appointments = l2.rpc.gettowerinfo(tower_id).get("appointments")
     assert appointments
-
-    # Disconnect the tower and see how appointments get backed up
     assert not l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
 
+    # Disconnect the tower and see how appointments get backed up
     mocked_return = "service_unavailable"
-    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl2", "desc1")["bolt11"])
+    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl2", "desc")["bolt11"])
     pending_appointments = [
         data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
     ]
@@ -174,11 +185,10 @@ def test_watchtower(node_factory, tower_mock):
 
     # The fail has triggered the retry strategy. By "turning it back on" we should get the pending appointments trough
     mocked_return = "success"
-    sleep(1)
-    assert not l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+
+    # Give it some time to switch
+    while l2.rpc.gettowerinfo(tower_id).get("pending_appointments"):
+        sleep(0.5)
+
+    # The previously pending appointment are now part of the sent appointments
     assert set(pending_appointments).issubset(l2.rpc.gettowerinfo(tower_id).get("appointments").keys())
-
-    # TODO: reduce max retries and force retry with retrytower
-
-
-# TODO: Check rejections
