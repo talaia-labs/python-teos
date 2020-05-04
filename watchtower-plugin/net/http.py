@@ -12,30 +12,25 @@ from common.cryptographer import Cryptographer
 from exceptions import TowerConnectionError, TowerResponseError
 
 
-def add_appointment(plugin, tower_id, tower_info, appointment_dict, signature):
+def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
     try:
-        plugin.log("Sending appointment to {}".format(tower_id))
-        response = send_appointment(tower_id, tower_info, appointment_dict, signature)
-        plugin.log("Appointment accepted and signed by {}".format(tower_id))
-        plugin.log("Remaining slots: {}".format(response.get("available_slots")))
+        plugin.log(f"Sending appointment {appointment_dict.get('locator')} to {tower_id}")
+        response = send_appointment(tower_id, tower, appointment_dict, signature)
+        plugin.log(f"Appointment accepted and signed by {tower_id}")
+        plugin.log(f"Remaining slots: {response.get('available_slots')}")
 
-        # TODO: Not storing the whole appointments for now. The node can recreate all the data if needed.
-        # DISCUSS: It may be worth checking that the available slots match instead of blindly trusting.
-
-        tower_info.appointments[appointment_dict.get("locator")] = response.get("signature")
-        tower_info.available_slots = response.get("available_slots")
-        tower_info.status = "reachable"
+        # # TODO: Not storing the whole appointments for now. The node can recreate all the data if needed.
+        # # DISCUSS: It may be worth checking that the available slots match instead of blindly trusting.
+        return response.get("signature"), response.get("available_slots")
 
     except SignatureError as e:
-        plugin.log("{} is misbehaving, not using it any longer".format(tower_id))
-        tower_info.status = "misbehaving"
-        tower_info.invalid_appointments.append((appointment_dict, e.kwargs.get("signature")))
+        plugin.log(f"{tower_id} is misbehaving, not using it any longer")
+        raise e
 
-    except TowerConnectionError:
-        # All TowerConnectionError are transitory. The connection is tried on register, so the URL cannot be malformed.
-        # Flag appointment for retry
-        plugin.log("{} cannot be reached. Adding appointment to pending".format(tower_id))
-        tower_info.status = "temporarily unreachable"
+    except TowerConnectionError as e:
+        plugin.log(f"{tower_id} cannot be reached")
+
+        raise e
 
     except TowerResponseError as e:
         data = e.kwargs.get("data")
@@ -43,30 +38,28 @@ def add_appointment(plugin, tower_id, tower_info, appointment_dict, signature):
 
         if data and status_code == constants.HTTP_BAD_REQUEST:
             if data.get("error_code") == errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS:
-                plugin.log("There is a subscription issue with {}. Adding appointment to pending".format(tower_id))
-                tower_info.status = "subscription error"
+                message = f"There is a subscription issue with {tower_id}"
+                raise TowerResponseError(message, status="subscription error")
 
             elif data.get("error_code") >= errors.INVALID_REQUEST_FORMAT:
-                plugin.log("Appointment sent to {} is invalid".format(tower_id))
-                tower_info.status = "reachable"
                 # DISCUSS: It may be worth backing up the data since otherwise the update is dropped
+                message = f"Appointment sent to {tower_id} is invalid"
+                raise TowerResponseError(message, status="reachable")
 
         elif status_code == constants.HTTP_SERVICE_UNAVAILABLE:
             # Flag appointment for retry
-            plugin.log("{} is temporarily unavailable. Adding appointment to pending".format(tower_id))
-            tower_info.status = "temporarily unreachable"
+            message = f"{tower_id} is temporarily unavailable"
 
-        else:
-            # Log unexpected behaviour
-            plugin.log(str(e), level="warn")
+            raise TowerResponseError(message, status="temporarily unreachable")
 
-    return tower_info.status
+        # Log unexpected behaviour without raising
+        plugin.log(str(e), level="warn")
 
 
-def send_appointment(tower_id, tower_info, appointment_dict, signature):
+def send_appointment(tower_id, tower, appointment_dict, signature):
     data = {"appointment": appointment_dict, "signature": signature}
 
-    add_appointment_endpoint = "{}/add_appointment".format(tower_info.netaddr)
+    add_appointment_endpoint = f"{tower.get('netaddr')}/add_appointment"
     response = process_post_response(post_request(data, add_appointment_endpoint, tower_id))
 
     signature = response.get("signature")
@@ -103,13 +96,13 @@ def post_request(data, endpoint, tower_id):
         return requests.post(url=endpoint, json=data, timeout=5)
 
     except ConnectTimeout:
-        message = "Cannot connect to {}. Connection timeout".format(tower_id)
+        message = f"Cannot connect to {tower_id}. Connection timeout"
 
     except ConnectionError:
-        message = "Cannot connect to {}. Tower cannot be reached".format(tower_id)
+        message = f"Cannot connect to {tower_id}. Tower cannot be reached"
 
     except (InvalidSchema, MissingSchema, InvalidURL):
-        message = "Invalid URL. No schema, or invalid schema, found (url={}, tower_id={}).".format(endpoint, tower_id)
+        message = f"Invalid URL. No schema, or invalid schema, found (url={endpoint}, tower_id={tower_id})"
 
     raise TowerConnectionError(message)
 

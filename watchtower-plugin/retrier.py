@@ -1,8 +1,10 @@
 import backoff
 from threading import Thread
 
-from tower_info import TowerInfo
+from common.exceptions import SignatureError
+
 from net.http import add_appointment
+from exceptions import TowerConnectionError, TowerResponseError
 
 
 MAX_RETRIES = None
@@ -11,19 +13,17 @@ MAX_RETRIES = None
 def on_backoff(details):
     plugin = details.get("args")[1]
     tower_id = details.get("args")[2]
-    plugin.log("Retry {} failed for tower {}, backing off".format(details.get("tries"), tower_id))
+    plugin.log(f"Retry {details.get('tries')} failed for tower {tower_id}, backing off")
 
 
 def on_giveup(details):
     plugin = details.get("args")[1]
     tower_id = details.get("args")[2]
-    tower_info = details.get("args")[3]
 
-    plugin.log("Max retries reached, abandoning tower {}".format(tower_id))
+    plugin.log(f"Max retries reached, abandoning tower {tower_id}")
 
-    tower_info.status = "unreachable"
-    plugin.wt_client.towers[tower_id]["status"] = "unreachable"
-    plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
+    tower_update = {"status": "unreachable"}
+    plugin.wt_client.update_tower_state(tower_id, tower_update)
 
 
 def set_max_retries(max_retries):
@@ -43,9 +43,9 @@ class Retrier:
     def manage_retry(self, plugin):
         while True:
             tower_id = self.temp_unreachable_towers.get()
-            tower_info = TowerInfo.from_dict(plugin.wt_client.db_manager.load_tower_record(tower_id))
+            tower = plugin.wt_client.towers[tower_id]
 
-            Thread(target=self.do_retry, args=[plugin, tower_id, tower_info], daemon=True).start()
+            Thread(target=self.do_retry, args=[plugin, tower_id, tower], daemon=True).start()
 
     @backoff.on_predicate(
         backoff.expo,
@@ -54,15 +54,32 @@ class Retrier:
         on_backoff=on_backoff,
         on_giveup=on_giveup,
     )
-    def do_retry(self, plugin, tower_id, tower_info):
+    def do_retry(self, plugin, tower_id, tower):
         for appointment_dict, signature in plugin.wt_client.towers[tower_id]["pending_appointments"]:
-            status = add_appointment(plugin, tower_id, tower_info, appointment_dict, signature)
+            tower_update = {}
+            try:
+                tower_signature, available_slots = add_appointment(plugin, tower_id, tower, appointment_dict, signature)
+                tower_update["status"] = "reachable"
+                tower_update["appointment"] = (appointment_dict.get("locator"), tower_signature)
+                tower_update["available_slots"] = available_slots
 
-            if status in ["reachable", "misbehaving"]:
-                tower_info.pending_appointments.remove([appointment_dict, signature])
+            except SignatureError as e:
+                tower_update["status"] = "misbehaving"
+                tower_update["invalid_appointment"] = (appointment_dict, e.kwargs.get("signature"))
 
+            except TowerConnectionError:
+                tower_update["status"] = "temporarily unreachable"
+
+            except TowerResponseError as e:
+                tower_update["status"] = e.kwargs.get("status")
+
+            if tower_update["status"] in ["reachable", "misbehaving"]:
+                tower_update["pending_appointment"] = ([appointment_dict, signature], "remove")
+
+            if tower_update["status"] != "temporarily unreachable":
                 # Update memory and TowersDB
-                plugin.wt_client.update_tower_state(tower_id, tower_info)
+                plugin.wt_client.update_tower_state(tower_id, tower_update)
 
-            else:
-                return status
+            # Continue looping if reachable, return for either retry or stop otherwise
+            if tower_update["status"] != "reachable":
+                return tower_update.get("status")
