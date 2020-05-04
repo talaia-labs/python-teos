@@ -40,21 +40,17 @@ class TowersDBM(DBManager):
         if is_compressed_pk(tower_id):
             try:
                 self.create_entry(tower_id, json.dumps(tower_data.to_dict()))
-                self.plugin.log("Adding tower to Tower's db (id={})".format(tower_id))
+                self.plugin.log(f"Adding tower to Tower's db (id={tower_id})")
                 return True
 
             except (json.JSONDecodeError, TypeError):
                 self.plugin.log(
-                    "Could't add tower to db. Wrong tower data format (tower_id={}, tower_data={})".format(
-                        tower_id, tower_data
-                    )
+                    f"Could't add tower to db. Wrong tower data format (tower_id={tower_id}, tower_data={tower_data})"
                 )
                 return False
 
         else:
-            self.plugin.log(
-                "Could't add user to db. Wrong pk format (tower_id={}, tower_data={})".format(tower_id, tower_data)
-            )
+            self.plugin.log(f"Could't add user to db. Wrong pk format (tower_id={tower_id}, tower_data={tower_data})")
             return False
 
     def load_tower_record(self, tower_id):
@@ -92,11 +88,11 @@ class TowersDBM(DBManager):
 
         try:
             self.delete_entry(tower_id)
-            self.plugin.log("Deleting tower from Tower's db (id={})".format(tower_id))
+            self.plugin.log(f"Deleting tower from Tower's db (id={tower_id})")
             return True
 
         except TypeError:
-            self.plugin.log("Cannot delete user from db, user key has wrong type (id={})".format(tower_id))
+            self.plugin.log(f"Cannot delete user from db, user key has wrong type (id={tower_id})")
             return False
 
     def load_all_tower_records(self):

@@ -6,9 +6,7 @@ from common.exceptions import InvalidParameter
 
 def parse_register_arguments(tower_id, host, port, config):
     if not isinstance(tower_id, str):
-        raise InvalidParameter(
-            "tower id must be a compressed public key (33-byte hex value) not {}".format(str(tower_id))
-        )
+        raise InvalidParameter(f"tower id must be a compressed public key (33-byte hex value) not {str(tower_id)}")
 
     # tower_id is of the form tower_id@[ip][:][port]
     if "@" in tower_id:
@@ -20,18 +18,18 @@ def parse_register_arguments(tower_id, host, port, config):
 
             # Only host was specified or colons where specified but not port
             if ":" not in tower_netaddr or tower_netaddr.endswith(":"):
-                tower_netaddr = "{}:{}".format(tower_netaddr, config.get("DEFAULT_PORT"))
+                tower_netaddr = f"{tower_netaddr}:{config.get('DEFAULT_PORT')}"
 
         else:
             raise InvalidParameter("cannot specify host as both xxx@yyy and separate arguments")
 
     # host was specified, but no port, defaulting
     elif host:
-        tower_netaddr = "{}:{}".format(host, config.get("DEFAULT_PORT"))
+        tower_netaddr = f"{host}:{config.get('DEFAULT_PORT')}"
 
     # host and port specified
     elif host and port:
-        tower_netaddr = "{}:{}".format(host, port)
+        tower_netaddr = f"{host}:{port}"
 
     else:
         raise InvalidParameter("tower host is missing")
