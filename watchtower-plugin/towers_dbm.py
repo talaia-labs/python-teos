@@ -50,7 +50,9 @@ class TowersDBM(DBManager):
                 return False
 
         else:
-            self.plugin.log(f"Could't add user to db. Wrong pk format (tower_id={tower_id}, tower_data={tower_data})")
+            self.plugin.log(
+                f"Could't add user to db. Wrong pk format (tower_id={tower_id}, tower_data={tower_data.to_dict()})"
+            )
             return False
 
     def load_tower_record(self, tower_id):
