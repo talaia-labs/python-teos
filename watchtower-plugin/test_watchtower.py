@@ -16,7 +16,6 @@ tower_port = "1234"
 tower_sk = PrivateKey()
 tower_id = Cryptographer.get_compressed_pk(tower_sk.public_key)
 
-nodes = None, None
 mocked_return = None
 
 
@@ -62,6 +61,22 @@ def add_appointment_service_unavailable():
     return response, rcode
 
 
+def add_appointment_misbehaving_tower(appointment, **kwargs):
+    # This covers a tower signing with invalid keys
+    wrong_sk = PrivateKey.from_hex(get_random_value_hex(32))
+
+    response, rcode = add_appointment_success(appointment, **kwargs)
+    response["signature"] = Cryptographer.sign(appointment.serialize(), wrong_sk)
+
+    return response, rcode
+
+
+def get_random_value_hex(nbytes):
+    pseudo_random_value = random.getrandbits(8 * nbytes)
+    prv_hex = "{:x}".format(pseudo_random_value)
+    return prv_hex.zfill(2 * nbytes)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def towers_dict():
     os.environ["TOWERS_DATA_DIR"] = "/tmp/watchtower"
@@ -74,12 +89,6 @@ def towers_dict():
 @pytest.fixture(scope="session", autouse=True)
 def prng_seed():
     random.seed(0)
-
-
-def get_random_value_hex(nbytes):
-    pseudo_random_value = random.getrandbits(8 * nbytes)
-    prv_hex = "{:x}".format(pseudo_random_value)
-    return prv_hex.zfill(2 * nbytes)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -106,16 +115,19 @@ def tower_mock():
 
     @app.route("/add_appointment", methods=["POST"])
     def add_appointment():
+        appointment = Appointment.from_dict(request.get_json().get("appointment"))
+        user_id = Cryptographer.get_compressed_pk(
+            Cryptographer.recover_pk(appointment.serialize(), request.get_json().get("signature"))
+        )
+
         if mocked_return == "success":
-            appointment = Appointment.from_dict(request.get_json().get("appointment"))
-            user_id = Cryptographer.get_compressed_pk(
-                Cryptographer.recover_pk(appointment.serialize(), request.get_json().get("signature"))
-            )
             data, rtype = add_appointment_success(appointment, **users[user_id])
         elif mocked_return == "reject_no_slots":
             data, rtype = add_appointment_reject_no_slots()
         elif mocked_return == "reject_invalid":
             data, rtype = add_appointment_reject_invalid()
+        elif mocked_return == "misbehaving_tower":
+            data, rtype = add_appointment_misbehaving_tower(appointment, **users[user_id])
         else:
             data, rtype = add_appointment_service_unavailable()
 
@@ -132,13 +144,6 @@ def tower_mock():
     Thread(target=app.run, kwargs={"host": tower_netaddr, "port": tower_port}, daemon=True).start()
 
 
-# nodes_factory is set as a function fixture, so need to work around it to reuse it
-@pytest.fixture(autouse=True)
-def init_nodes(node_factory):
-    global nodes
-    nodes = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
-
-
 def test_helpme_starts(node_factory):
     l1 = node_factory.get_node()
     # Test dynamically
@@ -151,9 +156,10 @@ def test_helpme_starts(node_factory):
     l1.start()
 
 
-def test_watchtower():
+def test_watchtower(node_factory):
     global mocked_return
-    l1, l2 = nodes
+    # FIXME: node_factory is a function scope fixture, so I cannot reuse it while splitting the tests logically
+    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
 
     # Register a new tower
     l2.rpc.registertower("{}@{}:{}".format(tower_id, tower_netaddr, tower_port))
@@ -182,13 +188,123 @@ def test_watchtower():
         data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
     ]
     assert pending_appointments
+    assert l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
 
     # The fail has triggered the retry strategy. By "turning it back on" we should get the pending appointments trough
     mocked_return = "success"
 
     # Give it some time to switch
     while l2.rpc.gettowerinfo(tower_id).get("pending_appointments"):
-        sleep(0.5)
+        sleep(0.1)
 
     # The previously pending appointment are now part of the sent appointments
     assert set(pending_appointments).issubset(l2.rpc.gettowerinfo(tower_id).get("appointments").keys())
+
+
+def test_watchtower_retry_offline(node_factory):
+    global mocked_return
+    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
+
+    # Send some more with to tower "offline"
+    mocked_return = "service_unavailable"
+
+    # There are no pending appointment atm
+    assert not l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+
+    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl3", "desc")["bolt11"])
+    pending_appointments = [
+        data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+    ]
+    assert pending_appointments
+
+    # Wait until the auto-retry gives up and force a retry manually
+    while l2.rpc.gettowerinfo(tower_id).get("status") == "temporarily unreachable":
+        sleep(0.1)
+    l2.rpc.retrytower(tower_id)
+
+    # After retrying with an offline tower the pending appointments are the exact same
+    assert pending_appointments == [
+        data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+    ]
+
+    # Now we can "turn the tower back on" and force a retry
+    mocked_return = "success"
+    l2.rpc.retrytower(tower_id)
+
+    # Give it some time to send everything
+    while l2.rpc.gettowerinfo(tower_id).get("pending_appointments"):
+        sleep(0.1)
+
+    # Check that all went trough
+    assert set(pending_appointments).issubset(l2.rpc.gettowerinfo(tower_id).get("appointments").keys())
+
+
+def test_watchtower_no_slots(node_factory):
+    global mocked_return
+    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
+
+    # Simulates there are no available slots when trying to send an appointment to the tower
+    mocked_return = "reject_no_slots"
+
+    # There are no pending appointments atm
+    assert not l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+
+    # Make a payment and the appointment should be as pending
+    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl3", "desc")["bolt11"])
+    pending_appointments = [
+        data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+    ]
+    assert pending_appointments
+
+    # Retrying should work but appointment won't go trough
+    assert "Retrying tower" in l2.rpc.retrytower(tower_id)
+    assert pending_appointments == [
+        data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
+    ]
+
+    # Adding appointments + retrying should work
+    mocked_return = "success"
+    l2.rpc.retrytower(tower_id)
+    while l2.rpc.gettowerinfo(tower_id).get("pending_appointments"):
+        sleep(0.1)
+
+    assert set(pending_appointments).issubset(l2.rpc.gettowerinfo(tower_id).get("appointments").keys())
+
+
+def test_watchtower_invalid_appointment(node_factory):
+    global mocked_return
+    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
+
+    # Simulates sending an appointment with invalid data to the tower
+    mocked_return = "reject_invalid"
+    tower_info = l2.rpc.gettowerinfo(tower_id)
+
+    # Make a payment and the appointment should be dropped
+    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl4", "desc")["bolt11"])
+
+    new_tower_info = l2.rpc.gettowerinfo(tower_id)
+    assert not new_tower_info.get("pending_appointments")
+    assert not l2.rpc.gettowerinfo(tower_id).get("invalid_appointments")
+    assert new_tower_info.get("appointments") == tower_info.get("appointments")
+
+    # FIXME: Currently we are just dropping appointments that are flagged as invalid by the tower. We may want to store
+    #       them for inspection.
+
+
+def test_watchtower_misbehaving(node_factory):
+    global mocked_return
+    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
+
+    # Simulates a tower that replies with an invalid signature
+    mocked_return = "misbehaving_tower"
+
+    # There are no invalid appointments atm
+    assert not l2.rpc.gettowerinfo(tower_id).get("invalid_appointments")
+
+    # Make a payment and the appointment make it to the tower, but the response will contain an invalid signature
+    l1.rpc.pay(l2.rpc.invoice(25000000, "lbl5", "desc")["bolt11"])
+
+    # The appointment should have been stored as invalid and the tower flagged as misbehaving
+    tower_info = l2.rpc.gettowerinfo(tower_id)
+    assert tower_info.get("invalid_appointments")
+    assert tower_info.get("status") == "misbehaving"
