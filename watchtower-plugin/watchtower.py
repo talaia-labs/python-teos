@@ -163,7 +163,6 @@ def get_appointment(plugin, tower_id, locator):
     """
 
     # FIXME: All responses from the tower should be signed.
-
     try:
         tower_id, locator = arg_parser.parse_get_appointment_arguments(tower_id, locator)
 
@@ -175,7 +174,7 @@ def get_appointment(plugin, tower_id, locator):
         data = {"locator": locator, "signature": signature}
 
         # Send request to the server.
-        tower_netaddr = plugin.wt_client.towers[tower_id].get("netaddr")
+        tower_netaddr = plugin.wt_client.towers[tower_id].netaddr
         get_appointment_endpoint = f"{tower_netaddr}/get_appointment"
         plugin.log(f"Requesting appointment from {tower_id}")
 
@@ -190,10 +189,10 @@ def get_appointment(plugin, tower_id, locator):
 @plugin.method("listtowers", desc="List all towers registered towers.")
 def list_towers(plugin):
     towers_info = {"towers": []}
-    for tower_id, info in plugin.wt_client.towers.items():
-        values = {k: v for k, v in info.items() if k != "pending_appointments"}
-        pending_appointments = [appointment.get("locator") for appointment, signature in info["pending_appointments"]]
-        invalid_appointments = [appointment.get("locator") for appointment, signature in info["invalid_appointments"]]
+    for tower_id, tower in plugin.wt_client.towers.items():
+        values = {k: v for k, v in tower.to_dict().items() if k not in ["pending_appointments", "invalid_appointments"]}
+        pending_appointments = [appointment.get("locator") for appointment, signature in tower.pending_appointments]
+        invalid_appointments = [appointment.get("locator") for appointment, signature in tower.invalid_appointments]
         values["pending_appointments"] = pending_appointments
         values["invalid_appointments"] = invalid_appointments
         towers_info["towers"].append({"id": tower_id, **values})
@@ -225,15 +224,15 @@ def retry_tower(plugin, tower_id):
 
     if not tower:
         response = {"error": f"{tower_id} is not a registered tower"}
-    if tower.get("status") not in ["unreachable", "subscription error"]:
-        response = {"error": f"{tower_id} is not unreachable. {tower.get('status')}"}
-    if not tower.get("pending_appointments"):
+    if tower.status not in ["unreachable", "subscription error"]:
+        response = {"error": f"{tower_id} is not unreachable. {tower.status}"}
+    if not tower.pending_appointments:
         response = {"error": f"{tower_id} does not have pending appointments"}
 
     if not response:
         response = f"Retrying tower {tower_id}"
         plugin.log(response)
-        plugin.wt_client.towers[tower_id]["status"] = "temporarily unreachable"
+        plugin.wt_client.towers[tower_id].status = "temporarily unreachable"
         plugin.wt_client.retrier.temp_unreachable_towers.put(tower_id)
 
     plugin.wt_client.lock.release()
@@ -260,11 +259,11 @@ def on_commitment_revocation(plugin, **kwargs):
     for tower_id, tower in plugin.wt_client.towers.items():
         tower_update = {}
 
-        if tower.get("status") == "misbehaving":
+        if tower.status == "misbehaving":
             return {"result": "continue"}
 
         try:
-            if tower.get("status") == "reachable":
+            if tower.status == "reachable":
                 tower_signature, available_slots = add_appointment(
                     plugin, tower_id, tower, appointment.to_dict(), signature
                 )
@@ -272,9 +271,9 @@ def on_commitment_revocation(plugin, **kwargs):
                 tower_update["available_slots"] = available_slots
 
             else:
-                if tower.get("status") in ["temporarily unreachable", "unreachable"]:
-                    plugin.log(f"{tower_id} is {tower.get('status')}. Adding {appointment.locator} to pending")
-                elif tower.get("status") == "subscription error":
+                if tower.status in ["temporarily unreachable", "unreachable"]:
+                    plugin.log(f"{tower_id} is {tower.status}. Adding {appointment.locator} to pending")
+                elif tower.status == "subscription error":
                     plugin.log(f"There is a subscription issue with {tower_id}. Adding appointment to pending")
 
                 tower_update["pending_appointment"] = (appointment.to_dict(), signature), "add"

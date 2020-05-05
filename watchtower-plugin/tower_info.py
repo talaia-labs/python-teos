@@ -49,10 +49,16 @@ class TowerInfo:
         return self.__dict__
 
     def get_summary(self):
-        return {
-            "netaddr": self.netaddr,
-            "status": self.status,
-            "available_slots": self.available_slots,
-            "pending_appointments": self.pending_appointments,
-            "invalid_appointments": self.invalid_appointments,
-        }
+        return TowerSummary(self)
+
+
+class TowerSummary:
+    def __init__(self, tower_info):
+        self.netaddr = tower_info.netaddr
+        self.status = tower_info.status
+        self.available_slots = tower_info.available_slots
+        self.pending_appointments = tower_info.pending_appointments
+        self.invalid_appointments = tower_info.invalid_appointments
+
+    def to_dict(self):
+        return self.__dict__

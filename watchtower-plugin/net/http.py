@@ -59,7 +59,7 @@ def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
 def send_appointment(tower_id, tower, appointment_dict, signature):
     data = {"appointment": appointment_dict, "signature": signature}
 
-    add_appointment_endpoint = f"{tower.get('netaddr')}/add_appointment"
+    add_appointment_endpoint = f"{tower.netaddr}/add_appointment"
     response = process_post_response(post_request(data, add_appointment_endpoint, tower_id))
 
     tower_signature = response.get("signature")
