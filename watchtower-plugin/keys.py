@@ -27,8 +27,8 @@ def generate_keys(data_dir):
         data_dir (:obj:`str`): path to data directory where the keys will be stored.
 
     Returns:
-        :obj:`tuple`: a tuple containing a ``PrivateKey`` and a ``str`` representing the client sk and
-        compressed pk respectively.
+        :obj:`tuple`: a tuple containing a ``PrivateKey`` and a ``str`` representing the client sk and compressed pk
+        respectively.
 
     Raises:
         :obj:`FileExistsError`: if the key pair already exists in the given directory.
@@ -56,8 +56,8 @@ def load_keys(data_dir):
         data_dir (:obj:`str`): path to data directory where the keys are stored.
 
     Returns:
-        :obj:`tuple`: a tuple containing a ``EllipticCurvePrivateKey`` and a ``str`` representing the client sk and
-        compressed pk respectively.
+        :obj:`tuple`: a tuple containing a ``PrivateKey`` and a ``str`` representing the client sk and compressed pk
+        respectively.
 
     Raises:
         :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if any of the keys is invalid or cannot be loaded.

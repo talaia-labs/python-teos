@@ -36,11 +36,29 @@ plugin = Plugin()
 
 
 class WTClient:
+    """
+    Holds all the data regarding the watchtower client.
+
+    Fires an additional tread to take care of retries.
+
+    Args:
+        sk (:obj:`PrivateKey): the user private key. Used to sign appointment sent to the towers.
+        user_id (:obj:`PrivateKey): the identifier of the user (compressed public key).
+        config (:obj:`dict`): the client configuration loaded on a dictionary.
+
+    Attributes:
+        towers (:obj:`dict`): a collection of registered towers. Indexed by tower_id, populated with :obj:`TowerSummary`
+            objects.
+        db_manager (:obj:`towers_dbm.TowersDBM`): a manager to interact with the towers database.
+        retrier (:obj:`retrier.Retrier`): a ``Retrier`` in charge of retrying sending jobs to temporarily unreachable
+            towers.
+        lock (:obj:`Lock`): a thread lock.
+    """
+
     def __init__(self, sk, user_id, config):
         self.sk = sk
         self.user_id = user_id
         self.towers = {}
-        self.tmp_unreachable_towers = []
         self.db_manager = TowersDBM(config.get("TOWERS_DB"), plugin)
         self.retrier = Retrier(config.get("MAX_RETRIES"), Queue())
         self.config = config
@@ -53,6 +71,16 @@ class WTClient:
         Thread(target=self.retrier.manage_retry, args=[plugin], daemon=True).start()
 
     def update_tower_state(self, tower_id, tower_update):
+        """
+        Updates the state of a tower both in memory and disk.
+
+        Access if restricted thought a lock to prevent race conditions.
+
+        Args:
+            tower_id (:obj:`str`): the identifier of the tower to be updated.
+            tower_update (:obj:`dict`): a dictionary containing the data to be added / removed.
+        """
+
         self.lock.acquire()
         tower_info = TowerInfo.from_dict(self.db_manager.load_tower_record(tower_id))
 
@@ -81,6 +109,8 @@ class WTClient:
 
 @plugin.init()
 def init(options, configuration, plugin):
+    """Initializes the plugin"""
+
     try:
         user_sk, user_id = generate_keys(DATA_DIR)
         plugin.log(f"Generating a new key pair for the watchtower client. Keys stored at {DATA_DIR}")
@@ -109,7 +139,7 @@ def register(plugin, tower_id, host=None, port=None):
         plugin (:obj:`Plugin`): this plugin.
         tower_id (:obj:`str`): the identifier of the tower to connect to (a compressed public key).
         host (:obj:`str`): the ip or hostname to connect to, optional.
-        host (:obj:`int`): the port to connect to, optional.
+        port (:obj:`int`): the port to connect to, optional.
 
     Accepted tower_id formats:
         - tower_id@host:port
@@ -189,8 +219,18 @@ def get_appointment(plugin, tower_id, locator):
         return e.to_json()
 
 
-@plugin.method("listtowers", desc="List all towers registered towers.")
+@plugin.method("listtowers", desc="List all registered towers.")
 def list_towers(plugin):
+    """
+    Lists all the registered towers. The given information comes from memory, so it is summarized.
+
+    Args:
+        plugin (:obj:`Plugin`): this plugin.
+
+    Returns:
+        :obj:`dict`: a dictionary containing the registered towers data.
+    """
+
     towers_info = {"towers": []}
     for tower_id, tower in plugin.wt_client.towers.items():
         values = {k: v for k, v in tower.to_dict().items() if k not in ["pending_appointments", "invalid_appointments"]}
@@ -205,6 +245,17 @@ def list_towers(plugin):
 
 @plugin.method("gettowerinfo", desc="List all towers registered towers.")
 def get_tower_info(plugin, tower_id):
+    """
+    Gets information about a given tower. Data comes from disk (DB), so all stored data is provided.
+
+    Args:
+        plugin (:obj:`Plugin`): this plugin.
+        tower_id: (:obj:`str`): the identifier of the queried tower.
+
+    Returns:
+        :obj:`dict`: a dictionary containing all data about the queried tower.
+    """
+
     tower_info = TowerInfo.from_dict(plugin.wt_client.db_manager.load_tower_record(tower_id))
     pending_appointments = [
         {"appointment": appointment, "signature": signature}
@@ -221,14 +272,31 @@ def get_tower_info(plugin, tower_id):
 
 @plugin.method("retrytower", desc="Retry to send pending appointment to an unreachable tower.")
 def retry_tower(plugin, tower_id):
+    """
+    Triggers a manual retry of a tower, tries to send all pending appointments to to it.
+
+    Only works if the tower is unreachable or there's been a subscription error.
+
+    Args:
+        plugin (:obj:`Plugin`): this plugin.
+        tower_id: (:obj:`str`): the identifier of the tower to be retried.
+
+    Returns:
+
+    """
     response = None
     plugin.wt_client.lock.acquire()
     tower = plugin.wt_client.towers.get(tower_id)
 
     if not tower:
         response = {"error": f"{tower_id} is not a registered tower"}
+
+    # FIXME: it may be worth only allowing unreachable and forcing a retry on register_tower if the state is
+    #        subscription error.
     if tower.status not in ["unreachable", "subscription error"]:
-        response = {"error": f"{tower_id} is not unreachable. {tower.status}"}
+        response = {
+            "error": f"Cannot retry tower. Expected tower status 'unreachable' or 'subscription error'. Received {tower.status}"
+        }
     if not tower.pending_appointments:
         response = {"error": f"{tower_id} does not have pending appointments"}
 
@@ -244,6 +312,15 @@ def retry_tower(plugin, tower_id):
 
 @plugin.hook("commitment_revocation")
 def on_commitment_revocation(plugin, **kwargs):
+    """
+    Sends an appointment to all registered towers for every net commitment transaction.
+
+    kwargs should contain the commitment identifier (commitment_txid) and the penalty transaction (penalty_tx)
+
+    Args:
+        plugin (:obj:`Plugin`): this plugin.
+    """
+
     try:
         commitment_txid, penalty_tx = arg_parser.parse_add_appointment_arguments(kwargs)
         appointment = Appointment(
@@ -300,7 +377,7 @@ def on_commitment_revocation(plugin, **kwargs):
         except TowerResponseError as e:
             tower_update["status"] = e.kwargs.get("status")
 
-            if tower_update["status"] in ["temporarily unreachable", "subscription_error"]:
+            if tower_update["status"] in ["temporarily unreachable", "subscription error"]:
                 plugin.log(f"Adding {appointment.locator} to pending")
                 tower_update["pending_appointment"] = (appointment.to_dict(), signature), "add"
 

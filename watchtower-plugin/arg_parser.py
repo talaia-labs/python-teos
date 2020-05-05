@@ -5,6 +5,22 @@ from common.exceptions import InvalidParameter
 
 
 def parse_register_arguments(tower_id, host, port, config):
+    """
+    Parses the arguments of the register command and checks that they are correct.
+
+    Args:
+        tower_id (:obj:`str`): the identifier of the tower to connect to (a compressed public key).
+        host (:obj:`str`): the ip or hostname to connect to, optional.
+        host (:obj:`int`): the port to connect to, optional.
+        config: (:obj:`dict`): the configuration dictionary.
+
+    Returns:
+        :obj:`tuple`: the tower id and tower network address.
+
+    Raises:
+        :obj:`common.exceptions.InvalidParameter`: if any of the parameters is wrong or missing.
+    """
+
     if not isinstance(tower_id, str):
         raise InvalidParameter(f"tower id must be a compressed public key (33-byte hex value) not {str(tower_id)}")
 
@@ -41,6 +57,20 @@ def parse_register_arguments(tower_id, host, port, config):
 
 
 def parse_get_appointment_arguments(tower_id, locator):
+    """
+    Parses the arguments of the get_appointment command and checks that they are correct.
+
+    Args:
+        tower_id (:obj:`str`): the identifier of the tower to connect to (a compressed public key).
+        locator (:obj:`str`): the locator of the appointment to query the tower about.
+
+    Returns:
+        :obj:`tuple`: the tower id and appointment locator.
+
+    Raises:
+        :obj:`common.exceptions.InvalidParameter`: if any of the parameters is wrong or missing.
+    """
+
     if not is_compressed_pk(tower_id):
         raise InvalidParameter("tower id must be a compressed public key (33-byte hex value)")
 
@@ -51,6 +81,21 @@ def parse_get_appointment_arguments(tower_id, locator):
 
 
 def parse_add_appointment_arguments(kwargs):
+    """
+    Parses the arguments of the add_appointment command and checks that they are correct.
+
+    The expected arguments are a commitment transaction id (32-byte hex string) and the penalty transaction.
+
+    Args:
+        kwargs (:obj:`dict`): a dictionary of arguments.
+
+    Returns:
+        :obj:`tuple`: the commitment transaction id and the penalty transaction.
+
+    Raises:
+        :obj:`common.exceptions.InvalidParameter`: if any of the parameters is wrong or missing.
+    """
+
     # Arguments to add_appointment come from c-lightning and they have been sanitised. Checking this just in case.
     commitment_txid = kwargs.get("commitment_txid")
     penalty_tx = kwargs.get("penalty_tx")

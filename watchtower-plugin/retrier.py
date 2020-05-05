@@ -11,16 +11,38 @@ MAX_RETRIES = None
 
 
 def check_retry(status):
+    """
+    Checks is the job needs to be retried. Jobs are retried if max_retries is not reached and the tower status is
+    temporarily unreachable.
+
+    Args:
+        status (:obj:`str`): the tower status.
+
+    Returns:
+            :obj:`bool`: True is the status is "temporarily unreachable", False otherwise.
+    """
     return status == "temporarily unreachable"
 
 
 def on_backoff(details):
+    """
+    Function called when backing off after a retry. Logs data regarding the retry.
+    Args:
+        details: the retry details (check backoff library for more info).
+    """
     plugin = details.get("args")[1]
     tower_id = details.get("args")[2]
     plugin.log(f"Retry {details.get('tries')} failed for tower {tower_id}, backing off")
 
 
 def on_giveup(details):
+    """
+    Function called when giving up after the last retry. Logs data regarding the retry and flags the tower as
+    unreachable.
+
+    Args:
+        details: the retry details (check backoff library for more info).
+    """
     plugin = details.get("args")[1]
     tower_id = details.get("args")[2]
 
@@ -31,20 +53,39 @@ def on_giveup(details):
 
 
 def set_max_retries(max_retries):
+    """Workaround to set max retries from Retrier to the backoff.on_predicate decorator"""
     global MAX_RETRIES
     MAX_RETRIES = max_retries
 
 
 def max_retries():
+    """Workaround to set max retries from Retrier to the backoff.on_predicate decorator"""
     return MAX_RETRIES
 
 
 class Retrier:
+    """
+    The Retrier is in charge of the retry process for appointments that were sent to towers that were temporarily
+    unreachable.
+
+    Args:
+        max_retries (:obj:`int`): the maximum number of times that a tower will be retried.
+        temp_unreachable_towers (:obj:`Queue`): a queue of temporarily unreachable towers populated by the plugin on
+            failing to deliver an appointment.
+    """
+
     def __init__(self, max_retries, temp_unreachable_towers):
         self.temp_unreachable_towers = temp_unreachable_towers
         set_max_retries(max_retries)
 
     def manage_retry(self, plugin):
+        """
+        Listens to the temporarily unreachable towers queue and creates a thread to manage each tower it gets.
+
+        Args:
+            plugin (:obj:`Plugin`): the plugin object.
+        """
+
         while True:
             tower_id = self.temp_unreachable_towers.get()
             tower = plugin.wt_client.towers[tower_id]
@@ -53,6 +94,23 @@ class Retrier:
 
     @backoff.on_predicate(backoff.expo, check_retry, max_tries=max_retries, on_backoff=on_backoff, on_giveup=on_giveup)
     def do_retry(self, plugin, tower_id, tower):
+        """
+        Retries to send a list of pending appointments to a temporarily unreachable tower. This function is managed by
+        manage_retries and run in a different thread per tower.
+
+        For every pending appointment the worker thread tries to send the data to the tower. If the tower keeps being
+        unreachable, the job is retries up to MAX_RETRIES. If MAX_RETRIES is reached, the worker thread gives up and the
+        tower is flagged as unreachable.
+
+        Args:
+            plugin (:obj:`Plugin`): the plugin object.
+            tower_id (:obj:`str`): the id of the tower managed by the thread.
+            tower: (:obj:`TowerSummary`): the tower data.
+
+        Returns:
+            :obj:`str`: the tower status if it is not reachable.
+        """
+
         for appointment_dict, signature in plugin.wt_client.towers[tower_id].pending_appointments:
             tower_update = {}
             try:
