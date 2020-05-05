@@ -1,32 +1,13 @@
 class TowerInfo:
-    def __init__(
-        self,
-        netaddr,
-        available_slots,
-        status="reachable",
-        appointments=None,
-        pending_appointments=None,
-        invalid_appointments=None,
-    ):
-
+    def __init__(self, netaddr, available_slots, status="reachable"):
         self.netaddr = netaddr
         self.available_slots = available_slots
         self.status = status
 
-        if not appointments:
-            self.appointments = {}
-        else:
-            self.appointments = appointments
-
-        if not pending_appointments:
-            self.pending_appointments = []
-        else:
-            self.pending_appointments = pending_appointments
-
-        if not invalid_appointments:
-            self.invalid_appointments = []
-        else:
-            self.invalid_appointments = invalid_appointments
+        self.appointments = {}
+        self.pending_appointments = []
+        self.invalid_appointments = []
+        self.misbehaving_proof = None
 
     @classmethod
     def from_dict(cls, tower_data):
@@ -36,6 +17,7 @@ class TowerInfo:
         appointments = tower_data.get("appointments")
         pending_appointments = tower_data.get("pending_appointments")
         invalid_appointments = tower_data.get("invalid_appointments")
+        misbehaving_proof = tower_data.get("misbehaving_proof")
 
         if any(
             v is None
@@ -43,7 +25,13 @@ class TowerInfo:
         ):
             raise ValueError("Wrong appointment data, some fields are missing")
 
-        return cls(netaddr, available_slots, status, appointments, pending_appointments, invalid_appointments)
+        tower = cls(netaddr, available_slots, status)
+        tower.appointments = appointments
+        tower.pending_appointments = pending_appointments
+        tower.invalid_appointments = invalid_appointments
+        tower.misbehaving_proof = misbehaving_proof
+
+        return tower
 
     def to_dict(self):
         return self.__dict__

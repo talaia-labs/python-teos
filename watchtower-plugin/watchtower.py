@@ -71,6 +71,9 @@ class WTClient:
         if "invalid_appointment" in tower_update:
             tower_info.invalid_appointments.append(list(tower_update.get("invalid_appointment")))
 
+        if "misbehaving_proof" in tower_update:
+            tower_info.misbehaving_proof = tower_update.get("misbehaving_proof")
+
         self.towers[tower_id] = tower_info.get_summary()
         self.db_manager.store_tower_record(tower_id, tower_info)
         self.lock.release()
@@ -280,7 +283,11 @@ def on_commitment_revocation(plugin, **kwargs):
 
         except SignatureError as e:
             tower_update["status"] = "misbehaving"
-            tower_update["invalid_appointment"] = (appointment.to_dict(), e.kwargs.get("signature"))
+            tower_update["misbehaving_proof"] = {
+                "appointment": appointment.to_dict(),
+                "signature": e.kwargs.get("signature"),
+                "recovered_id": e.kwargs.get("recovered_id"),
+            }
 
         except TowerConnectionError:
             # All TowerConnectionError are transitory. Connections are tried on register so URLs cannot be malformed.
@@ -299,6 +306,9 @@ def on_commitment_revocation(plugin, **kwargs):
 
                 if tower_update["status"] == "temporarily unreachable":
                     tower_update["retry"] = True
+
+            if e.kwargs.get("invalid_appointment"):
+                tower_update["invalid_appointment"] = (appointment.to_dict(), signature)
 
         finally:
             # Update memory and TowersDB

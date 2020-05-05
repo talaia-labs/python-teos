@@ -42,9 +42,8 @@ def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
                 raise TowerResponseError(message, status="subscription error")
 
             elif data.get("error_code") >= errors.INVALID_REQUEST_FORMAT:
-                # DISCUSS: It may be worth backing up the data since otherwise the update is dropped
                 message = f"Appointment sent to {tower_id} is invalid"
-                raise TowerResponseError(message, status="reachable")
+                raise TowerResponseError(message, status="reachable", invalid_appointment=True)
 
         elif status_code == constants.HTTP_SERVICE_UNAVAILABLE:
             # Flag appointment for retry
@@ -68,9 +67,13 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
         raise SignatureError("The response does not contain the signature of the appointment", signature=None)
 
     rpk = Cryptographer.recover_pk(Appointment.from_dict(appointment_dict).serialize(), tower_signature)
-    if tower_id != Cryptographer.get_compressed_pk(rpk):
+    recovered_id = Cryptographer.get_compressed_pk(rpk)
+    if tower_id != recovered_id:
         raise SignatureError(
-            "The returned appointment's signature is invalid", tower_id=tower_id, rpk=rpk, signature=tower_signature
+            "The returned appointment's signature is invalid",
+            tower_id=tower_id,
+            recovered_id=recovered_id,
+            signature=tower_signature,
         )
 
     return response

@@ -63,13 +63,20 @@ class Retrier:
 
             except SignatureError as e:
                 tower_update["status"] = "misbehaving"
-                tower_update["invalid_appointment"] = (appointment_dict, e.kwargs.get("signature"))
+                tower_update["misbehaving_proof"] = {
+                    "appointment": appointment_dict,
+                    "signature": e.kwargs.get("signature"),
+                    "recovered_id": e.kwargs.get("recovered_id"),
+                }
 
             except TowerConnectionError:
                 tower_update["status"] = "temporarily unreachable"
 
             except TowerResponseError as e:
                 tower_update["status"] = e.kwargs.get("status")
+
+                if e.kwargs.get("invalid_appointment"):
+                    tower_update["invalid_appointment"] = (appointment_dict, signature)
 
             if tower_update["status"] in ["reachable", "misbehaving"]:
                 tower_update["pending_appointment"] = ([appointment_dict, signature], "remove")
