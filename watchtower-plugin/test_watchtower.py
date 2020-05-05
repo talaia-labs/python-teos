@@ -1,4 +1,5 @@
 import random
+import configparser
 from time import sleep
 from coincurve import PrivateKey
 from threading import Thread
@@ -78,8 +79,15 @@ def get_random_value_hex(nbytes):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def towers_dict():
+def init_tower():
     os.environ["TOWERS_DATA_DIR"] = "/tmp/watchtower"
+    config = configparser.ConfigParser()
+    config["general"] = {"max_retries": "5"}
+
+    os.makedirs(os.environ["TOWERS_DATA_DIR"])
+
+    with open(os.path.join(os.environ["TOWERS_DATA_DIR"], "watchtower.conf"), "w") as configfile:
+        config.write(configfile)
 
     yield
 
