@@ -84,7 +84,7 @@ def init_tower():
     config = configparser.ConfigParser()
     config["general"] = {"max_retries": "5"}
 
-    os.makedirs(os.environ["TOWERS_DATA_DIR"])
+    os.makedirs(os.environ["TOWERS_DATA_DIR"], exist_ok=True)
 
     with open(os.path.join(os.environ["TOWERS_DATA_DIR"], "watchtower.conf"), "w") as configfile:
         config.write(configfile)

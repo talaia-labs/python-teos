@@ -10,6 +10,10 @@ from exceptions import TowerConnectionError, TowerResponseError
 MAX_RETRIES = None
 
 
+def check_retry(status):
+    return status == "temporarily unreachable"
+
+
 def on_backoff(details):
     plugin = details.get("args")[1]
     tower_id = details.get("args")[2]
@@ -47,15 +51,9 @@ class Retrier:
 
             Thread(target=self.do_retry, args=[plugin, tower_id, tower], daemon=True).start()
 
-    @backoff.on_predicate(
-        backoff.expo,
-        lambda x: x == "temporarily unreachable",
-        max_tries=max_retries,
-        on_backoff=on_backoff,
-        on_giveup=on_giveup,
-    )
+    @backoff.on_predicate(backoff.expo, check_retry, max_tries=max_retries, on_backoff=on_backoff, on_giveup=on_giveup)
     def do_retry(self, plugin, tower_id, tower):
-        for appointment_dict, signature in plugin.wt_client.towers[tower_id]["pending_appointments"]:
+        for appointment_dict, signature in plugin.wt_client.towers[tower_id].pending_appointments:
             tower_update = {}
             try:
                 tower_signature, available_slots = add_appointment(plugin, tower_id, tower, appointment_dict, signature)
