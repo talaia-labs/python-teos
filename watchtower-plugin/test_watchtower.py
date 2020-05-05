@@ -184,7 +184,8 @@ def test_watchtower(node_factory):
     l1.rpc.pay(l2.rpc.invoice(25000000, "lbl1", "desc")["bolt11"])
 
     # Check that the tower got it (list is not empty anymore)
-    # FIXME: it would be great to check the ids, need to run as dev tho and its currently failing to compile
+    # FIXME: it would be great to check the ids, I haven't found a way to check the list of commitments though.
+    #        simply signing the last tx won't work since every payment creates two updates.
     appointments = l2.rpc.gettowerinfo(tower_id).get("appointments")
     assert appointments
     assert not l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
@@ -285,18 +286,15 @@ def test_watchtower_invalid_appointment(node_factory):
 
     # Simulates sending an appointment with invalid data to the tower
     mocked_return = "reject_invalid"
-    tower_info = l2.rpc.gettowerinfo(tower_id)
+
+    # There are no invalid appointment atm
+    assert not l2.rpc.gettowerinfo(tower_id).get("invalid_appointments")
 
     # Make a payment and the appointment should be dropped
     l1.rpc.pay(l2.rpc.invoice(25000000, "lbl4", "desc")["bolt11"])
 
-    new_tower_info = l2.rpc.gettowerinfo(tower_id)
-    assert not new_tower_info.get("pending_appointments")
-    assert not l2.rpc.gettowerinfo(tower_id).get("invalid_appointments")
-    assert new_tower_info.get("appointments") == tower_info.get("appointments")
-
-    # FIXME: Currently we are just dropping appointments that are flagged as invalid by the tower. We may want to store
-    #       them for inspection.
+    # The appointments have been saves as invalid
+    assert l2.rpc.gettowerinfo(tower_id).get("invalid_appointments")
 
 
 def test_watchtower_misbehaving(node_factory):
@@ -306,13 +304,13 @@ def test_watchtower_misbehaving(node_factory):
     # Simulates a tower that replies with an invalid signature
     mocked_return = "misbehaving_tower"
 
-    # There are no invalid appointments atm
-    assert not l2.rpc.gettowerinfo(tower_id).get("invalid_appointments")
+    # There is no proof of misbehaviour
+    assert not l2.rpc.gettowerinfo(tower_id).get("misbehaving_proof")
 
     # Make a payment and the appointment make it to the tower, but the response will contain an invalid signature
     l1.rpc.pay(l2.rpc.invoice(25000000, "lbl5", "desc")["bolt11"])
 
-    # The appointment should have been stored as invalid and the tower flagged as misbehaving
+    # The tower should have stored the proof of misbehaviour
     tower_info = l2.rpc.gettowerinfo(tower_id)
-    assert tower_info.get("invalid_appointments")
     assert tower_info.get("status") == "misbehaving"
+    assert tower_info.get("misbehaving_proof")
