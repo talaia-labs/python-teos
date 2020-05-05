@@ -8,6 +8,7 @@ class TowerInfo:
         pending_appointments=None,
         invalid_appointments=None,
     ):
+
         self.netaddr = netaddr
         self.available_slots = available_slots
         self.status = status

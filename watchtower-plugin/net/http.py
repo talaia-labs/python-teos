@@ -62,15 +62,15 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
     add_appointment_endpoint = f"{tower.get('netaddr')}/add_appointment"
     response = process_post_response(post_request(data, add_appointment_endpoint, tower_id))
 
-    signature = response.get("signature")
+    tower_signature = response.get("signature")
     # Check that the server signed the appointment as it should.
-    if not signature:
+    if not tower_signature:
         raise SignatureError("The response does not contain the signature of the appointment", signature=None)
 
-    rpk = Cryptographer.recover_pk(Appointment.from_dict(appointment_dict).serialize(), signature)
+    rpk = Cryptographer.recover_pk(Appointment.from_dict(appointment_dict).serialize(), tower_signature)
     if tower_id != Cryptographer.get_compressed_pk(rpk):
         raise SignatureError(
-            "The returned appointment's signature is invalid", tower_id=tower_id, rpk=rpk, signature=signature
+            "The returned appointment's signature is invalid", tower_id=tower_id, rpk=rpk, signature=tower_signature
         )
 
     return response

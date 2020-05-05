@@ -69,7 +69,7 @@ class WTClient:
             else:
                 tower_info.pending_appointments.remove(list(data))
         if "invalid_appointment" in tower_update:
-            tower_info.pending_appointments.append(list(tower_update.get("invalid_appointment")))
+            tower_info.invalid_appointments.append(list(tower_update.get("invalid_appointment")))
 
         self.towers[tower_id] = tower_info.get_summary()
         self.db_manager.store_tower_record(tower_id, tower_info)
@@ -219,20 +219,25 @@ def get_tower_info(plugin, tower_id):
 
 @plugin.method("retrytower", desc="Retry to send pending appointment to an unreachable tower.")
 def retry_tower(plugin, tower_id):
+    response = None
+    plugin.wt_client.lock.acquire()
     tower = plugin.wt_client.towers.get(tower_id)
 
     if not tower:
-        return {"error": f"{tower_id} is not a registered tower"}
-    if tower.get("status") != "unreachable":
-        return {"error": f"{tower_id} is not unreachable"}
+        response = {"error": f"{tower_id} is not a registered tower"}
+    if tower.get("status") not in ["unreachable", "subscription error"]:
+        response = {"error": f"{tower_id} is not unreachable. {tower.get('status')}"}
     if not tower.get("pending_appointments"):
-        return {"error": f"{tower_id} does not have pending appointments"}
+        response = {"error": f"{tower_id} does not have pending appointments"}
 
-    message = f"Retrying tower {tower_id}"
-    plugin.log(message)
-    plugin.wt_client.retrier.temp_unreachable_towers.put(tower_id)
+    if not response:
+        response = f"Retrying tower {tower_id}"
+        plugin.log(response)
+        plugin.wt_client.towers[tower_id]["status"] = "temporarily unreachable"
+        plugin.wt_client.retrier.temp_unreachable_towers.put(tower_id)
 
-    return message
+    plugin.wt_client.lock.release()
+    return response
 
 
 @plugin.hook("commitment_revocation")
@@ -260,8 +265,10 @@ def on_commitment_revocation(plugin, **kwargs):
 
         try:
             if tower.get("status") == "reachable":
-                signature, available_slots = add_appointment(plugin, tower_id, tower, appointment.to_dict(), signature)
-                tower_update["appointment"] = (appointment.locator, signature)
+                tower_signature, available_slots = add_appointment(
+                    plugin, tower_id, tower, appointment.to_dict(), signature
+                )
+                tower_update["appointment"] = (appointment.locator, tower_signature)
                 tower_update["available_slots"] = available_slots
 
             else:
