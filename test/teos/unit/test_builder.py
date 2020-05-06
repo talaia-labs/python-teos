@@ -4,6 +4,7 @@ from queue import Queue
 
 from teos.builder import Builder
 from teos.watcher import Watcher
+from teos.tools import bitcoin_cli
 from teos.responder import Responder
 
 from test.teos.unit.conftest import (
@@ -11,9 +12,9 @@ from test.teos.unit.conftest import (
     generate_dummy_appointment,
     generate_dummy_tracker,
     generate_block,
-    bitcoin_cli,
     get_config,
     bitcoind_connect_params,
+    generate_keypair,
 )
 
 config = get_config()
@@ -24,7 +25,7 @@ def test_build_appointments():
 
     # Create some appointment data
     for i in range(10):
-        appointment, _ = generate_dummy_appointment(real_height=False)
+        appointment, _ = generate_dummy_appointment()
         uuid = uuid4().hex
 
         appointments_data[uuid] = appointment.to_dict()
@@ -32,7 +33,7 @@ def test_build_appointments():
         # Add some additional appointments that share the same locator to test all the builder's cases
         if i % 2 == 0:
             locator = appointment.locator
-            appointment, _ = generate_dummy_appointment(real_height=False)
+            appointment, _ = generate_dummy_appointment()
             uuid = uuid4().hex
             appointment.locator = locator
 
@@ -45,8 +46,7 @@ def test_build_appointments():
     for uuid, appointment in appointments.items():
         assert uuid in appointments_data.keys()
         assert appointments_data[uuid].get("locator") == appointment.get("locator")
-        assert appointments_data[uuid].get("end_time") == appointment.get("end_time")
-        assert len(appointments_data[uuid].get("encrypted_blob")) == appointment.get("size")
+        assert appointments_data[uuid].get("user_id") == appointment.get("user_id")
         assert uuid in locator_uuid_map[appointment.get("locator")]
 
 
@@ -75,7 +75,7 @@ def test_build_trackers():
 
         assert tracker.get("penalty_txid") == trackers_data[uuid].get("penalty_txid")
         assert tracker.get("locator") == trackers_data[uuid].get("locator")
-        assert tracker.get("appointment_end") == trackers_data[uuid].get("appointment_end")
+        assert tracker.get("user_id") == trackers_data[uuid].get("user_id")
         assert uuid in tx_tracker_map[tracker.get("penalty_txid")]
 
 
@@ -94,14 +94,14 @@ def test_populate_block_queue():
     assert len(blocks) == 0
 
 
-def test_update_states_empty_list(db_manager, carrier, block_processor):
+def test_update_states_empty_list(db_manager, gatekeeper, carrier, block_processor):
     w = Watcher(
         db_manager=db_manager,
+        gatekeeper=gatekeeper,
         block_processor=block_processor,
-        responder=Responder(db_manager, carrier, block_processor),
-        sk_der=None,
+        responder=Responder(db_manager, gatekeeper, carrier, block_processor),
+        sk_der=generate_keypair()[0].to_der(),
         max_appointments=config.get("MAX_APPOINTMENTS"),
-        expiry_delta=config.get("EXPIRY_DELTA"),
     )
 
     missed_blocks_watcher = []
@@ -115,14 +115,14 @@ def test_update_states_empty_list(db_manager, carrier, block_processor):
         Builder.update_states(w, missed_blocks_responder, missed_blocks_watcher)
 
 
-def test_update_states_responder_misses_more(run_bitcoind, db_manager, carrier, block_processor):
+def test_update_states_responder_misses_more(run_bitcoind, db_manager, gatekeeper, carrier, block_processor):
     w = Watcher(
         db_manager=db_manager,
+        gatekeeper=gatekeeper,
         block_processor=block_processor,
-        responder=Responder(db_manager, carrier, block_processor),
-        sk_der=None,
+        responder=Responder(db_manager, gatekeeper, carrier, block_processor),
+        sk_der=generate_keypair()[0].to_der(),
         max_appointments=config.get("MAX_APPOINTMENTS"),
-        expiry_delta=config.get("EXPIRY_DELTA"),
     )
 
     blocks = []
@@ -139,15 +139,15 @@ def test_update_states_responder_misses_more(run_bitcoind, db_manager, carrier, 
     assert w.responder.last_known_block == blocks[-1]
 
 
-def test_update_states_watcher_misses_more(db_manager, carrier, block_processor):
+def test_update_states_watcher_misses_more(db_manager, gatekeeper, carrier, block_processor):
     # Same as before, but data is now in the Responder
     w = Watcher(
         db_manager=db_manager,
+        gatekeeper=gatekeeper,
         block_processor=block_processor,
-        responder=Responder(db_manager, carrier, block_processor),
-        sk_der=None,
+        responder=Responder(db_manager, gatekeeper, carrier, block_processor),
+        sk_der=generate_keypair()[0].to_der(),
         max_appointments=config.get("MAX_APPOINTMENTS"),
-        expiry_delta=config.get("EXPIRY_DELTA"),
     )
 
     blocks = []

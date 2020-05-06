@@ -19,7 +19,7 @@ from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appoint
 
 @pytest.fixture(scope="module")
 def watcher_appointments():
-    return {uuid4().hex: generate_dummy_appointment(real_height=False)[0] for _ in range(10)}
+    return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
 @pytest.fixture(scope="module")
@@ -215,7 +215,7 @@ def test_store_load_triggered_appointment(db_manager):
     assert db_watcher_appointments == db_watcher_appointments_with_triggered
 
     # Create an appointment flagged as triggered
-    triggered_appointment, _ = generate_dummy_appointment(real_height=False)
+    triggered_appointment, _ = generate_dummy_appointment()
     uuid = uuid4().hex
     assert db_manager.store_watcher_appointment(uuid, triggered_appointment.to_dict()) is True
     db_manager.create_triggered_appointment_flag(uuid)

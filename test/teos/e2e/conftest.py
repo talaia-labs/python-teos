@@ -11,7 +11,6 @@ from common.config_loader import ConfigLoader
 
 
 getcontext().prec = 10
-END_TIME_DELTA = 10
 
 
 @pytest.fixture(scope="session")
@@ -123,16 +122,8 @@ def create_penalty_tx(bitcoin_cli, decoded_commitment_tx, destination=None):
     return signed_penalty_tx.get("hex")
 
 
-def build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx):
-    current_height = bitcoin_cli.getblockcount()
-
-    appointment_data = {
-        "tx": penalty_tx,
-        "tx_id": commitment_tx_id,
-        "start_time": current_height + 1,
-        "end_time": current_height + 1 + END_TIME_DELTA,
-        "to_self_delay": 20,
-    }
+def build_appointment_data(commitment_tx_id, penalty_tx):
+    appointment_data = {"tx": penalty_tx, "tx_id": commitment_tx_id, "to_self_delay": 20}
 
     return appointment_data
 

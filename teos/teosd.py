@@ -3,7 +3,6 @@ from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-import common.cryptographer
 from common.logger import Logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
@@ -25,7 +24,6 @@ from teos.tools import can_connect_to_bitcoind, in_correct_network
 from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def handle_signals(signal_received, frame):
@@ -52,13 +50,12 @@ def main(command_line_conf):
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     logger.info("Starting TEOS")
-    db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
 
     bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
     bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
 
     if not can_connect_to_bitcoind(bitcoind_connect_params):
-        logger.error("Can't connect to bitcoind. Shutting down")
+        logger.error("Cannot connect to bitcoind. Shutting down")
 
     elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
@@ -67,19 +64,27 @@ def main(command_line_conf):
         try:
             secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
             if not secret_key_der:
-                raise IOError("TEOS private key can't be loaded")
+                raise IOError("TEOS private key cannot be loaded")
 
+            logger.info(
+                "tower_id = {}".format(
+                    Cryptographer.get_compressed_pk(Cryptographer.load_private_key_der(secret_key_der).public_key)
+                )
+            )
             block_processor = BlockProcessor(bitcoind_connect_params)
             carrier = Carrier(bitcoind_connect_params)
 
-            responder = Responder(db_manager, carrier, block_processor)
-            watcher = Watcher(
-                db_manager,
+            gatekeeper = Gatekeeper(
+                UsersDBM(config.get("USERS_DB_PATH")),
                 block_processor,
-                responder,
-                secret_key_der,
-                config.get("MAX_APPOINTMENTS"),
+                config.get("DEFAULT_SLOTS"),
+                config.get("DEFAULT_SUBSCRIPTION_DURATION"),
                 config.get("EXPIRY_DELTA"),
+            )
+            db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
+            responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+            watcher = Watcher(
+                db_manager, gatekeeper, block_processor, responder, secret_key_der, config.get("MAX_APPOINTMENTS")
             )
 
             # Create the chain monitor and start monitoring the chain
@@ -153,9 +158,8 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            gatekeeper = Gatekeeper(UsersDBM(config.get("USERS_DB_PATH")), config.get("DEFAULT_SLOTS"))
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
-            API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher, gatekeeper).start()
+            API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)

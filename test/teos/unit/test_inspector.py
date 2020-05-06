@@ -1,19 +1,14 @@
 import pytest
 from binascii import unhexlify
 
-import teos.errors as errors
-from teos import LOG_PREFIX
+import common.errors as errors
 from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
+from teos.extended_appointment import ExtendedAppointment
 
-import common.cryptographer
-from common.logger import Logger
-from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
 from test.teos.unit.conftest import get_random_value_hex, bitcoind_connect_params, get_config
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 NO_HEX_STRINGS = [
     "R" * LOCATOR_LEN_HEX,
@@ -100,101 +95,6 @@ def test_check_locator():
                 raise e
 
 
-def test_check_start_time():
-    # Time is defined in block height
-    current_time = 100
-
-    # Right format and right value (start time in the future)
-    start_time = 101
-    assert inspector.check_start_time(start_time, current_time) is None
-
-    # Start time too small (either same block or block in the past)
-    start_times = [100, 99, 98, -1]
-    for start_time in start_times:
-        with pytest.raises(InspectionFailed):
-            try:
-                inspector.check_start_time(start_time, current_time)
-
-            except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
-                raise e
-
-    # Empty field
-    start_time = None
-    with pytest.raises(InspectionFailed):
-        try:
-            inspector.check_start_time(start_time, current_time)
-
-        except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
-            raise e
-
-    # Wrong data type
-    start_times = WRONG_TYPES
-    for start_time in start_times:
-        with pytest.raises(InspectionFailed):
-            try:
-                inspector.check_start_time(start_time, current_time)
-
-            except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
-                raise e
-
-
-def test_check_end_time():
-    # Time is defined in block height
-    current_time = 100
-    start_time = 120
-
-    # Right format and right value (start time before end and end in the future)
-    end_time = 121
-    assert inspector.check_end_time(end_time, start_time, current_time) is None
-
-    # End time too small (start time after end time)
-    end_times = [120, 119, 118, -1]
-    for end_time in end_times:
-        with pytest.raises(InspectionFailed):
-            try:
-                inspector.check_end_time(end_time, start_time, current_time)
-
-            except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
-                raise e
-
-    # End time too small (either same height as current block or in the past)
-    current_time = 130
-    end_times = [130, 129, 128, -1]
-    for end_time in end_times:
-        with pytest.raises(InspectionFailed):
-            try:
-                inspector.check_end_time(end_time, start_time, current_time)
-
-            except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
-                raise e
-
-    # Empty field
-    end_time = None
-    with pytest.raises(InspectionFailed):
-        try:
-            inspector.check_end_time(end_time, start_time, current_time)
-
-        except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
-            raise e
-
-    # Wrong data type
-    end_times = WRONG_TYPES
-    for end_time in end_times:
-        with pytest.raises(InspectionFailed):
-            try:
-                inspector.check_end_time(end_time, start_time, current_time)
-
-            except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
-                raise e
-
-
 def test_check_to_self_delay():
     # Right value, right format
     to_self_delays = [MIN_TO_SELF_DELAY, MIN_TO_SELF_DELAY + 1, MIN_TO_SELF_DELAY + 1000]
@@ -239,10 +139,6 @@ def test_check_blob():
     encrypted_blob = get_random_value_hex(120)
     assert inspector.check_blob(encrypted_blob) is None
 
-    # # Wrong content
-    # # FIXME: There is not proper defined format for this yet. It should be restricted by size at least, and check it
-    # #        is multiple of the block size defined by the encryption function.
-
     # Wrong type
     encrypted_blobs = WRONG_TYPES_NO_STR
     for encrypted_blob in encrypted_blobs:
@@ -284,23 +180,15 @@ def test_inspect(run_bitcoind):
     to_self_delay = MIN_TO_SELF_DELAY
     encrypted_blob = get_random_value_hex(64)
 
-    appointment_data = {
-        "locator": locator,
-        "start_time": start_time,
-        "end_time": end_time,
-        "to_self_delay": to_self_delay,
-        "encrypted_blob": encrypted_blob,
-    }
+    appointment_data = {"locator": locator, "to_self_delay": to_self_delay, "encrypted_blob": encrypted_blob}
 
     appointment = inspector.inspect(appointment_data)
 
     assert (
-        type(appointment) == Appointment
+        type(appointment) == ExtendedAppointment
         and appointment.locator == locator
-        and appointment.start_time == start_time
-        and appointment.end_time == end_time
         and appointment.to_self_delay == to_self_delay
-        and appointment.encrypted_blob.data == encrypted_blob
+        and appointment.encrypted_blob == encrypted_blob
     )
 
 

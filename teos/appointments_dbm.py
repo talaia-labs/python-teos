@@ -1,11 +1,10 @@
 import json
 import plyvel
 
-from teos.db_manager import DBManager
-
 from teos import LOG_PREFIX
 
 from common.logger import Logger
+from common.db_manager import DBManager
 
 logger = Logger(actor="AppointmentsDBM", log_name_prefix=LOG_PREFIX)
 
@@ -85,7 +84,7 @@ class AppointmentsDBM(DBManager):
             ``RESPONDER_LAST_BLOCK_KEY``).
 
         Returns:
-            :obj:`str` or :obj:`None`: A 16-byte hex-encoded str representing the last known block hash.
+            :obj:`str` or :obj:`None`: A 32-byte hex-encoded str representing the last known block hash.
 
             Returns ``None`` if the entry is not found.
         """
@@ -178,7 +177,7 @@ class AppointmentsDBM(DBManager):
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be stored.
-            appointment (:obj:`dict`): an appointment encoded as dictionary.
+            appointment (:obj:`dict`): an appointment encoded as a dictionary.
 
         Returns:
             :obj:`bool`: True if the appointment was stored in the db. False otherwise.
@@ -203,7 +202,7 @@ class AppointmentsDBM(DBManager):
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be stored.
-            tracker (:obj:`dict`): a tracker encoded as dictionary.
+            tracker (:obj:`dict`): a tracker encoded as a dictionary.
 
         Returns:
             :obj:`bool`: True if the tracker was stored in the db. False otherwise.
@@ -248,7 +247,7 @@ class AppointmentsDBM(DBManager):
 
     def create_append_locator_map(self, locator, uuid):
         """
-        Creates (or appends to if already exists) a ``locator:uuid`` map.
+        Creates a ``locator:uuid`` map.
 
         If the map already exists, the new ``uuid`` is appended to the existing ones (if it is not already there).
 
@@ -335,7 +334,7 @@ class AppointmentsDBM(DBManager):
 
     def batch_delete_watcher_appointments(self, uuids):
         """
-        Deletes an appointment from the database.
+        Deletes multiple appointments from the database.
 
         Args:
            uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the appointments to be deleted.
@@ -368,7 +367,7 @@ class AppointmentsDBM(DBManager):
 
     def batch_delete_responder_trackers(self, uuids):
         """
-        Deletes an appointment from the database.
+        Deletes multiple trackers from the database.
 
         Args:
            uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the trackers to be deleted.

@@ -14,7 +14,7 @@ class BlockProcessor:
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc passwd, host and port)
+            (rpc user, rpc password, host and port)
     """
 
     def __init__(self, btc_connect_params):
@@ -22,10 +22,10 @@ class BlockProcessor:
 
     def get_block(self, block_hash):
         """
-        Gives a block given a block hash by querying ``bitcoind``.
+        Gets a block given a block hash by querying ``bitcoind``.
 
         Args:
-            block_hash (:obj:`str`): The block hash to be queried.
+            block_hash (:obj:`str`): the block hash to be queried.
 
         Returns:
             :obj:`dict` or :obj:`None`: A dictionary containing the requested block data if the block is found.
@@ -44,7 +44,7 @@ class BlockProcessor:
 
     def get_best_block_hash(self):
         """
-        Returns the hash of the current best chain tip.
+        Gets the hash of the current best chain tip.
 
         Returns:
             :obj:`str` or :obj:`None`: The hash of the block if it can be found.
@@ -63,10 +63,10 @@ class BlockProcessor:
 
     def get_block_count(self):
         """
-        Returns the block height of the best chain.
+        Gets the block count of the best chain.
 
         Returns:
-            :obj:`int` or :obj:`None`: The block height if it can be computed.
+            :obj:`int` or :obj:`None`: The count of the best chain if it can be computed.
 
             Returns ``None`` otherwise (not even sure this can actually happen).
         """
@@ -86,7 +86,7 @@ class BlockProcessor:
         associated metadata given by ``bitcoind`` (e.g. confirmation count).
 
         Args:
-            raw_tx (:obj:`str`): The hex representation of the transaction.
+            raw_tx (:obj:`str`): the hex representation of the transaction.
 
         Returns:
             :obj:`dict` or :obj:`None`: The decoding of the given ``raw_tx`` if the transaction is well formatted.
@@ -99,7 +99,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             tx = None
-            logger.error("Can't build transaction from decoded data", error=e.error)
+            logger.error("Cannot build transaction from decoded data", error=e.error)
 
         return tx
 
@@ -133,7 +133,7 @@ class BlockProcessor:
 
     def get_missed_blocks(self, last_know_block_hash):
         """
-        Compute the blocks between the current best chain tip and a given block hash (``last_know_block_hash``).
+        Gets the blocks between the current best chain tip and a given block hash (``last_know_block_hash``).
 
         This method is used to fetch all the missed information when recovering from a crash.
 
@@ -158,7 +158,7 @@ class BlockProcessor:
 
     def is_block_in_best_chain(self, block_hash):
         """
-        Checks whether or not a given block is on the best chain. Blocks are identified by block_hash.
+        Checks whether a given block is on the best chain or not. Blocks are identified by block_hash.
 
         A block that is not in the best chain will either not exists (block = None) or have a confirmation count of
         -1 (implying that the block was forked out or the chain never grew from that one).

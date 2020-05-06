@@ -1,15 +1,14 @@
 import re
 
-import common.cryptographer
 from common.logger import Logger
 from common.tools import is_locator
 from common.constants import LOCATOR_LEN_HEX
-from common.appointment import Appointment
 
-from teos import errors, LOG_PREFIX
+from teos import LOG_PREFIX
+from common import errors
+from teos.extended_appointment import ExtendedAppointment
 
 logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by TEOS, would be stored in the logs. This is a possible DoS surface
@@ -49,9 +48,9 @@ class Inspector:
         Args:
             appointment_data (:obj:`dict`): a dictionary containing the appointment data.
 
-
         Returns:
-            :obj:`Appointment <teos.appointment.Appointment>`: An appointment initialized with the provided data.
+            :obj:`Extended <teos.extended_appointment.ExtendedAppointment>`: An appointment initialized with
+            the provided data.
 
         Raises:
            :obj:`InspectionFailed`: if any of the fields is wrong.
@@ -67,12 +66,16 @@ class Inspector:
             raise InspectionFailed(errors.UNKNOWN_JSON_RPC_EXCEPTION, "unexpected error occurred")
 
         self.check_locator(appointment_data.get("locator"))
-        self.check_start_time(appointment_data.get("start_time"), block_height)
-        self.check_end_time(appointment_data.get("end_time"), appointment_data.get("start_time"), block_height)
         self.check_to_self_delay(appointment_data.get("to_self_delay"))
         self.check_blob(appointment_data.get("encrypted_blob"))
 
-        return Appointment.from_dict(appointment_data)
+        # Set user_id to None since we still don't know it, it'll be set by the API after querying the gatekeeper
+        return ExtendedAppointment(
+            appointment_data.get("locator"),
+            appointment_data.get("to_self_delay"),
+            appointment_data.get("encrypted_blob"),
+            user_id=None,
+        )
 
     @staticmethod
     def check_locator(locator):
@@ -101,87 +104,6 @@ class Inspector:
 
         elif not is_locator(locator):
             raise InspectionFailed(errors.APPOINTMENT_WRONG_FIELD_FORMAT, "wrong locator format ({})".format(locator))
-
-    @staticmethod
-    def check_start_time(start_time, block_height):
-        """
-        Checks if the provided ``start_time`` is correct.
-
-        Start times must be ahead the current best chain tip.
-
-        Args:
-            start_time (:obj:`int`): the block height at which the tower is requested to start watching for breaches.
-            block_height (:obj:`int`): the chain height.
-
-        Raises:
-           :obj:`InspectionFailed`: if any of the fields is wrong.
-        """
-
-        if start_time is None:
-            raise InspectionFailed(errors.APPOINTMENT_EMPTY_FIELD, "empty start_time received")
-
-        elif type(start_time) != int:
-            raise InspectionFailed(
-                errors.APPOINTMENT_WRONG_FIELD_TYPE, "wrong start_time data type ({})".format(type(start_time))
-            )
-
-        elif start_time < block_height:
-            raise InspectionFailed(errors.APPOINTMENT_FIELD_TOO_SMALL, "start_time is in the past")
-
-        elif start_time == block_height:
-            raise InspectionFailed(
-                errors.APPOINTMENT_FIELD_TOO_SMALL,
-                "start_time is too close to current height. Accepted times are: [current_height+1, current_height+6]",
-            )
-
-        elif start_time > block_height + 6:
-            raise InspectionFailed(
-                errors.APPOINTMENT_FIELD_TOO_BIG,
-                "start_time is too far in the future. Accepted start times are up to 6 blocks in the future",
-            )
-
-    @staticmethod
-    def check_end_time(end_time, start_time, block_height):
-        """
-        Checks if the provided ``end_time`` is correct.
-
-        End times must be ahead both the ``start_time`` and the current best chain tip.
-
-        Args:
-            end_time (:obj:`int`): the block height at which the tower is requested to stop watching for breaches.
-            start_time (:obj:`int`): the block height at which the tower is requested to start watching for breaches.
-            block_height (:obj:`int`): the chain height.
-
-        Raises:
-           :obj:`InspectionFailed`: if any of the fields is wrong.
-        """
-
-        # TODO: What's too close to the current height is not properly defined. Right now any appointment that ends in
-        #       the future will be accepted (even if it's only one block away).
-
-        if end_time is None:
-            raise InspectionFailed(errors.APPOINTMENT_EMPTY_FIELD, "empty end_time received")
-
-        elif type(end_time) != int:
-            raise InspectionFailed(
-                errors.APPOINTMENT_WRONG_FIELD_TYPE, "wrong end_time data type ({})".format(type(end_time))
-            )
-
-        elif end_time > block_height + BLOCKS_IN_A_MONTH:  # 4320 = roughly a month in blocks
-            raise InspectionFailed(
-                errors.APPOINTMENT_FIELD_TOO_BIG, "end_time should be within the next month (<= current_height + 4320)"
-            )
-        elif start_time > end_time:
-            raise InspectionFailed(errors.APPOINTMENT_FIELD_TOO_SMALL, "end_time is smaller than start_time")
-
-        elif start_time == end_time:
-            raise InspectionFailed(errors.APPOINTMENT_FIELD_TOO_SMALL, "end_time is equal to start_time")
-
-        elif block_height > end_time:
-            raise InspectionFailed(errors.APPOINTMENT_FIELD_TOO_SMALL, "end_time is in the past")
-
-        elif block_height == end_time:
-            raise InspectionFailed(errors.APPOINTMENT_FIELD_TOO_SMALL, "end_time is too close to current height")
 
     def check_to_self_delay(self, to_self_delay):
         """
@@ -219,7 +141,6 @@ class Inspector:
                 ),
             )
 
-    # ToDo: #6-define-checks-encrypted-blob
     @staticmethod
     def check_blob(encrypted_blob):
         """

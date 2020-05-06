@@ -2,8 +2,8 @@ import os
 import shutil
 import pytest
 
-from teos.db_manager import DBManager
-from test.teos.unit.conftest import get_random_value_hex
+from common.db_manager import DBManager
+from test.common.unit.conftest import get_random_value_hex
 
 
 def open_create_db(db_path):

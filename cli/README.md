@@ -44,8 +44,6 @@ This command is used to send appointments to the watchtower. Appointments **must
 
 	{ "tx": tx,
 	  "tx_id": tx_id,
-	  "start_time": s,
-	  "end_time": e,
 	  "to_self_delay": d }
 	
 `tx` **must** be the raw penalty transaction that will be encrypted before sent to the watchtower. `type(tx) = hex encoded str`
@@ -59,12 +57,6 @@ This command is used to send appointments to the watchtower. Appointments **must
 `d` is the time the watchtower would have to respond with the **penalty transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the to\_self\_delay does not match the `OP_CSV`, the watchtower will try to respond with the penalty transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be at least `20`. `type(d) = int`
 
 The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text. 
-
-### Alpha release restrictions
-The alpha release does not have authentication, payments nor rate limiting, therefore some self imposed restrictions apply:
-
-- `start_time` should be within the next 6 blocks `[current_time+1, current_time+6]`.
-- `end_time` cannot be bigger than (roughly) a month. That is `4320` blocks on top of `start_time`.
 
 
 #### Usage
@@ -103,9 +95,7 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 		"appointment":
 			{
 				"encrypted_blob": eb,
-				"end_time": e,
 				"locator": appointment_locator,
-				"start_time": s,
 				"status": "being_watched",
 				"to_self_delay": d
 			}
@@ -118,7 +108,6 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 		"status": "dispute_responded",
 		"appointment":
 			{
-				"appointment_end": e,
 				"dispute_txid": dispute_txid,
 				"locator": appointment_locator,
 				"penalty_rawtx": penalty_rawtx,
@@ -164,10 +153,10 @@ python teos_cli.py register
 2. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not correspond to a valid transaction. However it can be used to interact with the Eye of Satoshi's API.
 
     ```
-	echo '{"tx": "4615a58815475ab8145b6bb90b1268a0dbb02e344ddd483f45052bec1f15b1951c1ee7f070a0993da395a5ee92ea3a1c184b5ffdb2507164bf1f8c1364155d48bdbc882eee0868ca69864a807f213f538990ad16f56d7dfb28a18e69e3f31ae9adad229e3244073b7d643b4597ec88bf247b9f73f301b0f25ae8207b02b7709c271da98af19f1db276ac48ba64f099644af1ae2c90edb7def5e8589a1bb17cc72ac42ecf07dd29cff91823938fd0d772c2c92b7ab050f8837efd46197c9b2b3f", "tx_id": "0b9510d92a50c1d67c6f7fc5d47908d96b3eccdea093d89bcbaf05bcfebdd951", "start_time": 0, "end_time": 0, "to_self_delay": 20}' > dummy_appointment_data.json
+	echo '{"tx": "4615a58815475ab8145b6bb90b1268a0dbb02e344ddd483f45052bec1f15b1951c1ee7f070a0993da395a5ee92ea3a1c184b5ffdb2507164bf1f8c1364155d48bdbc882eee0868ca69864a807f213f538990ad16f56d7dfb28a18e69e3f31ae9adad229e3244073b7d643b4597ec88bf247b9f73f301b0f25ae8207b02b7709c271da98af19f1db276ac48ba64f099644af1ae2c90edb7def5e8589a1bb17cc72ac42ecf07dd29cff91823938fd0d772c2c92b7ab050f8837efd46197c9b2b3f", "tx_id": "0b9510d92a50c1d67c6f7fc5d47908d96b3eccdea093d89bcbaf05bcfebdd951", "to_self_delay": 20}' > dummy_appointment_data.json
     ```
 
-    That will create a json file that follows the appointment data structure filled with dummy data and store it in `dummy_appointment_data.json`. **Note**: You'll need to update the `start_time` and `end_time` to match valid block heights.
+    That will create a json file that follows the appointment data structure filled with dummy data and store it in `dummy_appointment_data.json`.
 
 3. Send the appointment to the tower API. Which will then start monitoring for matching transactions.
 

@@ -6,52 +6,50 @@ import requests
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey
-from requests import Timeout, ConnectionError
 from getopt import getopt, GetoptError
+from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
+from cli.exceptions import TowerResponseError
 from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
-from cli.exceptions import InvalidKey, InvalidParameter, TowerResponseError
 from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
 
-import common.cryptographer
-from common.blob import Blob
 from common import constants
 from common.logger import Logger
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_logging, setup_data_folder
+from common.exceptions import InvalidKey, InvalidParameter, SignatureError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
-def register(compressed_pk, teos_url):
+def register(user_id, teos_url):
     """
     Registers the user to the tower.
 
     Args:
-        compressed_pk (:obj:`str`): a 33-byte hex-encoded compressed public key representing the user.
+        user_id (:obj:`str`): a 33-byte hex-encoded compressed public key representing the user.
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
         :obj:`dict`: a dictionary containing the tower response if the registration succeeded.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `compressed_pk` is invalid.
+        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `user_id` is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
         :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
-    if not is_compressed_pk(compressed_pk):
+    if not is_compressed_pk(user_id):
         raise InvalidParameter("The cli public key is not valid")
 
     # Send request to the server.
     register_endpoint = "{}/register".format(teos_url)
-    data = {"public_key": compressed_pk}
+    data = {"public_key": user_id}
 
     logger.info("Registering in the Eye of Satoshi")
     response = process_post_response(post_request(data, register_endpoint))
@@ -59,7 +57,7 @@ def register(compressed_pk, teos_url):
     return response
 
 
-def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
+def add_appointment(appointment_data, user_sk, teos_id, teos_url):
     """
     Manages the add_appointment command.
 
@@ -74,8 +72,8 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
 
     Args:
         appointment_data (:obj:`dict`): a dictionary containing the appointment data.
-        cli_sk (:obj:`PrivateKey`): the client's private key.
-        teos_pk (:obj:`PublicKey`): the tower's public key.
+        user_sk (:obj:`PrivateKey`): the user's private key.
+        teos_id (:obj:`str`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
@@ -104,13 +102,9 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
         raise InvalidParameter("The provided data is missing the transaction")
 
     appointment_data["locator"] = compute_locator(tx_id)
-    appointment_data["encrypted_blob"] = Cryptographer.encrypt(Blob(tx), tx_id)
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(tx, tx_id)
     appointment = Appointment.from_dict(appointment_data)
-    signature = Cryptographer.sign(appointment.serialize(), cli_sk)
-
-    # FIXME: the cryptographer should return exception we can capture
-    if not signature:
-        raise ValueError("The provided appointment cannot be signed")
+    signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
@@ -125,7 +119,7 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
         raise TowerResponseError("The response does not contain the signature of the appointment")
 
     rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
-    if not Cryptographer.verify_rpk(teos_pk, rpk):
+    if teos_id != Cryptographer.get_compressed_pk(rpk):
         raise TowerResponseError("The returned appointment's signature is invalid")
 
     logger.info("Appointment accepted and signed by the Eye of Satoshi")
@@ -134,14 +128,14 @@ def add_appointment(appointment_data, cli_sk, teos_pk, teos_url):
     return appointment, signature
 
 
-def get_appointment(locator, cli_sk, teos_pk, teos_url):
+def get_appointment(locator, user_sk, teos_id, teos_url):
     """
     Gets information about an appointment from the tower.
 
     Args:
         locator (:obj:`str`): the appointment locator used to identify it.
-        cli_sk (:obj:`PrivateKey`): the client's private key.
-        teos_pk (:obj:`PublicKey`): the tower's public key.
+        user_sk (:obj:`PrivateKey`): the user's private key.
+        teos_id (:obj:`PublicKey`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
@@ -155,13 +149,13 @@ def get_appointment(locator, cli_sk, teos_pk, teos_url):
         response was invalid.
     """
 
-    # FIXME: All responses from the tower should be signed. Not using teos_pk atm.
+    # FIXME: All responses from the tower should be signed. Not using teos_id atm.
 
     if not is_locator(locator):
         raise InvalidParameter("The provided locator is not valid", locator=locator)
 
     message = "get appointment {}".format(locator)
-    signature = Cryptographer.sign(message.encode(), cli_sk)
+    signature = Cryptographer.sign(message.encode(), user_sk)
     data = {"locator": locator, "signature": signature}
 
     # Send request to the server.
@@ -205,18 +199,17 @@ def get_all_appointments(teos_url):
         return None
 
 
-def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
+def load_keys(teos_pk_path, user_sk_path):
     """
     Loads all the keys required so sign, send, and verify the appointment.
 
     Args:
-        teos_pk_path (:obj:`str`): path to the tower public key file.
-        cli_sk_path (:obj:`str`): path to the client private key file.
-        cli_pk_path (:obj:`str`): path to the client public key file.
+        teos_pk_path (:obj:`str`): path to the tower's public key file.
+        user_sk_path (:obj:`str`): path to the user's private key file.
 
     Returns:
-        :obj:`tuple`: a three-item tuple containing a ``PrivateKey``, a ``PublicKey`` and a ``str``
-        representing the tower pk, user sk and user compressed pk respectively.
+        :obj:`tuple`: a three-item tuple containing a ``str``, a ``PrivateKey`` and a ``str``
+        representing the tower id (compressed pk), user sk and user id (compressed pk) respectively.
 
     Raises:
         :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if any of the keys is invalid or cannot be loaded.
@@ -225,33 +218,30 @@ def load_keys(teos_pk_path, cli_sk_path, cli_pk_path):
     if not teos_pk_path:
         raise InvalidKey("TEOS's public key file not found. Please check your settings")
 
-    if not cli_sk_path:
+    if not user_sk_path:
         raise InvalidKey("Client's private key file not found. Please check your settings")
-
-    if not cli_pk_path:
-        raise InvalidKey("Client's public key file not found. Please check your settings")
 
     try:
         teos_pk_der = Cryptographer.load_key_file(teos_pk_path)
-        teos_pk = PublicKey(teos_pk_der)
+        teos_id = Cryptographer.get_compressed_pk(PublicKey(teos_pk_der))
 
-    except ValueError:
-        raise InvalidKey("TEOS public key is invalid or cannot be parsed")
+    except (InvalidParameter, InvalidKey, ValueError):
+        raise InvalidKey("TEOS public key cannot be loaded")
 
-    cli_sk_der = Cryptographer.load_key_file(cli_sk_path)
-    cli_sk = Cryptographer.load_private_key_der(cli_sk_der)
+    try:
+        user_sk_der = Cryptographer.load_key_file(user_sk_path)
+        user_sk = Cryptographer.load_private_key_der(user_sk_der)
 
-    if cli_sk is None:
+    except (InvalidParameter, InvalidKey):
         raise InvalidKey("Client private key is invalid or cannot be parsed")
 
     try:
-        cli_pk_der = Cryptographer.load_key_file(cli_pk_path)
-        compressed_cli_pk = Cryptographer.get_compressed_pk(PublicKey(cli_pk_der))
+        user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
-    except ValueError:
-        raise InvalidKey("Client public key is invalid or cannot be parsed")
+    except (InvalidParameter, InvalidKey):
+        raise InvalidKey("Client public key cannot be loaded")
 
-    return teos_pk, cli_sk, compressed_cli_pk
+    return teos_id, user_sk, user_id
 
 
 def post_request(data, endpoint):
@@ -273,10 +263,10 @@ def post_request(data, endpoint):
         return requests.post(url=endpoint, json=data, timeout=5)
 
     except Timeout:
-        message = "Can't connect to the Eye of Satoshi's API. Connection timeout"
+        message = "Cannot connect to the Eye of Satoshi's API. Connection timeout"
 
     except ConnectionError:
-        message = "Can't connect to the Eye of Satoshi's API. Server cannot be reached"
+        message = "Cannot connect to the Eye of Satoshi's API. Server cannot be reached"
 
     except (InvalidSchema, MissingSchema, InvalidURL):
         message = "Invalid URL. No schema, or invalid schema, found ({})".format(endpoint)
@@ -412,17 +402,15 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        teos_pk, cli_sk, compressed_cli_pk = load_keys(
-            config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"), config.get("CLI_PUBLIC_KEY")
-        )
+        teos_id, user_sk, user_id = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"))
 
         if command == "register":
-            register_data = register(compressed_cli_pk, teos_url)
+            register_data = register(user_id, teos_url)
             logger.info("Registration succeeded. Available slots: {}".format(register_data.get("available_slots")))
 
         if command == "add_appointment":
             appointment_data = parse_add_appointment_args(args)
-            appointment, signature = add_appointment(appointment_data, cli_sk, teos_pk, teos_url)
+            appointment, signature = add_appointment(appointment_data, user_sk, teos_id, teos_url)
             save_appointment_receipt(appointment.to_dict(), signature, config.get("APPOINTMENTS_FOLDER_NAME"))
 
         elif command == "get_appointment":
@@ -435,7 +423,7 @@ def main(command, args, command_line_conf):
                 if arg_opt in ["-h", "--help"]:
                     sys.exit(help_get_appointment())
 
-                appointment_data = get_appointment(arg_opt, cli_sk, teos_pk, teos_url)
+                appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
                 if appointment_data:
                     print(appointment_data)
 
@@ -468,8 +456,8 @@ def main(command, args, command_line_conf):
 
     except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
         logger.error(str(e))
-    except (InvalidKey, InvalidParameter, TowerResponseError) as e:
-        logger.error(e.reason, **e.kwargs)
+    except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
+        logger.error(e.msg, **e.kwargs)
     except Exception as e:
         logger.error("Unknown error occurred", error=str(e))
 

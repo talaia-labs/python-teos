@@ -1,13 +1,12 @@
 import struct
 import binascii
+import pytest
 from pytest import fixture
 
 from common.appointment import Appointment
-from common.encrypted_blob import EncryptedBlob
+from common.constants import LOCATOR_LEN_BYTES
 
 from test.common.unit.conftest import get_random_value_hex
-
-from common.constants import LOCATOR_LEN_BYTES
 
 
 # Not much to test here, adding it for completeness
@@ -31,42 +30,28 @@ def appointment_data():
 def test_init_appointment(appointment_data):
     # The appointment has no checks whatsoever, since the inspector is the one taking care or that, and the only one
     # creating appointments.
-    # DISCUSS: whether this makes sense by design or checks should be ported from the inspector to the appointment
-    #          35-appointment-checks
     appointment = Appointment(
-        appointment_data["locator"],
-        appointment_data["start_time"],
-        appointment_data["end_time"],
-        appointment_data["to_self_delay"],
-        appointment_data["encrypted_blob"],
+        appointment_data["locator"], appointment_data["to_self_delay"], appointment_data["encrypted_blob"]
     )
 
     assert (
         appointment_data["locator"] == appointment.locator
-        and appointment_data["start_time"] == appointment.start_time
-        and appointment_data["end_time"] == appointment.end_time
         and appointment_data["to_self_delay"] == appointment.to_self_delay
-        and EncryptedBlob(appointment_data["encrypted_blob"]) == appointment.encrypted_blob
+        and appointment_data["encrypted_blob"] == appointment.encrypted_blob
     )
 
 
 def test_to_dict(appointment_data):
     appointment = Appointment(
-        appointment_data["locator"],
-        appointment_data["start_time"],
-        appointment_data["end_time"],
-        appointment_data["to_self_delay"],
-        appointment_data["encrypted_blob"],
+        appointment_data["locator"], appointment_data["to_self_delay"], appointment_data["encrypted_blob"]
     )
 
     dict_appointment = appointment.to_dict()
 
     assert (
         appointment_data["locator"] == dict_appointment["locator"]
-        and appointment_data["start_time"] == dict_appointment["start_time"]
-        and appointment_data["end_time"] == dict_appointment["end_time"]
         and appointment_data["to_self_delay"] == dict_appointment["to_self_delay"]
-        and EncryptedBlob(appointment_data["encrypted_blob"]) == EncryptedBlob(dict_appointment["encrypted_blob"])
+        and appointment_data["encrypted_blob"] == dict_appointment["encrypted_blob"]
     )
 
 
@@ -80,13 +65,9 @@ def test_from_dict(appointment_data):
         prev_val = appointment_data[key]
         appointment_data[key] = None
 
-        try:
+        with pytest.raises(ValueError, match="Wrong appointment data"):
             Appointment.from_dict(appointment_data)
-            assert False
-
-        except ValueError:
             appointment_data[key] = prev_val
-            assert True
 
 
 def test_serialize(appointment_data):
@@ -101,13 +82,9 @@ def test_serialize(appointment_data):
     assert isinstance(serialized_appointment, bytes)
 
     locator = serialized_appointment[:16]
-    start_time = serialized_appointment[16:20]
-    end_time = serialized_appointment[20:24]
-    to_self_delay = serialized_appointment[24:28]
-    encrypted_blob = serialized_appointment[28:]
+    to_self_delay = serialized_appointment[16:20]
+    encrypted_blob = serialized_appointment[20:]
 
     assert binascii.hexlify(locator).decode() == appointment.locator
-    assert struct.unpack(">I", start_time)[0] == appointment.start_time
-    assert struct.unpack(">I", end_time)[0] == appointment.end_time
     assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
-    assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob.data
+    assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob

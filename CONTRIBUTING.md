@@ -49,10 +49,10 @@ for opt, arg in opts:
 ```
 
 ```python
-if rcode == 0:
-    rcode, message = self.check_start_time(start_time, block_height)
-if rcode == 0:
-    rcode, message = self.check_end_time(end_time, start_time, block_height)
+if appointment_data is None:
+    raise InspectionFailed(errors.APPOINTMENT_EMPTY_FIELD, "empty appointment received")
+elif not isinstance(appointment_data, dict):
+    raise InspectionFailed(errors.APPOINTMENT_WRONG_FIELD, "wrong appointment format")
 ```
 
 ## Dev Requirements
