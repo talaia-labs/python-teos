@@ -1,6 +1,6 @@
 .vscode/
 .idea/
-.venv/
+.venv*
 *.log
 .DS_Store
 bitcoin.conf*
