@@ -340,7 +340,7 @@ def on_commitment_revocation(plugin, **kwargs):
         tower_update = {}
 
         if tower.status == "misbehaving":
-            return {"result": "continue"}
+            continue
 
         try:
             if tower.status == "reachable":
