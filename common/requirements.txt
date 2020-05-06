@@ -1,0 +1,4 @@
+cryptography==2.8
+coincurve
+pyzbase32
+plyvel
