@@ -6,11 +6,12 @@ Currently working on updating the software to match [BOLT13 rev1](https://github
 
 The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://github.com/sr-gi/bolt13), written in Python 3.
 
-`teos` consists in three main modules:
+`teos` consists in four main modules:
 
 - `teos`: including the tower's main functionality (server-side)
 - `cli`: including a reference command line interface (client-side)
 - `common`: including shared functionality between `teos` and `cli`.
+- `watchtower-plugin`: including a watchtower client plugin for c-lightning.
 
 Additionally, tests for every module can be found at `tests`.
 
