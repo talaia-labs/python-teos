@@ -1,45 +1,50 @@
+from teos.responder import TransactionTracker
+from teos.extended_appointment import ExtendedAppointment
+
+
 class Builder:
     """
-    The :class:`Builder` class is in charge of reconstructing data loaded from the database and build the data
-    structures of the :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>`.
+    The :class:`Builder` class is in charge of reconstructing data loaded from the appointments database and build the
+    data structures of the :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>`.
     """
 
     @staticmethod
     def build_appointments(appointments_data):
         """
-        Builds an appointments dictionary (``uuid: Appointment``) and a locator_uuid_map (``locator: uuid``) given a
-        dictionary of appointments from the database.
+        Builds an appointments dictionary (``uuid:ExtendedAppointment``) and a locator_uuid_map (``locator:uuid``)
+        given a dictionary of appointments from the database.
 
         Args:
             appointments_data (:obj:`dict`): a dictionary of dictionaries representing all the
                 :obj:`Watcher <teos.watcher.Watcher>` appointments stored in the database. The structure is as follows:
 
-                    ``{uuid: {locator: str, start_time: int, ...}, uuid: {locator:...}}``
+                    ``{uuid: {locator: str, ...}, uuid: {locator:...}}``
 
         Returns:
             :obj:`tuple`: A tuple with two dictionaries. ``appointments`` containing the appointment information in
-            :obj:`Appointment <teos.appointment.Appointment>` objects and ``locator_uuid_map`` containing a map of
-            appointment (``uuid:locator``).
+            :obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>` objects and ``locator_uuid_map``
+            containing a map of appointment (``uuid:locator``).
         """
 
         appointments = {}
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointments[uuid] = {"locator": data.get("locator"), "end_time": data.get("end_time")}
+            appointment = ExtendedAppointment.from_dict(data)
+            appointments[uuid] = appointment.get_summary()
 
-            if data.get("locator") in locator_uuid_map:
-                locator_uuid_map[data.get("locator")].append(uuid)
+            if appointment.locator in locator_uuid_map:
+                locator_uuid_map[appointment.locator].append(uuid)
 
             else:
-                locator_uuid_map[data.get("locator")] = [uuid]
+                locator_uuid_map[appointment.locator] = [uuid]
 
         return appointments, locator_uuid_map
 
     @staticmethod
     def build_trackers(tracker_data):
         """
-        Builds a tracker dictionary (``uuid: TransactionTracker``) and a tx_tracker_map (``penalty_txid: uuid``) given
+        Builds a tracker dictionary (``uuid:TransactionTracker``) and a tx_tracker_map (``penalty_txid:uuid``) given
         a dictionary of trackers from the database.
 
         Args:
@@ -60,17 +65,14 @@ class Builder:
         tx_tracker_map = {}
 
         for uuid, data in tracker_data.items():
-            trackers[uuid] = {
-                "penalty_txid": data.get("penalty_txid"),
-                "locator": data.get("locator"),
-                "appointment_end": data.get("appointment_end"),
-            }
+            tracker = TransactionTracker.from_dict(data)
+            trackers[uuid] = tracker.get_summary()
 
-            if data.get("penalty_txid") in tx_tracker_map:
-                tx_tracker_map[data.get("penalty_txid")].append(uuid)
+            if tracker.penalty_txid in tx_tracker_map:
+                tx_tracker_map[tracker.penalty_txid].append(uuid)
 
             else:
-                tx_tracker_map[data.get("penalty_txid")] = [uuid]
+                tx_tracker_map[tracker.penalty_txid] = [uuid]
 
         return trackers, tx_tracker_map
 
@@ -81,8 +83,8 @@ class Builder:
         :mod:`Responder <teos.responder.Responder>` using backed up data.
 
         Args:
-            block_queue (:obj:`Queue`): a ``Queue``
-            missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (do to a crash or shutdown).
+            block_queue (:obj:`Queue`): a ``Queue``.
+            missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (due to a crash or shutdown).
 
         Returns:
             :obj:`Queue`: A ``Queue`` containing all the missed blocks hashes.
@@ -94,8 +96,9 @@ class Builder:
     @staticmethod
     def update_states(watcher, missed_blocks_watcher, missed_blocks_responder):
         """
-        Updates the states of both the :mod:`Watcher <teos.watcher.Watcher>` and the :mod:`Responder <teos.responder.Responder>`.
-        If both have pending blocks to process they need to be updates at the same time, block by block.
+        Updates the states of both the :mod:`Watcher <teos.watcher.Watcher>` and the
+        :mod:`Responder <teos.responder.Responder>`. If both have pending blocks to process they need to be updated at
+        the same time, block by block.
 
         If only one instance has to be updated, ``populate_block_queue`` should be used.
 

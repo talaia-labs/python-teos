@@ -7,7 +7,7 @@ logger = Logger(actor="Cleaner", log_name_prefix=LOG_PREFIX)
 
 class Cleaner:
     """
-    The :class:`Cleaner` is the class in charge of removing expired/completed data from the tower.
+    The :class:`Cleaner` is in charge of removing expired/completed data from the tower.
 
     Mutable objects (like dicts) are passed-by-reference in Python, so no return is needed for the Cleaner.
     """
@@ -15,15 +15,16 @@ class Cleaner:
     @staticmethod
     def delete_appointment_from_memory(uuid, appointments, locator_uuid_map):
         """
-        Deletes an appointment from memory (appointments and locator_uuid_map dictionaries). If the given appointment
-        does not share locator with any other, the map will completely removed, otherwise, the uuid will be removed from
-        the map.
+        Deletes an appointment from memory (``appointments`` and ``locator_uuid_map`` dictionaries). If the given
+        appointment does not share locator with any other, the map will completely removed, otherwise, the uuid will be
+        removed from the map.
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be deleted.
             appointments (:obj:`dict`): the appointments dictionary from where the appointment should be removed.
             locator_uuid_map (:obj:`dict`): the locator:uuid map from where the appointment should also be removed.
         """
+
         locator = appointments[uuid].get("locator")
 
         # Delete the appointment
@@ -43,8 +44,8 @@ class Cleaner:
 
         Args:
             uuid (:obj:`str`): the identifier of the appointment to be deleted.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         db_manager.delete_watcher_appointment(uuid)
@@ -61,8 +62,8 @@ class Cleaner:
         Args:
             uuids (:obj:`list`): a list of identifiers to be removed from the map.
             locator (:obj:`str`): the identifier of the map to be either updated or deleted.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         locator_map = db_manager.load_locator_map(locator)
@@ -86,7 +87,7 @@ class Cleaner:
     @staticmethod
     def delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager):
         """
-        Deletes appointments which ``end_time`` has been reached (with no trigger) both from memory
+        Deletes appointments which ``expiry`` has been reached (with no trigger) both from memory
         (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
 
         Args:
@@ -95,8 +96,8 @@ class Cleaner:
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
                 appointments.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         locator_maps_to_update = {}
@@ -123,8 +124,9 @@ class Cleaner:
         """
         Deletes a completed appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
 
-        Currently, an appointment is only completed if it cannot make it to the (:obj:`Responder <teos.responder.Responder>`),
-        otherwise, it will be flagged as triggered and removed once the tracker is completed.
+        Currently, an appointment is only completed if it cannot make it to the
+        (:obj:`Responder <teos.responder.Responder>`), otherwise, it will be flagged as triggered and removed once the
+        tracker is completed.
 
         Args:
             completed_appointments (:obj:`list`): a list of appointments to be deleted.
@@ -132,9 +134,10 @@ class Cleaner:
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
                 appointments.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
+
         locator_maps_to_update = {}
 
         for uuid in completed_appointments:
@@ -160,7 +163,7 @@ class Cleaner:
     @staticmethod
     def flag_triggered_appointments(triggered_appointments, appointments, locator_uuid_map, db_manager):
         """
-        Deletes a list of  triggered appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and flags them as
+        Deletes a list of triggered appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and flags them as
         triggered on disk.
 
         Args:
@@ -169,8 +172,8 @@ class Cleaner:
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
                 appointments.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
         """
 
         for uuid in triggered_appointments:
@@ -178,31 +181,37 @@ class Cleaner:
             db_manager.create_triggered_appointment_flag(uuid)
 
     @staticmethod
-    def delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager):
+    def delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager, expired=False):
         """
-        Deletes a completed tracker both from memory (:obj:`Responder <teos.responder.Responder>`) and disk (from the
-        Responder's and Watcher's databases).
+        Deletes completed/expired trackers both from memory (:obj:`Responder <teos.responder.Responder>`) and disk
+        (from the Responder's and Watcher's databases).
 
         Args:
             trackers (:obj:`dict`): a dictionary containing all the :obj:`Responder <teos.responder.Responder>`
                 trackers.
+            height (:obj:`int`): the block height at which the trackers were completed.
             tx_tracker_map (:obj:`dict`): a ``penalty_txid:uuid`` map for the :obj:`Responder
                 <teos.responder.Responder>` trackers.
-            completed_trackers (:obj:`dict`): a dict of completed trackers to be deleted (uuid:confirmations).
-            height (:obj:`int`): the block height at which the trackers were completed.
-            db_manager (:obj:`DBManager <teos.db_manager.DBManager>`): a ``DBManager`` instance to interact with the
-                database.
+            completed_trackers (:obj:`dict`): a dict of completed/expired trackers to be deleted (uuid:confirmations).
+            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
+                to interact with the database.
+            expired (:obj:`bool`): whether the trackers have expired or not. Defaults to False.
         """
 
         locator_maps_to_update = {}
 
-        for uuid, confirmations in completed_trackers.items():
-            logger.info(
-                "Appointment completed. Appointment ended after reaching enough confirmations",
-                uuid=uuid,
-                height=height,
-                confirmations=confirmations,
-            )
+        for uuid in completed_trackers:
+
+            if expired:
+                logger.info(
+                    "Appointment couldn't be completed. Expiry reached but penalty didn't make it to the chain",
+                    uuid=uuid,
+                    height=height,
+                )
+            else:
+                logger.info(
+                    "Appointment completed. Penalty transaction was irrevocably confirmed", uuid=uuid, height=height
+                )
 
             penalty_txid = trackers[uuid].get("penalty_txid")
             locator = trackers[uuid].get("locator")
@@ -226,6 +235,35 @@ class Cleaner:
             Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
 
         # Delete appointment from the db (from watchers's and responder's db) and remove flag
-        db_manager.batch_delete_responder_trackers(list(completed_trackers.keys()))
-        db_manager.batch_delete_watcher_appointments(list(completed_trackers.keys()))
-        db_manager.batch_delete_triggered_appointment_flag(list(completed_trackers.keys()))
+        db_manager.batch_delete_responder_trackers(completed_trackers)
+        db_manager.batch_delete_watcher_appointments(completed_trackers)
+        db_manager.batch_delete_triggered_appointment_flag(completed_trackers)
+
+    @staticmethod
+    def delete_gatekeeper_appointments(gatekeeper, appointment_to_delete):
+        """
+        Deletes a list of expired / completed appointments of a given user both from memory and the UserDB.
+
+        Args:
+            gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control
+            the user access and subscription expiry.
+            appointment_to_delete (:obj:`dict`): uuid:user_id dict containing the appointments to delete
+            (expired + completed)
+        """
+
+        user_ids = []
+        # Remove appointments from memory
+        for uuid, user_id in appointment_to_delete.items():
+            if user_id in gatekeeper.registered_users and uuid in gatekeeper.registered_users[user_id].appointments:
+                # Remove the appointment from the appointment list and update the available slots
+                gatekeeper.lock.acquire()
+                freed_slots = gatekeeper.registered_users[user_id].appointments.pop(uuid)
+                gatekeeper.registered_users[user_id].available_slots += freed_slots
+                gatekeeper.lock.release()
+
+                if user_id not in user_ids:
+                    user_ids.append(user_id)
+
+        # Store the updated users in the DB
+        for user_id in user_ids:
+            gatekeeper.user_db.store_user(user_id, gatekeeper.registered_users[user_id].to_dict())

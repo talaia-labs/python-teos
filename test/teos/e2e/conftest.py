@@ -11,20 +11,17 @@ from common.config_loader import ConfigLoader
 
 
 getcontext().prec = 10
-END_TIME_DELTA = 10
 
 
 @pytest.fixture(scope="session")
 def bitcoin_cli():
     config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
-    print(config)
-    # btc_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
 
     return AuthServiceProxy(
         "http://%s:%s@%s:%d"
         % (
             config.get("BTC_RPC_USER"),
-            config.get("BTC_RPC_PASSWD"),
+            config.get("BTC_RPC_PASSWORD"),
             config.get("BTC_RPC_CONNECT"),
             config.get("BTC_RPC_PORT"),
         )
@@ -40,26 +37,35 @@ def prng_seed():
 def setup_node(bitcoin_cli):
     # This method will create a new address a mine bitcoin so the node can be used for testing
     new_addr = bitcoin_cli.getnewaddress()
-    bitcoin_cli.generatetoaddress(101, new_addr)
+    bitcoin_cli.generatetoaddress(106, new_addr)
 
 
-@pytest.fixture()
-def create_txs(bitcoin_cli):
+def create_txs(bitcoin_cli, n=1):
     utxos = bitcoin_cli.listunspent()
 
-    if len(utxos) == 0:
-        raise ValueError("There're no UTXOs.")
+    if len(utxos) < n:
+        raise ValueError("There're no enough UTXOs.")
 
-    utxo = utxos.pop(0)
-    while utxo.get("amount") < Decimal(2 / pow(10, 5)):
+    signed_commitment_txs = []
+    signed_penalty_txs = []
+
+    for _ in range(n):
         utxo = utxos.pop(0)
+        while utxo.get("amount") < Decimal(2 / pow(10, 5)):
+            utxo = utxos.pop(0)
 
-    signed_commitment_tx = create_commitment_tx(bitcoin_cli, utxo)
-    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx)
+        signed_commitment_tx = create_commitment_tx(bitcoin_cli, utxo)
+        decoded_commitment_tx = bitcoin_cli.decoderawtransaction(signed_commitment_tx)
 
-    signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
+        signed_penalty_tx = create_penalty_tx(bitcoin_cli, decoded_commitment_tx)
 
-    return signed_commitment_tx, signed_penalty_tx
+        signed_commitment_txs.append(signed_commitment_tx)
+        signed_penalty_txs.append(signed_penalty_tx)
+
+    if len(signed_penalty_txs) > 1:
+        return signed_commitment_txs, signed_penalty_txs
+    else:
+        return signed_commitment_txs[0], signed_penalty_txs[0]
 
 
 def run_teosd():
@@ -116,16 +122,8 @@ def create_penalty_tx(bitcoin_cli, decoded_commitment_tx, destination=None):
     return signed_penalty_tx.get("hex")
 
 
-def build_appointment_data(bitcoin_cli, commitment_tx_id, penalty_tx):
-    current_height = bitcoin_cli.getblockcount()
-
-    appointment_data = {
-        "tx": penalty_tx,
-        "tx_id": commitment_tx_id,
-        "start_time": current_height + 1,
-        "end_time": current_height + 1 + END_TIME_DELTA,
-        "to_self_delay": 20,
-    }
+def build_appointment_data(commitment_tx_id, penalty_tx):
+    appointment_data = {"tx": penalty_tx, "tx_id": commitment_tx_id, "to_self_delay": 20}
 
     return appointment_data
 

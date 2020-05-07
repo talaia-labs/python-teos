@@ -10,8 +10,8 @@ logger = Logger(actor="ChainMonitor", log_name_prefix=LOG_PREFIX)
 
 class ChainMonitor:
     """
-    The :class:`ChainMonitor` is the class in charge of monitoring the blockchain (via ``bitcoind``) to detect new
-    blocks on top of the best chain. If a new best block is spotted, the chain monitor will notify the
+    The :class:`ChainMonitor` is in charge of monitoring the blockchain (via ``bitcoind``) to detect new blocks on top
+    of the best chain. If a new best block is spotted, the chain monitor will notify the
     :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>` using ``Queues``.
 
     The :class:`ChainMonitor` monitors the chain using two methods: ``zmq`` and ``polling``. Blocks are only notified
@@ -20,21 +20,20 @@ class ChainMonitor:
     Args:
         watcher_queue (:obj:`Queue`): the queue to be used to send blocks hashes to the ``Watcher``.
         responder_queue (:obj:`Queue`): the queue to be used to send blocks hashes to the ``Responder``.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a blockProcessor instance.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance.
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
     Attributes:
         best_tip (:obj:`str`): a block hash representing the current best tip.
         last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         terminate (:obj:`bool`): a flag to signal the termination of the :class:`ChainMonitor` (shutdown the tower).
-        check_tip (:obj:`Event`): an event that's triggered at fixed time intervals and controls the polling thread.
+        check_tip (:obj:`Event`): an event that is triggered at fixed time intervals and controls the polling thread.
         lock (:obj:`Condition`): a lock used to protect concurrent access to the queues and ``best_tip`` by the zmq and
             polling threads.
         zmqSubSocket (:obj:`socket`): a socket to connect to ``bitcoind`` via ``zmq``.
         watcher_queue (:obj:`Queue`): a queue to send new best tips to the :obj:`Watcher <teos.watcher.Watcher>`.
         responder_queue (:obj:`Queue`): a queue to send new best tips to the
             :obj:`Responder <teos.responder.Responder>`.
-
         polling_delta (:obj:`int`): time between polls (in seconds).
         max_block_window_size (:obj:`int`): max size of last_tips.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a blockProcessor instance.
@@ -75,7 +74,6 @@ class ChainMonitor:
 
         Args:
             block_hash (:obj:`str`): the new block hash to be sent to the subscribers.
-            block_hash (:obj:`str`): the new block hash to be sent to the subscribers.
         """
 
         self.watcher_queue.put(block_hash)
@@ -90,7 +88,7 @@ class ChainMonitor:
             block_hash (:obj:`block_hash`): the new best tip.
 
         Returns:
-            (:obj:`bool`): ``True`` is the state was successfully updated, ``False`` otherwise.
+            :obj:`bool`: True is the state was successfully updated, False otherwise.
         """
 
         if block_hash != self.best_tip and block_hash not in self.last_tips:

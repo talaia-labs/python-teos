@@ -1,8 +1,9 @@
 import random
 from uuid import uuid4
 
-from teos.responder import TransactionTracker
 from teos.cleaner import Cleaner
+from teos.gatekeeper import UserInfo
+from teos.responder import TransactionTracker
 from common.appointment import Appointment
 
 from test.teos.unit.conftest import get_random_value_hex
@@ -23,11 +24,11 @@ def set_up_appointments(db_manager, total_appointments):
         uuid = uuid4().hex
         locator = get_random_value_hex(LOCATOR_LEN_BYTES)
 
-        appointment = Appointment(locator, None, None, None, None)
+        appointment = Appointment(locator, None, None)
         appointments[uuid] = {"locator": appointment.locator}
         locator_uuid_map[locator] = [uuid]
 
-        db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        db_manager.store_watcher_appointment(uuid, appointment.to_dict())
         db_manager.create_append_locator_map(locator, uuid)
 
         # Each locator can have more than one uuid assigned to it.
@@ -37,7 +38,7 @@ def set_up_appointments(db_manager, total_appointments):
             appointments[uuid] = {"locator": appointment.locator}
             locator_uuid_map[locator].append(uuid)
 
-            db_manager.store_watcher_appointment(uuid, appointment.to_json())
+            db_manager.store_watcher_appointment(uuid, appointment.to_dict())
             db_manager.create_append_locator_map(locator, uuid)
 
     return appointments, locator_uuid_map
@@ -60,7 +61,7 @@ def set_up_trackers(db_manager, total_trackers):
         trackers[uuid] = {"locator": tracker.locator, "penalty_txid": tracker.penalty_txid}
         tx_tracker_map[penalty_txid] = [uuid]
 
-        db_manager.store_responder_tracker(uuid, tracker.to_json())
+        db_manager.store_responder_tracker(uuid, tracker.to_dict())
         db_manager.create_append_locator_map(tracker.locator, uuid)
 
         # Each penalty_txid can have more than one uuid assigned to it.
@@ -70,7 +71,7 @@ def set_up_trackers(db_manager, total_trackers):
             trackers[uuid] = {"locator": tracker.locator, "penalty_txid": tracker.penalty_txid}
             tx_tracker_map[penalty_txid].append(uuid)
 
-            db_manager.store_responder_tracker(uuid, tracker.to_json())
+            db_manager.store_responder_tracker(uuid, tracker.to_dict())
             db_manager.create_append_locator_map(tracker.locator, uuid)
 
     return trackers, tx_tracker_map
@@ -156,7 +157,8 @@ def test_flag_triggered_appointments(db_manager):
         assert set(triggered_appointments).issubset(db_appointments)
 
 
-def test_delete_completed_trackers_db_match(db_manager):
+def test_delete_trackers_db_match(db_manager):
+    # Completed and expired trackers are deleted using the same method. The only difference is the logging message
     height = 0
 
     for _ in range(ITERATIONS):
@@ -165,12 +167,12 @@ def test_delete_completed_trackers_db_match(db_manager):
 
         completed_trackers = {tracker: 6 for tracker in selected_trackers}
 
-        Cleaner.delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
+        Cleaner.delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
 
         assert not set(completed_trackers).issubset(trackers.keys())
 
 
-def test_delete_completed_trackers_no_db_match(db_manager):
+def test_delete_trackers_no_db_match(db_manager):
     height = 0
 
     for _ in range(ITERATIONS):
@@ -203,5 +205,38 @@ def test_delete_completed_trackers_no_db_match(db_manager):
         completed_trackers = {tracker: 6 for tracker in selected_trackers}
 
         # We should be able to delete the correct ones and not fail in the others
-        Cleaner.delete_completed_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
+        Cleaner.delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
         assert not set(completed_trackers).issubset(trackers.keys())
+
+
+def test_delete_gatekeeper_appointments(gatekeeper):
+    # delete_gatekeeper_appointments should delete the appointments from user as long as both exist
+
+    appointments_not_to_delete = {}
+    appointments_to_delete = {}
+    # Let's add some users and appointments to the Gatekeeper
+    for _ in range(10):
+        user_id = get_random_value_hex(16)
+        # The UserInfo params do not matter much here
+        gatekeeper.registered_users[user_id] = UserInfo(available_slots=100, subscription_expiry=0)
+        for _ in range(random.randint(0, 10)):
+            # Add some appointments
+            uuid = get_random_value_hex(16)
+            gatekeeper.registered_users[user_id].appointments[uuid] = 1
+
+            if random.randint(0, 1) % 2:
+                appointments_to_delete[uuid] = user_id
+            else:
+                appointments_not_to_delete[uuid] = user_id
+
+    # Now let's delete half of them
+    Cleaner.delete_gatekeeper_appointments(gatekeeper, appointments_to_delete)
+
+    all_appointments_gatekeeper = []
+    # Let's get all the appointments in the Gatekeeper
+    for user_id, user in gatekeeper.registered_users.items():
+        all_appointments_gatekeeper.extend(user.appointments)
+
+    # Check that the first half of the appointments are not in the Gatekeeper, but the second half is
+    assert not set(appointments_to_delete).issubset(all_appointments_gatekeeper)
+    assert set(appointments_not_to_delete).issubset(all_appointments_gatekeeper)

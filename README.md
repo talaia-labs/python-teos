@@ -6,11 +6,12 @@ Currently working on updating the software to match [BOLT13 rev1](https://github
 
 The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://github.com/sr-gi/bolt13), written in Python 3.
 
-`teos` consists in three main modules:
+`teos` consists in four main modules:
 
 - `teos`: including the tower's main functionality (server-side)
 - `cli`: including a reference command line interface (client-side)
 - `common`: including shared functionality between `teos` and `cli`.
+- `watchtower-plugin`: including a watchtower client plugin for c-lightning.
 
 Additionally, tests for every module can be found at `tests`.
 
@@ -58,7 +59,7 @@ The configuration file options to change the network where `teos` will run are t
 ```
 [bitcoind]
 btc_rpc_user = "user"
-btc_rpc_passwd = "passwd"
+btc_rpc_password = "passwd"
 btc_rpc_connect = "localhost"
 btc_rpc_port = 8332
 btc_network = "mainnet"
@@ -69,7 +70,7 @@ For regtest, it should look like:
 ```
 [bitcoind]
 btc_rpc_user = "user"
-btc_rpc_passwd = "passwd"
+btc_rpc_password = "passwd"
 btc_rpc_connect = "localhost"
 btc_rpc_port = 18443
 btc_network = "regtest"

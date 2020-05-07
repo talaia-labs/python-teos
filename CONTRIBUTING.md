@@ -8,6 +8,15 @@ We use [black](https://github.com/psf/black) as our base code formatter with a l
 ```bash
 black --line-length=120 {source_file_or_directory}
 ```
+
+In additon, we use [flake8](https://flake8.pycqa.org/en/latest/) to detect style issues with the code:
+
+```bash
+flake8 --max-line-length=120 {source_file_or_directory}
+```
+
+ Not all outputs from flake8 are mandatory. For instance, splitting **bullet points in docstrings (E501)** will cause issues when generating the documentation, so we will leave that longer than the line length limit . Another example are **whitespaces before colons in inline fors (E203)**. `black` places them in that way, so we'll leave them like that.
+
 On top of that, there are a few rules to also have in mind.
 
 ### Code Spacing
@@ -40,10 +49,10 @@ for opt, arg in opts:
 ```
 
 ```python
-if rcode == 0:
-    rcode, message = self.check_start_time(start_time, block_height)
-if rcode == 0:
-    rcode, message = self.check_end_time(end_time, start_time, block_height)
+if appointment_data is None:
+    raise InspectionFailed(errors.APPOINTMENT_EMPTY_FIELD, "empty appointment received")
+elif not isinstance(appointment_data, dict):
+    raise InspectionFailed(errors.APPOINTMENT_WRONG_FIELD, "wrong appointment format")
 ```
 
 ## Dev Requirements

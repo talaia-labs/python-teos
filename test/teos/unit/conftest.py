@@ -10,23 +10,19 @@ from bitcoind_mock.bitcoind import BitcoindMock
 from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
 from bitcoind_mock.transaction import create_dummy_transaction
 
+from teos import DEFAULT_CONF
 from teos.carrier import Carrier
-from teos.tools import bitcoin_cli
-from teos.db_manager import DBManager
-from teos import LOG_PREFIX, DEFAULT_CONF
+from teos.users_dbm import UsersDBM
+from teos.gatekeeper import Gatekeeper
 from teos.responder import TransactionTracker
 from teos.block_processor import BlockProcessor
+from teos.appointments_dbm import AppointmentsDBM
+from teos.extended_appointment import ExtendedAppointment
 
-import common.cryptographer
-from common.blob import Blob
-from common.logger import Logger
 from common.tools import compute_locator
-from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
-
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 # Set params to connect to regtest for testing
 DEFAULT_CONF["BTC_RPC_PORT"]["value"] = 18443
@@ -53,13 +49,24 @@ def prng_seed():
 
 @pytest.fixture(scope="module")
 def db_manager():
-    manager = DBManager("test_db")
+    manager = AppointmentsDBM("test_db")
     # Add last know block for the Responder in the db
 
     yield manager
 
     manager.db.close()
     rmtree("test_db")
+
+
+@pytest.fixture(scope="module")
+def user_db_manager():
+    manager = UsersDBM("test_user_db")
+    # Add last know block for the Responder in the db
+
+    yield manager
+
+    manager.db.close()
+    rmtree("test_user_db")
 
 
 @pytest.fixture(scope="module")
@@ -70,6 +77,17 @@ def carrier():
 @pytest.fixture(scope="module")
 def block_processor():
     return BlockProcessor(bitcoind_connect_params)
+
+
+@pytest.fixture(scope="module")
+def gatekeeper(user_db_manager, block_processor):
+    return Gatekeeper(
+        user_db_manager,
+        block_processor,
+        get_config().get("DEFAULT_SLOTS"),
+        get_config().get("DEFAULT_SUBSCRIPTION_DURATION"),
+        get_config().get("EXPIRY_DELTA"),
+    )
 
 
 def generate_keypair():
@@ -85,9 +103,19 @@ def get_random_value_hex(nbytes):
     return prv_hex.zfill(2 * nbytes)
 
 
-def generate_block():
+def generate_block_w_delay():
     requests.post(url="http://{}:{}/generate".format(BTC_RPC_HOST, BTC_RPC_PORT), timeout=5)
     sleep(0.5)
+
+
+def generate_blocks_w_delay(n):
+    for _ in range(n):
+        generate_block()
+        sleep(0.2)
+
+
+def generate_block():
+    requests.post(url="http://{}:{}/generate".format(BTC_RPC_HOST, BTC_RPC_PORT), timeout=5)
 
 
 def generate_blocks(n):
@@ -100,55 +128,23 @@ def fork(block_hash):
     requests.post(fork_endpoint, json={"parent": block_hash})
 
 
-def generate_dummy_appointment_data(real_height=True, start_time_offset=5, end_time_offset=30):
-    if real_height:
-        current_height = bitcoin_cli(bitcoind_connect_params).getblockcount()
-
-    else:
-        current_height = 10
-
+def generate_dummy_appointment():
     dispute_tx = create_dummy_transaction()
     dispute_txid = dispute_tx.tx_id.hex()
     penalty_tx = create_dummy_transaction(dispute_txid)
 
-    dummy_appointment_data = {
-        "tx": penalty_tx.hex(),
-        "tx_id": dispute_txid,
-        "start_time": current_height + start_time_offset,
-        "end_time": current_height + end_time_offset,
-        "to_self_delay": 20,
-    }
-
-    # dummy keys for this test
-    client_sk, client_pk = generate_keypair()
-    client_pk_hex = client_pk.format().hex()
-
     locator = compute_locator(dispute_txid)
-    blob = Blob(dummy_appointment_data.get("tx"))
-
-    encrypted_blob = Cryptographer.encrypt(blob, dummy_appointment_data.get("tx_id"))
+    dummy_appointment_data = {"tx": penalty_tx.hex(), "tx_id": dispute_txid, "to_self_delay": 20}
+    encrypted_blob = Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id"))
 
     appointment_data = {
         "locator": locator,
-        "start_time": dummy_appointment_data.get("start_time"),
-        "end_time": dummy_appointment_data.get("end_time"),
         "to_self_delay": dummy_appointment_data.get("to_self_delay"),
         "encrypted_blob": encrypted_blob,
+        "user_id": get_random_value_hex(16),
     }
 
-    signature = Cryptographer.sign(Appointment.from_dict(appointment_data).serialize(), client_sk)
-
-    data = {"appointment": appointment_data, "signature": signature, "public_key": client_pk_hex}
-
-    return data, dispute_tx.hex()
-
-
-def generate_dummy_appointment(real_height=True, start_time_offset=5, end_time_offset=30):
-    appointment_data, dispute_tx = generate_dummy_appointment_data(
-        real_height=real_height, start_time_offset=start_time_offset, end_time_offset=end_time_offset
-    )
-
-    return Appointment.from_dict(appointment_data["appointment"]), dispute_tx
+    return ExtendedAppointment.from_dict(appointment_data), dispute_tx.hex()
 
 
 def generate_dummy_tracker():
@@ -162,7 +158,7 @@ def generate_dummy_tracker():
         dispute_txid=dispute_txid,
         penalty_txid=penalty_txid,
         penalty_rawtx=penalty_rawtx,
-        appointment_end=100,
+        user_id=get_random_value_hex(16),
     )
 
     return TransactionTracker.from_dict(tracker_data)

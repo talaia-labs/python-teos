@@ -3,7 +3,6 @@ from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-import common.cryptographer
 from common.logger import Logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
@@ -14,16 +13,17 @@ from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
 from teos.carrier import Carrier
+from teos.users_dbm import UsersDBM
 from teos.inspector import Inspector
 from teos.responder import Responder
-from teos.db_manager import DBManager
+from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
+from teos.appointments_dbm import AppointmentsDBM
 from teos.tools import can_connect_to_bitcoind, in_correct_network
 from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
-common.cryptographer.logger = Logger(actor="Cryptographer", log_name_prefix=LOG_PREFIX)
 
 
 def handle_signals(signal_received, frame):
@@ -43,19 +43,19 @@ def main(command_line_conf):
     signal(SIGQUIT, handle_signals)
 
     # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+    data_dir = command_line_conf.get("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
-    setup_data_folder(DATA_DIR)
+    setup_data_folder(data_dir)
     setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
     logger.info("Starting TEOS")
-    db_manager = DBManager(config.get("DB_PATH"))
 
     bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
     bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
 
     if not can_connect_to_bitcoind(bitcoind_connect_params):
-        logger.error("Can't connect to bitcoind. Shutting down")
+        logger.error("Cannot connect to bitcoind. Shutting down")
 
     elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
         logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
@@ -64,19 +64,27 @@ def main(command_line_conf):
         try:
             secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
             if not secret_key_der:
-                raise IOError("TEOS private key can't be loaded")
+                raise IOError("TEOS private key cannot be loaded")
 
+            logger.info(
+                "tower_id = {}".format(
+                    Cryptographer.get_compressed_pk(Cryptographer.load_private_key_der(secret_key_der).public_key)
+                )
+            )
             block_processor = BlockProcessor(bitcoind_connect_params)
             carrier = Carrier(bitcoind_connect_params)
 
-            responder = Responder(db_manager, carrier, block_processor)
-            watcher = Watcher(
-                db_manager,
+            gatekeeper = Gatekeeper(
+                UsersDBM(config.get("USERS_DB_PATH")),
                 block_processor,
-                responder,
-                secret_key_der,
-                config.get("MAX_APPOINTMENTS"),
+                config.get("DEFAULT_SLOTS"),
+                config.get("DEFAULT_SUBSCRIPTION_DURATION"),
                 config.get("EXPIRY_DELTA"),
+            )
+            db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
+            responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+            watcher = Watcher(
+                db_manager, gatekeeper, block_processor, responder, secret_key_der, config.get("MAX_APPOINTMENTS")
             )
 
             # Create the chain monitor and start monitoring the chain
@@ -150,7 +158,8 @@ def main(command_line_conf):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            API(Inspector(block_processor, config.get("MIN_TO_SELF_DELAY")), watcher).start()
+            inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
+            API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher).start()
         except Exception as e:
             logger.error("An error occurred: {}. Shutting down".format(e))
             exit(1)
@@ -163,15 +172,29 @@ if __name__ == "__main__":
         opts, _ = getopt(
             argv[1:],
             "h",
-            ["btcnetwork=", "btcrpcuser=", "btcrpcpassword=", "btcrpcconnect=", "btcrpcport=", "datadir=", "help"],
+            [
+                "apiconnect=",
+                "apiport=",
+                "btcnetwork=",
+                "btcrpcuser=",
+                "btcrpcpassword=",
+                "btcrpcconnect=",
+                "btcrpcport=",
+                "datadir=",
+                "help",
+            ],
         )
         for opt, arg in opts:
+            if opt in ["--apibind"]:
+                command_line_conf["API_BIND"] = arg
+            if opt in ["--apiport"]:
+                command_line_conf["API_PORT"] = arg
             if opt in ["--btcnetwork"]:
                 command_line_conf["BTC_NETWORK"] = arg
             if opt in ["--btcrpcuser"]:
                 command_line_conf["BTC_RPC_USER"] = arg
             if opt in ["--btcrpcpassword"]:
-                command_line_conf["BTC_RPC_PASSWD"] = arg
+                command_line_conf["BTC_RPC_PASSWORD"] = arg
             if opt in ["--btcrpcconnect"]:
                 command_line_conf["BTC_RPC_CONNECT"] = arg
             if opt in ["--btcrpcport"]:
@@ -180,7 +203,7 @@ if __name__ == "__main__":
                 except ValueError:
                     exit("btcrpcport must be an integer")
             if opt in ["--datadir"]:
-                DATA_DIR = os.path.expanduser(arg)
+                command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
             if opt in ["-h", "--help"]:
                 exit(show_usage())
 

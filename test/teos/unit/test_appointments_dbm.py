@@ -4,8 +4,8 @@ import pytest
 import shutil
 from uuid import uuid4
 
-from teos.db_manager import DBManager
-from teos.db_manager import (
+from teos.appointments_dbm import AppointmentsDBM
+from teos.appointments_dbm import (
     WATCHER_LAST_BLOCK_KEY,
     RESPONDER_LAST_BLOCK_KEY,
     LOCATOR_MAP_PREFIX,
@@ -19,7 +19,7 @@ from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appoint
 
 @pytest.fixture(scope="module")
 def watcher_appointments():
-    return {uuid4().hex: generate_dummy_appointment(real_height=False)[0] for _ in range(10)}
+    return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
 @pytest.fixture(scope="module")
@@ -30,36 +30,12 @@ def responder_trackers():
 def open_create_db(db_path):
 
     try:
-        db_manager = DBManager(db_path)
+        db_manager = AppointmentsDBM(db_path)
 
         return db_manager
 
     except ValueError:
         return False
-
-
-def test_init():
-    db_path = "init_test_db"
-
-    # First we check if the db exists, and if so we delete it
-    if os.path.isdir(db_path):
-        shutil.rmtree(db_path)
-
-    # Check that the db can be created if it does not exist
-    db_manager = open_create_db(db_path)
-    assert isinstance(db_manager, DBManager)
-    db_manager.db.close()
-
-    # Check that we can open an already create db
-    db_manager = open_create_db(db_path)
-    assert isinstance(db_manager, DBManager)
-    db_manager.db.close()
-
-    # Check we cannot create/open a db with an invalid parameter
-    assert open_create_db(0) is False
-
-    # Removing test db
-    shutil.rmtree(db_path)
 
 
 def test_load_appointments_db(db_manager):
@@ -110,53 +86,6 @@ def test_get_last_known_block():
 
     # Removing test db
     shutil.rmtree(db_path)
-
-
-def test_create_entry(db_manager):
-    key = get_random_value_hex(16)
-    value = get_random_value_hex(32)
-
-    # Adding a value with no prefix (create entry encodes values in utf-8 internally)
-    db_manager.create_entry(key, value)
-
-    # We should be able to get it straightaway from the key
-    assert db_manager.db.get(key.encode("utf-8")).decode("utf-8") == value
-
-    # If we prefix the key we should be able to get it if we add the prefix, but not otherwise
-    key = get_random_value_hex(16)
-    prefix = "w"
-    db_manager.create_entry(key, value, prefix=prefix)
-
-    assert db_manager.db.get((prefix + key).encode("utf-8")).decode("utf-8") == value
-    assert db_manager.db.get(key.encode("utf-8")) is None
-
-    # Same if we try to use any other prefix
-    another_prefix = "r"
-    assert db_manager.db.get((another_prefix + key).encode("utf-8")) is None
-
-
-def test_delete_entry(db_manager):
-    # Let's first get the key all the things we've wrote so far in the db
-    data = [k.decode("utf-8") for k, v in db_manager.db.iterator()]
-
-    # Let's empty the db now
-    for key in data:
-        db_manager.delete_entry(key)
-
-    assert len([k for k, v in db_manager.db.iterator()]) == 0
-
-    # Let's check that the same works if a prefix is provided.
-    prefix = "r"
-    key = get_random_value_hex(16)
-    value = get_random_value_hex(32)
-    db_manager.create_entry(key, value, prefix)
-
-    # Checks it's there
-    assert db_manager.db.get((prefix + key).encode("utf-8")).decode("utf-8") == value
-
-    # And now it's gone
-    db_manager.delete_entry(key, prefix)
-    assert db_manager.db.get((prefix + key).encode("utf-8")) is None
 
 
 def test_load_watcher_appointments_empty(db_manager):
@@ -240,15 +169,32 @@ def test_delete_locator_map(db_manager):
     assert len(locator_maps) != 0
 
     for locator, uuids in locator_maps.items():
-        db_manager.delete_locator_map(locator)
+        assert db_manager.delete_locator_map(locator) is True
 
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
     assert len(locator_maps) == 0
 
+    # Keys of wrong type should fail
+    assert db_manager.delete_locator_map(42) is False
+
+
+def test_store_watcher_appointment_wrong(db_manager, watcher_appointments):
+    # Wrong uuid types should fail
+    for _, appointment in watcher_appointments.items():
+        assert db_manager.store_watcher_appointment(42, appointment.to_dict()) is False
+
+
+def test_load_watcher_appointment_wrong(db_manager):
+    # Random keys should fail
+    assert db_manager.load_watcher_appointment(get_random_value_hex(16)) is None
+
+    # Wrong format keys should also return None
+    assert db_manager.load_watcher_appointment(42) is None
+
 
 def test_store_load_watcher_appointment(db_manager, watcher_appointments):
     for uuid, appointment in watcher_appointments.items():
-        db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        assert db_manager.store_watcher_appointment(uuid, appointment.to_dict()) is True
 
     db_watcher_appointments = db_manager.load_watcher_appointments()
 
@@ -259,7 +205,7 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
     assert watcher_appointments.keys() == db_watcher_appointments.keys()
 
     for uuid, appointment in watcher_appointments.items():
-        assert json.dumps(db_watcher_appointments[uuid], sort_keys=True, separators=(",", ":")) == appointment.to_json()
+        assert appointment.to_dict() == db_watcher_appointments[uuid]
 
 
 def test_store_load_triggered_appointment(db_manager):
@@ -269,9 +215,9 @@ def test_store_load_triggered_appointment(db_manager):
     assert db_watcher_appointments == db_watcher_appointments_with_triggered
 
     # Create an appointment flagged as triggered
-    triggered_appointment, _ = generate_dummy_appointment(real_height=False)
+    triggered_appointment, _ = generate_dummy_appointment()
     uuid = uuid4().hex
-    db_manager.store_watcher_appointment(uuid, triggered_appointment.to_json())
+    assert db_manager.store_watcher_appointment(uuid, triggered_appointment.to_dict()) is True
     db_manager.create_triggered_appointment_flag(uuid)
 
     # The new appointment is grabbed only if we set include_triggered
@@ -279,9 +225,23 @@ def test_store_load_triggered_appointment(db_manager):
     assert uuid in db_manager.load_watcher_appointments(include_triggered=True)
 
 
+def test_store_responder_trackers_wrong(db_manager, responder_trackers):
+    # Wrong uuid types should fail
+    for _, tracker in responder_trackers.items():
+        assert db_manager.store_responder_tracker(42, {"value": tracker}) is False
+
+
+def test_load_responder_tracker_wrong(db_manager):
+    # Random keys should fail
+    assert db_manager.load_responder_tracker(get_random_value_hex(16)) is None
+
+    # Wrong format keys should also return None
+    assert db_manager.load_responder_tracker(42) is None
+
+
 def test_store_load_responder_trackers(db_manager, responder_trackers):
     for key, value in responder_trackers.items():
-        db_manager.store_responder_tracker(key, json.dumps({"value": value}))
+        assert db_manager.store_responder_tracker(key, {"value": value}) is True
 
     db_responder_trackers = db_manager.load_responder_trackers()
 
@@ -297,16 +257,19 @@ def test_delete_watcher_appointment(db_manager, watcher_appointments):
     assert len(db_watcher_appointments) != 0
 
     for key in watcher_appointments.keys():
-        db_manager.delete_watcher_appointment(key)
+        assert db_manager.delete_watcher_appointment(key) is True
 
     db_watcher_appointments = db_manager.load_watcher_appointments()
     assert len(db_watcher_appointments) == 0
+
+    # Keys of wrong type should fail
+    assert db_manager.delete_watcher_appointment(42) is False
 
 
 def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
     # Let's start by adding a bunch of appointments
     for uuid, appointment in watcher_appointments.items():
-        db_manager.store_watcher_appointment(uuid, appointment.to_json())
+        assert db_manager.store_watcher_appointment(uuid, appointment.to_dict()) is True
 
     first_half = list(watcher_appointments.keys())[: len(watcher_appointments) // 2]
     second_half = list(watcher_appointments.keys())[len(watcher_appointments) // 2 :]
@@ -332,16 +295,19 @@ def test_delete_responder_tracker(db_manager, responder_trackers):
     assert len(db_responder_trackers) != 0
 
     for key in responder_trackers.keys():
-        db_manager.delete_responder_tracker(key)
+        assert db_manager.delete_responder_tracker(key) is True
 
     db_responder_trackers = db_manager.load_responder_trackers()
     assert len(db_responder_trackers) == 0
+
+    # Keys of wrong type should fail
+    assert db_manager.delete_responder_tracker(42) is False
 
 
 def test_batch_delete_responder_trackers(db_manager, responder_trackers):
     # Let's start by adding a bunch of appointments
     for uuid, value in responder_trackers.items():
-        db_manager.store_responder_tracker(uuid, json.dumps({"value": value}))
+        assert db_manager.store_responder_tracker(uuid, {"value": value}) is True
 
     first_half = list(responder_trackers.keys())[: len(responder_trackers) // 2]
     second_half = list(responder_trackers.keys())[len(responder_trackers) // 2 :]
@@ -364,21 +330,27 @@ def test_batch_delete_responder_trackers(db_manager, responder_trackers):
 def test_store_load_last_block_hash_watcher(db_manager):
     # Let's first create a made up block hash
     local_last_block_hash = get_random_value_hex(32)
-    db_manager.store_last_block_hash_watcher(local_last_block_hash)
+    assert db_manager.store_last_block_hash_watcher(local_last_block_hash) is True
 
     db_last_block_hash = db_manager.load_last_block_hash_watcher()
 
     assert local_last_block_hash == db_last_block_hash
 
+    # Wrong types for last block should fail for both store and load
+    assert db_manager.store_last_block_hash_watcher(42) is False
+
 
 def test_store_load_last_block_hash_responder(db_manager):
     # Same for the responder
     local_last_block_hash = get_random_value_hex(32)
-    db_manager.store_last_block_hash_responder(local_last_block_hash)
+    assert db_manager.store_last_block_hash_responder(local_last_block_hash) is True
 
     db_last_block_hash = db_manager.load_last_block_hash_responder()
 
     assert local_last_block_hash == db_last_block_hash
+
+    # Wrong types for last block should fail for both store and load
+    assert db_manager.store_last_block_hash_responder(42) is False
 
 
 def test_create_triggered_appointment_flag(db_manager):
@@ -425,11 +397,14 @@ def test_delete_triggered_appointment_flag(db_manager):
 
     # Delete all entries
     for k in keys:
-        db_manager.delete_triggered_appointment_flag(k)
+        assert db_manager.delete_triggered_appointment_flag(k) is True
 
     # Try to load them back
     for k in keys:
         assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + k).encode("utf-8")) is None
+
+    # Keys of wrong type should fail
+    assert db_manager.delete_triggered_appointment_flag(42) is False
 
 
 def test_batch_delete_triggered_appointment_flag(db_manager):

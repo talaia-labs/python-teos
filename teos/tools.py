@@ -8,14 +8,13 @@ Tools is a module with general methods that can used by different entities in th
 """
 
 
-# NOTCOVERED
 def bitcoin_cli(btc_connect_params):
     """
     An ``http`` connection with ``bitcoind`` using the ``json-rpc`` interface.
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc passwd, host and port)
+            (rpc user, rpc password, host and port)
 
     Returns:
         :obj:`AuthServiceProxy <teos.utils.auth_proxy.AuthServiceProxy>`: An authenticated service proxy to ``bitcoind``
@@ -26,7 +25,7 @@ def bitcoin_cli(btc_connect_params):
         "http://%s:%s@%s:%d"
         % (
             btc_connect_params.get("BTC_RPC_USER"),
-            btc_connect_params.get("BTC_RPC_PASSWD"),
+            btc_connect_params.get("BTC_RPC_PASSWORD"),
             btc_connect_params.get("BTC_RPC_CONNECT"),
             btc_connect_params.get("BTC_RPC_PORT"),
         )
@@ -40,7 +39,7 @@ def can_connect_to_bitcoind(btc_connect_params):
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc passwd, host and port)
+            (rpc user, rpc password, host and port)
     Returns:
         :obj:`bool`: ``True`` if the connection can be established. ``False`` otherwise.
     """
@@ -62,7 +61,7 @@ def in_correct_network(btc_connect_params, network):
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc passwd, host and port)
+            (rpc user, rpc password, host and port)
         network (:obj:`str`): the network the tower is connected to.
 
     Returns:

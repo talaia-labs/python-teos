@@ -1,0 +1,7 @@
+pyln-client
+requests
+coincurve
+cryptography==2.8
+pyzbase32
+plyvel
+backoff

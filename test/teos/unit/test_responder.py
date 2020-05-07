@@ -1,4 +1,3 @@
-import json
 import pytest
 import random
 from uuid import uuid4
@@ -9,24 +8,32 @@ from threading import Thread
 
 from teos.carrier import Carrier
 from teos.tools import bitcoin_cli
-from teos.db_manager import DBManager
 from teos.chain_monitor import ChainMonitor
-from teos.responder import Responder, TransactionTracker
+from teos.block_processor import BlockProcessor
+from teos.gatekeeper import Gatekeeper, UserInfo
+from teos.appointments_dbm import AppointmentsDBM
+from teos.responder import Responder, TransactionTracker, CONFIRMATIONS_BEFORE_RETRY
 
 from common.constants import LOCATOR_LEN_HEX
 from bitcoind_mock.transaction import create_dummy_transaction, create_tx_from_hex
 from test.teos.unit.conftest import (
     generate_block,
     generate_blocks,
+    generate_block_w_delay,
+    generate_blocks_w_delay,
     get_random_value_hex,
     bitcoind_connect_params,
     bitcoind_feed_params,
+    get_config,
 )
 
 
+config = get_config()
+
+
 @pytest.fixture(scope="module")
-def responder(db_manager, carrier, block_processor):
-    responder = Responder(db_manager, carrier, block_processor)
+def responder(db_manager, gatekeeper, carrier, block_processor):
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
@@ -36,7 +43,7 @@ def responder(db_manager, carrier, block_processor):
 @pytest.fixture(scope="session")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
-    db_manager = DBManager(db_name)
+    db_manager = AppointmentsDBM(db_name)
 
     yield db_manager
 
@@ -67,29 +74,84 @@ def create_dummy_tracker_data(random_txid=False, penalty_rawtx=None):
     if random_txid is True:
         penalty_txid = get_random_value_hex(32)
 
-    appointment_end = bitcoin_cli(bitcoind_connect_params).getblockcount() + 2
     locator = dispute_txid[:LOCATOR_LEN_HEX]
+    user_id = get_random_value_hex(16)
 
-    return locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end
+    return locator, dispute_txid, penalty_txid, penalty_rawtx, user_id
 
 
 def create_dummy_tracker(random_txid=False, penalty_rawtx=None):
-    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
-        random_txid, penalty_rawtx
-    )
-    return TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+    locator, dispute_txid, penalty_txid, penalty_rawtx, user_id = create_dummy_tracker_data(random_txid, penalty_rawtx)
+    return TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
 
 
 def test_tracker_init(run_bitcoind):
-    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data()
-    tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+    locator, dispute_txid, penalty_txid, penalty_rawtx, user_id = create_dummy_tracker_data()
+    tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
 
     assert (
-        tracker.dispute_txid == dispute_txid
+        tracker.locator == locator
+        and tracker.dispute_txid == dispute_txid
         and tracker.penalty_txid == penalty_txid
         and tracker.penalty_rawtx == penalty_rawtx
-        and tracker.appointment_end == appointment_end
+        and tracker.user_id == user_id
     )
+
+
+def test_tracker_to_dict():
+    tracker = create_dummy_tracker()
+    tracker_dict = tracker.to_dict()
+
+    assert (
+        tracker.locator == tracker_dict["locator"]
+        and tracker.penalty_rawtx == tracker_dict["penalty_rawtx"]
+        and tracker.user_id == tracker_dict["user_id"]
+    )
+
+
+def test_tracker_from_dict():
+    tracker_dict = create_dummy_tracker().to_dict()
+    new_tracker = TransactionTracker.from_dict(tracker_dict)
+
+    assert tracker_dict == new_tracker.to_dict()
+
+
+def test_tracker_from_dict_invalid_data():
+    tracker_dict = create_dummy_tracker().to_dict()
+
+    for value in ["dispute_txid", "penalty_txid", "penalty_rawtx", "user_id"]:
+        tracker_dict_copy = deepcopy(tracker_dict)
+        tracker_dict_copy[value] = None
+
+        try:
+            TransactionTracker.from_dict(tracker_dict_copy)
+            assert False
+
+        except ValueError:
+            assert True
+
+
+def test_tracker_get_summary():
+    tracker = create_dummy_tracker()
+    assert tracker.get_summary() == {
+        "locator": tracker.locator,
+        "user_id": tracker.user_id,
+        "penalty_txid": tracker.penalty_txid,
+    }
+
+
+def test_init_responder(temp_db_manager, gatekeeper, carrier, block_processor):
+    responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
+    assert isinstance(responder.trackers, dict) and len(responder.trackers) == 0
+    assert isinstance(responder.tx_tracker_map, dict) and len(responder.tx_tracker_map) == 0
+    assert isinstance(responder.unconfirmed_txs, list) and len(responder.unconfirmed_txs) == 0
+    assert isinstance(responder.missed_confirmations, dict) and len(responder.missed_confirmations) == 0
+    assert isinstance(responder.block_queue, Queue) and responder.block_queue.empty()
+    assert isinstance(responder.db_manager, AppointmentsDBM)
+    assert isinstance(responder.gatekeeper, Gatekeeper)
+    assert isinstance(responder.carrier, Carrier)
+    assert isinstance(responder.block_processor, BlockProcessor)
+    assert responder.last_known_block is None or isinstance(responder.last_known_block, str)
 
 
 def test_on_sync(run_bitcoind, responder, block_processor):
@@ -109,61 +171,8 @@ def test_on_sync_fail(responder, block_processor):
     assert responder.on_sync(chain_tip) is False
 
 
-def test_tracker_to_dict():
-    tracker = create_dummy_tracker()
-    tracker_dict = tracker.to_dict()
-
-    assert (
-        tracker.locator == tracker_dict["locator"]
-        and tracker.penalty_rawtx == tracker_dict["penalty_rawtx"]
-        and tracker.appointment_end == tracker_dict["appointment_end"]
-    )
-
-
-def test_tracker_to_json():
-    tracker = create_dummy_tracker()
-    tracker_dict = json.loads(tracker.to_json())
-
-    assert (
-        tracker.locator == tracker_dict["locator"]
-        and tracker.penalty_rawtx == tracker_dict["penalty_rawtx"]
-        and tracker.appointment_end == tracker_dict["appointment_end"]
-    )
-
-
-def test_tracker_from_dict():
-    tracker_dict = create_dummy_tracker().to_dict()
-    new_tracker = TransactionTracker.from_dict(tracker_dict)
-
-    assert tracker_dict == new_tracker.to_dict()
-
-
-def test_tracker_from_dict_invalid_data():
-    tracker_dict = create_dummy_tracker().to_dict()
-
-    for value in ["dispute_txid", "penalty_txid", "penalty_rawtx", "appointment_end"]:
-        tracker_dict_copy = deepcopy(tracker_dict)
-        tracker_dict_copy[value] = None
-
-        try:
-            TransactionTracker.from_dict(tracker_dict_copy)
-            assert False
-
-        except ValueError:
-            assert True
-
-
-def test_init_responder(temp_db_manager, carrier, block_processor):
-    responder = Responder(temp_db_manager, carrier, block_processor)
-    assert isinstance(responder.trackers, dict) and len(responder.trackers) == 0
-    assert isinstance(responder.tx_tracker_map, dict) and len(responder.tx_tracker_map) == 0
-    assert isinstance(responder.unconfirmed_txs, list) and len(responder.unconfirmed_txs) == 0
-    assert isinstance(responder.missed_confirmations, dict) and len(responder.missed_confirmations) == 0
-    assert responder.block_queue.empty()
-
-
-def test_handle_breach(db_manager, carrier, block_processor):
-    responder = Responder(db_manager, carrier, block_processor)
+def test_handle_breach(db_manager, gatekeeper, carrier, block_processor):
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
 
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
@@ -175,17 +184,17 @@ def test_handle_breach(db_manager, carrier, block_processor):
         tracker.dispute_txid,
         tracker.penalty_txid,
         tracker.penalty_rawtx,
-        tracker.appointment_end,
+        tracker.user_id,
         block_hash=get_random_value_hex(32),
     )
 
     assert receipt.delivered is True
 
 
-def test_handle_breach_bad_response(db_manager, block_processor):
+def test_handle_breach_bad_response(db_manager, gatekeeper, block_processor):
     # We need a new carrier here, otherwise the transaction will be flagged as previously sent and receipt.delivered
     # will be True
-    responder = Responder(db_manager, Carrier(bitcoind_connect_params), block_processor)
+    responder = Responder(db_manager, gatekeeper, Carrier(bitcoind_connect_params), block_processor)
 
     uuid = uuid4().hex
     tracker = create_dummy_tracker()
@@ -200,7 +209,7 @@ def test_handle_breach_bad_response(db_manager, block_processor):
         tracker.dispute_txid,
         tracker.penalty_txid,
         tracker.penalty_rawtx,
-        tracker.appointment_end,
+        tracker.user_id,
         block_hash=get_random_value_hex(32),
     )
 
@@ -211,9 +220,7 @@ def test_add_tracker(responder):
     for _ in range(20):
         uuid = uuid4().hex
         confirmations = 0
-        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
-            random_txid=True
-        )
+        locator, dispute_txid, penalty_txid, penalty_rawtx, user_id = create_dummy_tracker_data(random_txid=True)
 
         # Check the tracker is not within the responder trackers before adding it
         assert uuid not in responder.trackers
@@ -221,7 +228,7 @@ def test_add_tracker(responder):
         assert penalty_txid not in responder.unconfirmed_txs
 
         # And that it is afterwards
-        responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+        responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, confirmations)
         assert uuid in responder.trackers
         assert penalty_txid in responder.tx_tracker_map
         assert penalty_txid in responder.unconfirmed_txs
@@ -231,18 +238,18 @@ def test_add_tracker(responder):
         assert (
             tracker.get("penalty_txid") == penalty_txid
             and tracker.get("locator") == locator
-            and tracker.get("appointment_end") == appointment_end
+            and tracker.get("user_id") == user_id
         )
 
 
 def test_add_tracker_same_penalty_txid(responder):
     confirmations = 0
-    locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(random_txid=True)
+    locator, dispute_txid, penalty_txid, penalty_rawtx, user_id = create_dummy_tracker_data(random_txid=True)
     uuid_1 = uuid4().hex
     uuid_2 = uuid4().hex
 
-    responder.add_tracker(uuid_1, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
-    responder.add_tracker(uuid_2, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+    responder.add_tracker(uuid_1, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, confirmations)
+    responder.add_tracker(uuid_2, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, confirmations)
 
     # Check that both trackers have been added
     assert uuid_1 in responder.trackers and uuid_2 in responder.trackers
@@ -255,7 +262,7 @@ def test_add_tracker_same_penalty_txid(responder):
         assert (
             tracker.get("penalty_txid") == penalty_txid
             and tracker.get("locator") == locator
-            and tracker.get("appointment_end") == appointment_end
+            and tracker.get("user_id") == user_id
         )
 
 
@@ -263,39 +270,49 @@ def test_add_tracker_already_confirmed(responder):
     for i in range(20):
         uuid = uuid4().hex
         confirmations = i + 1
-        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
+        locator, dispute_txid, penalty_txid, penalty_rawtx, user_id = create_dummy_tracker_data(
             penalty_rawtx=create_dummy_transaction().hex()
         )
 
-        responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end, confirmations)
+        responder.add_tracker(uuid, locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, confirmations)
 
         assert penalty_txid not in responder.unconfirmed_txs
+        assert (
+            responder.trackers[uuid].get("penalty_txid") == penalty_txid
+            and responder.trackers[uuid].get("locator") == locator
+            and responder.trackers[uuid].get("user_id") == user_id
+        )
 
 
-def test_do_watch(temp_db_manager, carrier, block_processor):
+def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor):
     # Create a fresh responder to simplify the test
-    responder = Responder(temp_db_manager, carrier, block_processor)
+    responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     trackers = [create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(20)]
+    subscription_expiry = responder.block_processor.get_block_count() + 110
 
     # Let's set up the trackers first
     for tracker in trackers:
         uuid = uuid4().hex
 
-        responder.trackers[uuid] = {
-            "locator": tracker.locator,
-            "penalty_txid": tracker.penalty_txid,
-            "appointment_end": tracker.appointment_end,
-        }
+        # Simulate user registration so trackers can properly expire
+        responder.gatekeeper.registered_users[tracker.user_id] = UserInfo(
+            available_slots=10, subscription_expiry=subscription_expiry
+        )
+
+        # Add data to the Responder
+        responder.trackers[uuid] = tracker.get_summary()
         responder.tx_tracker_map[tracker.penalty_txid] = [uuid]
         responder.missed_confirmations[tracker.penalty_txid] = 0
         responder.unconfirmed_txs.append(tracker.penalty_txid)
+        # Assuming the appointment only took a single slot
+        responder.gatekeeper.registered_users[tracker.user_id].appointments[uuid] = 1
 
         # We also need to store the info in the db
         responder.db_manager.create_triggered_appointment_flag(uuid)
-        responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
+        responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
     # Let's start to watch
     Thread(target=responder.do_watch, daemon=True).start()
@@ -307,37 +324,40 @@ def test_do_watch(temp_db_manager, carrier, block_processor):
         broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
-    generate_block()
+    generate_block_w_delay()
 
     # The transactions we sent shouldn't be in the unconfirmed transaction list anymore
     assert not set(broadcast_txs).issubset(responder.unconfirmed_txs)
 
-    # TODO: test that reorgs can be detected once data persistence is merged (new version of the simulator)
+    # CONFIRMATIONS_BEFORE_RETRY+1 blocks after, the responder should rebroadcast the unconfirmed txs (15 remaining)
+    generate_blocks_w_delay(CONFIRMATIONS_BEFORE_RETRY + 1)
+    assert len(responder.unconfirmed_txs) == 0
+    assert len(responder.trackers) == 20
 
-    # Generating 5 additional blocks should complete the 5 trackers
-    generate_blocks(5)
+    # Generating 100 - CONFIRMATIONS_BEFORE_RETRY -2 additional blocks should complete the first 5 trackers
+    generate_blocks_w_delay(100 - CONFIRMATIONS_BEFORE_RETRY - 2)
+    assert len(responder.unconfirmed_txs) == 0
+    assert len(responder.trackers) == 15
+    # Check they are not in the Gatekeeper either
+    for tracker in trackers[:5]:
+        assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
 
-    assert not set(broadcast_txs).issubset(responder.tx_tracker_map)
-
-    # Do the rest
-    broadcast_txs = []
+    # CONFIRMATIONS_BEFORE_RETRY additional blocks should complete the rest
+    generate_blocks_w_delay(CONFIRMATIONS_BEFORE_RETRY)
+    assert len(responder.unconfirmed_txs) == 0
+    assert len(responder.trackers) == 0
+    # Check they are not in the Gatekeeper either
     for tracker in trackers[5:]:
-        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(tracker.penalty_rawtx)
-        broadcast_txs.append(tracker.penalty_txid)
-
-    # Mine a block
-    generate_blocks(6)
-
-    assert len(responder.tx_tracker_map) == 0
+        assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
 
 
-def test_check_confirmations(db_manager, carrier, block_processor):
-    responder = Responder(db_manager, carrier, block_processor)
+def test_check_confirmations(db_manager, gatekeeper, carrier, block_processor):
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
-    # been confirmed. To test this we need to create a list of transactions and the state of the responder
+    # been confirmed. To test this we need to create a list of transactions and the state of the Responder
     txs = [get_random_value_hex(32) for _ in range(20)]
 
     # The responder has a list of unconfirmed transaction, let make that some of them are the ones we've received
@@ -364,7 +384,6 @@ def test_check_confirmations(db_manager, carrier, block_processor):
         assert responder.missed_confirmations[tx] == 1
 
 
-# TODO: Check this properly, a bug pass unnoticed!
 def test_get_txs_to_rebroadcast(responder):
     # Let's create a few fake txids and assign at least 6 missing confirmations to each
     txs_missing_too_many_conf = {get_random_value_hex(32): 6 + i for i in range(10)}
@@ -388,68 +407,131 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_trackers(db_manager, carrier, block_processor):
-    initial_height = bitcoin_cli(bitcoind_connect_params).getblockcount()
-
-    responder = Responder(db_manager, carrier, block_processor)
+def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor):
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
-    # A complete tracker is a tracker that has reached the appointment end with enough confs (> MIN_CONFIRMATIONS)
-    # We'll create three type of transactions: end reached + enough conf, end reached + no enough conf, end not reached
-    trackers_end_conf = {
+    # A complete tracker is a tracker which penalty transaction has been irrevocably resolved (i.e. has reached 100
+    # confirmations)
+    # We'll create 3 type of txs: irrevocably resolved, confirmed but not irrevocably resolved, and unconfirmed
+    trackers_ir_resolved = {
         uuid4().hex: create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(10)
     }
 
-    trackers_end_no_conf = {}
+    trackers_confirmed = {
+        uuid4().hex: create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex()) for _ in range(10)
+    }
+
+    trackers_unconfirmed = {}
     for _ in range(10):
         tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
         responder.unconfirmed_txs.append(tracker.penalty_txid)
-        trackers_end_no_conf[uuid4().hex] = tracker
-
-    trackers_no_end = {}
-    for _ in range(10):
-        tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
-        tracker.appointment_end += 10
-        trackers_no_end[uuid4().hex] = tracker
+        trackers_unconfirmed[uuid4().hex] = tracker
 
     all_trackers = {}
-    all_trackers.update(trackers_end_conf)
-    all_trackers.update(trackers_end_no_conf)
-    all_trackers.update(trackers_no_end)
+    all_trackers.update(trackers_ir_resolved)
+    all_trackers.update(trackers_confirmed)
+    all_trackers.update(trackers_unconfirmed)
 
-    # Let's add all to the  responder
+    # Let's add all to the Responder
     for uuid, tracker in all_trackers.items():
-        responder.trackers[uuid] = {
-            "locator": tracker.locator,
-            "penalty_txid": tracker.penalty_txid,
-            "appointment_end": tracker.appointment_end,
-        }
+        responder.trackers[uuid] = tracker.get_summary()
 
-    for uuid, tracker in all_trackers.items():
+    for uuid, tracker in trackers_ir_resolved.items():
         bitcoin_cli(bitcoind_connect_params).sendrawtransaction(tracker.penalty_rawtx)
 
-    # The dummy appointments have a end_appointment time of current + 2, but trackers need at least 6 confs by default
-    generate_blocks(6)
+    generate_block_w_delay()
 
-    # And now let's check
-    completed_trackers = responder.get_completed_trackers(initial_height + 6)
-    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers.items()]
-    ended_trackers_keys = list(trackers_end_conf.keys())
-    assert set(completed_trackers_ids) == set(ended_trackers_keys)
+    for uuid, tracker in trackers_confirmed.items():
+        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(tracker.penalty_rawtx)
 
-    # Generating 6 additional blocks should also confirm trackers_no_end
-    generate_blocks(6)
+    # ir_resolved have 100 confirmations and confirmed have 99
+    generate_blocks_w_delay(99)
 
-    completed_trackers = responder.get_completed_trackers(initial_height + 12)
-    completed_trackers_ids = [tracker_id for tracker_id, confirmations in completed_trackers.items()]
-    ended_trackers_keys.extend(list(trackers_no_end.keys()))
+    # Let's check
+    completed_trackers = responder.get_completed_trackers()
+    ended_trackers_keys = list(trackers_ir_resolved.keys())
+    assert set(completed_trackers) == set(ended_trackers_keys)
 
-    assert set(completed_trackers_ids) == set(ended_trackers_keys)
+    # Generating 1 additional blocks should also include confirmed
+    generate_block_w_delay()
+
+    completed_trackers = responder.get_completed_trackers()
+    ended_trackers_keys.extend(list(trackers_confirmed.keys()))
+    assert set(completed_trackers) == set(ended_trackers_keys)
 
 
-def test_rebroadcast(db_manager, carrier, block_processor):
-    responder = Responder(db_manager, carrier, block_processor)
+def test_get_expired_trackers(responder):
+    # expired trackers are those who's subscription has reached the expiry block and have not been confirmed.
+    # confirmed trackers that have reached their expiry will be kept until completed
+    current_block = responder.block_processor.get_block_count()
+
+    # Lets first register the a couple of users
+    user1_id = get_random_value_hex(16)
+    responder.gatekeeper.registered_users[user1_id] = UserInfo(
+        available_slots=10, subscription_expiry=current_block + 15
+    )
+    user2_id = get_random_value_hex(16)
+    responder.gatekeeper.registered_users[user2_id] = UserInfo(
+        available_slots=10, subscription_expiry=current_block + 16
+    )
+
+    # And create some trackers and add them to the corresponding user in the Gatekeeper
+    expired_unconfirmed_trackers_15 = {}
+    expired_unconfirmed_trackers_16 = {}
+    expired_confirmed_trackers_15 = {}
+    for _ in range(10):
+        uuid = uuid4().hex
+        dummy_tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
+        dummy_tracker.user_id = user1_id
+        expired_unconfirmed_trackers_15[uuid] = dummy_tracker
+        responder.unconfirmed_txs.append(dummy_tracker.penalty_txid)
+        # Assume the appointment only took a single slot
+        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
+
+    for _ in range(10):
+        uuid = uuid4().hex
+        dummy_tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
+        dummy_tracker.user_id = user1_id
+        expired_confirmed_trackers_15[uuid] = dummy_tracker
+        # Assume the appointment only took a single slot
+        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
+
+    for _ in range(10):
+        uuid = uuid4().hex
+        dummy_tracker = create_dummy_tracker(penalty_rawtx=create_dummy_transaction().hex())
+        dummy_tracker.user_id = user2_id
+        expired_unconfirmed_trackers_16[uuid] = dummy_tracker
+        responder.unconfirmed_txs.append(dummy_tracker.penalty_txid)
+        # Assume the appointment only took a single slot
+        responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
+
+    all_trackers = {}
+    all_trackers.update(expired_confirmed_trackers_15)
+    all_trackers.update(expired_unconfirmed_trackers_15)
+    all_trackers.update(expired_unconfirmed_trackers_16)
+
+    # Add everything to the Responder
+    for uuid, tracker in all_trackers.items():
+        responder.trackers[uuid] = tracker.get_summary()
+
+    # Currently nothing should be expired
+    assert responder.get_expired_trackers(current_block) == []
+
+    # 15 blocks (+ EXPIRY_DELTA) afterwards only user1's confirmed trackers should be expired
+    assert responder.get_expired_trackers(current_block + 15 + config.get("EXPIRY_DELTA")) == list(
+        expired_unconfirmed_trackers_15.keys()
+    )
+
+    # 1 (+ EXPIRY_DELTA) block after that user2's should be expired
+    assert responder.get_expired_trackers(current_block + 16 + config.get("EXPIRY_DELTA")) == list(
+        expired_unconfirmed_trackers_16.keys()
+    )
+
+
+def test_rebroadcast(db_manager, gatekeeper, carrier, block_processor):
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
@@ -458,21 +540,17 @@ def test_rebroadcast(db_manager, carrier, block_processor):
     # Rebroadcast calls add_response with retry=True. The tracker data is already in trackers.
     for i in range(20):
         uuid = uuid4().hex
-        locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end = create_dummy_tracker_data(
+        locator, dispute_txid, penalty_txid, penalty_rawtx, user_id = create_dummy_tracker_data(
             penalty_rawtx=create_dummy_transaction().hex()
         )
 
-        tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, appointment_end)
+        tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
 
-        responder.trackers[uuid] = {
-            "locator": locator,
-            "penalty_txid": penalty_txid,
-            "appointment_end": appointment_end,
-        }
+        responder.trackers[uuid] = {"locator": locator, "penalty_txid": penalty_txid, "user_id": user_id}
 
         # We need to add it to the db too
         responder.db_manager.create_triggered_appointment_flag(uuid)
-        responder.db_manager.store_responder_tracker(uuid, tracker.to_json())
+        responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
         responder.tx_tracker_map[penalty_txid] = [uuid]
         responder.unconfirmed_txs.append(penalty_txid)

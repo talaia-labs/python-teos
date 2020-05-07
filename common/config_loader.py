@@ -21,14 +21,14 @@ class ConfigLoader:
         data_dir (:obj:`str`): the path to the data directory where the configuration file may be found.
         conf_file_path (:obj:`str`): the path to the config file (the file may not exist).
         conf_fields (:obj:`dict`): a dictionary populated with the configuration params and the expected types.
-            follows the same format as default_conf.
+            It follows the same format as default_conf.
         command_line_conf (:obj:`dict`): a dictionary containing the command line parameters that may replace the
             ones in default / config file.
     """
 
     def __init__(self, data_dir, conf_file_name, default_conf, command_line_conf):
         self.data_dir = data_dir
-        self.conf_file_path = self.data_dir + conf_file_name
+        self.conf_file_path = os.path.join(self.data_dir, conf_file_name)
         self.conf_fields = default_conf
         self.command_line_conf = command_line_conf
 
@@ -36,13 +36,13 @@ class ConfigLoader:
         """
         Builds a config dictionary from command line, config file and default configuration parameters.
 
-        The priority if as follows:
+        The priority is as follows:
             - command line
             - config file
             - defaults
 
         Returns:
-            obj:`dict`: a dictionary containing all the configuration parameters.
+            :obj:`dict`: a dictionary containing all the configuration parameters.
 
         """
 
@@ -50,6 +50,7 @@ class ConfigLoader:
             file_config = configparser.ConfigParser()
             file_config.read(self.conf_file_path)
 
+            # Load parameters and cast them to int if necessary
             if file_config:
                 for sec in file_config.sections():
                     for k, v in file_config.items(sec):
@@ -82,10 +83,10 @@ class ConfigLoader:
 
         Returns:
             :obj:`dict`: A dictionary with the same keys as the provided one, but containing only the "value" field as
-            value if the provided ``conf_fields`` where correct.
+            value if the provided ``conf_fields`` are correct.
 
         Raises:
-            ValueError: If any of the dictionary elements does not have the expected type
+            :obj:`ValueError`: If any of the dictionary elements does not have the expected type.
         """
 
         conf_dict = {}
@@ -104,11 +105,11 @@ class ConfigLoader:
 
     def extend_paths(self):
         """
-        Extends the relative paths of  the ``conf_fields`` dictionary with ``data_dir``.
+        Extends the relative paths of the ``conf_fields`` dictionary with ``data_dir``.
 
         If an absolute path is given, it'll remain the same.
         """
 
         for key, field in self.conf_fields.items():
-            if field.get("path") is True and isinstance(field.get("value"), str):
+            if field.get("path") and isinstance(field.get("value"), str):
                 self.conf_fields[key]["value"] = os.path.join(self.data_dir, self.conf_fields[key]["value"])
