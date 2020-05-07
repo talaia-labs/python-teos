@@ -41,8 +41,6 @@ class TowerMock:
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
-        # Thread(target=app.run, kwargs={"host": tower_netaddr, "port": tower_port}, daemon=True).start()
-
     def register(self):
         user_id = request.get_json().get("public_key")
 
