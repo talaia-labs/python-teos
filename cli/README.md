@@ -16,7 +16,7 @@ Refer to [INSTALL.md](INSTALL.md)
 #### Global options
 
 - `--apiconnect`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
-- `-apiport` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
+- `--apiport` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
 - `-h --help`: 	shows a list of commands or help for a specific command.
 
 #### Commands
@@ -176,16 +176,18 @@ python teos_cli.py register
 
 By default, `teos_cli` will connect to your local instance (running on localhost). There are also a couple of live instances running, one for mainet and one for testnet:
 
-- testnet endpoint = `teos.pisa.watch`
-- mainnet endpoint = `teosmainnet.pisa.watch`
+- testnet endpoint = `teos-testnet.pisa.watch:443`
+- mainnet endpoint = `teos.pisa.watch:443` or `theeyeofsatoshi.pisa.watch:443`
 
 ### Connecting to the mainnet instance
-Add `--apiconnect https://teosmainnet.pisa.watch` to your calls, for example:
+Add `--apiconnect  --apiport 443` to your calls, for example:
 
 ```
-python teos_cli.py --apiconnect https://teosmainnet.pisa.watch add_appointment -f dummy_appointment_data.json 
+python teos_cli.py --apiconnect=https://teos.pisa.watch add_appointment --apiport=443 -f dummy_appointment_data.json 
 ```
 
 You can also change the config file to avoid specifying the server every time:
-
-`TEOS_SERVER = "https://teosmainnet.pisa.watch"`
+```
+api_connect = https://teos.pisa.watch
+api_port = 443
+```

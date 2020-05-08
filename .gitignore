@@ -18,3 +18,4 @@ htmlcov
 docs/
 .teos
 .teos_cli
+*.orig
