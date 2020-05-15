@@ -1,9 +1,12 @@
 import json
 import os
+import time
+
 from elasticsearch import Elasticsearch, helpers
 from elasticsearch.client import IndicesClient
 from elasticsearch.helpers.errors import BulkIndexError
 
+from cli import teos_cli 
 from common.logger import Logger
 
 LOG_PREFIX = "System Monitor"
@@ -33,36 +36,42 @@ class Searcher:
     
     """
 
-    def __init__(self, host, port, cloud_id=None, auth_user=None, auth_pw=None):
-         self.es_host = host
-         self.es_port = port
+    def __init__(self, es_host, es_port, api_host, api_port, teos_dir, log_file, cloud_id=None, auth_user=None, auth_pw=None):
+         self.es_host = es_host
+         self.es_port = es_port
          self.es_cloud_id = cloud_id
          self.es_auth_user = auth_user
          self.es_auth_pw = auth_pw
-         self.es = Elasticsearch(
-             cloud_id=self.es_cloud_id,
-             http_auth=(self.es_auth_user, self.es_auth_pw),
-         )
+         if self.es_host is not "":
+             self.es = Elasticsearch([
+                 {'host': self.es_host, 'port': self.es_port}    
+             ])     
+         elif cloud_id is not "":
+             self.es = Elasticsearch(
+                 cloud_id=self.es_cloud_id,
+                 http_auth=(self.es_auth_user, self.es_auth_pw),
+             )
          self.index_client = IndicesClient(self.es)
-         # TODO: Pass the path through as a config option.
-         self.log_path = os.path.expanduser("~/.teos/teos_test.log") 
+         self.log_path = "{}/{}".format(teos_dir, log_file) 
+         self.api_host = api_host
+         self.api_port = api_port
 
     def start(self):
         """Starts Elasticsearch and compiles data to be visualized in Kibana"""
 
+        # self.delete_index("logs")        
+
         # Pull the watchtower logs into Elasticsearch.
-        # self.index_client.delete("logs")
-        # self.create_log_index("logs") 
-        # log_data = self.load_logs(self.log_path)
-        # self.index_logs(log_data)
+        #self.create_index("logs")
+        #log_data = self.load_logs(self.log_path)
+        #self.index_logs_bulk(log_data)
 
         # Search for the data we need to visualize a graph.
+        # self.load_and_index_other_data()
 
         # self.search_logs("message", ["logs"])
-        self.get_all_logs()
-        # self.delete_all_by_index("logs")
 
-    def create_log_index(self, index):
+    def create_index(self, index):
         """ 
         Create index with a particular mapping.
     
@@ -76,13 +85,17 @@ class Searcher:
                 "properties": {
                     "doc.time": {
                         "type": "date",
-                        "format": "strict_date_optional_time||dd/MM/yyyy HH:mm:ss"
+                        "format": "epoch_second||strict_date_optional_time||dd/MM/yyyy HH:mm:ss"
+                    },
+                    "doc.error.code": {
+                        "type": "integer"
                     }
                 }
             }
         }
-        self.index_client.create(index, body)
-         
+
+        resp = self.index_client.create(index, body)
+
     # TODO: Logs are constantly being updated. Keep that data updated
     def load_logs(self, log_path):
         """ 
@@ -109,9 +122,32 @@ class Searcher:
         return logs
     
         # TODO: Throw an error if the file is empty or if data isn't JSON-y.
-    
+
+    def load_and_index_other_data(self):
+        """
+        Loads and indexes the rest of the data into Elasticsearch that we'll need to visualize using Kibana.
+
+        """
+
+        # Grab # of appointments in watcher and responder 
+        num_appts = self.get_num_appointments()
+        watcher_appts = num_appts[0]
+        responder_appts = num_appts[1] 
+
+        # index current number of appointments in watcher and responder
+        self.index_item("logs", "watcher_appts", watcher_appts)
+        self.index_item("logs", "responder_appts", responder_appts)
+        
+    def index_item(self, index, field, value):
+        body = {
+            field: value,
+            "doc.time": time.time() 
+        }
+        
+        resp = self.es.index(index, body)
+
     @staticmethod 
-    def gen_log_data(log_data):
+    def gen_data(index, data):
         """ 
         Formats logs so it can be sent to Elasticsearch in bulk.
     
@@ -122,18 +158,13 @@ class Searcher:
             :obj:`dict`: A dict conforming to the required format for sending data to elasticsearch in bulk.
         """
     
-        for log in log_data:
-            # We don't need to include errors (which had problems mapping anyway)
-            # if 'error' in log:
-            #    continue
+        for log in data:
             yield {
-                "_index": "logs",
-                # "_type": "document",
+                "_index": index,
                 "doc": log
             }
     
-    
-    def index_logs(self, log_data):
+    def index_data_bulk(self, index, data):
         """ 
         Indexes logs in elasticsearch so they can be searched.
     
@@ -148,13 +179,25 @@ class Searcher:
             
         """
     
-        response = helpers.bulk(self.es, self.gen_log_data(log_data))
+        response = helpers.bulk(self.es, self.gen_data(index, data))
     
         # The response is a tuple of two items: 1) The number of items successfully indexed. 2) Any errors returned.
         if (response[0] <= 0):
             logger.error("None of the logs were indexed. Log data might be in the wrong form.") 
 
         return response
+
+    def get_num_appointments(self):
+        teos_url = "http://{}:{}".format(self.api_host, self.api_port)
+
+        resp = teos_cli.get_all_appointments(teos_url)
+
+        response = json.loads(resp)
+
+        watcher_appts = len(response.get("watcher_appointments"))
+        responder_appts = len(response.get("responder_trackers"))
+
+        return [watcher_appts, responder_appts]
 
     def search_logs(self, field, keyword, index):
         """ 
@@ -191,10 +234,15 @@ class Searcher:
         results = self.es.search(body, "logs") 
     
         results = json.dumps(results, indent=4)
-    
+  
         return results
+
     
-    
+    def delete_index(self, index):
+
+        results = self.index_client.delete(index)  
+
+
     def delete_all_by_index(self, index):
         """ 
         Deletes all logs in the chosen index of Elasticsearch.
