@@ -52,7 +52,7 @@ class Searcher:
                  http_auth=(self.es_auth_user, self.es_auth_pw),
              )
          self.index_client = IndicesClient(self.es)
-         self.log_path = "{}/{}".format(teos_dir, log_file) 
+         self.log_path = log_file 
          self.api_host = api_host
          self.api_port = api_port
 
@@ -62,9 +62,9 @@ class Searcher:
         # self.delete_index("logs")        
 
         # Pull the watchtower logs into Elasticsearch.
-        #self.create_index("logs")
+        # self.create_index("logs")
         #log_data = self.load_logs(self.log_path)
-        #self.index_logs_bulk(log_data)
+        #self.index_data_bulk("logs", log_data)
 
         # Search for the data we need to visualize a graph.
         # self.load_and_index_other_data()
@@ -89,7 +89,13 @@ class Searcher:
                     },
                     "doc.error.code": {
                         "type": "integer"
-                    }
+                    },
+                    "doc.watcher_appts": {
+                        "type": "integer"
+                    },
+                    "doc.responder_appts": {
+                        "type": "integer"
+                    } 
                 }
             }
         }
@@ -140,7 +146,7 @@ class Searcher:
         
     def index_item(self, index, field, value):
         body = {
-            field: value,
+            "doc.{}".format(field): value,
             "doc.time": time.time() 
         }
         
