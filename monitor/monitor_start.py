@@ -1,5 +1,6 @@
 from monitor import MONITOR_DIR, MONITOR_CONF, MONITOR_DEFAULT_CONF
 from monitor.searcher import Searcher
+from monitor.visualizer import Visualizer
 
 from common.config_loader import ConfigLoader
 from common.logger import Logger
@@ -33,6 +34,12 @@ def main(command_line_conf):
     # Create and start searcher.
     searcher = Searcher(es_host, es_port, api_host, api_port, DATA_DIR, log_file, cloud_id, auth_user, auth_pw)
     searcher.start()
+
+    kibana_host = mon_conf.get("KIBANA_HOST")
+    kibana_port = mon_conf.get("KIBANA_PORT")
+
+    visualizer = Visualizer(kibana_host, kibana_port, auth_user, auth_pw, max_users)
+    visualizer.create_dashboard()
 
 if __name__ == "__main__":
     # TODO:
