@@ -1,10 +1,15 @@
 from common.logger import Logger
+from common.exceptions import BasicException
 
 from teos import LOG_PREFIX
 from teos.tools import bitcoin_cli
 from teos.utils.auth_proxy import JSONRPCException
 
 logger = Logger(actor="BlockProcessor", log_name_prefix=LOG_PREFIX)
+
+
+class InvalidTransactionFormat(BasicException):
+    """Raised when a transaction is not properly formatted"""
 
 
 class BlockProcessor:
@@ -89,17 +94,19 @@ class BlockProcessor:
             raw_tx (:obj:`str`): the hex representation of the transaction.
 
         Returns:
-            :obj:`dict` or :obj:`None`: The decoding of the given ``raw_tx`` if the transaction is well formatted.
+            :obj:`dict`: The decoding of the given ``raw_tx`` if the transaction is well formatted.
 
-            Returns ``None`` otherwise.
+        Raises:
+            :obj:`InvalidTransactionFormat`: If the provided ``raw_tx`` has invalid format.
         """
 
         try:
             tx = bitcoin_cli(self.btc_connect_params).decoderawtransaction(raw_tx)
 
         except JSONRPCException as e:
-            tx = None
-            logger.error("Cannot build transaction from decoded data", error=e.error)
+            msg = "Cannot build transaction from decoded data"
+            logger.error(msg, error=e.error)
+            raise InvalidTransactionFormat(msg)
 
         return tx
 

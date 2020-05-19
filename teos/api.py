@@ -5,7 +5,7 @@ from flask import Flask, request, abort, jsonify
 from teos import LOG_PREFIX
 import common.errors as errors
 from teos.inspector import InspectionFailed
-from teos.watcher import AppointmentLimitReached
+from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 
 from common.logger import Logger
@@ -191,6 +191,13 @@ class API:
         except AppointmentLimitReached:
             rcode = HTTP_SERVICE_UNAVAILABLE
             response = {"error": "appointment rejected"}
+
+        except AppointmentAlreadyTriggered:
+            rcode = HTTP_BAD_REQUEST
+            response = {
+                "error": "appointment rejected. The provided appointment has already been triggered",
+                "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
+            }
 
         logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
