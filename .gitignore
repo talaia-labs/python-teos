@@ -1,6 +1,6 @@
 .vscode/
 .idea/
-.venv/
+.venv*
 *.log
 .DS_Store
 bitcoin.conf*
@@ -18,5 +18,5 @@ htmlcov
 docs/
 .teos
 .teos_cli
-
+*.orig
 /monitor/monitor.conf
