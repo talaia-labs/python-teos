@@ -43,7 +43,7 @@ def main(command_line_conf):
     signal(SIGQUIT, handle_signals)
 
     # Loads config and sets up the data folder and log file
-    data_dir = command_line_conf.get("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+    data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
     config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
     setup_data_folder(data_dir)
@@ -173,7 +173,7 @@ if __name__ == "__main__":
             argv[1:],
             "h",
             [
-                "apiconnect=",
+                "apibind=",
                 "apiport=",
                 "btcnetwork=",
                 "btcrpcuser=",
@@ -188,7 +188,10 @@ if __name__ == "__main__":
             if opt in ["--apibind"]:
                 command_line_conf["API_BIND"] = arg
             if opt in ["--apiport"]:
-                command_line_conf["API_PORT"] = arg
+                try:
+                    command_line_conf["API_PORT"] = int(arg)
+                except ValueError:
+                    exit("apiport must be an integer")
             if opt in ["--btcnetwork"]:
                 command_line_conf["BTC_NETWORK"] = arg
             if opt in ["--btcrpcuser"]:

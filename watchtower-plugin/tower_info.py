@@ -29,7 +29,7 @@ class TowerInfo:
         self.appointments = {}
         self.pending_appointments = []
         self.invalid_appointments = []
-        self.misbehaving_proof = None
+        self.misbehaving_proof = {}
 
     @classmethod
     def from_dict(cls, tower_data):

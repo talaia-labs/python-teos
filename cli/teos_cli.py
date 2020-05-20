@@ -484,7 +484,7 @@ if __name__ == "__main__":
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
 
-        command = args.pop(0)
+        command = args.pop(0) if args else None
         if command in commands:
             main(command, args, command_line_conf)
         elif not command:
