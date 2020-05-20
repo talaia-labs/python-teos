@@ -13,30 +13,35 @@ LOG_PREFIX = "System Monitor"
 logger = Logger(actor="Searcher", log_name_prefix=LOG_PREFIX)
 
 
-class Searcher:
+class DataLoader:
     """ 
-    The :class:`Searcher` is in charge of the monitor's Elasticsearch functionality for loading and searching through data.
+    The :class:`DataLoader` is in charge of the monitor's Elasticsearch functionality for loading and searching through data.
     
     Args:
-        host (:obj:`str`): The host Elasticsearch is running on.
-        port (:obj:`int`): The port Elasticsearch is runnning on.
+        es_host (:obj:`str`): The host Elasticsearch is listening on.
+        es_port (:obj:`int`): The port Elasticsearch is listening on.
+        api_host (:obj:`str`): The host Teos is listening on.
+        api_port (:obj:`int`): The port Teos is listening on.
+        log_file (:obj:`int`): The path to the log file ES will pull data from. 
         cloud_id (:obj:`str`): Elasticsearch cloud id, if Elasticsearch Cloud is being used.
         auth_user (:obj:`str`): Elasticsearch Cloud username, if Elasticsearch Cloud is being used.
         auth_pw (:obj:`str`): Elasticsearch Cloud password, if Elasticsearch Cloud is being used.
 
     Attributes:
-        host (:obj:`str`): The host Elasticsearch is running on.
-        port (:obj:`int`): The port Elasticsearch is runnning on.
+        es_host (:obj:`str`): The host Elasticsearch is running on.
+        es_port (:obj:`int`): The port Elasticsearch is runnning on.
         cloud_id (:obj:`str`): Elasticsearch cloud id, if Elasticsearch Cloud is being used.
         auth_user (:obj:`str`): Elasticsearch Cloud username, if Elasticsearch Cloud is being used.
         auth_pw (:obj:`str`): Elasticsearch Cloud password, if Elasticsearch Cloud is being used.
         es (:obj:`Elasticsearch <elasticsearch.Elasticsearch>`): The Elasticsearch client for searching for data to be visualized.
         index_client (:obj:`IndicesClient <elasticsearch.client.IndiciesClient>`): The index client where log data is stored.
         log_path (:obj:`str`): The path to the log file where log file will be pulled from and analyzed by ES.
+        api_host (:obj:`str`): The host Teos is listening on.
+        api_port (:obj:`int`): The port Teos is listening on.
     
     """
 
-    def __init__(self, es_host, es_port, api_host, api_port, teos_dir, log_file, cloud_id=None, auth_user=None, auth_pw=None):
+    def __init__(self, es_host, es_port, api_host, api_port, log_file, cloud_id=None, auth_user=None, auth_pw=None):
          self.es_host = es_host
          self.es_port = es_port
          self.es_cloud_id = cloud_id
@@ -57,19 +62,17 @@ class Searcher:
          self.api_port = api_port
 
     def start(self):
-        """Starts Elasticsearch and compiles data to be visualized in Kibana"""
+        """Loads data to be visualized in Kibana"""
 
-        # self.delete_index("logs")        
+        self.delete_index("logs")        
 
         # Pull the watchtower logs into Elasticsearch.
-        # self.create_index("logs")
-        #log_data = self.load_logs(self.log_path)
-        #self.index_data_bulk("logs", log_data)
+        self.create_index("logs")
+        log_data = self.load_logs(self.log_path)
+        self.index_data_bulk("logs", log_data)
 
-        # Search for the data we need to visualize a graph.
-        # self.load_and_index_other_data()
-
-        # self.search_logs("message", ["logs"])
+        # Grab the other data we need to visualize a graph.
+        self.load_and_index_other_data()
 
     def create_index(self, index):
         """ 
@@ -140,11 +143,23 @@ class Searcher:
         watcher_appts = num_appts[0]
         responder_appts = num_appts[1] 
 
+        # self.es.search for the watcher_appts doc... if it exists, then update the item. 
+
         # index current number of appointments in watcher and responder
         self.index_item("logs", "watcher_appts", watcher_appts)
         self.index_item("logs", "responder_appts", responder_appts)
         
     def index_item(self, index, field, value):
+        """ 
+        Indexes logs in elasticsearch so they can be searched.
+    
+        Args:
+            index (:obj:`str`): The index to which we want to load data.
+            field (:obj:`str`): The field of the data to be loaded.
+            value (:obj:`str`): The value of the data to be loaded.
+    
+        """
+
         body = {
             "doc.{}".format(field): value,
             "doc.time": time.time() 
@@ -175,7 +190,8 @@ class Searcher:
         Indexes logs in elasticsearch so they can be searched.
     
         Args:
-            logs (:obj:`list`): A list of logs in dict form.
+            index (:obj:`str`): The index to which we want to load data.
+            data (:obj:`list`): A list of data in dict form.
     
         Returns:
             response (:obj:`tuple`): The first value of the tuple equals the number of the logs data was entered successfully. If there are errors the second value in the tuple includes the errors.
@@ -194,6 +210,13 @@ class Searcher:
         return response
 
     def get_num_appointments(self):
+        """ 
+        Gets number of appointments the tower is storing in the watcher and responder, so we can load this data into Elasticsearch.
+    
+        Returns:
+            :obj:`list`: A list where the 0th element describes # of watcher appointments and the 1st element describes # of responder appointments.
+        """
+
         teos_url = "http://{}:{}".format(self.api_host, self.api_port)
 
         resp = teos_cli.get_all_appointments(teos_url)
@@ -205,6 +228,17 @@ class Searcher:
 
         return [watcher_appts, responder_appts]
 
+    def delete_index(self, index):
+        """ 
+        Deletes the chosen index of Elasticsearch.
+    
+        Args:
+            index (:obj:`str`): The ES index to delete.
+        """
+
+        results = self.index_client.delete(index)
+
+    # For testing purposes...
     def search_logs(self, field, keyword, index):
         """ 
         Searches Elasticsearch for data with a certain field and keyword.
@@ -243,27 +277,3 @@ class Searcher:
   
         return results
 
-    
-    def delete_index(self, index):
-
-        results = self.index_client.delete(index)  
-
-
-    def delete_all_by_index(self, index):
-        """ 
-        Deletes all logs in the chosen index of Elasticsearch.
-    
-        Args:
-            index (:obj:`str`): The index in Elasticsearch.
-    
-        Returns:
-            :obj:`dict`: A dict describing how many items were deleted and including any deletion failures.
-    
-        """
-    
-        body = { 
-            "query": { "match_all": {} }
-        }   
-        results = self.es.delete_by_query(index, body) 
-      
-        return results

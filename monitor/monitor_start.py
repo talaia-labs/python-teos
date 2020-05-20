@@ -1,5 +1,5 @@
 from monitor import MONITOR_DIR, MONITOR_CONF, MONITOR_DEFAULT_CONF
-from monitor.searcher import Searcher
+from monitor.data_loader import DataLoader
 from monitor.visualizer import Visualizer
 
 from common.config_loader import ConfigLoader
@@ -31,9 +31,9 @@ def main(command_line_conf):
     auth_user = mon_conf.get("AUTH_USER") 
     auth_pw = mon_conf.get("AUTH_PW")
 
-    # Create and start searcher.
-    searcher = Searcher(es_host, es_port, api_host, api_port, DATA_DIR, log_file, cloud_id, auth_user, auth_pw)
-    searcher.start()
+    # Create and start data loader.
+    dataLoader = DataLoader(es_host, es_port, api_host, api_port, log_file, cloud_id, auth_user, auth_pw)
+    dataLoader.start()
 
     kibana_host = mon_conf.get("KIBANA_HOST")
     kibana_port = mon_conf.get("KIBANA_PORT")
