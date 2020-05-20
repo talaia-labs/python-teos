@@ -19,3 +19,4 @@ docs/
 .teos
 .teos_cli
 *.orig
+/monitor/monitor.conf
