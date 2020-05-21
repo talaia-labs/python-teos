@@ -9,22 +9,32 @@ from teos.tools import bitcoin_cli
 from teos.responder import Responder
 from teos.gatekeeper import UserInfo
 from teos.chain_monitor import ChainMonitor
-from teos.appointments_dbm import AppointmentsDBM
 from teos.block_processor import BlockProcessor
-from teos.watcher import Watcher, AppointmentLimitReached
+from teos.appointments_dbm import AppointmentsDBM
+from teos.extended_appointment import ExtendedAppointment
 from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots
+from teos.watcher import (
+    Watcher,
+    AppointmentLimitReached,
+    LocatorCache,
+    EncryptionError,
+    InvalidTransactionFormat,
+    AppointmentAlreadyTriggered,
+)
 
 from common.tools import compute_locator
 from common.cryptographer import Cryptographer
 
 from test.teos.unit.conftest import (
     generate_blocks_w_delay,
+    generate_blocks,
     generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
     get_config,
     bitcoind_feed_params,
     bitcoind_connect_params,
+    create_dummy_transaction,
 )
 
 APPOINTMENTS = 5
@@ -55,7 +65,15 @@ def watcher(db_manager, gatekeeper):
     carrier = Carrier(bitcoind_connect_params)
 
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    watcher = Watcher(db_manager, gatekeeper, block_processor, responder, signing_key.to_der(), MAX_APPOINTMENTS)
+    watcher = Watcher(
+        db_manager,
+        gatekeeper,
+        block_processor,
+        responder,
+        signing_key.to_der(),
+        MAX_APPOINTMENTS,
+        config.get("BLOCK_CACHE_SIZE"),
+    )
 
     chain_monitor = ChainMonitor(
         watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
@@ -91,7 +109,7 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
-def test_init(run_bitcoind, watcher):
+def test_watcher_init(watcher, run_bitcoind):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
@@ -101,6 +119,76 @@ def test_init(run_bitcoind, watcher):
     assert isinstance(watcher.responder, Responder)
     assert isinstance(watcher.max_appointments, int)
     assert isinstance(watcher.signing_key, PrivateKey)
+    assert isinstance(watcher.locator_cache, LocatorCache)
+
+
+def test_locator_cache_init_not_enough_blocks(watcher):
+    # Make sure there are at least 3 blocks
+    block_count = watcher.block_processor.get_block_count()
+    if block_count < 3:
+        generate_blocks_w_delay(3 - block_count)
+
+    # Simulate there are only 3 blocks
+    third_block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(2)
+    watcher.locator_cache.init(third_block_hash, watcher.block_processor)
+    assert len(watcher.locator_cache.blocks) == 3
+    for k, v in watcher.locator_cache.blocks.items():
+        assert watcher.block_processor.get_block(k)
+
+
+def test_locator_cache_init(watcher):
+    # Empty cache
+    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
+
+    # Generate enough blocks so the cache can start full
+    generate_blocks(2 * watcher.locator_cache.cache_size)
+
+    watcher.locator_cache.init(watcher.block_processor.get_best_block_hash(), watcher.block_processor)
+    assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
+    for k, v in watcher.locator_cache.blocks.items():
+        assert watcher.block_processor.get_block(k)
+
+
+def test_locator_cache_is_full(watcher):
+    # Empty cache
+    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
+
+    for _ in range(watcher.locator_cache.cache_size):
+        watcher.locator_cache.blocks[uuid4().hex] = 0
+        assert not watcher.locator_cache.is_full()
+
+    watcher.locator_cache.blocks[uuid4().hex] = 0
+    assert watcher.locator_cache.is_full()
+
+    # Remove the data
+    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
+
+
+def test_locator_remove_older_block(watcher):
+    # Add some blocks to the cache if it is empty
+    if not len(watcher.locator_cache.blocks):
+        for _ in range(watcher.locator_cache.cache_size):
+            txid = get_random_value_hex(32)
+            locator = txid[:16]
+            watcher.locator_cache.blocks[get_random_value_hex(32)] = {locator: txid}
+            watcher.locator_cache.cache[locator] = txid
+
+    blocks_in_cache = watcher.locator_cache.blocks
+    oldest_block_hash = list(blocks_in_cache.keys())[0]
+    oldest_block_data = blocks_in_cache.get(oldest_block_hash)
+    rest_of_blocks = list(blocks_in_cache.keys())[1:]
+    watcher.locator_cache.remove_older_block()
+
+    # Oldest block data is not in the cache
+    assert oldest_block_hash not in watcher.locator_cache.blocks
+    for locator in oldest_block_data:
+        assert locator not in watcher.locator_cache.cache
+
+    # The rest of data is in the cache
+    assert set(rest_of_blocks).issubset(watcher.locator_cache.blocks)
+    for block_hash in rest_of_blocks:
+        for locator in watcher.locator_cache.blocks[block_hash]:
+            assert locator in watcher.locator_cache.cache
 
 
 def test_add_appointment_non_registered(watcher):
@@ -171,6 +259,103 @@ def test_add_appointment(watcher):
     assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
 
+# WIP: ADD appointment with the different uses of the cache
+def test_add_appointment_in_cache(watcher):
+    # Generate an appointment and add the dispute txid to the cache
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
+
+    appointment, dispute_tx = generate_dummy_appointment()
+    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+    watcher.locator_cache.cache[appointment.locator] = dispute_txid
+
+    # Try to add the appointment
+    response = watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+
+    # The appointment is accepted but it's not in the Watcher
+    assert (
+        response
+        and response.get("locator") == appointment.locator
+        and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
+        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), response.get("signature")))
+    )
+    assert not watcher.locator_uuid_map.get(appointment.locator)
+
+    # It went to the Responder straightaway
+    assert appointment.locator in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
+
+    # Trying to send it again should fail since it is already in the Responder
+    with pytest.raises(AppointmentAlreadyTriggered):
+        watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+
+
+def test_add_appointment_in_cache_invalid_blob(watcher):
+    # Generate an appointment with an invalid transaction and add the dispute txid to the cache
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
+
+    # We need to create the appointment manually
+    dispute_tx = create_dummy_transaction()
+    dispute_txid = dispute_tx.tx_id.hex()
+    penalty_tx = create_dummy_transaction(dispute_txid)
+
+    locator = compute_locator(dispute_txid)
+    dummy_appointment_data = {"tx": penalty_tx.hex(), "tx_id": dispute_txid, "to_self_delay": 20}
+    encrypted_blob = Cryptographer.encrypt(dummy_appointment_data.get("tx")[::-1], dummy_appointment_data.get("tx_id"))
+
+    appointment_data = {
+        "locator": locator,
+        "to_self_delay": dummy_appointment_data.get("to_self_delay"),
+        "encrypted_blob": encrypted_blob,
+        "user_id": get_random_value_hex(16),
+    }
+
+    appointment = ExtendedAppointment.from_dict(appointment_data)
+    watcher.locator_cache.cache[appointment.locator] = dispute_tx.tx_id.hex()
+
+    # Try to add the appointment
+    response = watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+
+    # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
+    assert (
+        response
+        and response.get("locator") == appointment.locator
+        and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
+        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), response.get("signature")))
+    )
+
+    assert not watcher.locator_uuid_map.get(appointment.locator)
+    assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
+
+
+def test_add_appointment_in_cache_invalid_transaction(watcher):
+    # Generate an appointment that cannot be decrypted and add the dispute txid to the cache
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
+
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment.encrypted_blob = appointment.encrypted_blob[::-1]
+    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+    watcher.locator_cache.cache[appointment.locator] = dispute_txid
+
+    # Try to add the appointment
+    response = watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+
+    # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
+    assert (
+        response
+        and response.get("locator") == appointment.locator
+        and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
+        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), response.get("signature")))
+    )
+
+    assert not watcher.locator_uuid_map.get(appointment.locator)
+    assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
+
+
 def test_add_too_many_appointments(watcher):
     # Simulate the user is registered
     user_sk, user_pk = generate_keypair()
@@ -200,6 +385,7 @@ def test_add_too_many_appointments(watcher):
 
 def test_do_watch(watcher, temp_db_manager):
     watcher.db_manager = temp_db_manager
+    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
 
     # We will wipe all the previous data and add 5 appointments
     appointments, locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
@@ -246,9 +432,37 @@ def test_do_watch(watcher, temp_db_manager):
     # FIXME: We should also add cases where the transactions are invalid. bitcoind_mock needs to be extended for this.
 
 
+def test_do_watch_cache_update(watcher):
+    # Test that data is properly added/remove to/from the cache
+
+    for _ in range(10):
+        blocks_in_cache = watcher.locator_cache.blocks
+        oldest_block_hash = list(blocks_in_cache.keys())[0]
+        oldest_block_data = blocks_in_cache.get(oldest_block_hash)
+        rest_of_blocks = list(blocks_in_cache.keys())[1:]
+        assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
+
+        generate_blocks_w_delay(1)
+
+        # The last oldest block is gone but the rest remain
+        assert oldest_block_hash not in watcher.locator_cache.blocks
+        assert set(rest_of_blocks).issubset(watcher.locator_cache.blocks.keys())
+
+        # The locators of the older block are gone but the rest remain
+        for locator in oldest_block_data:
+            assert locator not in watcher.locator_cache.cache
+        for block_hash in rest_of_blocks:
+            for locator in watcher.locator_cache.blocks[block_hash]:
+                assert locator in watcher.locator_cache.cache
+
+        # The size of the cache is the same
+        assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
+
+
 def test_get_breaches(watcher, txids, locator_uuid_map):
     watcher.locator_uuid_map = locator_uuid_map
-    potential_breaches = watcher.get_breaches(txids)
+    locators_txid_map = {compute_locator(txid): txid for txid in txids}
+    potential_breaches = watcher.get_breaches(locators_txid_map)
 
     # All the txids must breach
     assert locator_uuid_map.keys() == potential_breaches.keys()
@@ -258,38 +472,54 @@ def test_get_breaches_random_data(watcher, locator_uuid_map):
     # The likelihood of finding a potential breach with random data should be negligible
     watcher.locator_uuid_map = locator_uuid_map
     txids = [get_random_value_hex(32) for _ in range(TEST_SET_SIZE)]
+    locators_txid_map = {compute_locator(txid): txid for txid in txids}
 
-    potential_breaches = watcher.get_breaches(txids)
+    potential_breaches = watcher.get_breaches(locators_txid_map)
 
     # None of the txids should breach
     assert len(potential_breaches) == 0
 
 
-def test_filter_breaches_random_data(watcher):
-    appointments = {}
-    locator_uuid_map = {}
-    breaches = {}
+def test_check_breach(watcher):
+    # A breach will be flagged as valid only if the encrypted blob can be properly decrypted and the resulting data
+    # matches a transaction format.
+    uuid = uuid4().hex
+    appointment, dispute_tx = generate_dummy_appointment()
+    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
 
-    for i in range(TEST_SET_SIZE):
-        dummy_appointment, _ = generate_dummy_appointment()
-        uuid = uuid4().hex
-        appointments[uuid] = {"locator": dummy_appointment.locator, "user_id": dummy_appointment.user_id}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
-        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
+    valid_breach = watcher.check_breach(uuid, appointment, dispute_txid)
+    assert (
+        valid_breach
+        and valid_breach.get("locator") == appointment.locator
+        and valid_breach.get("dispute_txid") == dispute_txid
+    )
 
-        locator_uuid_map[dummy_appointment.locator] = [uuid]
 
-        if i % 2:
-            dispute_txid = get_random_value_hex(32)
-            breaches[dummy_appointment.locator] = dispute_txid
+def test_check_breach_random_data(watcher):
+    # If a breach triggers an appointment with random data as encrypted blob, the check should fail.
+    uuid = uuid4().hex
+    appointment, dispute_tx = generate_dummy_appointment()
+    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
 
-    watcher.locator_uuid_map = locator_uuid_map
-    watcher.appointments = appointments
+    # Set the blob to something "random"
+    appointment.encrypted_blob = get_random_value_hex(200)
 
-    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
+    with pytest.raises(EncryptionError):
+        watcher.check_breach(uuid, appointment, dispute_txid)
 
-    # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
-    assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
+
+def test_check_breach_invalid_transaction(watcher):
+    # If the breach triggers an appointment with data that can be decrypted but does not match a transaction, it should
+    # fail
+    uuid = uuid4().hex
+    appointment, dispute_tx = generate_dummy_appointment()
+    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+
+    # Set the blob to something "random"
+    appointment.encrypted_blob = Cryptographer.encrypt(get_random_value_hex(200), dispute_txid)
+
+    with pytest.raises(InvalidTransactionFormat):
+        watcher.check_breach(uuid, appointment, dispute_txid)
 
 
 def test_filter_valid_breaches(watcher):
@@ -323,3 +553,30 @@ def test_filter_valid_breaches(watcher):
 
     # We have "triggered" a single breach and it was valid.
     assert len(invalid_breaches) == 0 and len(valid_breaches) == 1
+
+
+def test_filter_breaches_random_data(watcher):
+    appointments = {}
+    locator_uuid_map = {}
+    breaches = {}
+
+    for i in range(TEST_SET_SIZE):
+        dummy_appointment, _ = generate_dummy_appointment()
+        uuid = uuid4().hex
+        appointments[uuid] = {"locator": dummy_appointment.locator, "user_id": dummy_appointment.user_id}
+        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
+        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
+
+        locator_uuid_map[dummy_appointment.locator] = [uuid]
+
+        if i % 2:
+            dispute_txid = get_random_value_hex(32)
+            breaches[dummy_appointment.locator] = dispute_txid
+
+    watcher.locator_uuid_map = locator_uuid_map
+    watcher.appointments = appointments
+
+    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
+
+    # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
+    assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
