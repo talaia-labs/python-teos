@@ -263,6 +263,7 @@ class Watcher:
 
         return {
             "locator": appointment.locator,
+            "start_block": self.last_known_block,
             "signature": signature,
             "available_slots": available_slots,
             "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
