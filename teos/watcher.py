@@ -200,17 +200,17 @@ class Watcher:
         # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
         uuid = hash_160("{}{}".format(appointment.locator, user_id))
 
+        # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
+        if uuid in self.responder.trackers:
+            message = "Appointment already in Responder"
+            logger.info(message)
+            raise AppointmentAlreadyTriggered(message)
+
         # Add the appointment to the Gatekeeper
         available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, appointment)
 
         # Appointments that were triggered in blocks hold in the cache
         if appointment.locator in self.locator_cache.cache:
-            # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
-            if uuid in self.responder.trackers:
-                message = "Appointment already in Responder"
-                logger.info(message)
-                raise AppointmentAlreadyTriggered(message)
-
             try:
                 breach = self.check_breach(uuid, appointment, self.locator_cache.cache[appointment.locator])
                 receipt = self.responder.handle_breach(

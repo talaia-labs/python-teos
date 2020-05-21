@@ -355,10 +355,10 @@ def test_add_appointment_in_cache(api, client):
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_BAD_REQUEST and r.json.get("error_code") == errors.APPOINTMENT_ALREADY_TRIGGERED
 
-    # The appointment should simply accepted if the data is not in the cache, since it cannot be triggered again
+    # The appointment would be rejected even if the data is not in the cache provided we've it has been triggered
     del api.watcher.locator_cache.cache[appointment.locator]
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert r.status_code == HTTP_BAD_REQUEST and r.json.get("error_code") == errors.APPOINTMENT_ALREADY_TRIGGERED
 
 
 def test_add_appointment_in_cache_cannot_decrypt(api, client):

@@ -259,7 +259,6 @@ def test_add_appointment(watcher):
     assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
 
-# WIP: ADD appointment with the different uses of the cache
 def test_add_appointment_in_cache(watcher):
     # Generate an appointment and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
