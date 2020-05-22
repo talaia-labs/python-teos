@@ -72,6 +72,26 @@ class LocatorCache:
 
         self.blocks = OrderedDict(reversed((list(self.blocks.items()))))
 
+    def fix_cache(self, last_known_block, block_processor):
+        tmp_cache = LocatorCache(self.cache_size)
+
+        target_block_hash = last_known_block
+        for _ in range(self.cache_size):
+            target_block = block_processor.get_block(target_block_hash)
+            if target_block:
+                if target_block_hash in self.blocks:
+                    tmp_cache.cache.update(self.blocks[target_block_hash])
+                    tmp_cache.blocks[target_block_hash] = self.blocks[target_block_hash]
+                else:
+                    locators = {compute_locator(txid): txid for txid in target_block.get("tx")}
+                    tmp_cache.cache.update(locators)
+                    tmp_cache.blocks[target_block_hash] = locators
+
+                target_block_hash = target_block.get("previousblockhash")
+
+        self.blocks = OrderedDict(reversed((list(tmp_cache.blocks.items()))))
+        self.cache = tmp_cache.cache
+
     def is_full(self):
         """  Returns whether the cache is full or not """
         return len(self.blocks) > self.cache_size
@@ -289,6 +309,10 @@ class Watcher:
             block_hash = self.block_queue.get()
             block = self.block_processor.get_block(block_hash)
             logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
+
+            # If a reorg is detected, the cache is fixed to cover the las `cache_size` blocks of the new chain
+            if self.last_known_block != block.get("previousblockhash"):
+                self.locator_cache.fix_cache(block_hash, self.block_processor)
 
             txids = block.get("tx")
             # Compute the locator for every transaction in the block and add them to the cache
