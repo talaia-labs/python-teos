@@ -90,7 +90,7 @@ def main(command_line_conf):
                 responder,
                 secret_key_der,
                 config.get("MAX_APPOINTMENTS"),
-                config.get("BLOCK_CACHE_SIZE"),
+                config.get("LOCATOR_CACHE_SIZE"),
             )
 
             # Create the chain monitor and start monitoring the chain

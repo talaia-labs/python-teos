@@ -21,7 +21,7 @@ DEFAULT_CONF = {
     "DEFAULT_SUBSCRIPTION_DURATION": {"value": 4320, "type": int},
     "EXPIRY_DELTA": {"value": 6, "type": int},
     "MIN_TO_SELF_DELAY": {"value": 20, "type": int},
-    "BLOCK_CACHE_SIZE": {"value": 6, "type": int},
+    "LOCATOR_CACHE_SIZE": {"value": 6, "type": int},
     "LOG_FILE": {"value": "teos.log", "type": str, "path": True},
     "TEOS_SECRET_KEY": {"value": "teos_sk.der", "type": str, "path": True},
     "APPOINTMENTS_DB_PATH": {"value": "appointments", "type": str, "path": True},

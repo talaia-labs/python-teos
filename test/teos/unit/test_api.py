@@ -75,7 +75,7 @@ def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
         responder,
         sk.to_der(),
         MAX_APPOINTMENTS,
-        config.get("BLOCK_CACHE_SIZE"),
+        config.get("LOCATOR_CACHE_SIZE"),
     )
     inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
     api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher)
