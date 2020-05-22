@@ -72,7 +72,7 @@ def watcher(db_manager, gatekeeper):
         responder,
         signing_key.to_der(),
         MAX_APPOINTMENTS,
-        config.get("BLOCK_CACHE_SIZE"),
+        config.get("LOCATOR_CACHE_SIZE"),
     )
 
     chain_monitor = ChainMonitor(
@@ -109,7 +109,75 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
-def test_watcher_init(watcher, run_bitcoind):
+def test_locator_cache_init_not_enough_blocks(run_bitcoind, block_processor):
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+    # Make sure there are at least 3 blocks
+    block_count = block_processor.get_block_count()
+    if block_count < 3:
+        generate_blocks_w_delay(3 - block_count)
+
+    # Simulate there are only 3 blocks
+    third_block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(2)
+    locator_cache.init(third_block_hash, block_processor)
+    assert len(locator_cache.blocks) == 3
+    for k, v in locator_cache.blocks.items():
+        assert block_processor.get_block(k)
+
+
+def test_locator_cache_init(block_processor):
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    # Generate enough blocks so the cache can start full
+    generate_blocks(2 * locator_cache.cache_size)
+
+    locator_cache.init(block_processor.get_best_block_hash(), block_processor)
+    assert len(locator_cache.blocks) == locator_cache.cache_size
+    for k, v in locator_cache.blocks.items():
+        assert block_processor.get_block(k)
+
+
+def test_locator_cache_is_full(block_processor):
+    # Empty cache
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    for _ in range(locator_cache.cache_size):
+        locator_cache.blocks[uuid4().hex] = 0
+        assert not locator_cache.is_full()
+
+    locator_cache.blocks[uuid4().hex] = 0
+    assert locator_cache.is_full()
+
+
+def test_locator_remove_older_block(block_processor):
+    # Empty cache
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    # Add some blocks to the cache
+    for _ in range(locator_cache.cache_size):
+        txid = get_random_value_hex(32)
+        locator = txid[:16]
+        locator_cache.blocks[get_random_value_hex(32)] = {locator: txid}
+        locator_cache.cache[locator] = txid
+
+    blocks_in_cache = locator_cache.blocks
+    oldest_block_hash = list(blocks_in_cache.keys())[0]
+    oldest_block_data = blocks_in_cache.get(oldest_block_hash)
+    rest_of_blocks = list(blocks_in_cache.keys())[1:]
+    locator_cache.remove_older_block()
+
+    # Oldest block data is not in the cache
+    assert oldest_block_hash not in locator_cache.blocks
+    for locator in oldest_block_data:
+        assert locator not in locator_cache.cache
+
+    # The rest of data is in the cache
+    assert set(rest_of_blocks).issubset(locator_cache.blocks)
+    for block_hash in rest_of_blocks:
+        for locator in locator_cache.blocks[block_hash]:
+            assert locator in locator_cache.cache
+
+
+def test_watcher_init(watcher):
     assert isinstance(watcher.appointments, dict) and len(watcher.appointments) == 0
     assert isinstance(watcher.locator_uuid_map, dict) and len(watcher.locator_uuid_map) == 0
     assert watcher.block_queue.empty()
@@ -120,75 +188,6 @@ def test_watcher_init(watcher, run_bitcoind):
     assert isinstance(watcher.max_appointments, int)
     assert isinstance(watcher.signing_key, PrivateKey)
     assert isinstance(watcher.locator_cache, LocatorCache)
-
-
-def test_locator_cache_init_not_enough_blocks(watcher):
-    # Make sure there are at least 3 blocks
-    block_count = watcher.block_processor.get_block_count()
-    if block_count < 3:
-        generate_blocks_w_delay(3 - block_count)
-
-    # Simulate there are only 3 blocks
-    third_block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(2)
-    watcher.locator_cache.init(third_block_hash, watcher.block_processor)
-    assert len(watcher.locator_cache.blocks) == 3
-    for k, v in watcher.locator_cache.blocks.items():
-        assert watcher.block_processor.get_block(k)
-
-
-def test_locator_cache_init(watcher):
-    # Empty cache
-    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
-
-    # Generate enough blocks so the cache can start full
-    generate_blocks(2 * watcher.locator_cache.cache_size)
-
-    watcher.locator_cache.init(watcher.block_processor.get_best_block_hash(), watcher.block_processor)
-    assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
-    for k, v in watcher.locator_cache.blocks.items():
-        assert watcher.block_processor.get_block(k)
-
-
-def test_locator_cache_is_full(watcher):
-    # Empty cache
-    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
-
-    for _ in range(watcher.locator_cache.cache_size):
-        watcher.locator_cache.blocks[uuid4().hex] = 0
-        assert not watcher.locator_cache.is_full()
-
-    watcher.locator_cache.blocks[uuid4().hex] = 0
-    assert watcher.locator_cache.is_full()
-
-    # Remove the data
-    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
-
-
-def test_locator_remove_older_block(watcher):
-    # Add some blocks to the cache if it is empty
-    if not len(watcher.locator_cache.blocks):
-        for _ in range(watcher.locator_cache.cache_size):
-            txid = get_random_value_hex(32)
-            locator = txid[:16]
-            watcher.locator_cache.blocks[get_random_value_hex(32)] = {locator: txid}
-            watcher.locator_cache.cache[locator] = txid
-
-    blocks_in_cache = watcher.locator_cache.blocks
-    oldest_block_hash = list(blocks_in_cache.keys())[0]
-    oldest_block_data = blocks_in_cache.get(oldest_block_hash)
-    rest_of_blocks = list(blocks_in_cache.keys())[1:]
-    watcher.locator_cache.remove_older_block()
-
-    # Oldest block data is not in the cache
-    assert oldest_block_hash not in watcher.locator_cache.blocks
-    for locator in oldest_block_data:
-        assert locator not in watcher.locator_cache.cache
-
-    # The rest of data is in the cache
-    assert set(rest_of_blocks).issubset(watcher.locator_cache.blocks)
-    for block_hash in rest_of_blocks:
-        for locator in watcher.locator_cache.blocks[block_hash]:
-            assert locator in watcher.locator_cache.cache
 
 
 def test_add_appointment_non_registered(watcher):
@@ -384,7 +383,6 @@ def test_add_too_many_appointments(watcher):
 
 def test_do_watch(watcher, temp_db_manager):
     watcher.db_manager = temp_db_manager
-    watcher.locator_cache = LocatorCache(watcher.locator_cache.cache_size)
 
     # We will wipe all the previous data and add 5 appointments
     appointments, locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
