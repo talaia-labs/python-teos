@@ -173,6 +173,7 @@ def test_add_appointment(api, client, appointment):
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_OK
     assert r.json.get("available_slots") == 0
+    assert r.json.get("start_block") == api.watcher.last_known_block
 
 
 def test_add_appointment_no_json(api, client, appointment):
@@ -258,6 +259,7 @@ def test_add_appointment_multiple_times_same_user(api, client, appointment, n=MU
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
         assert r.status_code == HTTP_OK
         assert r.json.get("available_slots") == n - 1
+        assert r.json.get("start_block") == api.watcher.last_known_block
 
     # Since all updates came from the same user, only the last one is stored
     assert len(api.watcher.locator_uuid_map[appointment.locator]) == 1
@@ -280,6 +282,7 @@ def test_add_appointment_multiple_times_different_users(api, client, appointment
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": signature}, compressed_pk)
         assert r.status_code == HTTP_OK
         assert r.json.get("available_slots") == 1
+        assert r.json.get("start_block") == api.watcher.last_known_block
 
     # Check that all the appointments have been added and that there are no duplicates
     assert len(set(api.watcher.locator_uuid_map[appointment.locator])) == n
@@ -291,14 +294,22 @@ def test_add_appointment_update_same_size(api, client, appointment):
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
     # The user has no additional slots, but it should be able to update
     # Let's just reverse the encrypted blob for example
     appointment.encrypted_blob = appointment.encrypted_blob[::-1]
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
 
 def test_add_appointment_update_bigger(api, client, appointment):
@@ -313,7 +324,11 @@ def test_add_appointment_update_bigger(api, client, appointment):
     appointment.encrypted_blob = TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
     # Check that it'll fail if no enough slots are available
     # Double the size from before
@@ -330,13 +345,21 @@ def test_add_appointment_update_smaller(api, client, appointment):
     appointment.encrypted_blob = TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
     # Let's update with one just small enough
     appointment.encrypted_blob = "A" * (ENCRYPTED_BLOB_MAX_SIZE_HEX - 2)
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 1
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 1
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
 
 def test_add_appointment_in_cache(api, client):
@@ -349,7 +372,11 @@ def test_add_appointment_in_cache(api, client):
     api.watcher.locator_cache.cache[appointment.locator] = dispute_txid
 
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
     # Trying to add it again should fail, since it is already in the Responder
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
@@ -373,7 +400,11 @@ def test_add_appointment_in_cache_cannot_decrypt(api, client):
 
     # The appointment should be accepted
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
 
 def test_add_appointment_in_cache_invalid_transaction(api, client):
@@ -404,7 +435,11 @@ def test_add_appointment_in_cache_invalid_transaction(api, client):
 
     # The appointment should be accepted
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 0
+    assert (
+        r.status_code == HTTP_OK
+        and r.json.get("available_slots") == 0
+        and r.json.get("start_block") == api.watcher.last_known_block
+    )
 
 
 def test_add_too_many_appointment(api, client):
@@ -421,7 +456,7 @@ def test_add_too_many_appointment(api, client):
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
 
         if i < free_appointment_slots:
-            assert r.status_code == HTTP_OK
+            assert r.status_code == HTTP_OK and r.json.get("start_block") == api.watcher.last_known_block
         else:
             assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
