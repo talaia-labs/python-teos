@@ -389,6 +389,73 @@ def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_
     assert appointment_info.get("appointment").get("penalty_tx") == appointment1_data.get("penalty_tx")
 
 
+def test_add_appointment_trigger_on_cache(bitcoin_cli):
+    # This tests sending an appointment which trigger is in the cache
+    commitment_tx, penalty_tx = create_txs(bitcoin_cli)
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
+    locator = compute_locator(commitment_tx_id)
+
+    # Let's send the commitment to the network and mine a block
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, bitcoin_cli.getnewaddress())
+
+    # Send the data to the tower and request it back. It should have gone straightaway to the Responder
+    add_appointment(appointment_data)
+    assert get_appointment_info(locator).get("status") == "dispute_responded"
+
+
+def test_add_appointment_invalid_trigger_on_cache(bitcoin_cli):
+    # This tests sending an invalid appointment which trigger is in the cache
+    commitment_tx, penalty_tx = create_txs(bitcoin_cli)
+    commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
+
+    # We can just flip the justice tx so it is invalid
+    appointment_data = build_appointment_data(commitment_tx_id, penalty_tx[::-1])
+    locator = compute_locator(commitment_tx_id)
+
+    # Let's send the commitment to the network and mine a block
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, bitcoin_cli.getnewaddress())
+    sleep(1)
+
+    # Send the data to the tower and request it back. It should get accepted but the data will be dropped.
+    add_appointment(appointment_data)
+    with pytest.raises(TowerResponseError):
+        get_appointment_info(locator)
+
+
+def test_add_appointment_trigger_on_cache_cannot_decrypt(bitcoin_cli):
+    commitment_tx, penalty_tx = create_txs(bitcoin_cli)
+
+    # Let's send the commitment to the network and mine a block
+    broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, bitcoin_cli.getnewaddress())
+    sleep(1)
+
+    # The appointment data is built using a random 32-byte value.
+    appointment_data = build_appointment_data(get_random_value_hex(32), penalty_tx)
+
+    # We cannot use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
+    appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(penalty_tx, get_random_value_hex(32))
+    appointment = Appointment.from_dict(appointment_data)
+
+    signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    data = {"appointment": appointment.to_dict(), "signature": signature}
+
+    # Send appointment to the server.
+    response = teos_cli.post_request(data, teos_add_appointment_endpoint)
+    response_json = teos_cli.process_post_response(response)
+
+    # Check that the server has accepted the appointment
+    signature = response_json.get("signature")
+    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    assert teos_id == Cryptographer.get_compressed_pk(rpk)
+    assert response_json.get("locator") == appointment.locator
+
+    # The appointment should should have been inmediately dropped
+    with pytest.raises(TowerResponseError):
+        get_appointment_info(appointment_data["locator"])
+
+
 def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
     global teosd_process
 
