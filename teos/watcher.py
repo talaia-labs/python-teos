@@ -61,14 +61,19 @@ class LocatorCache:
         # Not doing so implies store temporary variables in the Watcher and initialising the cache as None.
         target_block_hash = last_known_block
         for _ in range(self.cache_size):
-            target_block = block_processor.get_block(target_block_hash)
-
             # In some setups, like regtest, it could be the case that there are no enough previous blocks.
-            if target_block:
-                locators = {compute_locator(txid): txid for txid in target_block.get("tx")}
-                self.cache.update(locators)
-                self.blocks[target_block_hash] = locators
-                target_block_hash = target_block.get("previousblockhash")
+            # In those cases we pull as many as we can.
+            if target_block_hash:
+                target_block = block_processor.get_block(target_block_hash)
+                if not target_block:
+                    break
+            else:
+                break
+
+            locators = {compute_locator(txid): txid for txid in target_block.get("tx")}
+            self.cache.update(locators)
+            self.blocks[target_block_hash] = locators
+            target_block_hash = target_block.get("previousblockhash")
 
         self.blocks = OrderedDict(reversed((list(self.blocks.items()))))
 
