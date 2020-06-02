@@ -11,6 +11,7 @@ from common.config_loader import ConfigLoader
 
 
 getcontext().prec = 10
+utxos = []
 
 
 @pytest.fixture(scope="session")
@@ -37,11 +38,13 @@ def prng_seed():
 def setup_node(bitcoin_cli):
     # This method will create a new address a mine bitcoin so the node can be used for testing
     new_addr = bitcoin_cli.getnewaddress()
-    bitcoin_cli.generatetoaddress(106, new_addr)
+    bitcoin_cli.generatetoaddress(200, new_addr)
 
 
 def create_txs(bitcoin_cli, n=1):
-    utxos = bitcoin_cli.listunspent()
+    global utxos
+    if not utxos:
+        utxos = bitcoin_cli.listunspent()
 
     if len(utxos) < n:
         raise ValueError("There're no enough UTXOs.")
