@@ -62,7 +62,7 @@ class LocatorCache:
         target_block_hash = last_known_block
         for _ in range(self.cache_size):
             # In some setups, like regtest, it could be the case that there are no enough previous blocks.
-            # In those cases we pull as many as we can (up to ``cache_size``).
+            # In those cases we pull as many as we can (up to cache_size).
             if target_block_hash:
                 target_block = block_processor.get_block(target_block_hash)
                 if not target_block:
@@ -78,10 +78,18 @@ class LocatorCache:
         self.blocks = OrderedDict(reversed((list(self.blocks.items()))))
 
     def fix_cache(self, last_known_block, block_processor):
+        """
+        Fixes an existing cache after a reorg has been detected by feeding the last ``cache_size`` blocks to it.
+
+        Args:
+            last_known_block (:obj:`str`): the last known block hash after the reorg.
+            block_processor (:obj:`teos.block_processor.BlockProcessor`): a ``BlockProcessor`` instance.
+        """
+
         tmp_cache = LocatorCache(self.cache_size)
 
         # We assume there are no reorgs back to genesis. If so, this would raise some log warnings. And the cache will
-        # be filled with less than ``cache_size`` blocks.`
+        # be filled with less than cache_size blocks.
         target_block_hash = last_known_block
         for _ in range(tmp_cache.cache_size):
             target_block = block_processor.get_block(target_block_hash)
@@ -463,8 +471,10 @@ class Watcher:
             breaches (:obj:`dict`): a dictionary containing channel breaches (``locator:txid``).
 
         Returns:
-            :obj:`dict`: A dictionary containing all the breaches flagged either as valid or invalid.
-            The structure is as follows:
+            :obj:`tuple`: A dictionary and a list. The former contains the valid breaches, while the latter contain the
+            invalid ones.
+
+            The valid breaches dictionary has the following structure:
 
             ``{locator, dispute_txid, penalty_txid, penalty_rawtx}``
         """
