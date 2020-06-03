@@ -148,9 +148,9 @@ def test_fix_cache(block_processor):
 
     # Now let's fake a reorg of less than ``cache_size``. We'll go two blocks into the past.
     current_tip = block_processor.get_best_block_hash()
-    current_tip_locators = list(locator_cache.blocks[current_tip].keys())
+    current_tip_locators = locator_cache.blocks[current_tip]
     current_tip_parent = block_processor.get_block(current_tip).get("previousblockhash")
-    current_tip_parent_locators = list(locator_cache.blocks[current_tip_parent].keys())
+    current_tip_parent_locators = locator_cache.blocks[current_tip_parent]
     fake_tip = block_processor.get_block(current_tip_parent).get("previousblockhash")
     locator_cache.fix_cache(fake_tip, block_processor)
 
@@ -171,9 +171,9 @@ def test_fix_cache(block_processor):
     new_cache.fix_cache(block_processor.get_best_block_hash(), block_processor)
 
     # None of the data from the old cache is in the new cache
-    for block_hash, data in locator_cache.blocks.items():
+    for block_hash, locators in locator_cache.blocks.items():
         assert block_hash not in new_cache.blocks
-        for locator, txid in data.items():
+        for locator in locators:
             assert locator not in new_cache.cache
 
     # The data in the new cache corresponds to the last ``cache_size`` blocks.
@@ -181,7 +181,7 @@ def test_fix_cache(block_processor):
     for i in range(block_count, block_count - locator_cache.cache_size, -1):
         block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(i - 1)
         assert block_hash in new_cache.blocks
-        for locator, _ in new_cache.blocks[block_hash].items():
+        for locator in new_cache.blocks[block_hash]:
             assert locator in new_cache.cache
 
 
@@ -533,12 +533,8 @@ def test_check_breach(watcher):
     appointment, dispute_tx = generate_dummy_appointment()
     dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
 
-    valid_breach = watcher.check_breach(uuid, appointment, dispute_txid)
-    assert (
-        valid_breach
-        and valid_breach.get("locator") == appointment.locator
-        and valid_breach.get("dispute_txid") == dispute_txid
-    )
+    penalty_txid, penalty_rawtx = watcher.check_breach(uuid, appointment, dispute_txid)
+    assert Cryptographer.encrypt(penalty_rawtx, dispute_txid) == appointment.encrypted_blob
 
 
 def test_check_breach_random_data(watcher):
