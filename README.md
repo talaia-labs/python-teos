@@ -37,6 +37,14 @@ The configuration includes, amongst others, where your data folder is placed, wh
 To run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can follow [generate keys](#generate-keys) to generate them.
 
 
+## Running `teos` as a docker container
+`teos` container can be build from Dockerfile attached to the repo. ENV variables are optional, if not set defaults are used.
+
+	git clone https://github.com/talaia-labs/python-teos
+	cd python-teos
+	docker build . -t teos
+	docker run -it -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> -e BTC_RPC_HOST=<hostname> -e BTC_RPC_PORT=<port> -p 9814:9814/tcp teos
+
 ### Configuration file and command line parameters
 
 To change the configuration defaults you can:
