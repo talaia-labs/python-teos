@@ -4,6 +4,7 @@ from monitor.visualizer import Visualizer
 
 from common.config_loader import ConfigLoader
 from common.logger import Logger
+from common.tools import setup_data_folder
 
 from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
@@ -16,6 +17,7 @@ def main(command_line_conf):
     # Pull in Teos's config file to retrieve some of the data we need.
     conf_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     conf = conf_loader.build_config()
+    setup_data_folder(MONITOR_DIR)
 
     max_users = conf.get("DEFAULT_SLOTS")
     api_host = conf.get("API_BIND")
@@ -42,7 +44,6 @@ def main(command_line_conf):
     visualizer.create_dashboard()
 
 if __name__ == "__main__":
-    # TODO:
     command_line_conf = {}
 
     main(command_line_conf)

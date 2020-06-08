@@ -1,16 +1,14 @@
 import json
-import os
 import time
 
 from elasticsearch import Elasticsearch, helpers
 from elasticsearch.client import IndicesClient
-from elasticsearch.helpers.errors import BulkIndexError
 
 from cli import teos_cli 
 from common.logger import Logger
 
 LOG_PREFIX = "System Monitor"
-logger = Logger(actor="Searcher", log_name_prefix=LOG_PREFIX)
+logger = Logger(actor="Data loader", log_name_prefix=LOG_PREFIX)
 
 
 class DataLoader:
@@ -64,7 +62,8 @@ class DataLoader:
     def start(self):
         """Loads data to be visualized in Kibana"""
 
-        self.delete_index("logs")        
+        if self.index_client.exists("logs"):
+            self.delete_index("logs")        
 
         # Pull the watchtower logs into Elasticsearch.
         self.create_index("logs")

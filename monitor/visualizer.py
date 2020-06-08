@@ -1,7 +1,7 @@
 import json
 import requests
 
-from monitor.searcher import LOG_PREFIX
+from monitor.data_loader import LOG_PREFIX
 from common.logger import Logger
 
 from monitor.visualizations import index_pattern, visualizations, dashboard
@@ -11,7 +11,7 @@ logger = Logger(actor="Visualizer", log_name_prefix=LOG_PREFIX)
 
 class Visualizer:
     def __init__(self, kibana_host, kibana_port, auth_user, auth_pw, max_users):
-        self.kibana_endpoint = "{}:{}".format(kibana_host, kibana_port)
+        self.kibana_endpoint = "http://{}:{}".format(kibana_host, kibana_port)
         self.saved_obj_endpoint = "{}/api/saved_objects/".format(self.kibana_endpoint)
         self.auth_user = auth_user
         self.auth_pw = auth_pw
@@ -23,17 +23,22 @@ class Visualizer:
         self.max_users = max_users
 
     def create_dashboard(self):
-        # Create index pattern to pull Elasticsearch data into Kibana.
-        if not self.exists("index-pattern", "title", index_pattern.get("attributes").get("title")): 
-            resp = self.create_saved_object("index-pattern", index_pattern.get("attributes"), [])
+        index_id = None
 
-        index_id = resp.get("id")
+        # Find index pattern id if it exists. If it does not, create one to pull Elasticsearch data into Kibana.
+        index_pattern_json = self.find("index-pattern", "title", index_pattern.get("attributes").get("title"))
+
+        if index_pattern_json.get("total") == 0:
+            resp = self.create_saved_object("index-pattern", index_pattern.get("attributes"), [])
+            index_id = resp.get("id")
+        else:
+            index_id = index_pattern_json.get("saved_objects")[0].get("id") 
 
         visuals = []
         panelCount = 0
 
-        for key, value in visualizations.items():
-            if not self.exists("visualization", "title", value.get("attributes").get("title")):
+        for key, value in visualizations.items(): 
+            if not self.exists("visualization", "title", value.get("attributes").get("title")): 
                 if key == "available_user_slots_visual":
                     visState_json = json.loads(value["attributes"]["visState"])
                     visState_json["params"]["gauge"]["colorsRange"][0]["to"] = self.max_users
@@ -53,7 +58,31 @@ class Visualizer:
                 panelCount += 1
 
         if not self.exists("dashboard", "title", dashboard.get("attributes").get("title")):
+            panels_JSON = json.loads(dashboard["attributes"]["panelsJSON"])
+
+            for i, panel in enumerate(panels_JSON):
+                visual_id = visuals[i].get("id")
+                panel["gridData"]["i"] = visual_id 
+                panel["panelIndex"] = visual_id
+
+            dashboard["attributes"]["panelsJSON"] = json.dumps(panels_JSON)
+
             self.create_saved_object("dashboard", dashboard.get("attributes"), visuals) 
+
+    def find(self, obj_type, search_field, search):
+        endpoint = "{}{}".format(self.saved_obj_endpoint, "_find")
+
+        data = {
+            "type": obj_type,
+            "search_fields": search_field,
+            "search": search,
+            "default_search_operator": "AND"
+        }
+
+        response = requests.get(endpoint, params=data, headers=self.headers, auth=self.auth)
+
+        return response.json()
+ 
 
     def exists(self, obj_type, search_field, search):
         endpoint = "{}{}".format(self.saved_obj_endpoint, "_find")
@@ -90,6 +119,6 @@ class Visualizer:
         response = requests.post(endpoint, data=data, headers=self.headers, auth=self.auth)
 
         # log when an item is created.
-        logger.info("New Kibana saved object was created", response.text)
+        logger.info("New Kibana saved object was created")
 
         return response.json()
