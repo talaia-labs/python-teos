@@ -37,14 +37,6 @@ The configuration includes, amongst others, where your data folder is placed, wh
 To run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can follow [generate keys](#generate-keys) to generate them.
 
 
-## Running `teos` as a docker container
-`teos` container can be build from Dockerfile attached to the repo. ENV variables are optional, if not set defaults are used.
-
-	git clone https://github.com/talaia-labs/python-teos
-	cd python-teos
-	docker build . -t teos
-	docker run -it -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> -e BTC_RPC_HOST=<hostname> -e BTC_RPC_PORT=<port> -p 9814:9814/tcp teos
-
 ### Configuration file and command line parameters
 
 To change the configuration defaults you can:
@@ -60,7 +52,7 @@ and / or
 By default, `teos` runs on `mainnet`. In order to run it on another network you need to change the network parameter in the configuration file or pass the network parameter as a command line option. Notice that if teos does not find a `bitcoind` node running in the same network that it is set to run, it will refuse to run.
 
 
-### Modifiying the configuration file
+### Modifying the configuration file
 
 The configuration file options to change the network where `teos` will run are the `btc_rpc_port` and the `btc_network` under the `bitcoind` section:
 
@@ -92,6 +84,45 @@ Some configuration options can also be passed as options when running `teosd`. W
 ```
 python -m teos.teosd --btcnetwork=regtest --btcrpcport=18443
 ```
+
+## Running `teos` in a docker container
+A `teos` image can be built from the Dockerfile located in `/docker`. You can create the image by running:
+
+	cd python-teos
+	docker build -f docker/Dockerfile -t teos .
+	
+Then you can create a container by running:
+
+	docker run -it -e ENVS teos
+	
+Notice that ENV variables are optional, if unset the corresponding default setting is used. The following ENVs are available:
+
+```
+- API_BIND=<api hostname>
+- API_PORT=<api port>
+- BTC_NETWORK=<btc netwrok>
+- BTC_RPC_CONNECT=<btc node hostname>
+- BTC_RPC_PORT=<btc node port>
+- BTC_RPC_USER=<rpc username>
+- BTC_RPC_PASSWORD=<rpc password>
+```
+
+If you are running `teos` and `bitcoind` in the same machine, continue reading for how to create the container based on your OS.
+
+### `bitcoind` running on the same machine (UNIX)
+The easiest way to run both together int he same machine is to set the container to use the host network.
+	
+For example, if both `teos` and `bitcoind` are running on default settings, run:
+    `docker run --network=host -it -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> teos`
+
+Notice that you may still need to set your RPC authentication details, since, hopefully, your credentials won't match the `teos` defaults.
+
+### `bitcoind` running on the same machine (OSX or Windows)
+
+Docker for OSX and Windows do not allow to use the host network (nor to use the `docker0` bridge interface). To workaround this
+you can use the special `host.docker.internal` domain.
+
+    docker run -it -e BTC_RPC_CONNECT=host.docker.internal -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> teos
 
 ## Interacting with a TEOS Instance
 
