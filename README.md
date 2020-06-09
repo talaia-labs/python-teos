@@ -105,6 +105,8 @@ Notice that ENV variables are optional, if unset the corresponding default setti
 - BTC_RPC_PORT=<btc node port>
 - BTC_RPC_USER=<rpc username>
 - BTC_RPC_PASSWORD=<rpc password>
+- BTC_FEED_CONNECT=<btc zmq hostname>
+- BTC_FEED_PORT=<btc zmq port>
 ```
 
 If you are running `teos` and `bitcoind` in the same machine, continue reading for how to create the container based on your OS.
@@ -122,7 +124,7 @@ Notice that you may still need to set your RPC authentication details, since, ho
 Docker for OSX and Windows do not allow to use the host network (nor to use the `docker0` bridge interface). To workaround this
 you can use the special `host.docker.internal` domain.
 
-    docker run -it -e BTC_RPC_CONNECT=host.docker.internal -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> teos
+    docker run -p 9814 -it -e BTC_RPC_CONNECT=host.docker.internal -e BTC_FEED_CONNECT=host.docker.internal -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> teos
 
 ## Interacting with a TEOS Instance
 
