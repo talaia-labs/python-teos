@@ -63,11 +63,11 @@ class LocatorCache:
         for _ in range(self.cache_size):
             # In some setups, like regtest, it could be the case that there are no enough previous blocks.
             # In those cases we pull as many as we can (up to cache_size).
-            if target_block_hash:
-                target_block = block_processor.get_block(target_block_hash)
-                if not target_block:
-                    break
-            else:
+            if not target_block_hash:
+                break
+
+            target_block = block_processor.get_block(target_block_hash)
+            if not target_block:
                 break
 
             locator_txid_map = {compute_locator(txid): txid for txid in target_block.get("tx")}
@@ -79,7 +79,7 @@ class LocatorCache:
 
     def fix_cache(self, last_known_block, block_processor):
         """
-        Fixes an existing cache after a reorg has been detected by feeding the last ``cache_size`` blocks to it.
+        Fixes an existing cache after a reorg has been detected by feeding the most recent ``cache_size`` blocks to it.
 
         Args:
             last_known_block (:obj:`str`): the last known block hash after the reorg.
@@ -94,6 +94,8 @@ class LocatorCache:
         for _ in range(tmp_cache.cache_size):
             target_block = block_processor.get_block(target_block_hash)
             if target_block:
+                # Compute the locator:txid par for every transaction in the block and update both the cache and
+                # the block mapping.
                 locator_txid_map = {compute_locator(txid): txid for txid in target_block.get("tx")}
                 tmp_cache.cache.update(locator_txid_map)
                 tmp_cache.blocks[target_block_hash] = list(locator_txid_map.keys())
@@ -239,7 +241,7 @@ class Watcher:
         # Add the appointment to the Gatekeeper
         available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, appointment)
 
-        # Appointments that were triggered in blocks hold in the cache
+        # Appointments that were triggered in blocks held in the cache
         if appointment.locator in self.locator_cache.cache:
             try:
                 dispute_txid = self.locator_cache.cache[appointment.locator]
@@ -315,7 +317,7 @@ class Watcher:
             block = self.block_processor.get_block(block_hash)
             logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
 
-            # If a reorg is detected, the cache is fixed to cover the las `cache_size` blocks of the new chain
+            # If a reorg is detected, the cache is fixed to cover the last `cache_size` blocks of the new chain
             if self.last_known_block != block.get("previousblockhash"):
                 self.locator_cache.fix_cache(block_hash, self.block_processor)
 
