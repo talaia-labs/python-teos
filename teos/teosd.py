@@ -52,7 +52,7 @@ def main(command_line_conf):
     logger.info("Starting TEOS")
 
     bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
-    bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("FEED")}
+    bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
     if not can_connect_to_bitcoind(bitcoind_connect_params):
         logger.error("Cannot connect to bitcoind. Shutting down")
@@ -180,6 +180,8 @@ if __name__ == "__main__":
                 "btcrpcpassword=",
                 "btcrpcconnect=",
                 "btcrpcport=",
+                "btcfeedconnect=",
+                "btcfeedport=",
                 "datadir=",
                 "help",
             ],
@@ -205,6 +207,13 @@ if __name__ == "__main__":
                     command_line_conf["BTC_RPC_PORT"] = int(arg)
                 except ValueError:
                     exit("btcrpcport must be an integer")
+            if opt in ["--btcfeedconnect"]:
+                command_line_conf["BTC_FEED_CONNECT"] = arg
+            if opt in ["--btcfeedport"]:
+                try:
+                    command_line_conf["BTC_FEED_PORT"] = int(arg)
+                except ValueError:
+                    exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
             if opt in ["-h", "--help"]:

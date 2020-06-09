@@ -54,9 +54,9 @@ class ChainMonitor:
         self.zmqSubSocket.connect(
             "%s://%s:%s"
             % (
-                bitcoind_feed_params.get("FEED_PROTOCOL"),
-                bitcoind_feed_params.get("FEED_CONNECT"),
-                bitcoind_feed_params.get("FEED_PORT"),
+                bitcoind_feed_params.get("BTC_FEED_PROTOCOL"),
+                bitcoind_feed_params.get("BTC_FEED_CONNECT"),
+                bitcoind_feed_params.get("BTC_FEED_PORT"),
             )
         )
 

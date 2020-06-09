@@ -30,4 +30,12 @@ if [[ ! -z ${BTC_RPC_PORT} ]]; then
     START_COMMAND=$START_COMMAND" --btcrpcport=""$BTC_RPC_PORT"
 fi
 
+if [[ ! -z ${BTC_FEED_CONNECT} ]]; then
+    START_COMMAND=$START_COMMAND" --btcfeedconnect=""$BTC_FEED_CONNECT"
+fi
+
+if [[ ! -z ${BTC_FEED_PORT} ]]; then
+    START_COMMAND=$START_COMMAND" --btcfeedport=""$BTC_FEED_PORT"
+fi
+
 $START_COMMAND
