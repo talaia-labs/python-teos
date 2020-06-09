@@ -109,22 +109,48 @@ Notice that ENV variables are optional, if unset the corresponding default setti
 - BTC_FEED_PORT=<btc zmq port>
 ```
 
+You may also want to run docker with a volume, so you can have data persistence in `teos` databases and keys.
+If so, run:
+
+    docker volume create teos-data
+    
+And add the the mount parameter to `docker run`:
+
+    --mount source=teos-data,target=/root/.teos
+
 If you are running `teos` and `bitcoind` in the same machine, continue reading for how to create the container based on your OS.
 
 ### `bitcoind` running on the same machine (UNIX)
-The easiest way to run both together int he same machine is to set the container to use the host network.
+The easiest way to run both together in he same machine using UNIX is to set the container to use the host network.
 	
-For example, if both `teos` and `bitcoind` are running on default settings, run:
-    `docker run --network=host -it -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> teos`
+For example, if both `teos` and `bitcoind` are running on default settings, run
+    
+```
+docker run --network=host \
+  --name teos \
+  --mount source=teos-data,target=/root/.teos \
+  -e BTC_RPC_USER=<rpc username> \
+  -e BTC_RPC_PASSWD=<rpc password> \
+  -it teos
+```
 
 Notice that you may still need to set your RPC authentication details, since, hopefully, your credentials won't match the `teos` defaults.
 
 ### `bitcoind` running on the same machine (OSX or Windows)
 
-Docker for OSX and Windows do not allow to use the host network (nor to use the `docker0` bridge interface). To workaround this
+Docker for OSX and Windows does not allow to use the host network (nor to use the `docker0` bridge interface). To workaround this
 you can use the special `host.docker.internal` domain.
 
-    docker run -p 9814 -it -e BTC_RPC_CONNECT=host.docker.internal -e BTC_FEED_CONNECT=host.docker.internal -e BTC_RPC_USER=<rpc username> -e BTC_RPC_PASSWD=<rpc password> teos
+```
+docker run -p 9814:9814 \
+  --name teos \
+  --mount source=teos-data,target=/root/.teos \
+  -e BTC_RPC_CONNECT=host.docker.internal \
+  -e BTC_FEED_CONNECT=host.docker.internal \
+  -e BTC_RPC_USER=<rpc username> \
+  -e BTC_RPC_PASSWD=<rpc password> \
+  -it teos
+```
 
 ## Interacting with a TEOS Instance
 
