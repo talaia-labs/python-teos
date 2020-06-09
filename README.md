@@ -149,8 +149,12 @@ docker run -p 9814:9814 \
   -e BTC_FEED_CONNECT=host.docker.internal \
   -e BTC_RPC_USER=<rpc username> \
   -e BTC_RPC_PASSWD=<rpc password> \
+  -e API_BIND=0.0.0.0 \
   -it teos
 ```
+
+Notice that we also needed to add `API_BIND=0.0.0.0` to bind the API to all interfaces of the container.
+Otherwise it will bind to `localost` and we won't be able to send requests to the tower from the host.
 
 ## Interacting with a TEOS Instance
 
