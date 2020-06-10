@@ -77,9 +77,50 @@ class LocatorCache:
 
         self.blocks = OrderedDict(reversed((list(self.blocks.items()))))
 
-    def fix_cache(self, last_known_block, block_processor):
+    def get_txid(self, locator):
         """
-        Fixes an existing cache after a reorg has been detected by feeding the most recent ``cache_size`` blocks to it.
+        Gets a txid from the locator cache.
+
+        Args:
+            locator (:obj:`str`): the locator to lookup in the cache.
+
+        Returns:
+            :obj:`str` or :obj:`None`: The txid linked to the given locator if found. None otherwise.
+        """
+        return self.cache.get(locator)
+
+    def update(self, block_hash, locator_txid_map):
+        """
+        Updates the cache with data from a new block. Removes the oldest block if the cache is full after the addition.
+
+        Args:
+            block_hash (:obj:`str`): the hash of the new block.
+            locator_txid_map (:obj:`dict`): the dictionary of locators (locator:txid) derived from a list of transaction
+                ids.
+        """
+
+        self.cache.update(locator_txid_map)
+        self.blocks[block_hash] = list(locator_txid_map.keys())
+        logger.debug("Block added to cache", block_hash=block_hash)
+
+        if self.is_full():
+            self.remove_oldest_block()
+
+    def is_full(self):
+        """  Returns whether the cache is full or not """
+        return len(self.blocks) > self.cache_size
+
+    def remove_oldest_block(self):
+        """ Removes the oldest block from the cache """
+        block_hash, locators = self.blocks.popitem(last=False)
+        for locator in locators:
+            del self.cache[locator]
+
+        logger.debug("Block removed from cache", block_hash=block_hash)
+
+    def fix(self, last_known_block, block_processor):
+        """
+        Fixes the cache after a reorg has been detected by feeding the most recent ``cache_size`` blocks to it.
 
         Args:
             last_known_block (:obj:`str`): the last known block hash after the reorg.
@@ -103,18 +144,6 @@ class LocatorCache:
 
         self.blocks = OrderedDict(reversed((list(tmp_cache.blocks.items()))))
         self.cache = tmp_cache.cache
-
-    def is_full(self):
-        """  Returns whether the cache is full or not """
-        return len(self.blocks) > self.cache_size
-
-    def remove_older_block(self):
-        """ Removes the older block from the cache """
-        block_hash, locators = self.blocks.popitem(last=False)
-        for locator in locators:
-            del self.cache[locator]
-
-        logger.debug("Block removed from cache", block_hash=block_hash)
 
 
 class Watcher:
@@ -242,9 +271,9 @@ class Watcher:
         available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, appointment)
 
         # Appointments that were triggered in blocks held in the cache
-        if appointment.locator in self.locator_cache.cache:
+        dispute_txid = self.locator_cache.get_txid(appointment.locator)
+        if dispute_txid:
             try:
-                dispute_txid = self.locator_cache.cache[appointment.locator]
                 penalty_txid, penalty_rawtx = self.check_breach(uuid, appointment, dispute_txid)
                 receipt = self.responder.handle_breach(
                     uuid, appointment.locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, self.last_known_block
@@ -319,14 +348,12 @@ class Watcher:
 
             # If a reorg is detected, the cache is fixed to cover the last `cache_size` blocks of the new chain
             if self.last_known_block != block.get("previousblockhash"):
-                self.locator_cache.fix_cache(block_hash, self.block_processor)
+                self.locator_cache.fix(block_hash, self.block_processor)
 
             txids = block.get("tx")
             # Compute the locator for every transaction in the block and add them to the cache
             locator_txid_map = {compute_locator(txid): txid for txid in txids}
-            self.locator_cache.cache.update(locator_txid_map)
-            self.locator_cache.blocks[block_hash] = list(locator_txid_map.keys())
-            logger.debug("Block added to cache", block_hash=block_hash)
+            self.locator_cache.update(block_hash, locator_txid_map)
 
             if len(self.appointments) > 0 and locator_txid_map:
                 expired_appointments = self.gatekeeper.get_expired_appointments(block["height"])
@@ -391,10 +418,6 @@ class Watcher:
 
                 if len(self.appointments) != 0:
                     logger.info("No more pending appointments")
-
-            # Remove a block from the cache if the cache has reached its maximum size
-            if self.locator_cache.is_full():
-                self.locator_cache.remove_older_block()
 
             # Register the last processed block for the Watcher
             self.db_manager.store_last_block_hash_watcher(block_hash)

@@ -137,6 +137,122 @@ def test_locator_cache_init(block_processor):
         assert block_processor.get_block(k)
 
 
+def test_get_txid():
+    # Not much to test here, this is shadowing dict.get
+    locator = get_random_value_hex(16)
+    txid = get_random_value_hex(32)
+
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+    locator_cache.cache[locator] = txid
+
+    assert locator_cache.get_txid(locator) == txid
+
+    # A random locator should fail
+    assert locator_cache.get_txid(get_random_value_hex(16)) is None
+
+
+def test_update_cache():
+    # Update should add data about a new block in the cache. If the cache is full, the oldest block is dropped.
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    block_hash = get_random_value_hex(32)
+    txs = [get_random_value_hex(32) for _ in range(10)]
+    locator_txid_map = {compute_locator(txid): txid for txid in txs}
+
+    # Cache is empty
+    assert block_hash not in locator_cache.blocks
+    for locator in locator_txid_map.keys():
+        assert locator not in locator_cache.cache
+
+    # The data has been added to the cache
+    locator_cache.update(block_hash, locator_txid_map)
+    assert block_hash in locator_cache.blocks
+    for locator in locator_txid_map.keys():
+        assert locator in locator_cache.cache
+
+
+def test_update_cache_full():
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+    block_hashes = []
+    big_map = {}
+
+    for i in range(locator_cache.cache_size):
+        block_hash = get_random_value_hex(32)
+        txs = [get_random_value_hex(32) for _ in range(10)]
+        locator_txid_map = {compute_locator(txid): txid for txid in txs}
+        locator_cache.update(block_hash, locator_txid_map)
+
+        if i == 0:
+            first_block_hash = block_hash
+            first_locator_txid_map = locator_txid_map
+        else:
+            block_hashes.append(block_hash)
+            big_map.update(locator_txid_map)
+
+    # The cache is now full.
+    assert first_block_hash in locator_cache.blocks
+    for locator in first_locator_txid_map.keys():
+        assert locator in locator_cache.cache
+
+    # Add one more
+    block_hash = get_random_value_hex(32)
+    txs = [get_random_value_hex(32) for _ in range(10)]
+    locator_txid_map = {compute_locator(txid): txid for txid in txs}
+    locator_cache.update(block_hash, locator_txid_map)
+
+    # The first block is not there anymore, but the rest are there
+    assert first_block_hash not in locator_cache.blocks
+    for locator in first_locator_txid_map.keys():
+        assert locator not in locator_cache.cache
+
+    for block_hash in block_hashes:
+        assert block_hash in locator_cache.blocks
+
+    for locator in big_map.keys():
+        assert locator in locator_cache.cache
+
+
+def test_locator_cache_is_full(block_processor):
+    # Empty cache
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    for _ in range(locator_cache.cache_size):
+        locator_cache.blocks[uuid4().hex] = 0
+        assert not locator_cache.is_full()
+
+    locator_cache.blocks[uuid4().hex] = 0
+    assert locator_cache.is_full()
+
+
+def test_locator_remove_oldest_block(block_processor):
+    # Empty cache
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    # Add some blocks to the cache
+    for _ in range(locator_cache.cache_size):
+        txid = get_random_value_hex(32)
+        locator = txid[:16]
+        locator_cache.blocks[get_random_value_hex(32)] = {locator: txid}
+        locator_cache.cache[locator] = txid
+
+    blocks_in_cache = locator_cache.blocks
+    oldest_block_hash = list(blocks_in_cache.keys())[0]
+    oldest_block_data = blocks_in_cache.get(oldest_block_hash)
+    rest_of_blocks = list(blocks_in_cache.keys())[1:]
+    locator_cache.remove_oldest_block()
+
+    # Oldest block data is not in the cache
+    assert oldest_block_hash not in locator_cache.blocks
+    for locator in oldest_block_data:
+        assert locator not in locator_cache.cache
+
+    # The rest of data is in the cache
+    assert set(rest_of_blocks).issubset(locator_cache.blocks)
+    for block_hash in rest_of_blocks:
+        for locator in locator_cache.blocks[block_hash]:
+            assert locator in locator_cache.cache
+
+
 def test_fix_cache(block_processor):
     # This tests how a reorg will create a new version of the cache
     # Let's start setting a full cache. We'll mine ``cache_size`` bocks to be sure it's full
@@ -152,7 +268,7 @@ def test_fix_cache(block_processor):
     current_tip_parent = block_processor.get_block(current_tip).get("previousblockhash")
     current_tip_parent_locators = locator_cache.blocks[current_tip_parent]
     fake_tip = block_processor.get_block(current_tip_parent).get("previousblockhash")
-    locator_cache.fix_cache(fake_tip, block_processor)
+    locator_cache.fix(fake_tip, block_processor)
 
     # The last two blocks are not in the cache nor are the any of its locators
     assert current_tip not in locator_cache.blocks and current_tip_parent not in locator_cache.blocks
@@ -168,7 +284,7 @@ def test_fix_cache(block_processor):
     new_cache = deepcopy(locator_cache)
 
     generate_blocks_w_delay((config.get("LOCATOR_CACHE_SIZE") * 2))
-    new_cache.fix_cache(block_processor.get_best_block_hash(), block_processor)
+    new_cache.fix(block_processor.get_best_block_hash(), block_processor)
 
     # None of the data from the old cache is in the new cache
     for block_hash, locators in locator_cache.blocks.items():
@@ -183,47 +299,6 @@ def test_fix_cache(block_processor):
         assert block_hash in new_cache.blocks
         for locator in new_cache.blocks[block_hash]:
             assert locator in new_cache.cache
-
-
-def test_locator_cache_is_full(block_processor):
-    # Empty cache
-    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
-
-    for _ in range(locator_cache.cache_size):
-        locator_cache.blocks[uuid4().hex] = 0
-        assert not locator_cache.is_full()
-
-    locator_cache.blocks[uuid4().hex] = 0
-    assert locator_cache.is_full()
-
-
-def test_locator_remove_older_block(block_processor):
-    # Empty cache
-    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
-
-    # Add some blocks to the cache
-    for _ in range(locator_cache.cache_size):
-        txid = get_random_value_hex(32)
-        locator = txid[:16]
-        locator_cache.blocks[get_random_value_hex(32)] = {locator: txid}
-        locator_cache.cache[locator] = txid
-
-    blocks_in_cache = locator_cache.blocks
-    oldest_block_hash = list(blocks_in_cache.keys())[0]
-    oldest_block_data = blocks_in_cache.get(oldest_block_hash)
-    rest_of_blocks = list(blocks_in_cache.keys())[1:]
-    locator_cache.remove_older_block()
-
-    # Oldest block data is not in the cache
-    assert oldest_block_hash not in locator_cache.blocks
-    for locator in oldest_block_data:
-        assert locator not in locator_cache.cache
-
-    # The rest of data is in the cache
-    assert set(rest_of_blocks).issubset(locator_cache.blocks)
-    for block_hash in rest_of_blocks:
-        for locator in locator_cache.blocks[block_hash]:
-            assert locator in locator_cache.cache
 
 
 def test_watcher_init(watcher):
@@ -494,7 +569,7 @@ def test_do_watch_cache_update(watcher):
         assert oldest_block_hash not in watcher.locator_cache.blocks
         assert set(rest_of_blocks).issubset(watcher.locator_cache.blocks.keys())
 
-        # The locators of the older block are gone but the rest remain
+        # The locators of the oldest block are gone but the rest remain
         for locator in oldest_block_data:
             assert locator not in watcher.locator_cache.cache
         for block_hash in rest_of_blocks:
