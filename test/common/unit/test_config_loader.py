@@ -74,6 +74,9 @@ def test_build_conf_only_default():
         else:
             assert v == DEFAULT_CONF[k].get("value")
 
+    # No field should have been overwritten
+    assert not conf_loader.overwritten_fields
+
 
 def test_build_conf_with_conf_file(conf_file_conf):
     default_conf_copy = deepcopy(DEFAULT_CONF)
@@ -90,6 +93,10 @@ def test_build_conf_with_conf_file(conf_file_conf):
         # If a value is in the conf file, it will overwrite the one in the default conf
         if k in conf_file_conf:
             comp_v = conf_file_conf[k]
+
+            # Check that we have kept track of what's overwritten
+            assert k in conf_loader.overwritten_fields
+
         else:
             comp_v = DEFAULT_CONF[k].get("value")
 
@@ -115,6 +122,10 @@ def test_build_conf_with_command_line():
         # If a value is in the command line conf, it will overwrite the one in the default conf
         if k in COMMAND_LINE_CONF:
             comp_v = cmd_data[k]
+
+            # Check that we have kept track of what's overwritten
+            assert k in conf_loader.overwritten_fields
+
         else:
             comp_v = DEFAULT_CONF[k].get("value")
 
@@ -148,6 +159,10 @@ def test_build_conf_with_all(conf_file_conf):
             assert v == data_dir + comp_v
         else:
             assert v == comp_v
+
+        if k in cmd_data or k in conf_file_conf:
+            # Check that we have kept track of what's overwritten
+            assert k in conf_loader.overwritten_fields
 
 
 def test_build_invalid_data(conf_file_conf):
