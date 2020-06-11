@@ -31,6 +31,7 @@ class ConfigLoader:
         self.conf_file_path = os.path.join(self.data_dir, conf_file_name)
         self.conf_fields = default_conf
         self.command_line_conf = command_line_conf
+        self.overwritten_fields = set()
 
     def build_config(self):
         """
@@ -43,7 +44,6 @@ class ConfigLoader:
 
         Returns:
             :obj:`dict`: a dictionary containing all the configuration parameters.
-
         """
 
         if os.path.exists(self.conf_file_path):
@@ -65,9 +65,12 @@ class ConfigLoader:
                             else:
                                 self.conf_fields[k_upper]["value"] = v
 
+                            self.overwritten_fields.add(k_upper)
+
         # Override the command line parameters to the defaults / conf file
         for k, v in self.command_line_conf.items():
             self.conf_fields[k]["value"] = v
+            self.overwritten_fields.add(k)
 
         # Extend relative paths
         self.extend_paths()

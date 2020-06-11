@@ -20,8 +20,8 @@ from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
-from teos.tools import can_connect_to_bitcoind, in_correct_network
 from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
+from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
 
 logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
 
@@ -38,30 +38,35 @@ def handle_signals(signal_received, frame):
 def main(command_line_conf):
     global db_manager, chain_monitor
 
-    signal(SIGINT, handle_signals)
-    signal(SIGTERM, handle_signals)
-    signal(SIGQUIT, handle_signals)
+    try:
+        signal(SIGINT, handle_signals)
+        signal(SIGTERM, handle_signals)
+        signal(SIGQUIT, handle_signals)
 
-    # Loads config and sets up the data folder and log file
-    data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
-    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
-    config = config_loader.build_config()
-    setup_data_folder(data_dir)
-    setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
+        # Loads config and sets up the data folder and log file
+        data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+        config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+        config = config_loader.build_config()
 
-    logger.info("Starting TEOS")
+        # Set default RPC port if not overwritten by the user.
+        if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
+            config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
 
-    bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
-    bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
+        setup_data_folder(data_dir)
+        setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
 
-    if not can_connect_to_bitcoind(bitcoind_connect_params):
-        logger.error("Cannot connect to bitcoind. Shutting down")
+        logger.info("Starting TEOS")
 
-    elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
-        logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
+        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
+        bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
-    else:
-        try:
+        if not can_connect_to_bitcoind(bitcoind_connect_params):
+            logger.error("Cannot connect to bitcoind. Shutting down")
+
+        elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
+            logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
+
+        else:
             secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
             if not secret_key_der:
                 raise IOError("TEOS private key cannot be loaded")
@@ -160,9 +165,9 @@ def main(command_line_conf):
             chain_monitor.monitor_chain()
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
             API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher).start()
-        except Exception as e:
-            logger.error("An error occurred: {}. Shutting down".format(e))
-            exit(1)
+    except Exception as e:
+        logger.error("An error occurred: {}. Shutting down".format(e))
+        exit(1)
 
 
 if __name__ == "__main__":

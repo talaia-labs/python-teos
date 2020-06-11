@@ -54,14 +54,13 @@ By default, `teos` runs on `mainnet`. In order to run it on another network you 
 
 ### Modifying the configuration file
 
-The configuration file options to change the network where `teos` will run are the `btc_rpc_port` and the `btc_network` under the `bitcoind` section:
+The configuration file option to change the network where `teos` will run is `btc_network` under the `bitcoind` section:
 
 ```
 [bitcoind]
 btc_rpc_user = "user"
 btc_rpc_password = "passwd"
 btc_rpc_connect = "localhost"
-btc_rpc_port = 8332
 btc_network = "mainnet"
 ```
 
@@ -72,7 +71,6 @@ For regtest, it should look like:
 btc_rpc_user = "user"
 btc_rpc_password = "passwd"
 btc_rpc_connect = "localhost"
-btc_rpc_port = 18443
 btc_network = "regtest"
 ```
 
