@@ -98,15 +98,15 @@ Then you can create a container by running:
 Notice that ENV variables are optional, if unset the corresponding default setting is used. The following ENVs are available:
 
 ```
-- API_BIND=<api hostname>
-- API_PORT=<api port>
-- BTC_NETWORK=<btc netwrok>
-- BTC_RPC_CONNECT=<btc node hostname>
-- BTC_RPC_PORT=<btc node port>
-- BTC_RPC_USER=<rpc username>
-- BTC_RPC_PASSWORD=<rpc password>
-- BTC_FEED_CONNECT=<btc zmq hostname>
-- BTC_FEED_PORT=<btc zmq port>
+- API_BIND=<teos_api_hostname>
+- API_PORT=<teos_api_port>
+- BTC_NETWORK=<btc_network>
+- BTC_RPC_CONNECT=<btc_node_hostname>
+- BTC_RPC_PORT=<btc_node_port>
+- BTC_RPC_USER=<btc_rpc_username>
+- BTC_RPC_PASSWORD=<btc_rpc_password>
+- BTC_FEED_CONNECT=<btc_zmq_hostname>
+- BTC_FEED_PORT=<btc_zmq_port>
 ```
 
 You may also want to run docker with a volume, so you can have data persistence in `teos` databases and keys.
