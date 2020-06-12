@@ -35,7 +35,7 @@ auth_pw = mon_conf.get("AUTH_PW")
 
 @pytest.fixture(scope="module")
 def dataLoader():
-    dataLoader = DataLoader(es_host, es_port, api_host, api_port, log_file, cloud_id, auth_user, auth_pw)
+    dataLoader = DataLoader(es_host, es_port, api_host, api_port, log_file)
 
     return dataLoader 
 

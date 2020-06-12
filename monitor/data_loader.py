@@ -21,16 +21,11 @@ class DataLoader:
         api_host (:obj:`str`): The host Teos is listening on.
         api_port (:obj:`int`): The port Teos is listening on.
         log_file (:obj:`int`): The path to the log file ES will pull data from. 
-        cloud_id (:obj:`str`): Elasticsearch cloud id, if Elasticsearch Cloud is being used.
-        auth_user (:obj:`str`): Elasticsearch Cloud username, if Elasticsearch Cloud is being used.
-        auth_pw (:obj:`str`): Elasticsearch Cloud password, if Elasticsearch Cloud is being used.
 
     Attributes:
         es_host (:obj:`str`): The host Elasticsearch is running on.
         es_port (:obj:`int`): The port Elasticsearch is runnning on.
         cloud_id (:obj:`str`): Elasticsearch cloud id, if Elasticsearch Cloud is being used.
-        auth_user (:obj:`str`): Elasticsearch Cloud username, if Elasticsearch Cloud is being used.
-        auth_pw (:obj:`str`): Elasticsearch Cloud password, if Elasticsearch Cloud is being used.
         es (:obj:`Elasticsearch <elasticsearch.Elasticsearch>`): The Elasticsearch client for searching for data to be visualized.
         index_client (:obj:`IndicesClient <elasticsearch.client.IndiciesClient>`): The index client where log data is stored.
         log_path (:obj:`str`): The path to the log file where log file will be pulled from and analyzed by ES.
@@ -39,21 +34,12 @@ class DataLoader:
     
     """
 
-    def __init__(self, es_host, es_port, api_host, api_port, log_file, cloud_id=None, auth_user=None, auth_pw=None):
+    def __init__(self, es_host, es_port, api_host, api_port, log_file):
          self.es_host = es_host
          self.es_port = es_port
-         self.es_cloud_id = cloud_id
-         self.es_auth_user = auth_user
-         self.es_auth_pw = auth_pw
-         if self.es_host is not "":
-             self.es = Elasticsearch([
-                 {'host': self.es_host, 'port': self.es_port}    
-             ])     
-         elif cloud_id is not "":
-             self.es = Elasticsearch(
-                 cloud_id=self.es_cloud_id,
-                 http_auth=(self.es_auth_user, self.es_auth_pw),
-             )
+         self.es = Elasticsearch([
+             {'host': self.es_host, 'port': self.es_port}    
+         ])     
          self.index_client = IndicesClient(self.es)
          self.log_path = log_file 
          self.api_host = api_host

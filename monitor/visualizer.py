@@ -10,12 +10,9 @@ logger = Logger(actor="Visualizer", log_name_prefix=LOG_PREFIX)
 
 
 class Visualizer:
-    def __init__(self, kibana_host, kibana_port, auth_user, auth_pw, max_users):
+    def __init__(self, kibana_host, kibana_port, max_users):
         self.kibana_endpoint = "http://{}:{}".format(kibana_host, kibana_port)
         self.saved_obj_endpoint = "{}/api/saved_objects/".format(self.kibana_endpoint)
-        self.auth_user = auth_user
-        self.auth_pw = auth_pw
-        self.auth = (self.auth_user, self.auth_pw)
         self.headers = headers = { 
             "Content-Type": "application/json",
             "kbn-xsrf": "true"
@@ -79,7 +76,7 @@ class Visualizer:
             "default_search_operator": "AND"
         }
 
-        response = requests.get(endpoint, params=data, headers=self.headers, auth=self.auth)
+        response = requests.get(endpoint, params=data, headers=self.headers)
 
         return response.json()
  
@@ -94,7 +91,7 @@ class Visualizer:
             "default_search_operator": "AND"
         }
 
-        response = requests.get(endpoint, params=data, headers=self.headers, auth=self.auth) 
+        response = requests.get(endpoint, params=data, headers=self.headers) 
 
         response_json = response.json()
 
@@ -116,7 +113,7 @@ class Visualizer:
 
         data = json.dumps(data)
 
-        response = requests.post(endpoint, data=data, headers=self.headers, auth=self.auth)
+        response = requests.post(endpoint, data=data, headers=self.headers)
 
         # log when an item is created.
         logger.info("New Kibana saved object was created")

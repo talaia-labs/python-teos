@@ -29,18 +29,15 @@ def main(command_line_conf):
 
     es_host = mon_conf.get("ES_HOST")
     es_port = mon_conf.get("ES_PORT")
-    cloud_id = mon_conf.get("CLOUD_ID")
-    auth_user = mon_conf.get("AUTH_USER") 
-    auth_pw = mon_conf.get("AUTH_PW")
 
     # Create and start data loader.
-    dataLoader = DataLoader(es_host, es_port, api_host, api_port, log_file, cloud_id, auth_user, auth_pw)
+    dataLoader = DataLoader(es_host, es_port, api_host, api_port, log_file)
     dataLoader.start()
 
     kibana_host = mon_conf.get("KIBANA_HOST")
     kibana_port = mon_conf.get("KIBANA_PORT")
 
-    visualizer = Visualizer(kibana_host, kibana_port, auth_user, auth_pw, max_users)
+    visualizer = Visualizer(kibana_host, kibana_port, max_users)
     visualizer.create_dashboard()
 
 if __name__ == "__main__":
