@@ -281,24 +281,24 @@ def test_fix_cache(block_processor):
 
     # Test the same for a full cache reorg. We can simulate this by adding more blocks than the cache can fit and
     # trigger a fix. We'll use a new cache to compare with the old
-    new_cache = deepcopy(locator_cache)
+    old_cache_blocks = deepcopy(locator_cache.blocks)
 
     generate_blocks_w_delay((config.get("LOCATOR_CACHE_SIZE") * 2))
-    new_cache.fix(block_processor.get_best_block_hash(), block_processor)
+    locator_cache.fix(block_processor.get_best_block_hash(), block_processor)
 
     # None of the data from the old cache is in the new cache
-    for block_hash, locators in locator_cache.blocks.items():
-        assert block_hash not in new_cache.blocks
+    for block_hash, locators in old_cache_blocks.items():
+        assert block_hash not in locator_cache.blocks
         for locator in locators:
-            assert locator not in new_cache.cache
+            assert locator not in locator_cache.cache
 
     # The data in the new cache corresponds to the last ``cache_size`` blocks.
     block_count = block_processor.get_block_count()
     for i in range(block_count, block_count - locator_cache.cache_size, -1):
         block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(i - 1)
-        assert block_hash in new_cache.blocks
-        for locator in new_cache.blocks[block_hash]:
-            assert locator in new_cache.cache
+        assert block_hash in locator_cache.blocks
+        for locator in locator_cache.blocks[block_hash]:
+            assert locator in locator_cache.cache
 
 
 def test_watcher_init(watcher):

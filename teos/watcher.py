@@ -1,6 +1,7 @@
 from queue import Queue
 from threading import Thread
 from collections import OrderedDict
+from readerwriterlock import rwlock
 
 from common.logger import Logger
 from common.tools import compute_locator
@@ -47,6 +48,7 @@ class LocatorCache:
         self.cache = dict()
         self.blocks = OrderedDict()
         self.cache_size = blocks_in_cache
+        self.rw_lock = rwlock.RWLockWrite()
 
     def init(self, last_known_block, block_processor):
         """
@@ -87,7 +89,10 @@ class LocatorCache:
         Returns:
             :obj:`str` or :obj:`None`: The txid linked to the given locator if found. None otherwise.
         """
-        return self.cache.get(locator)
+
+        with self.rw_lock.gen_rlock():
+            locator = self.cache.get(locator)
+        return locator
 
     def update(self, block_hash, locator_txid_map):
         """
@@ -99,22 +104,26 @@ class LocatorCache:
                 ids.
         """
 
-        self.cache.update(locator_txid_map)
-        self.blocks[block_hash] = list(locator_txid_map.keys())
-        logger.debug("Block added to cache", block_hash=block_hash)
+        with self.rw_lock.gen_wlock():
+            self.cache.update(locator_txid_map)
+            self.blocks[block_hash] = list(locator_txid_map.keys())
+            logger.debug("Block added to cache", block_hash=block_hash)
 
         if self.is_full():
             self.remove_oldest_block()
 
     def is_full(self):
         """  Returns whether the cache is full or not """
-        return len(self.blocks) > self.cache_size
+        with self.rw_lock.gen_rlock():
+            full = len(self.blocks) > self.cache_size
+        return full
 
     def remove_oldest_block(self):
         """ Removes the oldest block from the cache """
-        block_hash, locators = self.blocks.popitem(last=False)
-        for locator in locators:
-            del self.cache[locator]
+        with self.rw_lock.gen_wlock():
+            block_hash, locators = self.blocks.popitem(last=False)
+            for locator in locators:
+                del self.cache[locator]
 
         logger.debug("Block removed from cache", block_hash=block_hash)
 
@@ -135,15 +144,16 @@ class LocatorCache:
         for _ in range(tmp_cache.cache_size):
             target_block = block_processor.get_block(target_block_hash)
             if target_block:
-                # Compute the locator:txid par for every transaction in the block and update both the cache and
+                # Compute the locator:txid pair for every transaction in the block and update both the cache and
                 # the block mapping.
                 locator_txid_map = {compute_locator(txid): txid for txid in target_block.get("tx")}
                 tmp_cache.cache.update(locator_txid_map)
                 tmp_cache.blocks[target_block_hash] = list(locator_txid_map.keys())
                 target_block_hash = target_block.get("previousblockhash")
 
-        self.blocks = OrderedDict(reversed((list(tmp_cache.blocks.items()))))
-        self.cache = tmp_cache.cache
+        with self.rw_lock.gen_wlock():
+            self.blocks = OrderedDict(reversed((list(tmp_cache.blocks.items()))))
+            self.cache = tmp_cache.cache
 
 
 class Watcher:
