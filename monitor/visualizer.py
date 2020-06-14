@@ -1,10 +1,9 @@
 import json
+import os
 import requests
 
 from monitor.data_loader import LOG_PREFIX
 from common.logger import Logger
-
-from monitor.visualizations import index_pattern, visualizations, dashboard
 
 logger = Logger(actor="Visualizer", log_name_prefix=LOG_PREFIX)
 
@@ -13,6 +12,7 @@ class Visualizer:
     def __init__(self, kibana_host, kibana_port, max_users):
         self.kibana_endpoint = "http://{}:{}".format(kibana_host, kibana_port)
         self.saved_obj_endpoint = "{}/api/saved_objects/".format(self.kibana_endpoint)
+        self.space_endpoint = "{}/api/spaces/space/".format(self.kibana_endpoint)
         self.headers = headers = { 
             "Content-Type": "application/json",
             "kbn-xsrf": "true"
@@ -20,6 +20,18 @@ class Visualizer:
         self.max_users = max_users
 
     def create_dashboard(self):
+        index_pattern = None
+        visualizations = None
+        dashboard = None
+        image_url = None
+
+        with open(os.getcwd() + '/monitor/kibana_data.json') as json_file:
+            data = json.load(json_file)
+            index_pattern = data.get("index_pattern")
+            visualizations = data.get("visualizations")
+            dashboard = data.get("dashboard") 
+            image_url = data.get("imageUrl") 
+        
         index_id = None
 
         # Find index pattern id if it exists. If it does not, create one to pull Elasticsearch data into Kibana.
@@ -65,6 +77,14 @@ class Visualizer:
             dashboard["attributes"]["panelsJSON"] = json.dumps(panels_JSON)
 
             self.create_saved_object("dashboard", dashboard.get("attributes"), visuals) 
+
+        space_id = "default"
+        space_name = "system-monitor" 
+
+        # Customize the Kibana "space" with Teos logo.
+        if self.get_space(space_id).get("name") != space_name:
+            self.customize_space(space_id, space_name, image_url) 
+      
 
     def find(self, obj_type, search_field, search):
         endpoint = "{}{}".format(self.saved_obj_endpoint, "_find")
@@ -117,5 +137,27 @@ class Visualizer:
 
         # log when an item is created.
         logger.info("New Kibana saved object was created")
+
+        return response.json()
+
+    def get_space(self, space_id):
+        endpoint = "{}{}".format(self.space_endpoint, space_id)
+
+        response = requests.get(endpoint, headers=self.headers)
+
+        return response.json()
+
+    def customize_space(self, space_id, space_name, image_url):
+        endpoint = "{}{}".format(self.space_endpoint, space_id)
+
+        data = {
+            "id": space_id,
+            "name": space_name,
+            "imageUrl": image_url
+        }
+
+        data = json.dumps(data)
+
+        response = requests.put(endpoint, data=data, headers=self.headers)
 
         return response.json()
