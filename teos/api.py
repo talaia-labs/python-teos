@@ -5,8 +5,8 @@ from flask import Flask, request, abort, jsonify
 from teos import LOG_PREFIX
 import common.errors as errors
 from teos.inspector import InspectionFailed
-from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
+from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
 from common.logger import Logger
 from common.cryptographer import hash_160
@@ -321,8 +321,11 @@ class API:
 
             :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
             appointments, the ``rcode`` is always 200 and the response contains the receipt signature (json). For
-            rejected appointments, the ``rcode`` is a 404 or 400 and the value contains an application error, and an
-            error message. Error messages can be found at :mod:`Errors <teos.errors>`.
+            rejected appointments, the ``rcode`` is either 400 or 404:
+
+            If the appointment is not found: 404
+            If the request is invalid: 400
+            If the appointment is already in the responder: 400 + message
         """
 
         # Getting the real IP if the server is behind a reverse proxy
@@ -343,33 +346,29 @@ class API:
             logger.info("Received delete_appointment request", from_addr=remote_addr, locator=locator)
 
             message = "delete appointment {}".format(locator).encode()
-            signature = request_data.get("signature")
-            user_id = self.watcher.gatekeeper.authenticate_user(message, signature)
+            user_signature = request_data.get("signature")
+            user_id = self.watcher.gatekeeper.authenticate_user(message, user_signature)
 
-            summary, signature = self.watcher.pop_appointment(locator, user_id)
+            tower_signature = self.watcher.pop_appointment(locator, user_id, user_signature)
 
-            if summary and signature:
-                # Appointment successfully deleted.
+            rcode = HTTP_OK
+            response = {
+                "locator": locator,
+                "signature": tower_signature,
+                "available_slots": self.watcher.gatekeeper.registered_users[user_id].get("available_slots"),
+                "status": "deletion_accepted",
+            }
 
-                # Free up the space in slot.
-                slot_size = ceil(summary.get("size") / ENCRYPTED_BLOB_MAX_SIZE_HEX)
-                if slot_size > 0:
-                    self.gatekeeper.free_slots(user_pk, slot_size)
+        except AppointmentNotFound:
+            rcode = HTTP_NOT_FOUND
+            response = {"locator": locator, "status": "deletion_rejected"}
 
-                rcode = HTTP_OK
-                response = {
-                    "locator": locator,
-                    "signature": signature,
-                    "available_slots": self.gatekeeper.registered_users[user_pk].get("available_slots"),
-                    "status": "deletion_accepted",
-                }
-            else:
-                # Appointment could not be deleted.
-                rcode = HTTP_BAD_REQUEST
-                response = {"locator": locator, "error": "appointment cannot be found", "status": "deletion_rejected"}
+        except AppointmentAlreadyTriggered as e:
+            rcode = HTTP_BAD_REQUEST
+            response = {"locator": locator, "status": "deletion_rejected", "error": e.msg}
 
         except (InspectionFailed, AuthenticationFailure):
-            rcode = HTTP_NOT_FOUND
+            rcode = HTTP_BAD_REQUEST
             response = {"locator": locator, "status": "deletion_rejected"}
 
         return jsonify(response), rcode

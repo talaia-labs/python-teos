@@ -22,6 +22,10 @@ class AppointmentLimitReached(BasicException):
     """Raised when the tower maximum appointment count has been reached"""
 
 
+class AppointmentNotFound(BasicException):
+    """Raised when an appointment is not found in the tower"""
+
+
 class AppointmentAlreadyTriggered(BasicException):
     """Raised when an appointment is sent to the Watcher but that same data has already been sent to the Responder"""
 
@@ -335,46 +339,50 @@ class Watcher:
             "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
         }
 
-    def pop_appointment(self, locator, user_pk):
+    def delete_appointment(self, locator, user_id, user_signature):
         """
-        Pops an appointment from the memory (``appointments`` and
-        ``locator_uuid_map`` dictionaries) and deletes it from the appointments
-        database.
-
-        The ``Watcher``  will stop monitoring the blockchain (``do_watch``) for
-        the appointment.
+        Deletes an appointment from the ``Watcher``. The tower will stop monitoring the deleted appointment.
 
         Args:
             locator (:obj:`str`): a 16-byte hex string identifying the appointment.
-            user_pk(:obj:`str`): the public key that identifies the user who
-                request the deletion (33-bytes hex str).
+            user_id (:obj:`str`): the public key that identifies the user who request the deletion (33-bytes hex str).
+            user_signature (:obj:`str`): the signature of the request provided by the user. The tower will sign the
+                signature deletion is accepted.
 
         Returns:
-            :obj:`tuple`: A tuple with the appointment summary and signaling if
-                it has been deleted or not.
-            The structure looks as follows:
-            - ``(summary, signature)`` if the appointment was deleted.
-            - ``(None, None)`` otherwise (e.g. appointment did not exist).
+            :obj:`str`: the signature of the user's signature if the appointment if the deletion is accepted.
+
+        Rises:
+            :obj:`AppointmentAlreadyTriggered`: if the appointment is already in the Responder. The deletion is
+            therefore rejected.
+            :obj:`AppointmentNotFound`: if the appointment cannot be found in the tower. The deletion is therefore
+            rejected.
         """
 
-        # The uuids are generated as the RIPEMD160(locator||user_pubkey), that way the tower does not need to know
-        # anything about the user from this point on (no need to store user_pk in the database).
-        # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
-        uuid = hash_160("{}{}".format(locator, user_pk))
+        uuid = hash_160("{}{}".format(locator, user_id))
+
+        # FIXME: We need to keep track of deletions
 
         if uuid in self.appointments:
-            # Delete appointment as "completed".
+            # Delete the appointment from both the Watcher and the Gatekeeper
             Cleaner.delete_completed_appointments([uuid], self.appointments, self.locator_uuid_map, self.db_manager)
+            Cleaner.delete_gatekeeper_appointments(self.gatekeeper, {uuid: user_id})
 
-            message = "delete appointment {}".format(locator)
-            signature = Cryptographer.sign(message.encode(), self.signing_key)
+            # Sign over the user signature as acceptance of the deletion request.
+            signature = Cryptographer.sign(user_signature.encode(), self.signing_key)
             logger.info("Appointment deleted", locator=locator)
 
-        else:
-            signature = None
-            logger.info("Deletion rejected", locator=locator)
+            return signature
 
-        return signature
+        elif uuid in self.responder.trackers:
+            message = "Cannot delete an already triggered appointment"
+            logger.info(message, locator=locator)
+            raise AppointmentAlreadyTriggered(message)
+
+        else:
+            message = "Appointment not found. Deletion rejected"
+            logger.info(message, locator=locator)
+            raise AppointmentNotFound(message)
 
     def do_watch(self):
         """
