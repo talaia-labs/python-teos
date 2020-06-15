@@ -89,7 +89,13 @@ def main(command_line_conf):
             db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
             responder = Responder(db_manager, gatekeeper, carrier, block_processor)
             watcher = Watcher(
-                db_manager, gatekeeper, block_processor, responder, secret_key_der, config.get("MAX_APPOINTMENTS")
+                db_manager,
+                gatekeeper,
+                block_processor,
+                responder,
+                secret_key_der,
+                config.get("MAX_APPOINTMENTS"),
+                config.get("LOCATOR_CACHE_SIZE"),
             )
 
             # Create the chain monitor and start monitoring the chain

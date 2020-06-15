@@ -113,19 +113,20 @@ def add_appointment(appointment_data, user_sk, teos_id, teos_url):
     add_appointment_endpoint = "{}/add_appointment".format(teos_url)
     response = process_post_response(post_request(data, add_appointment_endpoint))
 
-    signature = response.get("signature")
+    tower_signature = response.get("signature")
     # Check that the server signed the appointment as it should.
-    if not signature:
+    if not tower_signature:
         raise TowerResponseError("The response does not contain the signature of the appointment")
 
-    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    rpk = Cryptographer.recover_pk(appointment.serialize(), tower_signature)
     if teos_id != Cryptographer.get_compressed_pk(rpk):
         raise TowerResponseError("The returned appointment's signature is invalid")
 
     logger.info("Appointment accepted and signed by the Eye of Satoshi")
     logger.info("Remaining slots: {}".format(response.get("available_slots")))
+    logger.info("Start block: {}".format(response.get("start_block")))
 
-    return appointment, signature
+    return appointment, tower_signature
 
 
 def get_appointment(locator, user_sk, teos_id, teos_url):

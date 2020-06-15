@@ -1,3 +1,5 @@
+import pytest
+from teos.watcher import InvalidTransactionFormat
 from test.teos.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork
 
 
@@ -46,7 +48,8 @@ def test_decode_raw_transaction(block_processor):
 
 def test_decode_raw_transaction_invalid(block_processor):
     # Same but with an invalid one
-    assert block_processor.decode_raw_transaction(hex_tx[::-1]) is None
+    with pytest.raises(InvalidTransactionFormat):
+        block_processor.decode_raw_transaction(hex_tx[::-1])
 
 
 def test_get_missed_blocks(block_processor):
