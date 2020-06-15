@@ -1,5 +1,5 @@
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 from collections import OrderedDict
 from readerwriterlock import rwlock
 
@@ -334,6 +334,47 @@ class Watcher:
             "available_slots": available_slots,
             "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
         }
+
+    def pop_appointment(self, locator, user_pk):
+        """
+        Pops an appointment from the memory (``appointments`` and
+        ``locator_uuid_map`` dictionaries) and deletes it from the appointments
+        database.
+
+        The ``Watcher``  will stop monitoring the blockchain (``do_watch``) for
+        the appointment.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex string identifying the appointment.
+            user_pk(:obj:`str`): the public key that identifies the user who
+                request the deletion (33-bytes hex str).
+
+        Returns:
+            :obj:`tuple`: A tuple with the appointment summary and signaling if
+                it has been deleted or not.
+            The structure looks as follows:
+            - ``(summary, signature)`` if the appointment was deleted.
+            - ``(None, None)`` otherwise (e.g. appointment did not exist).
+        """
+
+        # The uuids are generated as the RIPEMD160(locator||user_pubkey), that way the tower does not need to know
+        # anything about the user from this point on (no need to store user_pk in the database).
+        # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
+        uuid = hash_160("{}{}".format(locator, user_pk))
+
+        if uuid in self.appointments:
+            # Delete appointment as "completed".
+            Cleaner.delete_completed_appointments([uuid], self.appointments, self.locator_uuid_map, self.db_manager)
+
+            message = "delete appointment {}".format(locator)
+            signature = Cryptographer.sign(message.encode(), self.signing_key)
+            logger.info("Appointment deleted", locator=locator)
+
+        else:
+            signature = None
+            logger.info("Deletion rejected", locator=locator)
+
+        return signature
 
     def do_watch(self):
         """

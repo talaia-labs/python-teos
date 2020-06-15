@@ -200,6 +200,46 @@ def get_all_appointments(teos_url):
         return None
 
 
+def delete_appointment(locator, cli_sk, teos_pk, teos_url):
+    """
+    Deletes information about an appointment from the tower.
+
+    Args:
+        locator (:obj:`str`): the locator used to identify the appointment.
+        cli_sk (:obj:`PrivateKey`): the client's private key.
+        teos_pk (:obj:`PublicKey`): the tower's public key.
+        teos_url (:obj:`str`): the teos base url.
+
+    Returns:
+        :obj:`dict` or :obj:`None`: a dictionary containing the appointment data if the locator is valid and the tower
+        responds. ``None`` otherwise.
+
+    Raises:
+        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if ``locator`` is invalid.
+        :obj:`ConnectionError`: if the client cannot connect to the tower.
+        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        response was invalid.
+    """
+
+    # FIXME: All responses from the tower should be signed. Not using teos_pk atm.
+
+    if not is_locator(locator):
+        raise InvalidParameter("The provided locator is not valid", locator=locator)
+
+    message = "delete appointment {}".format(locator)
+    signature = Cryptographer.sign(message.encode(), cli_sk)
+    data = {"locator": locator, "signature": signature}
+
+    # Send request to the server.
+    delete_appointment_endpoint = "{}/delete_appointment".format(teos_url)
+    logger.info("Sending appointment deletion request to the Eye of Satoshi")
+    server_response = post_request(data, delete_appointment_endpoint)
+
+    response_json = process_post_response(server_response)
+
+    return response_json
+
+
 def load_keys(teos_pk_path, user_sk_path):
     """
     Loads all the keys required so sign, send, and verify the appointment.
