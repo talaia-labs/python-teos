@@ -1,4 +1,5 @@
 import os
+from common.constants import MAINNET_RPC_PORT
 
 DATA_DIR = os.path.expanduser("~/.teos/")
 CONF_FILE_NAME = "teos.conf"
@@ -11,11 +12,11 @@ DEFAULT_CONF = {
     "BTC_RPC_USER": {"value": "user", "type": str},
     "BTC_RPC_PASSWORD": {"value": "passwd", "type": str},
     "BTC_RPC_CONNECT": {"value": "127.0.0.1", "type": str},
-    "BTC_RPC_PORT": {"value": 8332, "type": int},
+    "BTC_RPC_PORT": {"value": MAINNET_RPC_PORT, "type": int},
     "BTC_NETWORK": {"value": "mainnet", "type": str},
-    "FEED_PROTOCOL": {"value": "tcp", "type": str},
-    "FEED_CONNECT": {"value": "127.0.0.1", "type": str},
-    "FEED_PORT": {"value": 28332, "type": int},
+    "BTC_FEED_PROTOCOL": {"value": "tcp", "type": str},
+    "BTC_FEED_CONNECT": {"value": "localhost", "type": str},
+    "BTC_FEED_PORT": {"value": 28332, "type": int},
     "MAX_APPOINTMENTS": {"value": 1000000, "type": int},
     "DEFAULT_SLOTS": {"value": 100, "type": int},
     "DEFAULT_SUBSCRIPTION_DURATION": {"value": 4320, "type": int},

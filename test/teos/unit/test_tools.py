@@ -1,5 +1,9 @@
-from teos.tools import can_connect_to_bitcoind, in_correct_network, bitcoin_cli
+import pytest
+
+from teos.tools import in_correct_network, get_default_rpc_port
 from test.teos.unit.conftest import bitcoind_connect_params
+
+from common.constants import MAINNET_RPC_PORT, TESTNET_RPC_PORT, REGTEST_RPC_PORT
 
 
 def test_in_correct_network(run_bitcoind):
@@ -9,14 +13,16 @@ def test_in_correct_network(run_bitcoind):
     assert in_correct_network(bitcoind_connect_params, "regtest") is True
 
 
-def test_can_connect_to_bitcoind():
-    assert can_connect_to_bitcoind(bitcoind_connect_params) is True
+def test_get_default_rpc_port():
+    # Not much to be tested here.
+    assert get_default_rpc_port("mainnet") is MAINNET_RPC_PORT
+    assert get_default_rpc_port("testnet") is TESTNET_RPC_PORT
+    assert get_default_rpc_port("regtest") is REGTEST_RPC_PORT
 
 
-def test_bitcoin_cli(run_bitcoind):
-    try:
-        bitcoin_cli(bitcoind_connect_params).help()
-        assert True
+def test_get_default_rpc_port_wrong():
+    values = [0, "", 1.3, dict(), object(), None, "fakenet"]
 
-    except Exception:
-        assert False
+    for v in values:
+        with pytest.raises(ValueError):
+            get_default_rpc_port(v)

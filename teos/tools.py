@@ -3,11 +3,14 @@ from http.client import HTTPException
 
 from teos.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 
+from common.constants import MAINNET_RPC_PORT, TESTNET_RPC_PORT, REGTEST_RPC_PORT
+
 """
 Tools is a module with general methods that can used by different entities in the codebase.
 """
 
 
+# NOTCOVERED
 def bitcoin_cli(btc_connect_params):
     """
     An ``http`` connection with ``bitcoind`` using the ``json-rpc`` interface.
@@ -82,3 +85,27 @@ def in_correct_network(btc_connect_params, network):
         correct_network = True
 
     return correct_network
+
+
+def get_default_rpc_port(network):
+    """
+    Returns the default RPC port given a network name.
+
+    Args:
+        network (:obj:`str`): the network name. Either ``mainnet``, ``testnet`` or ``regtest``.
+
+    Returns:
+        :obj:`int`: The default RPC port depending on the given network name.
+
+    Raises:
+        :obj:`ValueError`: If the network is not mainnet, testnet or regtest.
+    """
+
+    if network == "mainnet":
+        return MAINNET_RPC_PORT
+    elif network == "testnet":
+        return TESTNET_RPC_PORT
+    elif network == "regtest":
+        return REGTEST_RPC_PORT
+    else:
+        raise ValueError("Wrong Bitcoin network. Expected: mainnet, testnet or regtest. Received: {}".format(network))
