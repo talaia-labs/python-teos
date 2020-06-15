@@ -5,3 +5,4 @@ coincurve
 pyzbase32
 requests
 plyvel
+readerwriterlock

@@ -18,6 +18,7 @@ def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
         response = send_appointment(tower_id, tower, appointment_dict, signature)
         plugin.log(f"Appointment accepted and signed by {tower_id}")
         plugin.log(f"Remaining slots: {response.get('available_slots')}")
+        plugin.log(f"Start block: {response.get('start_block')}")
 
         # # TODO: Not storing the whole appointments for now. The node can recreate all the data if needed.
         # # DISCUSS: It may be worth checking that the available slots match instead of blindly trusting.
