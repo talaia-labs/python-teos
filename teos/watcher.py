@@ -1,5 +1,5 @@
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 from collections import OrderedDict
 from readerwriterlock import rwlock
 
@@ -20,6 +20,10 @@ logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
 
 class AppointmentLimitReached(BasicException):
     """Raised when the tower maximum appointment count has been reached"""
+
+
+class AppointmentNotFound(BasicException):
+    """Raised when an appointment is not found in the tower"""
 
 
 class AppointmentAlreadyTriggered(BasicException):
@@ -334,6 +338,51 @@ class Watcher:
             "available_slots": available_slots,
             "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
         }
+
+    def delete_appointment(self, locator, user_id, user_signature):
+        """
+        Deletes an appointment from the ``Watcher``. The tower will stop monitoring the deleted appointment.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex string identifying the appointment.
+            user_id (:obj:`str`): the public key that identifies the user who request the deletion (33-bytes hex str).
+            user_signature (:obj:`str`): the signature of the request provided by the user. The tower will sign the
+                signature deletion is accepted.
+
+        Returns:
+            :obj:`str`: the signature of the user's signature if the appointment if the deletion is accepted.
+
+        Rises:
+            :obj:`AppointmentAlreadyTriggered`: if the appointment is already in the Responder. The deletion is
+            therefore rejected.
+            :obj:`AppointmentNotFound`: if the appointment cannot be found in the tower. The deletion is therefore
+            rejected.
+        """
+
+        uuid = hash_160("{}{}".format(locator, user_id))
+
+        # FIXME: We need to keep track of deletions
+
+        if uuid in self.appointments:
+            # Delete the appointment from both the Watcher and the Gatekeeper
+            Cleaner.delete_completed_appointments([uuid], self.appointments, self.locator_uuid_map, self.db_manager)
+            Cleaner.delete_gatekeeper_appointments(self.gatekeeper, {uuid: user_id})
+
+            # Sign over the user signature as acceptance of the deletion request.
+            signature = Cryptographer.sign(user_signature.encode(), self.signing_key)
+            logger.info("Appointment deleted", locator=locator)
+
+            return signature
+
+        elif uuid in self.responder.trackers:
+            message = "Cannot delete an already triggered appointment"
+            logger.info(message, locator=locator)
+            raise AppointmentAlreadyTriggered(message)
+
+        else:
+            message = "Appointment not found. Deletion rejected"
+            logger.info(message, locator=locator)
+            raise AppointmentNotFound(message)
 
     def do_watch(self):
         """

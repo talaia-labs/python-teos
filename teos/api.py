@@ -5,8 +5,8 @@ from flask import Flask, request, abort, jsonify
 from teos import LOG_PREFIX
 import common.errors as errors
 from teos.inspector import InspectionFailed
-from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
+from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
 from common.logger import Logger
 from common.cryptographer import hash_160
@@ -87,6 +87,7 @@ class API:
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
             "/get_all_appointments": (self.get_all_appointments, ["GET"]),
+            "/delete_appointment": (self.delete_appointment, ["POST"]),
         }
 
         for url, params in routes.items():
@@ -299,6 +300,78 @@ class API:
             abort(404)
 
         return response
+
+    def delete_appointment(self):
+        """
+        Delete information about a given appointment state in the Watchtower.
+
+        The information is requested by ``locator``.
+
+        Returns:
+            :obj:`str`: A json formatted dictionary containing information about the appointment deletion request.
+
+            Returns not found if the user does not have the requested appointment or the locator is invalid.
+            Returns bad request if the appointment does not exist in the Watchtower.
+
+            A ``status`` flag is added to the data that signals the status of the deletion request.
+
+            - A successfully deleted appointment is flagged as ``deletion_accepted``.
+            - An appointment that did not exist (or was already deleted), or where the locator is invalid or the user
+            does not have the requested appointment, are flagged as ``deletion_rejected``.
+
+            :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
+            appointments, the ``rcode`` is always 200 and the response contains the receipt signature (json). For
+            rejected appointments, the ``rcode`` is either 400 or 404:
+
+            If the appointment is not found: 404
+            If the request is invalid: 400
+            If the appointment is already in the responder: 400 + message
+        """
+
+        # Getting the real IP if the server is behind a reverse proxy
+        remote_addr = get_remote_addr()
+
+        # Check that data type and content are correct. Abort otherwise.
+        try:
+            request_data = get_request_data_json(request)
+
+        except InvalidParameter as e:
+            logger.info("Received invalid delete_appointment request", from_addr="{}".format(remote_addr))
+            return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
+
+        locator = request_data.get("locator")
+
+        try:
+            self.inspector.check_locator(locator)
+            logger.info("Received delete_appointment request", from_addr=remote_addr, locator=locator)
+
+            message = "delete appointment {}".format(locator).encode()
+            user_signature = request_data.get("signature")
+            user_id = self.watcher.gatekeeper.authenticate_user(message, user_signature)
+
+            tower_signature = self.watcher.pop_appointment(locator, user_id, user_signature)
+
+            rcode = HTTP_OK
+            response = {
+                "locator": locator,
+                "signature": tower_signature,
+                "available_slots": self.watcher.gatekeeper.registered_users[user_id].get("available_slots"),
+                "status": "deletion_accepted",
+            }
+
+        except AppointmentNotFound:
+            rcode = HTTP_NOT_FOUND
+            response = {"locator": locator, "status": "deletion_rejected"}
+
+        except AppointmentAlreadyTriggered as e:
+            rcode = HTTP_BAD_REQUEST
+            response = {"locator": locator, "status": "deletion_rejected", "error": e.msg}
+
+        except (InspectionFailed, AuthenticationFailure):
+            rcode = HTTP_BAD_REQUEST
+            response = {"locator": locator, "status": "deletion_rejected"}
+
+        return jsonify(response), rcode
 
     def start(self):
         """ This function starts the Flask server used to run the API """
