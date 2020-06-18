@@ -1,32 +1,20 @@
-# Python CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-python/ for more details
-#
 version: 2
+
 jobs:
-  build:
+  unit_tests:
     machine:
       image: ubuntu-1604:201903-01
-
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
-
-    working_directory: ~/repo
 
     steps:
       - checkout
 
-      # Download and cache dependencies
       - restore_cache:
-          keys:
-            - v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+            keys:
+              - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
 
       - run:
           name: Install dependencies
           command: |
-            sudo snap install `cat test/teos/e2e/bitcoind_snap.sh`
             pyenv local 3.7.0
             python3 -m venv venv
             . venv/bin/activate
@@ -38,18 +26,8 @@ jobs:
       - save_cache:
           paths:
             - ./venv
-            #- /snap
-          key: v2-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
 
-      # Run bitcoind for E2E testing (running it early so it has time to bootstrap)
-      - run:
-          name: Run bitcoind
-          command: |
-            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            cp test/teos/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            /snap/bin/bitcoin-core.daemon
-
-      # Run unit tests
       - run:
           name: Run teos unit tests
           command: |
@@ -68,7 +46,29 @@ jobs:
             . venv/bin/activate
             pytest test/cli/unit
 
-      # Setup teos for E2E testing
+  e2e_tests:
+    machine:
+      image: ubuntu-1604:201903-01
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+
+      - run:
+          name: Install bitcoind
+          command: |
+            sudo snap install `cat test/teos/e2e/bitcoind_snap.sh`
+
+      - run:
+          name: Run bitcoind
+          command: |
+            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            cp test/teos/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
+            /snap/bin/bitcoin-core.daemon
+
       - run:
           name: Setup teos
           command: |
@@ -78,14 +78,18 @@ jobs:
             cp ~/.teos/teos_pk.der ~/.teos_cli/
             cp test/teos/e2e/teos.conf ~/.teos/
 
-
-      # Run E2E tests
       - run:
           name: Run e2e tests
           command: |
             . venv/bin/activate
             pytest test/teos/e2e/
 
-      # - store_artifacts:
-      #    path: test-reports
-      #    destination: test-reports
+workflows:
+  version: 2
+
+  run_tests:
+    jobs:
+      - unit_tests
+      - e2e_tests:
+          requires:
+            - unit_tests
