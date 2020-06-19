@@ -95,6 +95,7 @@ jobs:
     steps:
       - checkout
       - run:
+          name: docker linux amd64
           command: |
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
             if [ -z "$LATEST_TAG" ]
@@ -112,6 +113,8 @@ jobs:
     steps:
       - checkout
       - run:
+          name: docker linux arm32
+          no_output_timeout: 20m
           command: |
             sudo docker run --rm --privileged multiarch/qemu-user-static:register --reset
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
@@ -130,6 +133,8 @@ jobs:
     steps:
       - checkout
       - run:
+          name: docker linux arm64
+          no_output_timeout: 20m
           command: |
             sudo docker run --rm --privileged multiarch/qemu-user-static:register --reset
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
@@ -148,6 +153,8 @@ jobs:
 
     steps:
       - run:
+          name: docker linux multiarch
+          no_output_timeout: 20m
           command: |
             # Turn on Experimental features
             sudo mkdir $HOME/.docker
