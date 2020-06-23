@@ -84,6 +84,7 @@ jobs:
           name: Run e2e tests
           command: |
             . venv/bin/activate
+            python -m test.teos.e2e.wait_bitcoind_bootstrap
             pytest test/teos/e2e/
 
   # Update Docker image
