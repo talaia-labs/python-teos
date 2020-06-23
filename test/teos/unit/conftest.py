@@ -84,8 +84,8 @@ def gatekeeper(user_db_manager, block_processor):
     return Gatekeeper(
         user_db_manager,
         block_processor,
-        get_config().get("DEFAULT_SLOTS"),
-        get_config().get("DEFAULT_SUBSCRIPTION_DURATION"),
+        get_config().get("SUBSCRIPTION_SLOTS"),
+        get_config().get("SUBSCRIPTION_DURATION"),
         get_config().get("EXPIRY_DELTA"),
     )
 

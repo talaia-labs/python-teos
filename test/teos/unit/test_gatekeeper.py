@@ -15,10 +15,12 @@ config = get_config()
 
 
 def test_init(gatekeeper, run_bitcoind):
-    assert isinstance(gatekeeper.default_slots, int) and gatekeeper.default_slots == config.get("DEFAULT_SLOTS")
-    assert isinstance(
-        gatekeeper.default_subscription_duration, int
-    ) and gatekeeper.default_subscription_duration == config.get("DEFAULT_SUBSCRIPTION_DURATION")
+    assert isinstance(gatekeeper.subscription_slots, int) and gatekeeper.subscription_slots == config.get(
+        "SUBSCRIPTION_SLOTS"
+    )
+    assert isinstance(gatekeeper.subscription_duration, int) and gatekeeper.subscription_duration == config.get(
+        "SUBSCRIPTION_DURATION"
+    )
     assert isinstance(gatekeeper.expiry_delta, int) and gatekeeper.expiry_delta == config.get("EXPIRY_DELTA")
     assert isinstance(gatekeeper.block_processor, BlockProcessor)
     assert isinstance(gatekeeper.user_db, UsersDBM)
@@ -26,8 +28,8 @@ def test_init(gatekeeper, run_bitcoind):
 
 
 def test_add_update_user(gatekeeper):
-    # add_update_user adds DEFAULT_SLOTS to a given user as long as the identifier is {02, 03}| 32-byte hex str
-    # it also add DEFAULT_SUBSCRIPTION_DURATION + current_block_height to the user
+    # add_update_user adds SUBSCRIPTION_SLOTS to a given user as long as the identifier is {02, 03}| 32-byte hex str
+    # it also add SUBSCRIPTION_DURATION + current_block_height to the user
     user_id = "02" + get_random_value_hex(32)
 
     for _ in range(10):
@@ -36,12 +38,12 @@ def test_add_update_user(gatekeeper):
 
         gatekeeper.add_update_user(user_id)
 
-        assert gatekeeper.registered_users.get(user_id).available_slots == current_slots + config.get("DEFAULT_SLOTS")
+        assert gatekeeper.registered_users.get(user_id).available_slots == current_slots + config.get(
+            "SUBSCRIPTION_SLOTS"
+        )
         assert gatekeeper.registered_users[
             user_id
-        ].subscription_expiry == gatekeeper.block_processor.get_block_count() + config.get(
-            "DEFAULT_SUBSCRIPTION_DURATION"
-        )
+        ].subscription_expiry == gatekeeper.block_processor.get_block_count() + config.get("SUBSCRIPTION_DURATION")
 
     # The same can be checked for multiple users
     for _ in range(10):
@@ -49,12 +51,10 @@ def test_add_update_user(gatekeeper):
         user_id = "03" + get_random_value_hex(32)
 
         gatekeeper.add_update_user(user_id)
-        assert gatekeeper.registered_users.get(user_id).available_slots == config.get("DEFAULT_SLOTS")
+        assert gatekeeper.registered_users.get(user_id).available_slots == config.get("SUBSCRIPTION_SLOTS")
         assert gatekeeper.registered_users[
             user_id
-        ].subscription_expiry == gatekeeper.block_processor.get_block_count() + config.get(
-            "DEFAULT_SUBSCRIPTION_DURATION"
-        )
+        ].subscription_expiry == gatekeeper.block_processor.get_block_count() + config.get("SUBSCRIPTION_DURATION")
 
 
 def test_add_update_user_wrong_id(gatekeeper):
@@ -142,7 +142,7 @@ def test_add_update_appointment(gatekeeper):
 
     # This is a standard size appointment, so it should have reduced the slots by one
     assert appointment_uuid in gatekeeper.registered_users[user_id].appointments
-    assert remaining_slots == config.get("DEFAULT_SLOTS") - 1
+    assert remaining_slots == config.get("SUBSCRIPTION_SLOTS") - 1
 
     # Updates can leave the count as is, decrease it, or increase it, depending on the appointment size (modulo
     # ENCRYPTED_BLOB_MAX_SIZE_HEX)
@@ -151,18 +151,18 @@ def test_add_update_appointment(gatekeeper):
     appointment_same_size, _ = generate_dummy_appointment()
     remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment)
     assert appointment_uuid in gatekeeper.registered_users[user_id].appointments
-    assert remaining_slots == config.get("DEFAULT_SLOTS") - 1
+    assert remaining_slots == config.get("SUBSCRIPTION_SLOTS") - 1
 
     # Bigger appointments decrease it
     appointment_x2_size = appointment_same_size
     appointment_x2_size.encrypted_blob = "A" * (ENCRYPTED_BLOB_MAX_SIZE_HEX + 1)
     remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment_x2_size)
     assert appointment_uuid in gatekeeper.registered_users[user_id].appointments
-    assert remaining_slots == config.get("DEFAULT_SLOTS") - 2
+    assert remaining_slots == config.get("SUBSCRIPTION_SLOTS") - 2
 
     # Smaller appointments increase it
     remaining_slots = gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment)
-    assert remaining_slots == config.get("DEFAULT_SLOTS") - 1
+    assert remaining_slots == config.get("SUBSCRIPTION_SLOTS") - 1
 
     # If the appointment needs more slots than there's free, it should fail
     gatekeeper.registered_users[user_id].available_slots = 1

@@ -119,12 +119,12 @@ def test_register(client, api):
     r = client.post(register_endpoint, json=data)
     assert r.status_code == HTTP_OK
     assert r.json.get("public_key") == user_id
-    assert r.json.get("available_slots") == config.get("DEFAULT_SLOTS")
-    assert r.json.get("subscription_expiry") == current_height + config.get("DEFAULT_SUBSCRIPTION_DURATION")
+    assert r.json.get("available_slots") == config.get("SUBSCRIPTION_SLOTS")
+    assert r.json.get("subscription_expiry") == current_height + config.get("SUBSCRIPTION_DURATION")
 
 
 def test_register_top_up(client, api):
-    # Calling register more than once will give us DEFAULT_SLOTS * number_of_calls slots.
+    # Calling register more than once will give us SUBSCRIPTION_SLOTS * number_of_calls slots.
     # It will also refresh the expiry.
     temp_sk, tmp_pk = generate_keypair()
     tmp_user_id = hexlify(tmp_pk.format(compressed=True)).decode("utf-8")
@@ -136,8 +136,8 @@ def test_register_top_up(client, api):
         r = client.post(register_endpoint, json=data)
         assert r.status_code == HTTP_OK
         assert r.json.get("public_key") == tmp_user_id
-        assert r.json.get("available_slots") == config.get("DEFAULT_SLOTS") * (i + 1)
-        assert r.json.get("subscription_expiry") == current_height + config.get("DEFAULT_SUBSCRIPTION_DURATION")
+        assert r.json.get("available_slots") == config.get("SUBSCRIPTION_SLOTS") * (i + 1)
+        assert r.json.get("subscription_expiry") == current_height + config.get("SUBSCRIPTION_DURATION")
 
 
 def test_register_no_client_pk(client):
