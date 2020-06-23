@@ -166,7 +166,11 @@ def test_appointment_life_cycle(bitcoin_cli):
     response = teos_cli.register(user_id, teos_base_endpoint)
     assert (
         response.get("available_slots")
-        == available_slots + teos_config.get("DEFAULT_SLOTS") + 1 - appointments_in_watcher - appointments_in_responder
+        == available_slots
+        + teos_config.get("SUBSCRIPTION_SLOTS")
+        + 1
+        - appointments_in_watcher
+        - appointments_in_responder
     )
 
 

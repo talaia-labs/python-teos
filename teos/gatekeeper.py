@@ -54,8 +54,8 @@ class Gatekeeper:
     perform actions.
 
     Attributes:
-        default_slots (:obj:`int`): the number of slots assigned to a user subscription.
-        default_subscription_duration (:obj:`int`): the expiry assigned to a user subscription.
+        subscription_slots (:obj:`int`): the number of slots assigned to a user subscription.
+        subscription_duration (:obj:`int`): the expiry assigned to a user subscription.
         expiry_delta (:obj:`int`): the grace period given to the user to renew their subscription.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
@@ -65,9 +65,9 @@ class Gatekeeper:
 
     """
 
-    def __init__(self, user_db, block_processor, default_slots, default_subscription_duration, expiry_delta):
-        self.default_slots = default_slots
-        self.default_subscription_duration = default_subscription_duration
+    def __init__(self, user_db, block_processor, subscription_slots, subscription_duration, expiry_delta):
+        self.subscription_slots = subscription_slots
+        self.subscription_duration = subscription_duration
         self.expiry_delta = expiry_delta
         self.block_processor = block_processor
         self.user_db = user_db
@@ -96,13 +96,13 @@ class Gatekeeper:
 
         if user_id not in self.registered_users:
             self.registered_users[user_id] = UserInfo(
-                self.default_slots, self.block_processor.get_block_count() + self.default_subscription_duration
+                self.subscription_slots, self.block_processor.get_block_count() + self.subscription_duration
             )
         else:
-            # FIXME: For now new calls to register add default_slots to the current count and reset the expiry time
-            self.registered_users[user_id].available_slots += self.default_slots
+            # FIXME: For now new calls to register add subscription_slots to the current count and reset the expiry time
+            self.registered_users[user_id].available_slots += self.subscription_slots
             self.registered_users[user_id].subscription_expiry = (
-                self.block_processor.get_block_count() + self.default_subscription_duration
+                self.block_processor.get_block_count() + self.subscription_duration
             )
 
         self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
