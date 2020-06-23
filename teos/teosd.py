@@ -82,8 +82,8 @@ def main(command_line_conf):
             gatekeeper = Gatekeeper(
                 UsersDBM(config.get("USERS_DB_PATH")),
                 block_processor,
-                config.get("DEFAULT_SLOTS"),
-                config.get("DEFAULT_SUBSCRIPTION_DURATION"),
+                config.get("SUBSCRIPTION_SLOTS"),
+                config.get("SUBSCRIPTION_DURATION"),
                 config.get("EXPIRY_DELTA"),
             )
             db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
