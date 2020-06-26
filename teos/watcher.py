@@ -227,7 +227,7 @@ class Watcher:
 
         return watcher_thread
 
-    def add_appointment(self, appointment, signature):
+    def add_appointment(self, appointment, user_signature):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
@@ -243,9 +243,9 @@ class Watcher:
         identified by ``uuid`` and stored in ``appointments`` and ``locator_uuid_map``.
 
         Args:
-            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the appointment to
-                be added to the :obj:`Watcher`.
-            signature (:obj:`str`): the user's appointment signature (hex-encoded).
+            appointment (:obj:`Appointment <common.appointment.Appointment>`): the appointment to be added to the
+                :obj:`Watcher`.
+            user_signature (:obj:`str`): the user's appointment signature (hex-encoded).
 
         Returns:
             :obj:`dict`: The tower response as a dict, containing: locator, signature, available_slots and
@@ -263,13 +263,20 @@ class Watcher:
             logger.info(message, locator=appointment.locator)
             raise AppointmentLimitReached(message)
 
-        user_id = self.gatekeeper.authenticate_user(appointment.serialize(), signature)
-        # The user_id needs to be added to the ExtendedAppointment once the former has been authenticated
-        appointment.user_id = user_id
+        user_id = self.gatekeeper.authenticate_user(appointment.serialize(), user_signature)
+        start_block = self.block_processor.get_block(self.last_known_block).get("height")
+        extended_appointment = ExtendedAppointment(
+            appointment.locator,
+            appointment.encrypted_blob,
+            appointment.to_self_delay,
+            user_id,
+            user_signature,
+            start_block,
+        )
 
         # The uuids are generated as the RIPEMD160(locator||user_pubkey).
         # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
-        uuid = hash_160("{}{}".format(appointment.locator, user_id))
+        uuid = hash_160("{}{}".format(extended_appointment.locator, user_id))
 
         # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
         if uuid in self.responder.trackers:
@@ -278,22 +285,28 @@ class Watcher:
             raise AppointmentAlreadyTriggered(message)
 
         # Add the appointment to the Gatekeeper
-        available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, appointment)
+        available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, extended_appointment)
 
         # Appointments that were triggered in blocks held in the cache
-        dispute_txid = self.locator_cache.get_txid(appointment.locator)
+        dispute_txid = self.locator_cache.get_txid(extended_appointment.locator)
         if dispute_txid:
             try:
-                penalty_txid, penalty_rawtx = self.check_breach(uuid, appointment, dispute_txid)
+                penalty_txid, penalty_rawtx = self.check_breach(uuid, extended_appointment, dispute_txid)
                 receipt = self.responder.handle_breach(
-                    uuid, appointment.locator, dispute_txid, penalty_txid, penalty_rawtx, user_id, self.last_known_block
+                    uuid,
+                    extended_appointment.locator,
+                    dispute_txid,
+                    penalty_txid,
+                    penalty_rawtx,
+                    user_id,
+                    self.last_known_block,
                 )
 
                 # At this point the appointment is accepted but data is only kept if it goes through the Responder.
                 # Otherwise it is dropped.
                 if receipt.delivered:
-                    self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-                    self.db_manager.create_append_locator_map(appointment.locator, uuid)
+                    self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
+                    self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
                     self.db_manager.create_triggered_appointment_flag(uuid)
 
             except (EncryptionError, InvalidTransactionFormat):
@@ -304,32 +317,34 @@ class Watcher:
 
         # Regular appointments that have not been triggered (or, at least, not recently)
         else:
-            self.appointments[uuid] = appointment.get_summary()
+            self.appointments[uuid] = extended_appointment.get_summary()
 
-            if appointment.locator in self.locator_uuid_map:
+            if extended_appointment.locator in self.locator_uuid_map:
                 # If the uuid is already in the map it means this is an update.
-                if uuid not in self.locator_uuid_map[appointment.locator]:
-                    self.locator_uuid_map[appointment.locator].append(uuid)
+                if uuid not in self.locator_uuid_map[extended_appointment.locator]:
+                    self.locator_uuid_map[extended_appointment.locator].append(uuid)
             else:
                 # Otherwise two users have sent an appointment with the same locator, so we need to store both.
-                self.locator_uuid_map[appointment.locator] = [uuid]
+                self.locator_uuid_map[extended_appointment.locator] = [uuid]
 
-            self.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-            self.db_manager.create_append_locator_map(appointment.locator, uuid)
+            self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
+            self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
 
         try:
-            signature = Cryptographer.sign(appointment.serialize(), self.signing_key)
+            signature = Cryptographer.sign(
+                ExtendedAppointment.create_receipt(user_signature, start_block), self.signing_key
+            )
 
         except (InvalidParameter, SignatureError):
             # This should never happen since data is sanitized, just in case to avoid a crash
-            logger.error("Data couldn't be signed", appointment=appointment.to_dict())
+            logger.error("Data couldn't be signed", appointment=extended_appointment.to_dict())
             signature = None
 
-        logger.info("New appointment accepted", locator=appointment.locator)
+        logger.info("New appointment accepted", locator=extended_appointment.locator)
 
         return {
-            "locator": appointment.locator,
-            "start_block": self.last_known_block,
+            "locator": extended_appointment.locator,
+            "start_block": extended_appointment.start_block,
             "signature": signature,
             "available_slots": available_slots,
             "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
