@@ -12,7 +12,6 @@ from teos.gatekeeper import UserInfo
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
-from teos.extended_appointment import ExtendedAppointment
 from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots
 from teos.watcher import (
     Watcher,
@@ -24,6 +23,7 @@ from teos.watcher import (
 )
 
 from common.tools import compute_locator
+from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
 from test.teos.unit.conftest import (
@@ -75,6 +75,8 @@ def watcher(db_manager, gatekeeper):
         MAX_APPOINTMENTS,
         config.get("LOCATOR_CACHE_SIZE"),
     )
+
+    watcher.last_known_block = block_processor.get_best_block_hash()
 
     chain_monitor = ChainMonitor(
         watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
@@ -256,7 +258,7 @@ def test_locator_remove_oldest_block(block_processor):
 def test_fix_cache(block_processor):
     # This tests how a reorg will create a new version of the cache
     # Let's start setting a full cache. We'll mine ``cache_size`` bocks to be sure it's full
-    generate_blocks_w_delay((config.get("LOCATOR_CACHE_SIZE")))
+    generate_blocks_w_delay(config.get("LOCATOR_CACHE_SIZE"))
 
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
     locator_cache.init(block_processor.get_best_block_hash(), block_processor)
@@ -270,7 +272,7 @@ def test_fix_cache(block_processor):
     fake_tip = block_processor.get_block(current_tip_parent).get("previousblockhash")
     locator_cache.fix(fake_tip, block_processor)
 
-    # The last two blocks are not in the cache nor are the any of its locators
+    # The last two blocks are not in the cache nor are there any of its locators
     assert current_tip not in locator_cache.blocks and current_tip_parent not in locator_cache.blocks
     for locator in current_tip_parent_locators + current_tip_locators:
         assert locator not in locator_cache.cache
@@ -295,7 +297,7 @@ def test_fix_cache(block_processor):
     # The data in the new cache corresponds to the last ``cache_size`` blocks.
     block_count = block_processor.get_block_count()
     for i in range(block_count, block_count - locator_cache.cache_size, -1):
-        block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(i - 1)
+        block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(i)
         assert block_hash in locator_cache.blocks
         for locator in locator_cache.blocks[block_hash]:
             assert locator in locator_cache.cache
@@ -351,7 +353,9 @@ def test_add_appointment(watcher):
     response = watcher.add_appointment(appointment, appointment_signature)
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-        Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+        Cryptographer.recover_pk(
+            Appointment.create_receipt(appointment_signature, response.get("start_block")), response.get("signature")
+        )
     )
     assert response.get("available_slots") == available_slots - 1
 
@@ -359,7 +363,9 @@ def test_add_appointment(watcher):
     response = watcher.add_appointment(appointment, appointment_signature)
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-        Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+        Cryptographer.recover_pk(
+            Appointment.create_receipt(appointment_signature, response.get("start_block")), response.get("signature")
+        )
     )
     # The slot count should not have been reduced and only one copy is kept.
     assert response.get("available_slots") == available_slots - 1
@@ -376,7 +382,9 @@ def test_add_appointment(watcher):
     response = watcher.add_appointment(appointment, appointment_signature)
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-        Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+        Cryptographer.recover_pk(
+            Appointment.create_receipt(appointment_signature, response.get("start_block")), response.get("signature")
+        )
     )
     assert response.get("available_slots") == available_slots - 1
     assert len(watcher.locator_uuid_map[appointment.locator]) == 2
@@ -393,14 +401,16 @@ def test_add_appointment_in_cache(watcher):
     watcher.locator_cache.cache[appointment.locator] = dispute_txid
 
     # Try to add the appointment
-    response = watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+    user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    response = watcher.add_appointment(appointment, user_signature)
+    appointment_receipt = Appointment.create_receipt(user_signature, response.get("start_block"))
 
     # The appointment is accepted but it's not in the Watcher
     assert (
         response
         and response.get("locator") == appointment.locator
         and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
-        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), response.get("signature")))
+        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment_receipt, response.get("signature")))
     )
     assert not watcher.locator_uuid_map.get(appointment.locator)
 
@@ -434,18 +444,20 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
         "user_id": get_random_value_hex(16),
     }
 
-    appointment = ExtendedAppointment.from_dict(appointment_data)
+    appointment = Appointment.from_dict(appointment_data)
     watcher.locator_cache.cache[appointment.locator] = dispute_tx.tx_id.hex()
 
     # Try to add the appointment
-    response = watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+    user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    response = watcher.add_appointment(appointment, user_signature)
+    appointment_receipt = Appointment.create_receipt(user_signature, response.get("start_block"))
 
     # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
     assert (
         response
         and response.get("locator") == appointment.locator
         and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
-        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), response.get("signature")))
+        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment_receipt, response.get("signature")))
     )
 
     assert not watcher.locator_uuid_map.get(appointment.locator)
@@ -464,14 +476,16 @@ def test_add_appointment_in_cache_invalid_transaction(watcher):
     watcher.locator_cache.cache[appointment.locator] = dispute_txid
 
     # Try to add the appointment
-    response = watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
+    user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    response = watcher.add_appointment(appointment, user_signature)
+    appointment_receipt = Appointment.create_receipt(user_signature, response.get("start_block"))
 
     # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
     assert (
         response
         and response.get("locator") == appointment.locator
         and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
-        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), response.get("signature")))
+        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment_receipt, response.get("signature")))
     )
 
     assert not watcher.locator_uuid_map.get(appointment.locator)
@@ -491,11 +505,12 @@ def test_add_too_many_appointments(watcher):
     for i in range(MAX_APPOINTMENTS):
         appointment, dispute_tx = generate_dummy_appointment()
         appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-
         response = watcher.add_appointment(appointment, appointment_signature)
+        appointment_receipt = Appointment.create_receipt(appointment_signature, response.get("start_block"))
+
         assert response.get("locator") == appointment.locator
         assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(appointment.serialize(), response.get("signature"))
+            Cryptographer.recover_pk(appointment_receipt, response.get("signature"))
         )
         assert response.get("available_slots") == available_slots - (i + 1)
 

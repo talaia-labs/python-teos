@@ -2,9 +2,9 @@ import pytest
 from binascii import unhexlify
 
 import common.errors as errors
+from common.appointment import Appointment
 from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
-from teos.extended_appointment import ExtendedAppointment
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
@@ -175,8 +175,6 @@ def test_check_blob():
 def test_inspect(run_bitcoind):
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-    start_time = block_processor.get_block_count() + 5
-    end_time = start_time + 20
     to_self_delay = MIN_TO_SELF_DELAY
     encrypted_blob = get_random_value_hex(64)
 
@@ -185,7 +183,7 @@ def test_inspect(run_bitcoind):
     appointment = inspector.inspect(appointment_data)
 
     assert (
-        type(appointment) == ExtendedAppointment
+        type(appointment) == Appointment
         and appointment.locator == locator
         and appointment.to_self_delay == to_self_delay
         and appointment.encrypted_blob == encrypted_blob

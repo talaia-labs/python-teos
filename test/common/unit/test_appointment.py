@@ -31,7 +31,7 @@ def test_init_appointment(appointment_data):
     # The appointment has no checks whatsoever, since the inspector is the one taking care or that, and the only one
     # creating appointments.
     appointment = Appointment(
-        appointment_data["locator"], appointment_data["to_self_delay"], appointment_data["encrypted_blob"]
+        appointment_data["locator"], appointment_data["encrypted_blob"], appointment_data["to_self_delay"]
     )
 
     assert (
@@ -43,7 +43,7 @@ def test_init_appointment(appointment_data):
 
 def test_to_dict(appointment_data):
     appointment = Appointment(
-        appointment_data["locator"], appointment_data["to_self_delay"], appointment_data["encrypted_blob"]
+        appointment_data["locator"], appointment_data["encrypted_blob"], appointment_data["to_self_delay"]
     )
 
     dict_appointment = appointment.to_dict()
@@ -82,9 +82,9 @@ def test_serialize(appointment_data):
     assert isinstance(serialized_appointment, bytes)
 
     locator = serialized_appointment[:16]
-    to_self_delay = serialized_appointment[16:20]
-    encrypted_blob = serialized_appointment[20:]
+    encrypted_blob = serialized_appointment[16:-4]
+    to_self_delay = serialized_appointment[-4:]
 
     assert binascii.hexlify(locator).decode() == appointment.locator
-    assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
     assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob
+    assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay

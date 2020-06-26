@@ -283,8 +283,9 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     response_json = teos_cli.process_post_response(response)
 
     # Check that the server has accepted the appointment
-    signature = response_json.get("signature")
-    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    tower_signature = response_json.get("signature")
+    appointment_receipt = Appointment.create_receipt(signature, response_json.get("start_block"))
+    rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
 
@@ -469,12 +470,13 @@ def test_add_appointment_trigger_on_cache_cannot_decrypt(bitcoin_cli):
     response_json = teos_cli.process_post_response(response)
 
     # Check that the server has accepted the appointment
-    signature = response_json.get("signature")
-    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    tower_signature = response_json.get("signature")
+    appointment_receipt = Appointment.create_receipt(signature, response_json.get("start_block"))
+    rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
 
-    # The appointment should should have been inmediately dropped
+    # The appointment should should have been immediately dropped
     with pytest.raises(TowerResponseError):
         get_appointment_info(appointment_data["locator"])
 

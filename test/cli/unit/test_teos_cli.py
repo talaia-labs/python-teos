@@ -50,6 +50,9 @@ dummy_appointment_dict = {
 
 dummy_appointment = Appointment.from_dict(dummy_appointment_dict)
 
+# The height is never checked in the tests, so we can make it up
+CURRENT_HEIGHT = 300
+
 
 def get_signature(message, sk):
     return Cryptographer.sign(message, sk)
@@ -74,10 +77,16 @@ def test_register():
 def test_add_appointment():
     # Simulate a request to add_appointment for dummy_appointment, make sure that the right endpoint is requested
     # and the return value is True
+    appointment = teos_cli.create_appointment(dummy_appointment_data)
+    user_signature = Cryptographer.sign(appointment.serialize(), dummy_user_sk)
+    appointment_receipt = Appointment.create_receipt(user_signature, CURRENT_HEIGHT)
+
     response = {
         "locator": dummy_appointment.locator,
-        "signature": get_signature(dummy_appointment.serialize(), dummy_teos_sk),
+        "signature": get_signature(appointment_receipt, dummy_teos_sk),
         "available_slots": 100,
+        "start_block": CURRENT_HEIGHT,
+        "subscription_expiry": CURRENT_HEIGHT + 4320,
     }
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
     result = teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
@@ -88,14 +97,20 @@ def test_add_appointment():
 
 
 @responses.activate
-def test_add_appointment_with_invalid_signature(monkeypatch):
+def test_add_appointment_with_invalid_signature():
     # Simulate a request to add_appointment for dummy_appointment, but sign with a different key,
     # make sure that the right endpoint is requested, but the return value is False
+    appointment = teos_cli.create_appointment(dummy_appointment_data)
+    user_signature = Cryptographer.sign(appointment.serialize(), dummy_user_sk)
+    appointment_receipt = Appointment.create_receipt(user_signature, CURRENT_HEIGHT)
 
+    # Sign with a bad key
     response = {
-        "locator": dummy_appointment.to_dict()["locator"],
-        "signature": get_signature(dummy_appointment.serialize(), another_sk),  # Sign with a bad key
+        "locator": dummy_appointment.locator,
+        "signature": get_signature(appointment_receipt, another_sk),
         "available_slots": 100,
+        "start_block": CURRENT_HEIGHT,
+        "subscription_expiry": CURRENT_HEIGHT + 4320,
     }
 
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)

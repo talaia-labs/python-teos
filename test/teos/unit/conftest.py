@@ -142,6 +142,8 @@ def generate_dummy_appointment():
         "to_self_delay": dummy_appointment_data.get("to_self_delay"),
         "encrypted_blob": encrypted_blob,
         "user_id": get_random_value_hex(16),
+        "user_signature": get_random_value_hex(50),
+        "start_block": 200,
     }
 
     return ExtendedAppointment.from_dict(appointment_data), dispute_tx.hex()
