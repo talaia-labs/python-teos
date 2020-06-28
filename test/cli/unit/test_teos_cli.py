@@ -31,19 +31,11 @@ register_endpoint = "{}/register".format(teos_url)
 get_appointment_endpoint = "{}/get_appointment".format(teos_url)
 get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
 
-dummy_appointment_data = {
-    "tx": get_random_value_hex(192),
-    "tx_id": get_random_value_hex(32),
-    "start_time": 1500,
-    "end_time": 50000,
-    "to_self_delay": 200,
-}
+dummy_appointment_data = {"tx": get_random_value_hex(192), "tx_id": get_random_value_hex(32), "to_self_delay": 200}
 
 # This is the format appointment turns into once it hits "add_appointment"
 dummy_appointment_dict = {
     "locator": compute_locator(dummy_appointment_data.get("tx_id")),
-    "start_time": dummy_appointment_data.get("start_time"),
-    "end_time": dummy_appointment_data.get("end_time"),
     "to_self_delay": dummy_appointment_data.get("to_self_delay"),
     "encrypted_blob": Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")),
 }
