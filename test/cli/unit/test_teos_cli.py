@@ -39,15 +39,10 @@ dummy_appointment_dict = {
     "to_self_delay": dummy_appointment_data.get("to_self_delay"),
     "encrypted_blob": Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")),
 }
-
 dummy_appointment = Appointment.from_dict(dummy_appointment_dict)
 
 # The height is never checked in the tests, so we can make it up
 CURRENT_HEIGHT = 300
-
-
-def get_signature(message, sk):
-    return Cryptographer.sign(message, sk)
 
 
 # TODO: 90-add-more-add-appointment-tests
@@ -65,6 +60,36 @@ def test_register():
     )
 
 
+def test_create_appointment():
+    # Tests that an appointment is properly created provided the input data is correct
+    appointment = teos_cli.create_appointment(dummy_appointment_data)
+    assert isinstance(appointment, Appointment)
+    assert appointment.locator == dummy_appointment_data.get(
+        "locator"
+    ) and appointment.to_self_delay == dummy_appointment_data.get("to_self_delay")
+    assert appointment.encrypted_blob == Cryptographer.encrypt(
+        dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")
+    )
+
+
+def test_create_appointment_missing_fields():
+    # Data is sanitized by parse_add_appointment_args, so the input must be a dict with data.
+    # The expected fields may be missing though.
+    no_txid = {"tx": get_random_value_hex(200)}
+    no_tx = {"tx_id": get_random_value_hex(32)}
+    incorrect_txid = {"tx_id": get_random_value_hex(31), "tx": get_random_value_hex(200)}
+    incorrect_tx = {"tx_id": get_random_value_hex(32), "tx": 1}
+
+    with pytest.raises(InvalidParameter, match="Missing txid"):
+        teos_cli.create_appointment(no_txid)
+    with pytest.raises(InvalidParameter, match="Wrong txid"):
+        teos_cli.create_appointment(incorrect_txid)
+    with pytest.raises(InvalidParameter, match="is missing the transaction"):
+        teos_cli.create_appointment(no_tx)
+    with pytest.raises(InvalidParameter, match="transaction is not a string"):
+        teos_cli.create_appointment(incorrect_tx)
+
+
 @responses.activate
 def test_add_appointment():
     # Simulate a request to add_appointment for dummy_appointment, make sure that the right endpoint is requested
@@ -75,13 +100,16 @@ def test_add_appointment():
 
     response = {
         "locator": dummy_appointment.locator,
-        "signature": get_signature(appointment_receipt, dummy_teos_sk),
+        "signature": Cryptographer.sign(appointment_receipt, dummy_teos_sk),
         "available_slots": 100,
         "start_block": CURRENT_HEIGHT,
         "subscription_expiry": CURRENT_HEIGHT + 4320,
     }
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
-    result = teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
+
+    result = teos_cli.add_appointment(
+        Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url
+    )
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == add_appointment_endpoint
@@ -89,7 +117,7 @@ def test_add_appointment():
 
 
 @responses.activate
-def test_add_appointment_with_invalid_signature():
+def test_add_appointment_with_invalid_tower_signature():
     # Simulate a request to add_appointment for dummy_appointment, but sign with a different key,
     # make sure that the right endpoint is requested, but the return value is False
     appointment = teos_cli.create_appointment(dummy_appointment_data)
@@ -99,7 +127,7 @@ def test_add_appointment_with_invalid_signature():
     # Sign with a bad key
     response = {
         "locator": dummy_appointment.locator,
-        "signature": get_signature(appointment_receipt, another_sk),
+        "signature": Cryptographer.sign(appointment_receipt, another_sk),
         "available_slots": 100,
         "start_block": CURRENT_HEIGHT,
         "subscription_expiry": CURRENT_HEIGHT + 4320,
@@ -108,7 +136,7 @@ def test_add_appointment_with_invalid_signature():
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
 
     with pytest.raises(TowerResponseError):
-        teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
+        teos_cli.add_appointment(Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url)
 
 
 @responses.activate
@@ -151,7 +179,7 @@ def test_load_keys():
     with open(empty_file_path, "wb"):
         pass
 
-    # Now we can test the function passing the using this files
+    # Now we can test the function using this files
     r = teos_cli.load_keys(public_key_file_path, private_key_file_path)
     assert isinstance(r, tuple)
     assert len(r) == 3
@@ -182,7 +210,7 @@ def test_load_keys():
 def test_post_request():
     response = {
         "locator": dummy_appointment.to_dict()["locator"],
-        "signature": get_signature(dummy_appointment.serialize(), dummy_teos_sk),
+        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
     }
 
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
@@ -198,7 +226,7 @@ def test_process_post_response():
     # Let's first create a response
     response = {
         "locator": dummy_appointment.to_dict()["locator"],
-        "signature": get_signature(dummy_appointment.serialize(), dummy_teos_sk),
+        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
     }
 
     # A 200 OK with a correct json response should return the json of the response
@@ -244,6 +272,10 @@ def test_parse_add_appointment_args_wrong():
     with pytest.raises(InvalidParameter):
         teos_cli.parse_add_appointment_args(None)
 
+    # If the arg is an empty dict it should fail
+    with pytest.raises(InvalidParameter):
+        teos_cli.parse_add_appointment_args({})
+
     # If file doesn't exist, function should fail.
     with pytest.raises(FileNotFoundError):
         teos_cli.parse_add_appointment_args(["-f", "nonexistent_file"])
@@ -257,7 +289,8 @@ def test_save_appointment_receipt(monkeypatch):
     assert not os.path.exists(appointments_folder)
     teos_cli.save_appointment_receipt(
         dummy_appointment.to_dict(),
-        get_signature(dummy_appointment.serialize(), dummy_teos_sk),
+        Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
+        CURRENT_HEIGHT,
         config.get("APPOINTMENTS_FOLDER_NAME"),
     )
     assert os.path.exists(appointments_folder)
