@@ -1,11 +1,12 @@
 import pytest
 import random
+from time import sleep
 from multiprocessing import Process
 from decimal import Decimal, getcontext
 
 from teos.teosd import main
 from teos import DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF
-from teos.utils.auth_proxy import AuthServiceProxy
+from teos.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 
 from common.config_loader import ConfigLoader
 
@@ -36,8 +37,17 @@ def prng_seed():
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_node(bitcoin_cli):
+
+    # Check that the nodes is up and running (specially for circleci)
+    while True:
+        try:
+            new_addr = bitcoin_cli.getnewaddress()
+            break
+        except JSONRPCException as e:
+            if "Loading wallet..." in str(e):
+                sleep(1)
+
     # This method will create a new address a mine bitcoin so the node can be used for testing
-    new_addr = bitcoin_cli.getnewaddress()
     bitcoin_cli.generatetoaddress(200, new_addr)
 
 

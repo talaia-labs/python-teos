@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-START_COMMAND="/usr/local/bin/python3 -m teos.teosd "
+START_COMMAND="python3 -m teos.teosd "
 
 if [[ ! -z ${API_BIND} ]]; then
     START_COMMAND=$START_COMMAND" --apibind=""$API_BIND"
