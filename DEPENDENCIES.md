@@ -61,7 +61,7 @@ Bitcoin needs to be running with the following options enables:
 - `txindex` to be able to look for non-wallet transactions
 - `server` to run rpc commands
 
-Here's an example of a `bitcoin.conf` you can use:
+Here's an example of a `bitcoin.conf` you can use if you want to run bitcoind on regtest:
 
 ```
 # [debug]
