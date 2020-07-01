@@ -69,6 +69,25 @@ def test_register():
         "available_slots"
     )
 
+def test_register_with_invalid_user_id():
+    # Simulate a register response
+    with pytest.raises(InvalidParameter):
+        teos_cli.register("invalid_user_id", teos_url)
+
+    # should not have done any network request
+    assert len(responses.calls) == 0
+
+def test_register_with_connection_error():
+    # We don't mock any url to simulate a connection error
+    with pytest.raises(ConnectionError):
+        teos_cli.register(dummy_user_id, teos_url)
+
+    # Should also fail with missing or unknown protocol, with a more specific error message
+    with pytest.raises(ConnectionError, match="Invalid URL"):
+        teos_cli.register(dummy_user_id, "//teos.watch")
+    with pytest.raises(ConnectionError, match="Invalid URL"):
+        teos_cli.register(dummy_user_id, "nonExistingProtocol://teos.watch")
+
 
 @responses.activate
 def test_add_appointment():
