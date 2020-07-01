@@ -58,20 +58,20 @@ The configuration file option to change the network where `teos` will run is `bt
 
 ```
 [bitcoind]
-btc_rpc_user = "user"
-btc_rpc_password = "passwd"
-btc_rpc_connect = "localhost"
-btc_network = "mainnet"
+btc_rpc_user = user
+btc_rpc_password = passwd
+btc_rpc_connect = localhost
+btc_network = mainnet
 ```
 
 For regtest, it should look like:
 
 ```
 [bitcoind]
-btc_rpc_user = "user"
-btc_rpc_password = "passwd"
-btc_rpc_connect = "localhost"
-btc_network = "regtest"
+btc_rpc_user = user
+btc_rpc_password = passwd
+btc_rpc_connect = localhost
+btc_network = regtest
 ```
 
 
