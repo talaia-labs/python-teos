@@ -183,8 +183,7 @@ def test_inspect(run_bitcoind):
     appointment = inspector.inspect(appointment_data)
 
     assert (
-        type(appointment) == Appointment
-        and appointment.locator == locator
+        appointment.locator == locator
         and appointment.to_self_delay == to_self_delay
         and appointment.encrypted_blob == encrypted_blob
     )

@@ -75,13 +75,13 @@ def create_appointment(appointment_data):
     tx = appointment_data.get("tx")
 
     if not tx_id:
-        raise InvalidParameter("Missing txid, locator cannot be computed")
+        raise InvalidParameter("Missing tx_id, locator cannot be computed")
     elif not is_256b_hex_str(tx_id):
-        raise InvalidParameter("Wrong txid, locator cannot be computed")
+        raise InvalidParameter("Wrong tx_id, locator cannot be computed")
     elif not tx:
-        raise InvalidParameter("The provided data is missing the transaction")
+        raise InvalidParameter("The tx field is missing in the provided data")
     elif not isinstance(tx, str):
-        raise InvalidParameter("The provided transaction is not a string")
+        raise InvalidParameter("The provided tx field is not a string")
 
     appointment_data["locator"] = compute_locator(tx_id)
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(tx, tx_id)

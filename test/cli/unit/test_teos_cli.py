@@ -80,13 +80,13 @@ def test_create_appointment_missing_fields():
     incorrect_txid = {"tx_id": get_random_value_hex(31), "tx": get_random_value_hex(200)}
     incorrect_tx = {"tx_id": get_random_value_hex(32), "tx": 1}
 
-    with pytest.raises(InvalidParameter, match="Missing txid"):
+    with pytest.raises(InvalidParameter, match="Missing tx_id"):
         teos_cli.create_appointment(no_txid)
-    with pytest.raises(InvalidParameter, match="Wrong txid"):
+    with pytest.raises(InvalidParameter, match="Wrong tx_id"):
         teos_cli.create_appointment(incorrect_txid)
-    with pytest.raises(InvalidParameter, match="is missing the transaction"):
+    with pytest.raises(InvalidParameter, match="tx field is missing"):
         teos_cli.create_appointment(no_tx)
-    with pytest.raises(InvalidParameter, match="transaction is not a string"):
+    with pytest.raises(InvalidParameter, match="tx field is not a string"):
         teos_cli.create_appointment(incorrect_tx)
 
 
@@ -179,7 +179,7 @@ def test_load_keys():
     with open(empty_file_path, "wb"):
         pass
 
-    # Now we can test the function using this files
+    # Now we can test the function using these files
     r = teos_cli.load_keys(public_key_file_path, private_key_file_path)
     assert isinstance(r, tuple)
     assert len(r) == 3
