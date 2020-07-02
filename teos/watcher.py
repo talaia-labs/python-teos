@@ -4,6 +4,7 @@ from collections import OrderedDict
 from readerwriterlock import rwlock
 
 from common.logger import Logger
+import common.receipts as receipts
 from common.tools import compute_locator
 from common.exceptions import BasicException
 from common.exceptions import EncryptionError
@@ -349,7 +350,7 @@ class Watcher:
 
         try:
             signature = Cryptographer.sign(
-                ExtendedAppointment.create_receipt(user_signature, start_block), self.signing_key
+                receipts.create_appointment_receipt(user_signature, start_block), self.signing_key
             )
 
         except (InvalidParameter, SignatureError):

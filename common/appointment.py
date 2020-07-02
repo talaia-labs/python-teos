@@ -1,5 +1,4 @@
 import struct
-import pyzbase32
 from binascii import unhexlify
 
 
@@ -73,23 +72,3 @@ class Appointment:
               :obj:`bytes`: The serialized data to be signed.
         """
         return unhexlify(self.locator) + unhexlify(self.encrypted_blob) + struct.pack(">I", self.to_self_delay)
-
-    @staticmethod
-    def create_receipt(user_signature, start_block):
-        """
-        Creates an appointment receipt.
-
-        The receipt has the following format:
-
-            user_signature | start_block
-
-        All values are big endian.
-
-        Args:
-            user_signature (:obj:`str`): the signature of the appointment by the user.
-            start_block (:obj:`str`): the block height at which the tower will start watching for the appointment.
-
-        Returns:
-              :obj:`bytes`: The serialized data to be signed.
-        """
-        return pyzbase32.decode_bytes(user_signature) + struct.pack(">I", start_block)
