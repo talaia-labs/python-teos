@@ -289,26 +289,41 @@ def test_post_request():
 
 
 @responses.activate
-def test_process_post_response():
-    # Let's first create a response
-    response = {
+def test_post_request_connection_error():
+    with pytest.raises(ConnectionError):
+        teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
+
+
+@pytest.fixture
+def post_response():
+    # Create a reponse for the post requests to the tower 
+    return {
         "locator": dummy_appointment.to_dict()["locator"],
         "signature": get_signature(dummy_appointment.serialize(), dummy_teos_sk),
     }
 
+
+@responses.activate
+def test_process_post_response(post_response):
     # A 200 OK with a correct json response should return the json of the response
-    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+    responses.add(responses.POST, add_appointment_endpoint, json=post_response, status=200)
     r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
     assert teos_cli.process_post_response(r) == r.json()
 
-    # If we modify the response code for a rejection (lets say 404) we should get None
-    responses.replace(responses.POST, add_appointment_endpoint, json=response, status=404)
+
+@responses.activate
+def test_process_post_response_404(post_response):
+    # If the response code is a rejection (lets say 404) it should raise TowerResponseError
+    responses.add(responses.POST, add_appointment_endpoint, json=post_response, status=404)
     with pytest.raises(TowerResponseError):
         r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
 
-    # The same should happen if the response is not in json independently of the return type
-    responses.replace(responses.POST, add_appointment_endpoint, status=404)
+
+@responses.activate
+def test_process_post_response_not_json(post_response):
+    # TowerResponseError should be raised if the response is not in json (independently of the status code)
+    responses.add(responses.POST, add_appointment_endpoint, status=404)
     with pytest.raises(TowerResponseError):
         r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
