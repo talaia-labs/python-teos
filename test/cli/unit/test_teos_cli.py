@@ -188,6 +188,7 @@ def test_get_appointment():
 
 @responses.activate
 def test_get_appointment_invalid_locator():
+    # Test that an invalid locator fails with InvalidParamater before any network request
     with pytest.raises(InvalidParameter, match="locator is not valid"):
         teos_cli.get_appointment("deadbeef", dummy_user_sk, dummy_teos_id, teos_url)
 
@@ -197,6 +198,8 @@ def test_get_appointment_invalid_locator():
 
 @responses.activate
 def test_get_appointment_tower_error():
+    # Test that a TowerResponseError is raised if the response is invalid.
+
     locator = dummy_appointment_dict.get("locator")
 
     responses.add(responses.POST, get_appointment_endpoint, body="{ invalid json response", status=200)
