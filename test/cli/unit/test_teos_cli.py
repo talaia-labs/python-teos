@@ -174,7 +174,7 @@ def test_get_appointment():
     # Response of get_appointment endpoint is an appointment with status added to it.
     response = {
         "locator": dummy_appointment_dict.get("locator"),
-        "status": "being_watch",
+        "status": "being_watched",
         "appointment": dummy_appointment_dict,
     }
 
