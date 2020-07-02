@@ -359,8 +359,9 @@ def test_parse_add_appointment_args_wrong():
         teos_cli.parse_add_appointment_args(["-f", "nonexistent_file"])
 
 
-def test_save_appointment_receipt():
+def test_save_appointment_receipt(monkeypatch):
     appointments_folder = "test_appointments_receipts"
+    monkeypatch.setitem(config, "APPOINTMENTS_FOLDER_NAME", appointments_folder)
     config["APPOINTMENTS_FOLDER_NAME"] = appointments_folder
 
     # The functions creates a new directory if it does not exist
