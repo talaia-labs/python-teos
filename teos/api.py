@@ -126,11 +126,12 @@ class API:
         if user_id:
             try:
                 rcode = HTTP_OK
-                available_slots, subscription_expiry = self.watcher.gatekeeper.add_update_user(user_id)
+                available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
                 response = {
                     "public_key": user_id,
                     "available_slots": available_slots,
                     "subscription_expiry": subscription_expiry,
+                    "subscription_signature": subscription_signature,
                 }
 
             except InvalidParameter as e:
