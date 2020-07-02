@@ -187,7 +187,25 @@ def test_get_appointment():
 
 
 @responses.activate
-def test_get_appointment_err():
+def test_get_appointment_invalid_locator():
+    with pytest.raises(InvalidParameter, match="locator is not valid"):
+        teos_cli.get_appointment("deadbeef", dummy_user_sk, dummy_teos_id, teos_url)
+
+    # Should fail validation before making any network request
+    assert len(responses.calls) == 0
+
+
+@responses.activate
+def test_get_appointment_tower_error():
+    locator = dummy_appointment_dict.get("locator")
+
+    responses.add(responses.POST, get_appointment_endpoint, body="{ invalid json response", status=200)
+    with pytest.raises(TowerResponseError):
+        teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
+
+
+@responses.activate
+def test_get_appointment_connection_error():
     locator = get_random_value_hex(16)
 
     # Test that get_appointment handles a connection error appropriately.
