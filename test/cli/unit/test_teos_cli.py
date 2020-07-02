@@ -1,5 +1,6 @@
 import os
 import json
+from collections import namedtuple
 import shutil
 import pytest
 import responses
@@ -218,7 +219,12 @@ def test_get_appointment_connection_error():
         teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
 
 
-def test_load_keys():
+@pytest.fixture
+def keyfiles():
+    # generate a private/public key pair, and an empty file, and return their names
+
+    KeyFiles = namedtuple('KeyFiles', ['private_key_file_path', 'public_key_file_path', 'empty_file_path'])
+
     # Let's first create a private key and public key files
     private_key_file_path = "sk_test_file"
     public_key_file_path = "pk_test_file"
@@ -230,31 +236,41 @@ def test_load_keys():
     with open(empty_file_path, "wb"):
         pass
 
-    # Now we can test the function passing the using this files
-    r = teos_cli.load_keys(public_key_file_path, private_key_file_path)
-    assert isinstance(r, tuple)
-    assert len(r) == 3
-
-    # If any param does not match the expected, we should get an InvalidKey exception
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(None, private_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, None)
-
-    # The same should happen if we pass a public key where a private should be, for instance
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(private_key_file_path, public_key_file_path)
-
-    # Same if any of the files is empty
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(empty_file_path, private_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, empty_file_path)
+    yield KeyFiles(private_key_file_path, public_key_file_path, empty_file_path)
 
     # Remove the tmp files
     os.remove(private_key_file_path)
     os.remove(public_key_file_path)
     os.remove(empty_file_path)
+
+
+def test_load_keys(keyfiles):
+    # Test that it correctly returns a tuple of 3 elements with the correct keys
+    r = teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.private_key_file_path)
+    assert isinstance(r, tuple)
+    assert len(r) == 3
+
+
+def test_load_keys_none(keyfiles):
+    # If any param does not match the expected, we should get an InvalidKey exception
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(None, keyfiles.private_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(keyfiles.public_key_file_path, None)
+
+
+def test_load_keys_wrong_order(keyfiles):
+    # InvalidKey should be raised if the keys are passed in the wrong order
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(keyfiles.private_key_file_path, keyfiles.public_key_file_path)
+
+
+def test_load_keys_empty(keyfiles):
+    # If any of the files is empty, InvalidKey should be raised
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(keyfiles.empty_file_path, keyfiles.private_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.empty_file_path)
 
 
 @responses.activate
