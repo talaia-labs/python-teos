@@ -69,6 +69,8 @@ def test_register():
         "available_slots"
     )
 
+
+@responses.activate
 def test_register_with_invalid_user_id():
     # Simulate a register response
     with pytest.raises(InvalidParameter):
@@ -77,6 +79,8 @@ def test_register_with_invalid_user_id():
     # should not have done any network request
     assert len(responses.calls) == 0
 
+
+@responses.activate
 def test_register_with_connection_error():
     # We don't mock any url to simulate a connection error
     with pytest.raises(ConnectionError):
@@ -107,7 +111,46 @@ def test_add_appointment():
 
 
 @responses.activate
-def test_add_appointment_with_invalid_signature(monkeypatch):
+def test_add_appointment_with_invalid_appointment_data(monkeypatch):
+    with pytest.raises(InvalidParameter, match="JSON is empty"):
+        teos_cli.add_appointment("", dummy_user_sk, dummy_teos_id, teos_url)
+
+    with monkeypatch.context() as m:
+        with pytest.raises(InvalidParameter, match="locator is wrong"):
+            m.setitem(dummy_appointment_data, "tx_id", "invalid_txid")
+            teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
+
+    with monkeypatch.context() as m:
+        with pytest.raises(InvalidParameter, match="missing the transaction"):
+            m.setitem(dummy_appointment_data, "tx", "")
+            teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
+
+    # None of the previous calls should have performed any network request
+    assert len(responses.calls) == 0
+
+
+@responses.activate
+def test_add_appointment_with_missing_signature():
+    # Simulate a request to add_appointment for dummy_appointment, but the response does not have
+    # the signature.
+
+    response = {
+        "locator": dummy_appointment.to_dict()["locator"],
+        # no signature
+        "available_slots": 100,
+    }
+
+    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+
+    with pytest.raises(TowerResponseError, match="does not contain the signature"):
+        teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
+
+    # should have performed exactly 1 network request
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_add_appointment_with_invalid_signature():
     # Simulate a request to add_appointment for dummy_appointment, but sign with a different key,
     # make sure that the right endpoint is requested, but the return value is False
 
@@ -121,6 +164,9 @@ def test_add_appointment_with_invalid_signature(monkeypatch):
 
     with pytest.raises(TowerResponseError):
         teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
+
+    # should have performed exactly 1 network request
+    assert len(responses.calls) == 1
 
 
 @responses.activate
@@ -261,7 +307,7 @@ def test_parse_add_appointment_args_wrong():
         teos_cli.parse_add_appointment_args(["-f", "nonexistent_file"])
 
 
-def test_save_appointment_receipt(monkeypatch):
+def test_save_appointment_receipt():
     appointments_folder = "test_appointments_receipts"
     config["APPOINTMENTS_FOLDER_NAME"] = appointments_folder
 
