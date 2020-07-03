@@ -6,6 +6,7 @@ import responses
 from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
 
+import common.receipts as receipts
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -49,15 +50,37 @@ CURRENT_HEIGHT = 300
 @responses.activate
 def test_register():
     # Simulate a register response
-    response = {"public_key": dummy_user_id, "available_slots": 100}
+    slots = 100
+    expiry = CURRENT_HEIGHT + 4320
+    signature = Cryptographer.sign(receipts.create_registration_receipt(dummy_user_id, slots, expiry), dummy_teos_sk)
+    response = {"available_slots": slots, "subscription_expiry": expiry, "subscription_signature": signature}
     responses.add(responses.POST, register_endpoint, json=response, status=200)
-    result = teos_cli.register(dummy_user_id, teos_url)
+    teos_cli.register(dummy_user_id, dummy_teos_id, teos_url)
 
-    assert len(responses.calls) == 1
-    assert responses.calls[0].request.url == register_endpoint
-    assert result.get("public_key") == dummy_user_id and result.get("available_slots") == response.get(
-        "available_slots"
-    )
+
+@responses.activate
+def test_register_wrong_signature():
+    # Simulate a register response with a wrong signature
+    slots = 100
+    expiry = CURRENT_HEIGHT + 4320
+    signature = Cryptographer.sign(receipts.create_registration_receipt(dummy_user_id, slots, expiry), another_sk)
+    response = {"available_slots": slots, "subscription_expiry": expiry, "subscription_signature": signature}
+    responses.add(responses.POST, register_endpoint, json=response, status=200)
+
+    with pytest.raises(TowerResponseError, match="signature is invalid"):
+        teos_cli.register(dummy_user_id, dummy_teos_id, teos_url)
+
+
+@responses.activate
+def test_register_no_signature():
+    # Simulate a register response with a wrong signature
+    slots = 100
+    expiry = CURRENT_HEIGHT + 4320
+    response = {"available_slots": slots, "subscription_expiry": expiry}
+    responses.add(responses.POST, register_endpoint, json=response, status=200)
+
+    with pytest.raises(TowerResponseError, match="does not contain the signature"):
+        teos_cli.register(dummy_user_id, dummy_teos_id, teos_url)
 
 
 def test_create_appointment():
@@ -96,7 +119,7 @@ def test_add_appointment():
     # and the return value is True
     appointment = teos_cli.create_appointment(dummy_appointment_data)
     user_signature = Cryptographer.sign(appointment.serialize(), dummy_user_sk)
-    appointment_receipt = Appointment.create_receipt(user_signature, CURRENT_HEIGHT)
+    appointment_receipt = receipts.create_appointment_receipt(user_signature, CURRENT_HEIGHT)
 
     response = {
         "locator": dummy_appointment.locator,
@@ -122,7 +145,7 @@ def test_add_appointment_with_invalid_tower_signature():
     # make sure that the right endpoint is requested, but the return value is False
     appointment = teos_cli.create_appointment(dummy_appointment_data)
     user_signature = Cryptographer.sign(appointment.serialize(), dummy_user_sk)
-    appointment_receipt = Appointment.create_receipt(user_signature, CURRENT_HEIGHT)
+    appointment_receipt = receipts.create_appointment_receipt(user_signature, CURRENT_HEIGHT)
 
     # Sign with a bad key
     response = {

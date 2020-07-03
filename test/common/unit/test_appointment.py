@@ -91,16 +91,3 @@ def test_serialize(appointment_data):
     assert binascii.hexlify(locator).decode() == appointment.locator
     assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob
     assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
-
-
-def test_create_receipt(appointment_data):
-    # Not much to test here, basically making sure the fields are in the correct order
-    # The receipt format is user_signature | start_block
-    sk = PrivateKey.from_int(42)
-    data = get_random_value_hex(120)
-    signature = Cryptographer.sign(data.encode(), sk)
-    start_block = 200
-    receipt = Appointment.create_receipt(signature, start_block)
-
-    assert pyzbase32.encode_bytes(receipt[:-4]).decode() == signature
-    assert struct.unpack(">I", receipt[-4:])[0] == start_block

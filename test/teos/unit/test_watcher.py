@@ -22,6 +22,7 @@ from teos.watcher import (
     AppointmentAlreadyTriggered,
 )
 
+import common.receipts as receipts
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -354,7 +355,8 @@ def test_add_appointment(watcher):
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
         Cryptographer.recover_pk(
-            Appointment.create_receipt(appointment_signature, response.get("start_block")), response.get("signature")
+            receipts.create_appointment_receipt(appointment_signature, response.get("start_block")),
+            response.get("signature"),
         )
     )
     assert response.get("available_slots") == available_slots - 1
@@ -364,7 +366,8 @@ def test_add_appointment(watcher):
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
         Cryptographer.recover_pk(
-            Appointment.create_receipt(appointment_signature, response.get("start_block")), response.get("signature")
+            receipts.create_appointment_receipt(appointment_signature, response.get("start_block")),
+            response.get("signature"),
         )
     )
     # The slot count should not have been reduced and only one copy is kept.
@@ -383,7 +386,8 @@ def test_add_appointment(watcher):
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
         Cryptographer.recover_pk(
-            Appointment.create_receipt(appointment_signature, response.get("start_block")), response.get("signature")
+            receipts.create_appointment_receipt(appointment_signature, response.get("start_block")),
+            response.get("signature"),
         )
     )
     assert response.get("available_slots") == available_slots - 1
@@ -403,7 +407,7 @@ def test_add_appointment_in_cache(watcher):
     # Try to add the appointment
     user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     response = watcher.add_appointment(appointment, user_signature)
-    appointment_receipt = Appointment.create_receipt(user_signature, response.get("start_block"))
+    appointment_receipt = receipts.create_appointment_receipt(user_signature, response.get("start_block"))
 
     # The appointment is accepted but it's not in the Watcher
     assert (
@@ -450,7 +454,7 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
     # Try to add the appointment
     user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     response = watcher.add_appointment(appointment, user_signature)
-    appointment_receipt = Appointment.create_receipt(user_signature, response.get("start_block"))
+    appointment_receipt = receipts.create_appointment_receipt(user_signature, response.get("start_block"))
 
     # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
     assert (
@@ -478,7 +482,7 @@ def test_add_appointment_in_cache_invalid_transaction(watcher):
     # Try to add the appointment
     user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     response = watcher.add_appointment(appointment, user_signature)
-    appointment_receipt = Appointment.create_receipt(user_signature, response.get("start_block"))
+    appointment_receipt = receipts.create_appointment_receipt(user_signature, response.get("start_block"))
 
     # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
     assert (
@@ -506,7 +510,7 @@ def test_add_too_many_appointments(watcher):
         appointment, dispute_tx = generate_dummy_appointment()
         appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
         response = watcher.add_appointment(appointment, appointment_signature)
-        appointment_receipt = Appointment.create_receipt(appointment_signature, response.get("start_block"))
+        appointment_receipt = receipts.create_appointment_receipt(appointment_signature, response.get("start_block"))
 
         assert response.get("locator") == appointment.locator
         assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
