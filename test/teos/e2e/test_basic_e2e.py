@@ -393,7 +393,7 @@ def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_
     # tmp keys for a different user
     tmp_user_sk = PrivateKey()
     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
-    teos_cli.register(user_id, teos_id, teos_base_endpoint)
+    teos_cli.register(tmp_user_id, teos_id, teos_base_endpoint)
 
     appointment_1 = teos_cli.create_appointment(appointment1_data)
     add_appointment(appointment_1)
