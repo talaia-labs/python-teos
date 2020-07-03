@@ -27,6 +27,10 @@ class AppointmentAlreadyTriggered(BasicException):
     """Raised when an appointment is sent to the Watcher but that same data has already been sent to the Responder"""
 
 
+class AppointmentNotFound(BasicException):
+    """Raised when an appointment is not found on the tower"""
+
+
 class LocatorCache:
     """
     The LocatorCache keeps the data about the last ``cache_size`` blocks around so appointments can be checked against
@@ -233,7 +237,7 @@ class Watcher:
         Registers a user.
 
         Args:
-            user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
+            user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
             :obj:`tuple`: A tuple containing the available slots, the subscription expiry, and the signature of the
@@ -244,6 +248,36 @@ class Watcher:
         signature = Cryptographer.sign(registration_receipt, self.signing_key)
 
         return available_slots, subscription_expiry, signature
+
+    def get_appointment(self, locator, user_signature):
+        """
+        Gets information about an appointment.
+
+        The appointment can either be in the Watcher, the Responder, or not found.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex-encoded value used by the tower to detect channel breaches.
+            user_signature (:obj:`str`): the signature of the request by the user.
+
+        Returns:
+            :obj:`tuple`: A tuple containing the appointment data and the status (either "being_watched" or
+            "dispute_responded").
+        """
+
+        message = "get appointment {}".format(locator).encode()
+        user_id = self.gatekeeper.authenticate_user(message, user_signature)
+        uuid = hash_160("{}{}".format(locator, user_id))
+
+        if uuid in self.appointments:
+            appointment_data = self.db_manager.load_watcher_appointment(uuid)
+            status = "being_watched"
+        elif uuid in self.responder.trackers:
+            appointment_data = self.db_manager.load_responder_tracker(uuid)
+            status = "dispute_responded"
+        else:
+            raise AppointmentNotFound("Cannot find {}".format(locator))
+
+        return appointment_data, status
 
     def add_appointment(self, appointment, user_signature):
         """
