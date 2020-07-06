@@ -22,6 +22,10 @@ def setup_logging(log_file_path, silent=False):
     Args:
         log_file_path(:obj:`str`): the path and name of the log file.
         silent(:obj:`str`): if True, only critical errors will be shown to console.
+
+    Raises:
+        (:obj:`RuntimeError`) setup_logger had already been called.
+
     """
 
     global configured
@@ -80,5 +84,12 @@ def setup_logging(log_file_path, silent=False):
 
 
 def get_logger(actor=None):
+    """
+    Returns a logger, that has the given `actor` in all future log entries.
+
+    Args:
+        actor(:obj:`str`): the name of the "actor" field that will be attached to all the logs issued by this logger.
+
+    """
     return structlog.get_logger(actor=actor)
 
