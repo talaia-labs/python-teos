@@ -1,8 +1,6 @@
-from teos import LOG_PREFIX
+from common.logger import get_logger
 
-from common.logger import Logger
-
-logger = Logger(actor="Cleaner", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="Cleaner")
 
 
 class Cleaner:

@@ -1,12 +1,10 @@
 import json
 import plyvel
 
-from teos import LOG_PREFIX
-
-from common.logger import Logger
+from common.logger import get_logger
 from common.db_manager import DBManager
 
-logger = Logger(actor="AppointmentsDBM", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="AppointmentsDBM")
 
 WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"

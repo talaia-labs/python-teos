@@ -1,16 +1,15 @@
 from queue import Queue
 from threading import Thread
 
-from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
 
-from common.logger import Logger
+from common.logger import get_logger
 from common.constants import IRREVOCABLY_RESOLVED
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
 
-logger = Logger(actor="Responder", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="Responder")
 
 
 class TransactionTracker:

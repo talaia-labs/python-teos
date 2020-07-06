@@ -2,7 +2,6 @@ import os
 
 DATA_DIR = os.path.expanduser("~/.teos_cli/")
 CONF_FILE_NAME = "teos_cli.conf"
-LOG_PREFIX = "cli"
 
 # Load config fields
 DEFAULT_CONF = {

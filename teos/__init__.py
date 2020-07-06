@@ -3,7 +3,6 @@ from common.constants import MAINNET_RPC_PORT
 
 DATA_DIR = os.path.expanduser("~/.teos/")
 CONF_FILE_NAME = "teos.conf"
-LOG_PREFIX = "teos"
 
 # Default conf fields
 DEFAULT_CONF = {

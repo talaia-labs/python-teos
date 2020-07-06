@@ -2,10 +2,9 @@ import zmq
 import binascii
 from threading import Thread, Event, Condition
 
-from teos import LOG_PREFIX
-from common.logger import Logger
+from common.logger import get_logger
 
-logger = Logger(actor="ChainMonitor", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="ChainMonitor")
 
 
 class ChainMonitor:

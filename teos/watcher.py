@@ -3,7 +3,7 @@ from threading import Thread
 from collections import OrderedDict
 from readerwriterlock import rwlock
 
-from common.logger import Logger
+from common.logger import get_logger
 import common.receipts as receipts
 from common.tools import compute_locator
 from common.exceptions import BasicException
@@ -11,12 +11,11 @@ from common.exceptions import EncryptionError
 from common.cryptographer import Cryptographer, hash_160
 from common.exceptions import InvalidParameter, SignatureError
 
-from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
 from teos.extended_appointment import ExtendedAppointment
 from teos.block_processor import InvalidTransactionFormat
 
-logger = Logger(actor="Watcher", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="Watcher")
 
 
 class AppointmentLimitReached(BasicException):

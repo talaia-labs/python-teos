@@ -2,13 +2,12 @@ import os
 import logging
 from flask import Flask, request, abort, jsonify
 
-from teos import LOG_PREFIX
 import common.errors as errors
 from teos.inspector import InspectionFailed
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
-from common.logger import Logger
+from common.logger import get_logger
 from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
@@ -16,7 +15,7 @@ from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
-logger = Logger(actor="API", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="API")
 
 
 # NOTCOVERED: not sure how to monkey path this one. May be related to #77

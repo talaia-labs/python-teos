@@ -1,13 +1,11 @@
 import json
 import plyvel
 
-from teos import LOG_PREFIX
-
-from common.logger import Logger
+from common.logger import get_logger
 from common.db_manager import DBManager
 from common.tools import is_compressed_pk
 
-logger = Logger(actor="UsersDBM", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="UsersDBM")
 
 
 class UsersDBM(DBManager):

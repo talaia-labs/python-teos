@@ -1,11 +1,10 @@
-from teos import LOG_PREFIX
-from common.logger import Logger
+from common.logger import get_logger
 from teos.tools import bitcoin_cli
 import teos.rpc_errors as rpc_errors
 from teos.utils.auth_proxy import JSONRPCException
 from common.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
 
-logger = Logger(actor="Carrier", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="Carrier")
 
 # FIXME: This class is not fully covered by unit tests
 

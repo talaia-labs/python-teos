@@ -1,96 +1,84 @@
 import json
 import logging
+import logging.config
+import structlog
 from datetime import datetime
 
+configured = False # set to True once setuo_logging is called
 
-class _StructuredMessage:
-    def __init__(self, message, **kwargs):
-        self.message = message
-        self.time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.kwargs = kwargs
+timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
+pre_chain = [
+    # Add the log level and a timestamp to the event_dict if the log entry
+    # is not from structlog.
+    structlog.stdlib.add_log_level,
+    timestamper,
+]
 
-    def to_dict(self):
-        return {**self.kwargs, "message": self.message, "time": self.time}
 
-
-class Logger:
+def setup_logging(log_file_path, silent=False):
     """
-    The :class:`Logger` is in charge of logging events into the log file.
+    Configures the logging options. It must be called only once, before using get_logger.
 
     Args:
-        log_name_prefix (:obj:`str`): the prefix of the logger where the data will be stored in (server, client, ...).
-        actor (:obj:`str`): the system actor that is logging the event (e.g. ``Watcher``, ``Cryptographer``, ...).
+        log_file_path(:obj:`str`): the path and name of the log file.
+        silent(:obj:`str`): if True, only critical errors will be shown to console.
     """
 
-    def __init__(self, log_name_prefix, actor=None):
-        self.actor = actor
-        self.f_logger = logging.getLogger("{}_file_log".format(log_name_prefix))
-        self.c_logger = logging.getLogger("{}_console_log".format(log_name_prefix))
+    global configured
 
-    def _add_prefix(self, msg):
-        return msg if self.actor is None else "[{}]: {}".format(self.actor, msg)
+    if configured:
+        raise RuntimeError("logging was already configured.")
 
-    def _create_console_message(self, msg, **kwargs):
-        s_message = _StructuredMessage(self._add_prefix(msg), **kwargs).to_dict()
-        message = "{} {}".format(s_message["time"], s_message["message"])
+    logging.config.dictConfig({
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "plain": {
+                    "()": structlog.stdlib.ProcessorFormatter,
+                    "processor": structlog.dev.ConsoleRenderer(colors=False),
+                    "foreign_pre_chain": pre_chain,
+                },
+            },
+            "handlers": {
+                "console": {
+                    "level": "INFO" if not silent else "CRITICAL",
+                    "class": "logging.StreamHandler",
+                    "formatter": "plain",
+                },
+                "file": {
+                    "level": "DEBUG",
+                    "class": "logging.handlers.WatchedFileHandler",
+                    "filename": log_file_path,
+                    "formatter": "plain",
+                },
+            },
+            "loggers": {
+                "": {
+                    "handlers": ["console", "file"],
+                    "level": "DEBUG",
+                    "propagate": True,
+                },
+            }
+    })
 
-        # s_message will always have at least two items (message and time).
-        if len(s_message) > 2:
-            params = "".join("{}={}, ".format(k, v) for k, v in s_message.items() if k not in ["message", "time"])
+    structlog.configure(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            timestamper,
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
 
-            # Remove the extra 2 characters (space and comma) and add all data to the final message.
-            message += " ({})".format(params[:-2])
+    configured = True
 
-        return message
 
-    @staticmethod
-    def _create_file_message(msg, **kwargs):
-        return json.dumps(_StructuredMessage(msg, **kwargs).to_dict())
+def get_logger(actor=None):
+    return structlog.get_logger(actor=actor)
 
-    def info(self, msg, **kwargs):
-        """
-        Logs an ``INFO`` level message to stdout and file.
-
-        Args:
-             msg (:obj:`str`): the message to be logged.
-             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
-        """
-
-        self.f_logger.info(self._create_file_message(msg, **kwargs))
-        self.c_logger.info(self._create_console_message(msg, **kwargs))
-
-    def debug(self, msg, **kwargs):
-        """
-        Logs a ``DEBUG`` level message to stdout and file.
-
-        Args:
-             msg (:obj:`str`): the message to be logged.
-             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
-        """
-
-        self.f_logger.debug(self._create_file_message(msg, **kwargs))
-        self.c_logger.debug(self._create_console_message(msg, **kwargs))
-
-    def error(self, msg, **kwargs):
-        """
-        Logs an ``ERROR`` level message to stdout and file.
-
-        Args:
-             msg (:obj:`str`): the message to be logged.
-             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
-        """
-
-        self.f_logger.error(self._create_file_message(msg, **kwargs))
-        self.c_logger.error(self._create_console_message(msg, **kwargs))
-
-    def warning(self, msg, **kwargs):
-        """
-        Logs a ``WARNING`` level message to stdout and file.
-
-        Args:
-             msg (:obj:`str`): the message to be logged.
-             kwargs (:obj:`dict`): a ``key:value`` collection parameters to be added to the output.
-        """
-
-        self.f_logger.warning(self._create_file_message(msg, **kwargs))
-        self.c_logger.warning(self._create_console_message(msg, **kwargs))

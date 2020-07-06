@@ -1,11 +1,10 @@
-from common.logger import Logger
+from common.logger import get_logger
 from common.exceptions import BasicException
 
-from teos import LOG_PREFIX
 from teos.tools import bitcoin_cli
 from teos.utils.auth_proxy import JSONRPCException
 
-logger = Logger(actor="BlockProcessor", log_name_prefix=LOG_PREFIX)
+logger = get_logger(actor="BlockProcessor")
 
 
 class InvalidTransactionFormat(BasicException):
