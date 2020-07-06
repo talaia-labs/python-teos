@@ -125,6 +125,7 @@ class Retrier:
                     "appointment": appointment_dict,
                     "signature": e.kwargs.get("signature"),
                     "recovered_id": e.kwargs.get("recovered_id"),
+                    "receipt": e.kwargs.get("receipt"),
                 }
 
             except TowerConnectionError:

@@ -5,6 +5,7 @@ from queue import Queue
 from pyln.client import Plugin
 from threading import Thread, Lock
 
+import common.receipts as receipts
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
@@ -165,10 +166,27 @@ def register(plugin, tower_id, host=None, port=None):
         plugin.log(f"Registering in the Eye of Satoshi (tower_id={tower_id})")
 
         response = process_post_response(post_request(data, register_endpoint, tower_id))
-        plugin.log(f"Registration succeeded. Available slots: {response.get('available_slots')}")
+        available_slots = response.get("available_slots")
+        subscription_expiry = response.get("subscription_expiry")
+        tower_signature = response.get("signature")
+
+        if available_slots is None or not isinstance(available_slots, int):
+            raise TowerResponseError(f"available_slots is missing or of wrong type ({available_slots})")
+        if subscription_expiry is None or not isinstance(subscription_expiry, int):
+            raise TowerResponseError(f"subscription_expiry is missing or of wrong type ({subscription_expiry})")
+        if tower_signature is None or not isinstance(tower_signature, str):
+            raise TowerResponseError(f"signature is missing or of wrong type ({tower_signature})")
+
+        # Check tower signature
+        registration_receipt = receipts.create_registration_receipt(
+            plugin.wt_client.user_id, available_slots, subscription_expiry
+        )
+        Cryptographer.recover_pk(registration_receipt, tower_signature)
+
+        plugin.log(f"Registration succeeded. Available slots: {available_slots}")
 
         # Save data
-        tower_info = TowerInfo(tower_netaddr, response.get("available_slots"))
+        tower_info = TowerInfo(tower_netaddr, available_slots)
         plugin.wt_client.lock.acquire()
         plugin.wt_client.towers[tower_id] = tower_info.get_summary()
         plugin.wt_client.db_manager.store_tower_record(tower_id, tower_info)
@@ -176,7 +194,7 @@ def register(plugin, tower_id, host=None, port=None):
 
         return response
 
-    except (InvalidParameter, TowerConnectionError, TowerResponseError) as e:
+    except (InvalidParameter, TowerConnectionError, TowerResponseError, SignatureError) as e:
         plugin.log(str(e), level="warn")
         return e.to_json()
 
@@ -364,6 +382,7 @@ def on_commitment_revocation(plugin, **kwargs):
                 "appointment": appointment.to_dict(),
                 "signature": e.kwargs.get("signature"),
                 "recovered_id": e.kwargs.get("recovered_id"),
+                "receipt": e.kwargs.get("receipt"),
             }
 
         except TowerConnectionError:
