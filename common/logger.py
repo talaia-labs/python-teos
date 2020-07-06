@@ -30,7 +30,6 @@ class CustomLogRenderer:
             return repr(val)
 
     def __call__(self, _, __, event_dict):
-        # Initialize lazily to prevent import side-effects.
         sio = StringIO()
 
         ts = event_dict.pop("timestamp", None)
@@ -49,9 +48,9 @@ class CustomLogRenderer:
         sio.write(event)
 
         # Represent all the key=value elements still in event_dict
-        sio.write(
-            " ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
-        )
+        key_value_part = " ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
+        if len(key_value_part) > 0:
+            sio.write("\t" + key_value_part)
 
         return sio.getvalue()
 
@@ -111,8 +110,6 @@ def setup_logging(log_file_path, silent=False):
         processors=[
             structlog.stdlib.PositionalArgumentsFormatter(),
             timestamper,
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         context_class=dict,
