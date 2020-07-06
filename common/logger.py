@@ -1,18 +1,60 @@
 import json
 import logging
 import logging.config
-import structlog
+from io import StringIO
 from datetime import datetime
+import structlog
 
 configured = False # set to True once setuo_logging is called
 
 timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
 pre_chain = [
-    # Add the log level and a timestamp to the event_dict if the log entry
-    # is not from structlog.
-    structlog.stdlib.add_log_level,
     timestamper,
 ]
+
+
+# Stripped down version of structlog.dev.ConsoleRenderer, adding the "actor" instead of the level.
+class CustomLogRenderer:
+    """
+    Render ``event_dict``. It renders the timestamp, followed by the actor within "[]" (unless it's None),
+    followed by the event, then any remaining argument in the key=value format
+    """
+
+    def _repr(self, val):
+        """
+        Determine representation of *val* depending on its type.
+        """
+        if isinstance(val, str):
+            return val
+        else:
+            return repr(val)
+
+    def __call__(self, _, __, event_dict):
+        # Initialize lazily to prevent import side-effects.
+        sio = StringIO()
+
+        ts = event_dict.pop("timestamp", None)
+        if ts is not None:
+            sio.write(str(ts) + " ")
+
+        actor = event_dict.pop("actor", None)
+        if actor is not None:
+            sio.write("[" + actor + "] ")
+
+        # force event to str for compatibility with standard library
+        event = event_dict.pop("event")
+        if not isinstance(event, str):
+            event = str(event)
+
+        sio.write(event)
+
+        # Represent all the key=value elements still in event_dict
+        sio.write(
+            " ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
+        )
+
+        return sio.getvalue()
+
 
 
 def setup_logging(log_file_path, silent=False):
@@ -39,7 +81,7 @@ def setup_logging(log_file_path, silent=False):
             "formatters": {
                 "plain": {
                     "()": structlog.stdlib.ProcessorFormatter,
-                    "processor": structlog.dev.ConsoleRenderer(colors=False),
+                    "processor": CustomLogRenderer(),
                     "foreign_pre_chain": pre_chain,
                 },
             },
@@ -67,7 +109,6 @@ def setup_logging(log_file_path, silent=False):
 
     structlog.configure(
         processors=[
-            structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
             timestamper,
             structlog.processors.StackInfoRenderer(),
