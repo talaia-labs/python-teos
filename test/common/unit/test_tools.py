@@ -8,7 +8,6 @@ from common.tools import (
     is_locator,
     compute_locator,
     setup_data_folder,
-    setup_logging,
     is_u4int,
 )
 from test.common.unit.conftest import get_random_value_hex
