@@ -61,28 +61,53 @@ Bitcoin needs to be running with the following options enables:
 - `txindex` to be able to look for non-wallet transactions
 - `server` to run rpc commands
 
-Here's an example of a `bitcoin.conf` you can use if you want to run bitcoind on regtest:
+Here's an example of a `bitcoin.conf` you can use for mainnet:
 
 ```
-# [debug]
-regtest=1
+# [rpc]
+server=1
+rpcuser=user
+rpcpassword=passwd
+rpcservertimeout=600
+
+# [zmq]
+zmqpubhashblock=tcp://127.0.0.1:28332
+zmqpubrawblock=tcp://127.0.0.1:28332
+zmqpubhashtx=tcp://127.0.0.1:28333
+zmqpubrawtx=tcp://127.0.0.1:28333
+
+# [blockchain]
+txindex=1
+
+# [others]
 daemon=1
 debug=1
-logips=1
+maxtxfee=1
+```
 
+And here's an example for regtest:
+
+```
 # [rpc]
 server=1
 rpcuser=user
 rpcpassword=passwd
 
-# [blockchain]
-txindex=1
-
-# [ZMQ]
+# [zmq]
 zmqpubhashblock=tcp://127.0.0.1:28332
 zmqpubrawblock=tcp://127.0.0.1:28332
 zmqpubhashtx=tcp://127.0.0.1:28333
 zmqpubrawtx=tcp://127.0.0.1:28333
+
+# [blockchain]
+txindex=1
+
+# [others]
+regtest=1
+daemon=1
+debug=1
+logips=1
+
 ```
 
 ### Installing the Dependencies
