@@ -25,7 +25,7 @@ Refer to [INSTALL.md](INSTALL.md)
 ## Running TEOS
 
 Make sure bitcoind is running before running TEOS (it will fail at startup if it cannot connect to bitcoind). You can find
-[DEPENDENCIES.md#installing-bitcoind](here) a sample config file.
+[here](DEPENDENCIES.md#installing-bitcoind) a sample config file.
 
 Before you can run TEOS, you need to follow a few more configuration steps.
 
@@ -43,9 +43,9 @@ and / or
 
 - Add some global options when running the daemon (run `teosd.py -h` for more info).
 
-### Generating key pair
+### Tower identity and signing key
 
-In order to run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can follow [generate keys](#generate-keys) to generate them.
+In order to run `teos`, you need to have a pair of keys stored in your data directory, that are used as the tower's identity. Users can recognize the tower by its public key, and the tower uses the private key to sign appointments. You can follow [generate keys](#generate-keys) to generate them.
 
 ### Starting the TEOS daemon 👁
 
