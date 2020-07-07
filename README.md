@@ -60,7 +60,7 @@ python -m teos.teosd
 Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
 
 ```
-python -m teos.teosd --btcnetwork=regtest --btcrpcport=18443
+python -m teos.teosd --btcnetwork=regtest
 ```
 
 ### Running TEOS in another network

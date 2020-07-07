@@ -11,6 +11,9 @@
 - `openssl` version 1.1+
 - `bitcoind`
 
+Moreover, your system could need some additional dev libraries in order to run `teos`, such as `libffi-dev` and `libleveldb-dev`.
+This ultimately depends on your OS and distro.
+
 ### Checking if the dependencies are already satisfied
 
 Most UNIX systems ship with `python3` already installed, whereas OSX systems tend to ship with `python2`. In order to check our python version we should run:
@@ -113,6 +116,7 @@ and for `pip3`:
 
 `teos` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
 
+- `wheel`
 - `zmq`
 - `flask`
 - `cryptography`
@@ -120,4 +124,5 @@ and for `pip3`:
 - `pyzbase32`
 - `requests`
 - `plyvel`
+- `readerwriterlock`
 
