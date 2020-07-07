@@ -5,7 +5,7 @@ from io import StringIO
 from datetime import datetime
 import structlog
 
-configured = False # set to True once setuo_logging is called
+configured = False # set to True once setup_logging is called
 
 timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
 pre_chain = [
@@ -17,7 +17,7 @@ pre_chain = [
 class CustomLogRenderer:
     """
     Render ``event_dict``. It renders the timestamp, followed by the actor within "[]" (unless it's None),
-    followed by the event, then any remaining argument in the key=value format
+    followed by the event, then any remaining item in event_dict in the key=value format
     """
 
     def _repr(self, val):
