@@ -25,7 +25,7 @@ Refer to [INSTALL.md](INSTALL.md)
 ## Running TEOS
 
 Make sure bitcoind is running before running TEOS (it will fail at startup if it cannot connect to bitcoind). You can find
-[DEPENDENCIES.md#installing-bitcoind](here) a sample config file to run on regtest.
+[DEPENDENCIES.md#installing-bitcoind](here) a sample config file.
 
 Before you can run TEOS, you need to follow a few more configuration steps.
 
