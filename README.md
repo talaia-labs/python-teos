@@ -43,7 +43,27 @@ and / or
 
 - Add some global options when running the daemon (run `teosd.py -h` for more info).
 
-### Modifying the configuration file to run on regtest
+### Generating key pair
+
+In order to run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can follow [generate keys](#generate-keys) to generate them.
+
+### Starting the TEOS daemon 👁
+
+Not that everything is ready, you can run `teos` by running `teosd.py` under `teos`:
+
+```
+python -m teos.teosd
+```
+
+### Passing command line options to `teosd`
+
+Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
+
+```
+python -m teos.teosd --btcnetwork=regtest --btcrpcport=18443
+```
+
+### Running TEOS in another network
 
 By default, `teos` runs on `mainnet`. In order to run it on another network you need to change the network parameter in the configuration file or pass the network parameter as a command line option. Notice that if teos does not find a `bitcoind` node running in the same network that it is set to run, it will refuse to run.
 
@@ -66,28 +86,6 @@ btc_rpc_password = passwd
 btc_rpc_connect = localhost
 btc_network = regtest
 ```
-
-### Generating key pairs
-
-In order to run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can follow [generate keys](#generate-keys) to generate them.
-
-
-### Passing command line options to `teosd`
-
-Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
-
-```
-python -m teos.teosd --btcnetwork=regtest --btcrpcport=18443
-```
-
-### Starting the TEOS daemon 👁
-
-Not that everything is ready, you can run `teos` by running `teosd.py` under `teos`:
-
-```
-python -m teos.teosd
-```
-
 
 ## Running `teos` in a docker container
 A `teos` image can be built from the Dockerfile located in `/docker`. You can create the image by running:
