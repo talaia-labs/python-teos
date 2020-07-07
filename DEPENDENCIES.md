@@ -85,31 +85,6 @@ debug=1
 maxtxfee=1
 ```
 
-And here's an example for regtest:
-
-```
-# [rpc]
-server=1
-rpcuser=user
-rpcpassword=passwd
-
-# [zmq]
-zmqpubhashblock=tcp://127.0.0.1:28332
-zmqpubrawblock=tcp://127.0.0.1:28332
-zmqpubhashtx=tcp://127.0.0.1:28333
-zmqpubrawtx=tcp://127.0.0.1:28333
-
-# [blockchain]
-txindex=1
-
-# [others]
-regtest=1
-daemon=1
-debug=1
-logips=1
-
-```
-
 ### Installing the Dependencies
 
 `python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.

@@ -43,13 +43,13 @@ and / or
 
 - Add some global options when running the daemon (run `teosd.py -h` for more info).
 
-### Tower identity and signing key
+### Tower id and signing key
 
-In order to run `teos`, you need to have a pair of keys stored in your data directory, that are used as the tower's identity. Users can recognize the tower by its public key, and the tower uses the private key to sign appointments. You can follow [generate keys](#generate-keys) to generate them.
+`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. You can follow [generate keys](#generate-keys) to generate them.
 
 ### Starting the TEOS daemon 👁
 
-Not that everything is ready, you can run `teos` by running `teosd.py` under `teos`:
+Now that everything is ready, you can run `teos` by running `teosd.py` under `teos`:
 
 ```
 python -m teos.teosd
