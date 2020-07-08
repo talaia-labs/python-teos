@@ -73,7 +73,8 @@ def test_commands_non_registered(bitcoin_cli):
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 
     with pytest.raises(TowerResponseError):
-        assert add_appointment(appointment_data)
+        appointment = teos_cli.create_appointment(appointment_data)
+        add_appointment(appointment)
 
     # Get appointment
     with pytest.raises(TowerResponseError):
@@ -91,8 +92,8 @@ def test_commands_registered(bitcoin_cli):
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 
-    appointment, available_slots = add_appointment(appointment_data)
-    assert isinstance(appointment, Appointment) and isinstance(available_slots, str)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
 
     # Get appointment
     r = get_appointment_info(appointment_data.get("locator"))
@@ -113,7 +114,8 @@ def test_appointment_life_cycle(bitcoin_cli):
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
-    appointment, signature = add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
     appointments_in_watcher += 1
 
     # Get the information from the tower to check that it matches
@@ -199,7 +201,8 @@ def test_multiple_appointments_life_cycle(bitcoin_cli):
 
     # Send all of them to watchtower.
     for appt in appointments:
-        add_appointment(appt.get("appointment_data"))
+        appointment = teos_cli.create_appointment(appt.get("appointment_data"))
+        add_appointment(appointment)
         appointments_in_watcher += 1
 
     # Two of these appointments are breached, and the watchtower responds to them.
@@ -244,7 +247,8 @@ def test_appointment_malformed_penalty(bitcoin_cli):
     appointment_data = build_appointment_data(commitment_tx_id, mod_penalty_tx.hex())
     locator = compute_locator(commitment_tx_id)
 
-    appointment, _ = add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
@@ -283,8 +287,9 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
     response_json = teos_cli.process_post_response(response)
 
     # Check that the server has accepted the appointment
-    signature = response_json.get("signature")
-    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    tower_signature = response_json.get("signature")
+    appointment_receipt = Appointment.create_receipt(signature, response_json.get("start_block"))
+    rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
 
@@ -308,8 +313,9 @@ def test_two_identical_appointments(bitcoin_cli):
     locator = compute_locator(commitment_tx_id)
 
     # Send the appointment twice
-    add_appointment(appointment_data)
-    add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
+    add_appointment(appointment)
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -371,7 +377,7 @@ def test_two_identical_appointments(bitcoin_cli):
 
 
 def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_cli):
-    # This tests sending an appointment with two valid transaction with the same locator fro different users
+    # This tests sending an appointment with two valid transaction with the same locator from different users
     commitment_tx, penalty_tx1 = create_txs(bitcoin_cli)
     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
 
@@ -389,8 +395,10 @@ def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_
     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
     teos_cli.register(tmp_user_id, teos_base_endpoint)
 
-    appointment, _ = add_appointment(appointment1_data)
-    appointment_2, _ = add_appointment(appointment2_data, sk=tmp_user_sk)
+    appointment_1 = teos_cli.create_appointment(appointment1_data)
+    add_appointment(appointment_1)
+    appointment_2 = teos_cli.create_appointment(appointment2_data)
+    add_appointment(appointment_2, sk=tmp_user_sk)
 
     # Broadcast the commitment transaction and mine a block
     new_addr = bitcoin_cli.getnewaddress()
@@ -423,7 +431,8 @@ def test_add_appointment_trigger_on_cache(bitcoin_cli):
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, bitcoin_cli.getnewaddress())
 
     # Send the data to the tower and request it back. It should have gone straightaway to the Responder
-    add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
     assert get_appointment_info(locator).get("status") == "dispute_responded"
 
 
@@ -441,7 +450,8 @@ def test_add_appointment_invalid_trigger_on_cache(bitcoin_cli):
     sleep(1)
 
     # Send the data to the tower and request it back. It should get accepted but the data will be dropped.
-    add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
     with pytest.raises(TowerResponseError):
         get_appointment_info(locator)
 
@@ -469,17 +479,20 @@ def test_add_appointment_trigger_on_cache_cannot_decrypt(bitcoin_cli):
     response_json = teos_cli.process_post_response(response)
 
     # Check that the server has accepted the appointment
-    signature = response_json.get("signature")
-    rpk = Cryptographer.recover_pk(appointment.serialize(), signature)
+    tower_signature = response_json.get("signature")
+    appointment_receipt = Appointment.create_receipt(signature, response_json.get("start_block"))
+    rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
 
-    # The appointment should should have been inmediately dropped
+    # The appointment should should have been immediately dropped
     with pytest.raises(TowerResponseError):
         get_appointment_info(appointment_data["locator"])
 
 
 def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
+    # This tests data persistence. An appointment is sent to the tower, the tower is restarted and the appointment is
+    # then triggered.
     global teosd_process
 
     teos_pid = teosd_process.pid
@@ -489,7 +502,8 @@ def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    appointment, _ = add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
 
     # Restart teos
     teosd_process.terminate()
@@ -513,6 +527,8 @@ def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
 
 
 def test_appointment_shutdown_teos_trigger_while_offline(bitcoin_cli):
+    # This tests data persistence. An appointment is sent to the tower and the tower is stopped. The appointment is then
+    # triggered with the tower offline, and then the tower is brought back online.
     global teosd_process
 
     teos_pid = teosd_process.pid
@@ -522,7 +538,8 @@ def test_appointment_shutdown_teos_trigger_while_offline(bitcoin_cli):
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
     locator = compute_locator(commitment_tx_id)
 
-    appointment, _ = add_appointment(appointment_data)
+    appointment = teos_cli.create_appointment(appointment_data)
+    add_appointment(appointment)
 
     # Check that the appointment is still in the Watcher
     appointment_info = get_appointment_info(locator)

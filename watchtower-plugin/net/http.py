@@ -61,13 +61,14 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
 
     add_appointment_endpoint = f"{tower.netaddr}/add_appointment"
     response = process_post_response(post_request(data, add_appointment_endpoint, tower_id))
+    appointment_receipt = Appointment.create_receipt(signature, response.get("start_block"))
 
     tower_signature = response.get("signature")
     # Check that the server signed the appointment as it should.
     if not tower_signature:
         raise SignatureError("The response does not contain the signature of the appointment", signature=None)
 
-    rpk = Cryptographer.recover_pk(Appointment.from_dict(appointment_dict).serialize(), tower_signature)
+    rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     recovered_id = Cryptographer.get_compressed_pk(rpk)
     if tower_id != recovered_id:
         raise SignatureError(
