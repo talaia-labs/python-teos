@@ -37,7 +37,7 @@ The configuration includes, amongst others, where your data folder is placed, wh
 
 To change the configuration defaults you can:
 
-- Define a configuration file following the template (check [teos/template.conf](teos/template.conf)) and place it in the `data_dir` (that defaults to `~/.teos/`) 
+- Define a configuration file named `teos.conf` following the template (check [teos/template.conf](teos/template.conf)) and place it in the `data_dir` (that defaults to `~/.teos/`)
 
 and / or 
 
