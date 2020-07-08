@@ -71,17 +71,12 @@ def test_register():
     )
 
 
-@responses.activate
 def test_register_with_invalid_user_id():
     # Simulate a register response
     with pytest.raises(InvalidParameter):
         teos_cli.register("invalid_user_id", teos_url)
 
-    # should not have done any network request
-    assert len(responses.calls) == 0
 
-
-@responses.activate
 def test_register_with_connection_error():
     # We don't mock any url to simulate a connection error
     with pytest.raises(ConnectionError):
@@ -111,7 +106,6 @@ def test_add_appointment():
     assert result
 
 
-@responses.activate
 def test_add_appointment_with_invalid_appointment_data(monkeypatch):
     with pytest.raises(InvalidParameter, match="JSON is empty"):
         teos_cli.add_appointment("", dummy_user_sk, dummy_teos_id, teos_url)
@@ -125,9 +119,6 @@ def test_add_appointment_with_invalid_appointment_data(monkeypatch):
         with pytest.raises(InvalidParameter, match="missing the transaction"):
             m.setitem(dummy_appointment_data, "tx", "")
             teos_cli.add_appointment(dummy_appointment_data, dummy_user_sk, dummy_teos_id, teos_url)
-
-    # None of the previous calls should have performed any network request
-    assert len(responses.calls) == 0
 
 
 @responses.activate
@@ -187,25 +178,22 @@ def test_get_appointment():
     assert result.get("locator") == response.get("locator")
 
 
-@responses.activate
 def test_get_appointment_invalid_locator():
     # Test that an invalid locator fails with InvalidParamater before any network request
     with pytest.raises(InvalidParameter, match="locator is not valid"):
         teos_cli.get_appointment("deadbeef", dummy_user_sk, dummy_teos_id, teos_url)
 
-    # Should fail validation before making any network request
-    assert len(responses.calls) == 0
-
 
 @responses.activate
 def test_get_appointment_tower_error():
     # Test that a TowerResponseError is raised if the response is invalid.
-
     locator = dummy_appointment_dict.get("locator")
 
     responses.add(responses.POST, get_appointment_endpoint, body="{ invalid json response", status=200)
     with pytest.raises(TowerResponseError):
         teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
+
+    assert len(responses.calls) == 1
 
 
 @responses.activate
@@ -296,7 +284,7 @@ def test_post_request_connection_error():
 
 @pytest.fixture
 def post_response():
-    # Create a reponse for the post requests to the tower 
+    # Create a response for the post requests to the tower
     return {
         "locator": dummy_appointment.to_dict()["locator"],
         "signature": get_signature(dummy_appointment.serialize(), dummy_teos_sk),
