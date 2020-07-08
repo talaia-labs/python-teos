@@ -2,13 +2,33 @@ from common.appointment import Appointment
 
 
 class ExtendedAppointment(Appointment):
-    def __init__(self, locator, to_self_delay, encrypted_blob, user_id):
-        super().__init__(locator, to_self_delay, encrypted_blob)
+    """
+    The :class:`ExtendedAppointment` contains extended information about an appointment between a user and the tower.
+
+    It extends the :class:`Appointment <common.appointment.Appointment>` with information relevant to the tower, such
+    as the ``user_id``, ``user_signature`` and ``start_block``.
+
+    Args:
+        locator (:obj:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
+            trigger for the tower to decrypt and broadcast the penalty transaction.
+        encrypted_blob (:obj:`str`): An encrypted blob of data containing a penalty transaction. The tower will decrypt
+            it and broadcast the penalty transaction upon seeing a breach on the blockchain.
+        to_self_delay (:obj:`int`): The ``to_self_delay`` encoded in the ``csv`` of the ``to_remote`` output of the
+            commitment transaction that this appointment is covering.
+        user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
+        user_signature (:obj:`str`): the signature of the appointment by the user.
+        start_block (:obj:`str`): the block height at where the towers started watching for this appointment.
+    """
+
+    def __init__(self, locator, encrypted_blob, to_self_delay, user_id, user_signature, start_block):
+        super().__init__(locator, encrypted_blob, to_self_delay)
         self.user_id = user_id
+        self.user_signature = user_signature
+        self.start_block = start_block
 
     def get_summary(self):
         """
-        Returns the summary of an appointment, consisting on the locator, the user_id and the appointment size.
+        Returns the summary of an appointment, consisting on the locator, and the user_id.
 
         Returns:
             :obj:`dict`: the appointment summary.
@@ -36,11 +56,20 @@ class ExtendedAppointment(Appointment):
 
         appointment = Appointment.from_dict(appointment_data)
         user_id = appointment_data.get("user_id")
+        user_signature = appointment_data.get("user_signature")
+        start_block = appointment_data.get("start_block")
 
-        if not user_id:
-            raise ValueError("Wrong appointment data, user_id is missing")
+        if any(v is None for v in [user_id, user_signature, start_block]):
+            raise ValueError("Wrong appointment data, some fields are missing")
 
         else:
-            appointment = cls(appointment.locator, appointment.to_self_delay, appointment.encrypted_blob, user_id)
+            appointment = cls(
+                appointment.locator,
+                appointment.encrypted_blob,
+                appointment.to_self_delay,
+                user_id,
+                user_signature,
+                start_block,
+            )
 
         return appointment

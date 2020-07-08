@@ -10,6 +10,7 @@ from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 
 from common.logger import Logger
 from common.cryptographer import hash_160
+from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
@@ -245,7 +246,7 @@ class API:
             triggered_appointments = self.watcher.db_manager.load_all_triggered_flags()
             uuid = hash_160("{}{}".format(locator, user_id))
 
-            # If the appointment has been triggered, it should be in the locator (default else just in case).
+            # If the appointment has been triggered, it should be in the Responder (default else just in case).
             if uuid in triggered_appointments:
                 appointment_data = self.watcher.db_manager.load_responder_tracker(uuid)
                 if appointment_data:
@@ -262,8 +263,8 @@ class API:
                 appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
                 if appointment_data:
                     rcode = HTTP_OK
-                    # Remove user_id field from appointment data since it is an internal field
-                    appointment_data.pop("user_id")
+                    # Remove the unnecessary data by casting the extended appointment to a regular appointment
+                    appointment_data = Appointment.from_dict(appointment_data).to_dict()
                     response = {"locator": locator, "status": "being_watched", "appointment": appointment_data}
                 else:
                     rcode = HTTP_NOT_FOUND
@@ -279,7 +280,7 @@ class API:
         """
         Gives information about all the appointments in the Watchtower.
 
-        This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
+          This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
 
         Returns:
             :obj:`str`: A json formatted dictionary containing all the appointments hold by the ``Watcher``

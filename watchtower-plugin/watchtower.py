@@ -325,8 +325,8 @@ def on_commitment_revocation(plugin, **kwargs):
         commitment_txid, penalty_tx = arg_parser.parse_add_appointment_arguments(kwargs)
         appointment = Appointment(
             locator=compute_locator(commitment_txid),
-            to_self_delay=20,  # does not matter for now, any value 20-2^32-1 would do
             encrypted_blob=Cryptographer.encrypt(penalty_tx, commitment_txid),
+            to_self_delay=20,  # does not matter for now, any value 20-2^32-1 would do
         )
         signature = Cryptographer.sign(appointment.serialize(), plugin.wt_client.sk)
 

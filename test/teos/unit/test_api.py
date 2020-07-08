@@ -4,12 +4,12 @@ from binascii import hexlify
 
 from teos.api import API
 import common.errors as errors
+from teos.watcher import Watcher
 from teos.inspector import Inspector
 from teos.gatekeeper import UserInfo
+from common.appointment import Appointment
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
-from teos.extended_appointment import ExtendedAppointment
-from teos.watcher import Watcher, AppointmentAlreadyTriggered
 
 from test.teos.unit.conftest import (
     get_random_value_hex,
@@ -77,6 +77,7 @@ def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
         MAX_APPOINTMENTS,
         config.get("LOCATOR_CACHE_SIZE"),
     )
+    watcher.last_known_block = block_processor.get_best_block_hash()
     inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
     api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher)
 
@@ -164,7 +165,7 @@ def test_register_json_no_inner_dict(client):
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-def test_add_appointment(api, client, appointment):
+def test_add_appointment(api, client, appointment, block_processor):
     # Simulate the user registration (end time does not matter here)
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
 
@@ -173,7 +174,7 @@ def test_add_appointment(api, client, appointment):
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_OK
     assert r.json.get("available_slots") == 0
-    assert r.json.get("start_block") == api.watcher.last_known_block
+    assert r.json.get("start_block") == block_processor.get_block_count()
 
 
 def test_add_appointment_no_json(api, client, appointment):
@@ -249,7 +250,7 @@ def test_add_appointment_registered_not_enough_free_slots(api, client, appointme
     assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
-def test_add_appointment_multiple_times_same_user(api, client, appointment, n=MULTIPLE_APPOINTMENTS):
+def test_add_appointment_multiple_times_same_user(api, client, appointment, block_processor, n=MULTIPLE_APPOINTMENTS):
     # Multiple appointments with the same locator should be valid and count as updates
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
@@ -259,13 +260,15 @@ def test_add_appointment_multiple_times_same_user(api, client, appointment, n=MU
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
         assert r.status_code == HTTP_OK
         assert r.json.get("available_slots") == n - 1
-        assert r.json.get("start_block") == api.watcher.last_known_block
+        assert r.json.get("start_block") == block_processor.get_block_count()
 
     # Since all updates came from the same user, only the last one is stored
     assert len(api.watcher.locator_uuid_map[appointment.locator]) == 1
 
 
-def test_add_appointment_multiple_times_different_users(api, client, appointment, n=MULTIPLE_APPOINTMENTS):
+def test_add_appointment_multiple_times_different_users(
+    api, client, appointment, block_processor, n=MULTIPLE_APPOINTMENTS
+):
     # If the same appointment comes from different users, all are kept
     # Create user keys and appointment signatures
     user_keys = [generate_keypair() for _ in range(n)]
@@ -282,13 +285,13 @@ def test_add_appointment_multiple_times_different_users(api, client, appointment
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": signature}, compressed_pk)
         assert r.status_code == HTTP_OK
         assert r.json.get("available_slots") == 1
-        assert r.json.get("start_block") == api.watcher.last_known_block
+        assert r.json.get("start_block") == block_processor.get_block_count()
 
     # Check that all the appointments have been added and that there are no duplicates
     assert len(set(api.watcher.locator_uuid_map[appointment.locator])) == n
 
 
-def test_add_appointment_update_same_size(api, client, appointment):
+def test_add_appointment_update_same_size(api, client, appointment, block_processor):
     # Update an appointment by one of the same size and check that no additional slots are filled
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
 
@@ -297,7 +300,7 @@ def test_add_appointment_update_same_size(api, client, appointment):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
     # The user has no additional slots, but it should be able to update
@@ -308,11 +311,11 @@ def test_add_appointment_update_same_size(api, client, appointment):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
 
-def test_add_appointment_update_bigger(api, client, appointment):
+def test_add_appointment_update_bigger(api, client, appointment, block_processor):
     # Update an appointment by one bigger, and check additional slots are filled
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=2, subscription_expiry=0)
 
@@ -327,7 +330,7 @@ def test_add_appointment_update_bigger(api, client, appointment):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
     # Check that it'll fail if no enough slots are available
@@ -338,7 +341,7 @@ def test_add_appointment_update_bigger(api, client, appointment):
     assert r.status_code == HTTP_BAD_REQUEST
 
 
-def test_add_appointment_update_smaller(api, client, appointment):
+def test_add_appointment_update_smaller(api, client, appointment, block_processor):
     # Update an appointment by one bigger, and check slots are freed
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=2, subscription_expiry=0)
     # This should take 2 slots
@@ -348,7 +351,7 @@ def test_add_appointment_update_smaller(api, client, appointment):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
     # Let's update with one just small enough
@@ -358,11 +361,11 @@ def test_add_appointment_update_smaller(api, client, appointment):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 1
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
 
-def test_add_appointment_in_cache(api, client):
+def test_add_appointment_in_cache(api, client, block_processor):
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
     appointment, dispute_tx = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -375,7 +378,7 @@ def test_add_appointment_in_cache(api, client):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
     # Trying to add it again should fail, since it is already in the Responder
@@ -388,7 +391,7 @@ def test_add_appointment_in_cache(api, client):
     assert r.status_code == HTTP_BAD_REQUEST and r.json.get("error_code") == errors.APPOINTMENT_ALREADY_TRIGGERED
 
 
-def test_add_appointment_in_cache_cannot_decrypt(api, client):
+def test_add_appointment_in_cache_cannot_decrypt(api, client, block_processor):
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
     appointment, dispute_tx = generate_dummy_appointment()
     appointment.encrypted_blob = appointment.encrypted_blob[::-1]
@@ -403,11 +406,11 @@ def test_add_appointment_in_cache_cannot_decrypt(api, client):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
 
-def test_add_appointment_in_cache_invalid_transaction(api, client):
+def test_add_appointment_in_cache_invalid_transaction(api, client, block_processor):
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # We need to create the appointment manually
@@ -423,10 +426,9 @@ def test_add_appointment_in_cache_invalid_transaction(api, client):
         "locator": locator,
         "to_self_delay": dummy_appointment_data.get("to_self_delay"),
         "encrypted_blob": encrypted_blob,
-        "user_id": get_random_value_hex(16),
     }
 
-    appointment = ExtendedAppointment.from_dict(appointment_data)
+    appointment = Appointment.from_dict(appointment_data)
     api.watcher.locator_cache.cache[appointment.locator] = dispute_tx.tx_id.hex()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
@@ -438,11 +440,11 @@ def test_add_appointment_in_cache_invalid_transaction(api, client):
     assert (
         r.status_code == HTTP_OK
         and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == api.watcher.last_known_block
+        and r.json.get("start_block") == block_processor.get_block_count()
     )
 
 
-def test_add_too_many_appointment(api, client):
+def test_add_too_many_appointment(api, client, block_processor):
     # Give slots to the user
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=200, subscription_expiry=0)
 
@@ -456,7 +458,7 @@ def test_add_too_many_appointment(api, client):
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
 
         if i < free_appointment_slots:
-            assert r.status_code == HTTP_OK and r.json.get("start_block") == api.watcher.last_known_block
+            assert r.status_code == HTTP_OK and r.json.get("start_block") == block_processor.get_block_count()
         else:
             assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
@@ -513,9 +515,10 @@ def test_get_appointment_in_watcher(api, client, appointment):
     # Check that the appointment is on the Watcher
     assert r.json.get("status") == "being_watched"
 
+    # Cast the extended appointment (used by the tower) to a regular appointment (used by the user)
+    appointment = Appointment.from_dict(appointment.to_dict())
+
     # Check the the sent appointment matches the received one
-    appointment_dict = appointment.to_dict()
-    appointment_dict.pop("user_id")
     assert r.json.get("locator") == appointment.locator
     assert appointment.to_dict() == r.json.get("appointment")
 

@@ -57,55 +57,65 @@ def register(user_id, teos_url):
     return response
 
 
-def add_appointment(appointment_data, user_sk, teos_id, teos_url):
+def create_appointment(appointment_data):
+    """
+    Creates an appointment object from an appointment data dictionary provided by the user. Performs all the required
+    sanity checks on the input data:
+        - Check that the given commitment_txid is correct (proper format and not missing)
+        - Check that the transaction is correct (not missing)
+
+    Args:
+        appointment_data (:obj:`dict`): a dictionary containing the appointment data.
+
+    Returns:
+        :obj:`common.appointment.Appointment`: An appointment built from the appointment data provided by the user.
+    """
+
+    tx_id = appointment_data.get("tx_id")
+    tx = appointment_data.get("tx")
+
+    if not tx_id:
+        raise InvalidParameter("Missing tx_id, locator cannot be computed")
+    elif not is_256b_hex_str(tx_id):
+        raise InvalidParameter("Wrong tx_id, locator cannot be computed")
+    elif not tx:
+        raise InvalidParameter("The tx field is missing in the provided data")
+    elif not isinstance(tx, str):
+        raise InvalidParameter("The provided tx field is not a string")
+
+    appointment_data["locator"] = compute_locator(tx_id)
+    appointment_data["encrypted_blob"] = Cryptographer.encrypt(tx, tx_id)
+
+    return Appointment.from_dict(appointment_data)
+
+
+def add_appointment(appointment, user_sk, teos_id, teos_url):
     """
     Manages the add_appointment command.
 
     The life cycle of the function is as follows:
-        - Check that the given commitment_txid is correct (proper format and not missing)
-        - Check that the transaction is correct (not missing)
-        - Create the appointment locator and encrypted blob from the commitment_txid and the penalty_tx
         - Sign the appointment
         - Send the appointment to the tower
         - Wait for the response
         - Check the tower's response and signature
 
     Args:
-        appointment_data (:obj:`dict`): a dictionary containing the appointment data.
+        appointment (:obj:`Appointment <common.appointment.Appointment>`): An appointment object.
         user_sk (:obj:`PrivateKey`): the user's private key.
         teos_id (:obj:`str`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`tuple`: A tuple (`:obj:Appointment <common.appointment.Appointment>`, :obj:`str`) containing the
-        appointment and the tower's signature.
+        :obj:`tuple`: A tuple containing the start block and the tower's signature of the appointment.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `appointment_data` or any of its fields is
-        invalid.
         :obj:`ValueError`: if the appointment cannot be signed.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
         :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
-    if not appointment_data:
-        raise InvalidParameter("The provided appointment JSON is empty")
-
-    tx_id = appointment_data.get("tx_id")
-    tx = appointment_data.get("tx")
-
-    if not is_256b_hex_str(tx_id):
-        raise InvalidParameter("The provided locator is wrong or missing")
-
-    if not tx:
-        raise InvalidParameter("The provided data is missing the transaction")
-
-    appointment_data["locator"] = compute_locator(tx_id)
-    appointment_data["encrypted_blob"] = Cryptographer.encrypt(tx, tx_id)
-    appointment = Appointment.from_dict(appointment_data)
     signature = Cryptographer.sign(appointment.serialize(), user_sk)
-
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
     # Send appointment to the server.
@@ -114,19 +124,21 @@ def add_appointment(appointment_data, user_sk, teos_id, teos_url):
     response = process_post_response(post_request(data, add_appointment_endpoint))
 
     tower_signature = response.get("signature")
+    start_block = response.get("start_block")
+    appointment_receipt = Appointment.create_receipt(signature, start_block)
     # Check that the server signed the appointment as it should.
     if not tower_signature:
         raise TowerResponseError("The response does not contain the signature of the appointment")
 
-    rpk = Cryptographer.recover_pk(appointment.serialize(), tower_signature)
+    rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     if teos_id != Cryptographer.get_compressed_pk(rpk):
         raise TowerResponseError("The returned appointment's signature is invalid")
 
     logger.info("Appointment accepted and signed by the Eye of Satoshi")
     logger.info("Remaining slots: {}".format(response.get("available_slots")))
-    logger.info("Start block: {}".format(response.get("start_block")))
+    logger.info("Start block: {}".format(start_block))
 
-    return appointment, tower_signature
+    return start_block, tower_signature
 
 
 def get_appointment(locator, user_sk, teos_id, teos_url):
@@ -350,18 +362,22 @@ def parse_add_appointment_args(args):
         else:
             appointment_data = json.loads(arg_opt)
 
+        if not appointment_data:
+            raise InvalidParameter("The provided appointment JSON is empty")
+
     except json.JSONDecodeError:
         raise InvalidParameter("Non-JSON encoded data provided as appointment. " + use_help)
 
     return appointment_data
 
 
-def save_appointment_receipt(appointment, signature, appointments_folder_path):
+def save_appointment_receipt(appointment, start_block, signature, appointments_folder_path):
     """
     Saves an appointment receipt to disk. A receipt consists of an appointment and a signature from the tower.
 
     Args:
         appointment (:obj:`Appointment <common.appointment.Appointment>`): the appointment to be saved on disk.
+        start_block (:obj:`int`): the block height at which the tower started to watch for the appointment.
         signature (:obj:`str`): the signature of the appointment performed by the tower.
         appointments_folder_path (:obj:`str`): the path to the appointments folder.
 
@@ -377,7 +393,7 @@ def save_appointment_receipt(appointment, signature, appointments_folder_path):
     uuid = uuid4().hex  # prevent filename collisions
 
     filename = "{}/appointment-{}-{}-{}.json".format(appointments_folder_path, timestamp, locator, uuid)
-    data = {"appointment": appointment, "signature": signature}
+    data = {"appointment": appointment, "start_block": start_block, "signature": signature}
 
     try:
         with open(filename, "w") as f:
@@ -411,8 +427,11 @@ def main(command, args, command_line_conf):
 
         if command == "add_appointment":
             appointment_data = parse_add_appointment_args(args)
-            appointment, signature = add_appointment(appointment_data, user_sk, teos_id, teos_url)
-            save_appointment_receipt(appointment.to_dict(), signature, config.get("APPOINTMENTS_FOLDER_NAME"))
+            appointment = create_appointment(appointment_data)
+            start_block, signature = add_appointment(appointment, user_sk, teos_id, teos_url)
+            save_appointment_receipt(
+                appointment.to_dict(), start_block, signature, config.get("APPOINTMENTS_FOLDER_NAME")
+            )
 
         elif command == "get_appointment":
             if not args:

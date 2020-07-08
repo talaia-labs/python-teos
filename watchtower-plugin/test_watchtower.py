@@ -20,6 +20,9 @@ tower_id = Cryptographer.get_compressed_pk(tower_sk.public_key)
 
 mocked_return = None
 
+# The height is never checked on the tests, so it can be hardcoded
+CURRENT_HEIGHT = 1000
+
 
 class TowerMock:
     def __init__(self, tower_sk):
@@ -45,10 +48,10 @@ class TowerMock:
         user_id = request.get_json().get("public_key")
 
         if user_id not in self.users:
-            self.users[user_id] = {"available_slots": 100, "subscription_expiry": 4320}
+            self.users[user_id] = {"available_slots": 100, "subscription_expiry": CURRENT_HEIGHT + 4320}
         else:
             self.users[user_id]["available_slots"] += 100
-            self.users[user_id]["subscription_expiry"] = 4320
+            self.users[user_id]["subscription_expiry"] = CURRENT_HEIGHT + 4320
 
         rcode = constants.HTTP_OK
         response = {
@@ -61,18 +64,17 @@ class TowerMock:
 
     def add_appointment(self):
         appointment = Appointment.from_dict(request.get_json().get("appointment"))
-        user_id = Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(appointment.serialize(), request.get_json().get("signature"))
-        )
+        signature = request.get_json().get("signature")
+        user_id = Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment.serialize(), signature))
 
         if mocked_return == "success":
-            response, rtype = add_appointment_success(appointment, self.users[user_id], self.sk)
+            response, rtype = add_appointment_success(appointment, signature, self.users[user_id], self.sk)
         elif mocked_return == "reject_no_slots":
             response, rtype = add_appointment_reject_no_slots()
         elif mocked_return == "reject_invalid":
             response, rtype = add_appointment_reject_invalid()
         elif mocked_return == "misbehaving_tower":
-            response, rtype = add_appointment_misbehaving_tower(appointment, self.users[user_id], self.sk)
+            response, rtype = add_appointment_misbehaving_tower(appointment, signature, self.users[user_id], self.sk)
         else:
             response, rtype = add_appointment_service_unavailable()
 
@@ -101,11 +103,13 @@ class TowerMock:
         return jsonify(response), rcode
 
 
-def add_appointment_success(appointment, user, tower_sk):
+def add_appointment_success(appointment, signature, user, tower_sk):
     rcode = constants.HTTP_OK
+    current_height = CURRENT_HEIGHT  # this is not checked, so we can made it up
     response = {
         "locator": appointment.locator,
-        "signature": Cryptographer.sign(appointment.serialize(), tower_sk),
+        "signature": Cryptographer.sign(Appointment.create_receipt(signature, current_height), tower_sk),
+        "start_block": CURRENT_HEIGHT,
         "available_slots": user.get("available_slots") - 1,
         "subscription_expiry": user.get("subscription_expiry"),
     }
@@ -150,12 +154,12 @@ def add_appointment_service_unavailable():
     return response, rcode
 
 
-def add_appointment_misbehaving_tower(appointment, user, tower_sk):
+def add_appointment_misbehaving_tower(appointment, signature, user, tower_sk):
     # This covers a tower signing with invalid keys
     wrong_sk = PrivateKey.from_hex(get_random_value_hex(32))
+    wrong_sig = Cryptographer.sign(Appointment.create_receipt(signature, CURRENT_HEIGHT), wrong_sk)
 
-    wrong_sig = Cryptographer.sign(appointment.serialize(), wrong_sk)
-    response, rcode = add_appointment_success(appointment, user, tower_sk)
+    response, rcode = add_appointment_success(appointment, signature, user, tower_sk)
     user["appointments"][appointment.locator]["signature"] = wrong_sig
     response["signature"] = wrong_sig
 

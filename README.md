@@ -24,63 +24,67 @@ Refer to [INSTALL.md](INSTALL.md)
 
 ## Running TEOS
 
-You can run `teos` buy running `teosd.py` under `teos`:
+Make sure bitcoind is running before running TEOS (it will fail at startup if it cannot connect to bitcoind). You can find
+[here](DEPENDENCIES.md#installing-bitcoind) a sample config file.
 
-```
-python -m teos.teosd
-```
+Before you can run TEOS, you need to follow a few more configuration steps.
+
+### Configuration file and command line parameters
 
 `teos` comes with a default configuration that can be found at [teos/\_\_init\_\_.py](teos/__init__.py). 
 
 The configuration includes, amongst others, where your data folder is placed, what network it connects to, etc.
 
-To run `teos` you need a set of keys (to sign appointments) stored in your data directory. You can follow [generate keys](#generate-keys) to generate them.
-
-
-### Configuration file and command line parameters
-
 To change the configuration defaults you can:
 
-- Define a configuration file following the template (check [teos/template.conf](teos/template.conf)) and place it in the `data_dir` (that defaults to `~/.teos/`) 
+- Define a configuration file named `teos.conf` following the template (check [teos/template.conf](teos/template.conf)) and place it in the `data_dir` (that defaults to `~/.teos/`)
 
 and / or 
 
 - Add some global options when running the daemon (run `teosd.py -h` for more info).
 
-## Running TEOS in another network
+### Tower id and signing key
 
-By default, `teos` runs on `mainnet`. In order to run it on another network you need to change the network parameter in the configuration file or pass the network parameter as a command line option. Notice that if teos does not find a `bitcoind` node running in the same network that it is set to run, it will refuse to run.
+`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. You can follow [generate keys](#generate-keys) to generate them.
 
+### Starting the TEOS daemon 👁
 
-### Modifying the configuration file
-
-The configuration file option to change the network where `teos` will run is `btc_network` under the `bitcoind` section:
-
-```
-[bitcoind]
-btc_rpc_user = "user"
-btc_rpc_password = "passwd"
-btc_rpc_connect = "localhost"
-btc_network = "mainnet"
-```
-
-For regtest, it should look like:
+Now that everything is ready, you can run `teos` by running `teosd.py` under `teos`:
 
 ```
-[bitcoind]
-btc_rpc_user = "user"
-btc_rpc_password = "passwd"
-btc_rpc_connect = "localhost"
-btc_network = "regtest"
+python -m teos.teosd
 ```
-
 
 ### Passing command line options to `teosd`
 
 Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
 
 ```
-python -m teos.teosd --btcnetwork=regtest --btcrpcport=18443
+python -m teos.teosd --btcnetwork=regtest
+```
+
+### Running TEOS in another network
+
+By default, `teos` runs on `mainnet`. In order to run it on another network you need to change the network parameter in the configuration file or pass the network parameter as a command line option. Notice that if teos does not find a `bitcoind` node running in the same network that it is set to run, it will refuse to run.
+
+The configuration file option to change the network where `teos` will run is `btc_network` under the `bitcoind` section:
+
+```
+[bitcoind]
+btc_rpc_user = user
+btc_rpc_password = passwd
+btc_rpc_connect = localhost
+btc_network = mainnet
+```
+
+For regtest, it should look like:
+
+```
+[bitcoind]
+btc_rpc_user = user
+btc_rpc_password = passwd
+btc_rpc_connect = localhost
+btc_network = regtest
 ```
 
 ## Running `teos` in a docker container
