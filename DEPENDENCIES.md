@@ -11,6 +11,9 @@
 - `openssl` version 1.1+
 - `bitcoind`
 
+Moreover, your system could need some additional dev libraries in order to run `teos`, such as `libffi-dev` and `libleveldb-dev`.
+This ultimately depends on your OS and distro.
+
 ### Checking if the dependencies are already satisfied
 
 Most UNIX systems ship with `python3` already installed, whereas OSX systems tend to ship with `python2`. In order to check our python version we should run:
@@ -61,28 +64,28 @@ Bitcoin needs to be running with the following options enables:
 - `txindex` to be able to look for non-wallet transactions
 - `server` to run rpc commands
 
-Here's an example of a `bitcoin.conf` you can use:
+Here's an example of a `bitcoin.conf` you can use for mainnet:
 
 ```
-# [debug]
-regtest=1
-daemon=1
-debug=1
-logips=1
-
 # [rpc]
 server=1
 rpcuser=user
 rpcpassword=passwd
+rpcservertimeout=600
 
-# [blockchain]
-txindex=1
-
-# [ZMQ]
+# [zmq]
 zmqpubhashblock=tcp://127.0.0.1:28332
 zmqpubrawblock=tcp://127.0.0.1:28332
 zmqpubhashtx=tcp://127.0.0.1:28333
 zmqpubrawtx=tcp://127.0.0.1:28333
+
+# [blockchain]
+txindex=1
+
+# [others]
+daemon=1
+debug=1
+maxtxfee=1
 ```
 
 ### Installing the Dependencies
@@ -113,6 +116,7 @@ and for `pip3`:
 
 `teos` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
 
+- `wheel`
 - `zmq`
 - `flask`
 - `cryptography`
@@ -120,4 +124,5 @@ and for `pip3`:
 - `pyzbase32`
 - `requests`
 - `plyvel`
+- `readerwriterlock`
 
