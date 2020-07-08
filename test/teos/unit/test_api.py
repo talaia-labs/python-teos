@@ -499,9 +499,6 @@ def test_get_appointment_not_registered_user(client):
 
 
 def test_get_appointment_in_watcher(api, client, appointment):
-    # Simulate the user registration (end time does not matter here)
-    api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-
     # Mock the appointment in the Watcher
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
     api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
@@ -524,9 +521,6 @@ def test_get_appointment_in_watcher(api, client, appointment):
 
 
 def test_get_appointment_in_responder(api, client, appointment):
-    # Simulate the user registration (end time does not matter here)
-    api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-
     # Mock the appointment in the Responder
     tracker_data = {
         "locator": appointment.locator,
