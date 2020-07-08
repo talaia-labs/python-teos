@@ -56,7 +56,6 @@ def get_signature(message, sk):
     return Cryptographer.sign(message, sk)
 
 
-# TODO: 90-add-more-add-appointment-tests
 @responses.activate
 def test_register():
     # Simulate a register response
@@ -276,7 +275,6 @@ def test_post_request():
     assert response
 
 
-@responses.activate
 def test_post_request_connection_error():
     with pytest.raises(ConnectionError):
         teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
