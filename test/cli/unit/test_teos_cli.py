@@ -48,6 +48,42 @@ dummy_appointment = Appointment.from_dict(dummy_appointment_dict)
 CURRENT_HEIGHT = 300
 
 
+@pytest.fixture
+def keyfiles():
+    # generate a private/public key pair, and an empty file, and return their names
+
+    KeyFiles = namedtuple(
+        "KeyFiles", ["private_key_file_path", "public_key_file_path", "empty_file_path"]
+    )
+
+    # Let's first create a private key and public key files
+    private_key_file_path = "sk_test_file"
+    public_key_file_path = "pk_test_file"
+    empty_file_path = "empty_file"
+    with open(private_key_file_path, "wb") as f:
+        f.write(dummy_user_sk.to_der())
+    with open(public_key_file_path, "wb") as f:
+        f.write(dummy_user_sk.public_key.format(compressed=True))
+    with open(empty_file_path, "wb"):
+        pass
+
+    yield KeyFiles(private_key_file_path, public_key_file_path, empty_file_path)
+
+    # Remove the tmp files
+    os.remove(private_key_file_path)
+    os.remove(public_key_file_path)
+    os.remove(empty_file_path)
+
+
+@pytest.fixture
+def post_response():
+    # Create a response for the post requests to the tower
+    return {
+        "locator": dummy_appointment.to_dict()["locator"],
+        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
+    }
+
+
 @responses.activate
 def test_register():
     # Simulate a register response
@@ -241,33 +277,6 @@ def test_get_appointment_connection_error():
         teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
 
 
-@pytest.fixture
-def keyfiles():
-    # generate a private/public key pair, and an empty file, and return their names
-
-    KeyFiles = namedtuple(
-        "KeyFiles", ["private_key_file_path", "public_key_file_path", "empty_file_path"]
-    )
-
-    # Let's first create a private key and public key files
-    private_key_file_path = "sk_test_file"
-    public_key_file_path = "pk_test_file"
-    empty_file_path = "empty_file"
-    with open(private_key_file_path, "wb") as f:
-        f.write(dummy_user_sk.to_der())
-    with open(public_key_file_path, "wb") as f:
-        f.write(dummy_user_sk.public_key.format(compressed=True))
-    with open(empty_file_path, "wb"):
-        pass
-
-    yield KeyFiles(private_key_file_path, public_key_file_path, empty_file_path)
-
-    # Remove the tmp files
-    os.remove(private_key_file_path)
-    os.remove(public_key_file_path)
-    os.remove(empty_file_path)
-
-
 def test_load_keys(keyfiles):
     # Test that it correctly returns a tuple of 3 elements with the correct keys
     r = teos_cli.load_keys(
@@ -323,15 +332,6 @@ def test_post_request_connection_error():
         teos_cli.post_request(
             json.dumps(dummy_appointment_data), add_appointment_endpoint
         )
-
-
-@pytest.fixture
-def post_response():
-    # Create a response for the post requests to the tower
-    return {
-        "locator": dummy_appointment.to_dict()["locator"],
-        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
-    }
 
 
 @responses.activate
