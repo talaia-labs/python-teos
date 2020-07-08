@@ -313,7 +313,8 @@ def retry_tower(plugin, tower_id):
     #        subscription error.
     if tower.status not in ["unreachable", "subscription error"]:
         response = {
-            "error": f"Cannot retry tower. Expected tower status 'unreachable' or 'subscription error'. Received {tower.status}"
+            "error": f"Cannot retry tower. Expected tower status 'unreachable' or 'subscription error'. "
+            f"Received {tower.status}"
         }
     if not tower.pending_appointments:
         response = {"error": f"{tower_id} does not have pending appointments"}
