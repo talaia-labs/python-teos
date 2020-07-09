@@ -43,16 +43,21 @@ def main(command_line_conf):
         signal(SIGTERM, handle_signals)
         signal(SIGQUIT, handle_signals)
 
-        # Loads config and sets up the data folder and log file
+        # Loads config and sets up the base data folder and log file
         data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
         config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
         config = config_loader.build_config()
 
+        network = config.get("BTC_NETWORK")
+
         # Set default RPC port if not overwritten by the user.
         if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
-            config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
+            config["BTC_RPC_PORT"] = get_default_rpc_port(network)
 
-        setup_data_folder(data_dir)
+        # if not on mainnet, data is in the appropriate subfolder
+        data_dir_network = data_dir if network == "mainnet" else os.path.join(data_dir, network)
+
+        setup_data_folder(data_dir_network)
         setup_logging(config.get("LOG_FILE"))
 
         logger.info("Starting TEOS")
@@ -63,7 +68,7 @@ def main(command_line_conf):
         if not can_connect_to_bitcoind(bitcoind_connect_params):
             logger.error("Cannot connect to bitcoind. Shutting down")
 
-        elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
+        elif not in_correct_network(bitcoind_connect_params, network):
             logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
         else:
