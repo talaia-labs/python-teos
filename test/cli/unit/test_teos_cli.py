@@ -38,9 +38,7 @@ dummy_appointment_data = {"tx": get_random_value_hex(192), "tx_id": get_random_v
 dummy_appointment_dict = {
     "locator": compute_locator(dummy_appointment_data.get("tx_id")),
     "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-    "encrypted_blob": Cryptographer.encrypt(
-        dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")
-    ),
+    "encrypted_blob": Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")),
 }
 dummy_appointment = Appointment.from_dict(dummy_appointment_dict)
 
@@ -52,9 +50,7 @@ CURRENT_HEIGHT = 300
 def keyfiles():
     # generate a private/public key pair, and an empty file, and return their names
 
-    KeyFiles = namedtuple(
-        "KeyFiles", ["private_key_file_path", "public_key_file_path", "empty_file_path"]
-    )
+    KeyFiles = namedtuple("KeyFiles", ["private_key_file_path", "public_key_file_path", "empty_file_path"])
 
     # Let's first create a private key and public key files
     private_key_file_path = "sk_test_file"
@@ -93,9 +89,9 @@ def test_register():
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == register_endpoint
-    assert result.get("public_key") == dummy_user_id and result.get(
+    assert result.get("public_key") == dummy_user_id and result.get("available_slots") == response.get(
         "available_slots"
-    ) == response.get("available_slots")
+    )
 
 
 def test_register_with_invalid_user_id():
@@ -190,9 +186,7 @@ def test_add_appointment_with_missing_signature():
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
 
     with pytest.raises(TowerResponseError, match="does not contain the signature"):
-        teos_cli.add_appointment(
-            Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url
-        )
+        teos_cli.add_appointment(Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url)
 
     # should have performed exactly 1 network request
     assert len(responses.calls) == 1
@@ -234,9 +228,7 @@ def test_get_appointment():
     }
 
     responses.add(responses.POST, get_appointment_endpoint, json=response, status=200)
-    result = teos_cli.get_appointment(
-        dummy_appointment_dict.get("locator"), dummy_user_sk, dummy_teos_id, teos_url
-    )
+    result = teos_cli.get_appointment(dummy_appointment_dict.get("locator"), dummy_user_sk, dummy_teos_id, teos_url)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == get_appointment_endpoint
@@ -255,10 +247,7 @@ def test_get_appointment_tower_error():
     locator = dummy_appointment_dict.get("locator")
 
     responses.add(
-        responses.POST,
-        get_appointment_endpoint,
-        body="{ invalid json response",
-        status=200,
+        responses.POST, get_appointment_endpoint, body="{ invalid json response", status=200,
     )
     with pytest.raises(TowerResponseError):
         teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
@@ -279,9 +268,7 @@ def test_get_appointment_connection_error():
 
 def test_load_keys(keyfiles):
     # Test that it correctly returns a tuple of 3 elements with the correct keys
-    r = teos_cli.load_keys(
-        keyfiles.public_key_file_path, keyfiles.private_key_file_path
-    )
+    r = teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.private_key_file_path)
     assert isinstance(r, tuple)
     assert len(r) == 3
 
@@ -297,9 +284,7 @@ def test_load_keys_none(keyfiles):
 def test_load_keys_wrong_order(keyfiles):
     # InvalidKey should be raised if the keys are passed in the wrong order
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(
-            keyfiles.private_key_file_path, keyfiles.public_key_file_path
-        )
+        teos_cli.load_keys(keyfiles.private_key_file_path, keyfiles.public_key_file_path)
 
 
 def test_load_keys_empty(keyfiles):
@@ -318,9 +303,7 @@ def test_post_request():
     }
 
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
-    response = teos_cli.post_request(
-        json.dumps(dummy_appointment_data), add_appointment_endpoint
-    )
+    response = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
 
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == add_appointment_endpoint
@@ -329,33 +312,23 @@ def test_post_request():
 
 def test_post_request_connection_error():
     with pytest.raises(ConnectionError):
-        teos_cli.post_request(
-            json.dumps(dummy_appointment_data), add_appointment_endpoint
-        )
+        teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
 
 
 @responses.activate
 def test_process_post_response(post_response):
     # A 200 OK with a correct json response should return the json of the response
-    responses.add(
-        responses.POST, add_appointment_endpoint, json=post_response, status=200
-    )
-    r = teos_cli.post_request(
-        json.dumps(dummy_appointment_data), add_appointment_endpoint
-    )
+    responses.add(responses.POST, add_appointment_endpoint, json=post_response, status=200)
+    r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
     assert teos_cli.process_post_response(r) == r.json()
 
 
 @responses.activate
 def test_process_post_response_404(post_response):
     # If the response code is a rejection (lets say 404) it should raise TowerResponseError
-    responses.add(
-        responses.POST, add_appointment_endpoint, json=post_response, status=404
-    )
+    responses.add(responses.POST, add_appointment_endpoint, json=post_response, status=404)
     with pytest.raises(TowerResponseError):
-        r = teos_cli.post_request(
-            json.dumps(dummy_appointment_data), add_appointment_endpoint
-        )
+        r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
 
 
@@ -364,16 +337,12 @@ def test_process_post_response_not_json(post_response):
     # TowerResponseError should be raised if the response is not in json (independently of the status code)
     responses.add(responses.POST, add_appointment_endpoint, status=404)
     with pytest.raises(TowerResponseError):
-        r = teos_cli.post_request(
-            json.dumps(dummy_appointment_data), add_appointment_endpoint
-        )
+        r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
 
     responses.replace(responses.POST, add_appointment_endpoint, status=200)
     with pytest.raises(TowerResponseError):
-        r = teos_cli.post_request(
-            json.dumps(dummy_appointment_data), add_appointment_endpoint
-        )
+        r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
 
 
@@ -386,9 +355,7 @@ def test_parse_add_appointment_args():
     assert appt_data
 
     # If appointment json is passed in, function should work.
-    appt_data = teos_cli.parse_add_appointment_args(
-        [json.dumps(dummy_appointment_data)]
-    )
+    appt_data = teos_cli.parse_add_appointment_args([json.dumps(dummy_appointment_data)])
     assert appt_data
 
     os.remove("appt_test_file")
