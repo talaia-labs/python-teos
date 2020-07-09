@@ -1,7 +1,7 @@
 from math import ceil
 from threading import Lock
 
-from common.tools import is_compressed_pk
+from common.tools import is_compressed_pk, is_u4int
 from common.cryptographer import Cryptographer
 from common.receipts import create_registration_receipt
 from common.constants import ENCRYPTED_BLOB_MAX_SIZE_HEX
@@ -101,6 +101,9 @@ class Gatekeeper:
             )
         else:
             # FIXME: For now new calls to register add subscription_slots to the current count and reset the expiry time
+            if not is_u4int(self.registered_users[user_id].available_slots + self.subscription_slots):
+                raise InvalidParameter("Maximum slots reached for the subscription")
+
             self.registered_users[user_id].available_slots += self.subscription_slots
             self.registered_users[user_id].subscription_expiry = (
                 self.block_processor.get_block_count() + self.subscription_duration

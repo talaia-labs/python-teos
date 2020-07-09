@@ -2,7 +2,7 @@ import struct
 import pyzbase32
 from binascii import unhexlify
 
-from common.tools import is_compressed_pk
+from common.tools import is_compressed_pk, is_u4int
 from common.exceptions import InvalidParameter
 
 
@@ -12,14 +12,14 @@ def create_registration_receipt(user_id, available_slots, subscription_expiry):
 
     The receipt has the following format:
 
-        user_id | available_slots | subscription_expiry
+        user_id (33-byte) | available_slots (4-byte) | subscription_expiry (4-byte)
 
     All values are big endian.
 
     Args:
         user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
-        available_slots (:obj:`int`): the number of slots assigned to a user subscription.
-        subscription_expiry (:obj:`int`): the expiry assigned to a user subscription.
+        available_slots (:obj:`int`): the number of slots assigned to a user subscription (4-byte unsigned int).
+        subscription_expiry (:obj:`int`): the expiry assigned to a user subscription (4-byte unsigned int).
 
     Returns:
           :obj:`bytes`: The serialized data to be signed.
@@ -27,10 +27,10 @@ def create_registration_receipt(user_id, available_slots, subscription_expiry):
 
     if not is_compressed_pk(user_id):
         raise InvalidParameter("Provided public key does not match expected format (33-byte hex string)")
-    elif not isinstance(available_slots, int):
-        raise InvalidParameter("Provided available_slots must be an integer")
-    elif not isinstance(subscription_expiry, int):
-        raise InvalidParameter("Provided subscription_expiry must be an integer")
+    elif not is_u4int(available_slots):
+        raise InvalidParameter("Provided available_slots must be a 4-byte unsigned integer")
+    elif not is_u4int(subscription_expiry):
+        raise InvalidParameter("Provided subscription_expiry must be a 4-byte unsigned integer")
 
     return unhexlify(user_id) + struct.pack(">I", available_slots) + struct.pack(">I", subscription_expiry)
 
@@ -41,7 +41,7 @@ def create_appointment_receipt(user_signature, start_block):
 
     The receipt has the following format:
 
-        user_signature | start_block
+        user_signature | start_block (4-byte)
 
     All values are big endian.
 
@@ -55,7 +55,7 @@ def create_appointment_receipt(user_signature, start_block):
 
     if not isinstance(user_signature, str):
         raise InvalidParameter("Provided user_signature is invalid")
-    elif not isinstance(start_block, int):
-        raise InvalidParameter("Provided start_block is invalid")
+    elif not is_u4int(start_block):
+        raise InvalidParameter("Provided start_block must be a 4-byte unsigned integer")
 
     return pyzbase32.decode_bytes(user_signature) + struct.pack(">I", start_block)
