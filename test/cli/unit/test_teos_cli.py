@@ -1,5 +1,6 @@
 import os
 import json
+from collections import namedtuple
 import shutil
 import pytest
 import responses
@@ -46,7 +47,40 @@ dummy_appointment = Appointment.from_dict(dummy_appointment_dict)
 CURRENT_HEIGHT = 300
 
 
-# TODO: 90-add-more-add-appointment-tests
+@pytest.fixture
+def keyfiles():
+    # generate a private/public key pair, and an empty file, and return their names
+
+    KeyFiles = namedtuple("KeyFiles", ["private_key_file_path", "public_key_file_path", "empty_file_path"])
+
+    # Let's first create a private key and public key files
+    private_key_file_path = "sk_test_file"
+    public_key_file_path = "pk_test_file"
+    empty_file_path = "empty_file"
+    with open(private_key_file_path, "wb") as f:
+        f.write(dummy_user_sk.to_der())
+    with open(public_key_file_path, "wb") as f:
+        f.write(dummy_user_sk.public_key.format(compressed=True))
+    with open(empty_file_path, "wb"):
+        pass
+
+    yield KeyFiles(private_key_file_path, public_key_file_path, empty_file_path)
+
+    # Remove the tmp files
+    os.remove(private_key_file_path)
+    os.remove(public_key_file_path)
+    os.remove(empty_file_path)
+
+
+@pytest.fixture
+def post_response():
+    # Create a response for the post requests to the tower
+    return {
+        "locator": dummy_appointment.to_dict()["locator"],
+        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
+    }
+
+
 @responses.activate
 def test_register():
     # Simulate a register response
@@ -81,6 +115,24 @@ def test_register_no_signature():
 
     with pytest.raises(TowerResponseError, match="does not contain the signature"):
         teos_cli.register(dummy_user_id, dummy_teos_id, teos_url)
+
+
+def test_register_with_invalid_user_id():
+    # Simulate a register response
+    with pytest.raises(InvalidParameter):
+        teos_cli.register("invalid_user_id", teos_url)
+
+
+def test_register_with_connection_error():
+    # We don't mock any url to simulate a connection error
+    with pytest.raises(ConnectionError):
+        teos_cli.register(dummy_user_id, teos_url)
+
+    # Should also fail with missing or unknown protocol, with a more specific error message
+    with pytest.raises(ConnectionError, match="Invalid URL"):
+        teos_cli.register(dummy_user_id, "//teos.watch")
+    with pytest.raises(ConnectionError, match="Invalid URL"):
+        teos_cli.register(dummy_user_id, "nonExistingProtocol://teos.watch")
 
 
 def test_create_appointment():
@@ -140,7 +192,31 @@ def test_add_appointment():
 
 
 @responses.activate
-def test_add_appointment_with_invalid_tower_signature():
+def test_add_appointment_with_missing_signature():
+    # Simulate a request to add_appointment for dummy_appointment, but the response does not have
+    # the signature.
+
+    appointment = teos_cli.create_appointment(dummy_appointment_data)
+
+    response = {
+        "locator": dummy_appointment.locator,
+        # no signature
+        "available_slots": 100,
+        "start_block": CURRENT_HEIGHT,
+        "subscription_expiry": CURRENT_HEIGHT + 4320,
+    }
+
+    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+
+    with pytest.raises(TowerResponseError, match="does not contain the signature"):
+        teos_cli.add_appointment(Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url)
+
+    # should have performed exactly 1 network request
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_add_appointment_with_invalid_signature():
     # Simulate a request to add_appointment for dummy_appointment, but sign with a different key,
     # make sure that the right endpoint is requested, but the return value is False
     appointment = teos_cli.create_appointment(dummy_appointment_data)
@@ -161,13 +237,16 @@ def test_add_appointment_with_invalid_tower_signature():
     with pytest.raises(TowerResponseError):
         teos_cli.add_appointment(Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url)
 
+    # should have performed exactly 1 network request
+    assert len(responses.calls) == 1
+
 
 @responses.activate
 def test_get_appointment():
     # Response of get_appointment endpoint is an appointment with status added to it.
     response = {
         "locator": dummy_appointment_dict.get("locator"),
-        "status": "being_watch",
+        "status": "being_watched",
         "appointment": dummy_appointment_dict,
     }
 
@@ -179,8 +258,28 @@ def test_get_appointment():
     assert result.get("locator") == response.get("locator")
 
 
+def test_get_appointment_invalid_locator():
+    # Test that an invalid locator fails with InvalidParamater before any network request
+    with pytest.raises(InvalidParameter, match="locator is not valid"):
+        teos_cli.get_appointment("deadbeef", dummy_user_sk, dummy_teos_id, teos_url)
+
+
 @responses.activate
-def test_get_appointment_err():
+def test_get_appointment_tower_error():
+    # Test that a TowerResponseError is raised if the response is invalid.
+    locator = dummy_appointment_dict.get("locator")
+
+    responses.add(
+        responses.POST, get_appointment_endpoint, body="{ invalid json response", status=200,
+    )
+    with pytest.raises(TowerResponseError):
+        teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
+
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_get_appointment_connection_error():
     locator = get_random_value_hex(16)
 
     # Test that get_appointment handles a connection error appropriately.
@@ -190,43 +289,33 @@ def test_get_appointment_err():
         teos_cli.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
 
 
-def test_load_keys():
-    # Let's first create a private key and public key files
-    private_key_file_path = "sk_test_file"
-    public_key_file_path = "pk_test_file"
-    empty_file_path = "empty_file"
-    with open(private_key_file_path, "wb") as f:
-        f.write(dummy_user_sk.to_der())
-    with open(public_key_file_path, "wb") as f:
-        f.write(dummy_user_sk.public_key.format(compressed=True))
-    with open(empty_file_path, "wb"):
-        pass
-
-    # Now we can test the function using these files
-    r = teos_cli.load_keys(public_key_file_path, private_key_file_path)
+def test_load_keys(keyfiles):
+    # Test that it correctly returns a tuple of 3 elements with the correct keys
+    r = teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.private_key_file_path)
     assert isinstance(r, tuple)
     assert len(r) == 3
 
+
+def test_load_keys_none(keyfiles):
     # If any param does not match the expected, we should get an InvalidKey exception
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(None, private_key_file_path)
+        teos_cli.load_keys(None, keyfiles.private_key_file_path)
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, None)
+        teos_cli.load_keys(keyfiles.public_key_file_path, None)
 
-    # The same should happen if we pass a public key where a private should be, for instance
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(private_key_file_path, public_key_file_path)
 
-    # Same if any of the files is empty
+def test_load_keys_wrong_order(keyfiles):
+    # InvalidKey should be raised if the keys are passed in the wrong order
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(empty_file_path, private_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(public_key_file_path, empty_file_path)
+        teos_cli.load_keys(keyfiles.private_key_file_path, keyfiles.public_key_file_path)
 
-    # Remove the tmp files
-    os.remove(private_key_file_path)
-    os.remove(public_key_file_path)
-    os.remove(empty_file_path)
+
+def test_load_keys_empty(keyfiles):
+    # If any of the files is empty, InvalidKey should be raised
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(keyfiles.empty_file_path, keyfiles.private_key_file_path)
+    with pytest.raises(InvalidKey):
+        teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.empty_file_path)
 
 
 @responses.activate
@@ -244,27 +333,32 @@ def test_post_request():
     assert response
 
 
-@responses.activate
-def test_process_post_response():
-    # Let's first create a response
-    response = {
-        "locator": dummy_appointment.to_dict()["locator"],
-        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
-    }
+def test_post_request_connection_error():
+    with pytest.raises(ConnectionError):
+        teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
 
+
+@responses.activate
+def test_process_post_response(post_response):
     # A 200 OK with a correct json response should return the json of the response
-    responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
+    responses.add(responses.POST, add_appointment_endpoint, json=post_response, status=200)
     r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
     assert teos_cli.process_post_response(r) == r.json()
 
-    # If we modify the response code for a rejection (lets say 404) we should get None
-    responses.replace(responses.POST, add_appointment_endpoint, json=response, status=404)
+
+@responses.activate
+def test_process_post_response_404(post_response):
+    # If the response code is a rejection (lets say 404) it should raise TowerResponseError
+    responses.add(responses.POST, add_appointment_endpoint, json=post_response, status=404)
     with pytest.raises(TowerResponseError):
         r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
 
-    # The same should happen if the response is not in json independently of the return type
-    responses.replace(responses.POST, add_appointment_endpoint, status=404)
+
+@responses.activate
+def test_process_post_response_not_json(post_response):
+    # TowerResponseError should be raised if the response is not in json (independently of the status code)
+    responses.add(responses.POST, add_appointment_endpoint, status=404)
     with pytest.raises(TowerResponseError):
         r = teos_cli.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
         teos_cli.process_post_response(r)
@@ -306,6 +400,7 @@ def test_parse_add_appointment_args_wrong():
 
 def test_save_appointment_receipt(monkeypatch):
     appointments_folder = "test_appointments_receipts"
+    monkeypatch.setitem(config, "APPOINTMENTS_FOLDER_NAME", appointments_folder)
     config["APPOINTMENTS_FOLDER_NAME"] = appointments_folder
 
     # The functions creates a new directory if it does not exist
@@ -329,7 +424,10 @@ def test_save_appointment_receipt(monkeypatch):
 def test_get_all_appointments():
     # Response of get_all_appointments endpoint is all appointments from watcher and responder.
     dummy_appointment_dict["status"] = "being_watched"
-    response = {"watcher_appointments": dummy_appointment_dict, "responder_trackers": {}}
+    response = {
+        "watcher_appointments": dummy_appointment_dict,
+        "responder_trackers": {},
+    }
 
     request_url = get_all_appointments_endpoint
     responses.add(responses.GET, request_url, json=response, status=200)

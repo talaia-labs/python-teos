@@ -230,7 +230,7 @@ def get_all_appointments(teos_url):
 
 def load_keys(teos_pk_path, user_sk_path):
     """
-    Loads all the keys required so sign, send, and verify the appointment.
+    Loads all the keys required to sign, send, and verify the appointment.
 
     Args:
         teos_pk_path (:obj:`str`): path to the tower's public key file.
