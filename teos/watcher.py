@@ -262,6 +262,9 @@ class Watcher:
         Returns:
             :obj:`tuple`: A tuple containing the appointment data and the status (either "being_watched" or
             "dispute_responded").
+
+        Raises:
+            :obj:`AppointmentNotFound`: If the appointment is not found in the tower.
         """
 
         message = "get appointment {}".format(locator).encode()
