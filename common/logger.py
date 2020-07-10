@@ -61,7 +61,7 @@ def setup_logging(log_file_path, silent=False):
     global configured
 
     if configured:
-        raise RuntimeError("logging was already configured.")
+        raise RuntimeError("Logging was already configured")
 
     logging.config.dictConfig({
             "version": 1,
