@@ -4,7 +4,7 @@ from threading import Thread, Event, Condition
 
 from common.logger import get_logger
 
-logger = get_logger(actor="ChainMonitor")
+logger = get_logger(component="ChainMonitor")
 
 
 class ChainMonitor:

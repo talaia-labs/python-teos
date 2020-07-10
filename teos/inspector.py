@@ -7,7 +7,7 @@ from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
 
 
-logger = get_logger(actor="Inspector")
+logger = get_logger(component="Inspector")
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by TEOS, would be stored in the logs. This is a possible DoS surface

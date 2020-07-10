@@ -4,7 +4,7 @@ import teos.rpc_errors as rpc_errors
 from teos.utils.auth_proxy import JSONRPCException
 from common.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
 
-logger = get_logger(actor="Carrier")
+logger = get_logger(component="Carrier")
 
 # FIXME: This class is not fully covered by unit tests
 

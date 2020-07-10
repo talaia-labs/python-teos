@@ -15,7 +15,7 @@ from teos.cleaner import Cleaner
 from teos.extended_appointment import ExtendedAppointment
 from teos.block_processor import InvalidTransactionFormat
 
-logger = get_logger(actor="Watcher")
+logger = get_logger(component="Watcher")
 
 
 class AppointmentLimitReached(BasicException):

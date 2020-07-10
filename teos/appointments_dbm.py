@@ -4,7 +4,7 @@ import plyvel
 from common.logger import get_logger
 from common.db_manager import DBManager
 
-logger = get_logger(actor="AppointmentsDBM")
+logger = get_logger(component="AppointmentsDBM")
 
 WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"

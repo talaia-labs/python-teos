@@ -15,7 +15,7 @@ from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
-logger = get_logger(actor="API")
+logger = get_logger(component="API")
 
 
 # NOTCOVERED: not sure how to monkey path this one. May be related to #77

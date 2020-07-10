@@ -1,6 +1,6 @@
 from common.logger import get_logger
 
-logger = get_logger(actor="Cleaner")
+logger = get_logger(component="Cleaner")
 
 
 class Cleaner:

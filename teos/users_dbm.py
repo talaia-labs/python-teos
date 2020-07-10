@@ -5,7 +5,7 @@ from common.logger import get_logger
 from common.db_manager import DBManager
 from common.tools import is_compressed_pk
 
-logger = get_logger(actor="UsersDBM")
+logger = get_logger(component="UsersDBM")
 
 
 class UsersDBM(DBManager):

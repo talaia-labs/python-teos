@@ -24,7 +24,7 @@ from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
-logger = get_logger(actor="Client")
+logger = get_logger(component="Client")
 
 
 def register(user_id, teos_id, teos_url):

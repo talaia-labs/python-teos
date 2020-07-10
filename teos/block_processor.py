@@ -4,7 +4,7 @@ from common.exceptions import BasicException
 from teos.tools import bitcoin_cli
 from teos.utils.auth_proxy import JSONRPCException
 
-logger = get_logger(actor="BlockProcessor")
+logger = get_logger(component="BlockProcessor")
 
 
 class InvalidTransactionFormat(BasicException):

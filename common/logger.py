@@ -1,8 +1,5 @@
-import json
-import logging
 import logging.config
 from io import StringIO
-from datetime import datetime
 import structlog
 
 configured = False # set to True once setup_logging is called
@@ -13,37 +10,30 @@ pre_chain = [
 ]
 
 
-# Stripped down version of structlog.dev.ConsoleRenderer, adding the "actor" instead of the level.
+# Stripped down version of structlog.dev.ConsoleRenderer, adding the "component" instead of the level.
 class CustomLogRenderer:
     """
-    Render ``event_dict``. It renders the timestamp, followed by the actor within "[]" (unless it's None),
-    followed by the event, then any remaining item in event_dict in the key=value format
+    Render ``event_dict``. It renders the timestamp, followed by the component within "[]" (unless it's None),
+    followed by the event, then any remaining item in ``event_dict`` in the key=value format.
     """
 
     def _repr(self, val):
-        """
-        Determine representation of *val* depending on its type.
-        """
-        if isinstance(val, str):
-            return val
-        else:
-            return repr(val)
+        """Returns the representation of *val* if it's not a ``str``."""
+        return val if isinstance(val, str) else repr(val)
 
     def __call__(self, _, __, event_dict):
+        """Returns ``event_dict`` rendered as a string."""
         sio = StringIO()
 
         ts = event_dict.pop("timestamp", None)
-        if ts is not None:
+        if ts:
             sio.write(str(ts) + " ")
 
-        actor = event_dict.pop("actor", None)
-        if actor is not None:
-            sio.write("[" + actor + "] ")
+        component = event_dict.pop("component", None)
+        if component:
+            sio.write("[" + component + "] ")
 
-        # force event to str for compatibility with standard library
-        event = event_dict.pop("event")
-        if not isinstance(event, str):
-            event = str(event)
+        event = self._repr(event_dict.pop("event"))
 
         sio.write(event)
 
@@ -61,12 +51,11 @@ def setup_logging(log_file_path, silent=False):
     Configures the logging options. It must be called only once, before using get_logger.
 
     Args:
-        log_file_path(:obj:`str`): the path and name of the log file.
-        silent(:obj:`str`): if True, only critical errors will be shown to console.
+        log_file_path (:obj:`str`): the path and name of the log file.
+        silent (:obj:`str`): if True, only critical errors will be shown to console.
 
     Raises:
-        (:obj:`RuntimeError`) setup_logger had already been called.
-
+        :obj:`RuntimeError` setup_logger had already been called.
     """
 
     global configured
@@ -121,13 +110,15 @@ def setup_logging(log_file_path, silent=False):
     configured = True
 
 
-def get_logger(actor=None):
+def get_logger(component=None):
     """
-    Returns a logger, that has the given `actor` in all future log entries.
+    Returns a logger, that has the given `component` in all future log entries.
+
+    Returns:
+        a proxy obtained from structlog.get_logger with the `component` as bound variable.
 
     Args:
-        actor(:obj:`str`): the name of the "actor" field that will be attached to all the logs issued by this logger.
-
+        component(:obj:`str`): the name of the "component" field that will be attached to all the logs issued by this logger.
     """
-    return structlog.get_logger(actor=actor)
+    return structlog.get_logger(component=component)
 

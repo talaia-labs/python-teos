@@ -9,7 +9,7 @@ from common.constants import IRREVOCABLY_RESOLVED
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
 
-logger = get_logger(actor="Responder")
+logger = get_logger(component="Responder")
 
 
 class TransactionTracker:

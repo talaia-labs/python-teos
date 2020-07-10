@@ -23,7 +23,7 @@ from teos.appointments_dbm import AppointmentsDBM
 from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
 
-logger = get_logger(actor="Daemon")
+logger = get_logger(component="Daemon")
 
 
 def handle_signals(signal_received, frame):
