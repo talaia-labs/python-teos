@@ -3,6 +3,7 @@ import re
 from common.tools import is_locator
 from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
+import common.errors as errors
 
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
