@@ -1,13 +1,14 @@
 import json
+import binascii
 import requests
 from requests import ConnectionError, ConnectTimeout
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
 from common import errors
 from common import constants
-from common.appointment import Appointment
-from common.exceptions import SignatureError
+import common.receipts as receipts
 from common.cryptographer import Cryptographer
+from common.exceptions import SignatureError, InvalidParameter
 
 from exceptions import TowerConnectionError, TowerResponseError
 
@@ -25,6 +26,7 @@ def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
         return response.get("signature"), response.get("available_slots")
 
     except SignatureError as e:
+        plugin.log(str(e))
         plugin.log(f"{tower_id} is misbehaving, not using it any longer")
         raise e
 
@@ -61,13 +63,25 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
 
     add_appointment_endpoint = f"{tower.netaddr}/add_appointment"
     response = process_post_response(post_request(data, add_appointment_endpoint, tower_id))
-    appointment_receipt = Appointment.create_receipt(signature, response.get("start_block"))
 
     tower_signature = response.get("signature")
-    # Check that the server signed the appointment as it should.
-    if not tower_signature:
-        raise SignatureError("The response does not contain the signature of the appointment", signature=None)
+    start_block = response.get("start_block")
 
+    if not tower_signature:
+        raise SignatureError("The response does not contain the signature of the appointment")
+
+    try:
+        appointment_receipt = receipts.create_appointment_receipt(signature, start_block)
+    except InvalidParameter as e:
+        raise SignatureError(
+            f"The receipt cannot be created. {e.msg}",
+            tower_id=tower_id,
+            recovered_id=None,
+            signature=tower_signature,
+            receipt=None,
+        )
+
+    # Check that the server signed the receipt as it should.
     rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     recovered_id = Cryptographer.get_compressed_pk(rpk)
     if tower_id != recovered_id:
@@ -76,6 +90,7 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
             tower_id=tower_id,
             recovered_id=recovered_id,
             signature=tower_signature,
+            receipt=binascii.hexlify(appointment_receipt).decode(),
         )
 
     return response

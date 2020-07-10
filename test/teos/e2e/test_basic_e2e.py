@@ -8,6 +8,7 @@ from coincurve import PrivateKey
 from cli.exceptions import TowerResponseError
 from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
+import common.receipts as receipts
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -85,7 +86,7 @@ def test_commands_registered(bitcoin_cli):
     global appointments_in_watcher
 
     # Test registering and trying again
-    teos_cli.register(user_id, teos_base_endpoint)
+    teos_cli.register(user_id, teos_id, teos_base_endpoint)
 
     # Add appointment
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
@@ -106,8 +107,7 @@ def test_appointment_life_cycle(bitcoin_cli):
     global appointments_in_watcher, appointments_in_responder
 
     # First of all we need to register
-    response = teos_cli.register(user_id, teos_base_endpoint)
-    available_slots = response.get("available_slots")
+    available_slots, subscription_expiry = teos_cli.register(user_id, teos_id, teos_base_endpoint)
 
     # After that we can build an appointment and send it to the tower
     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
@@ -165,9 +165,9 @@ def test_appointment_life_cycle(bitcoin_cli):
 
     # Check that the appointment is not in the Gatekeeper by checking the available slots (should have increase by 1)
     # We can do so by topping up the subscription (FIXME: find a better way to check this).
-    response = teos_cli.register(user_id, teos_base_endpoint)
+    available_slots_response, _ = teos_cli.register(user_id, teos_id, teos_base_endpoint)
     assert (
-        response.get("available_slots")
+        available_slots_response
         == available_slots
         + teos_config.get("SUBSCRIPTION_SLOTS")
         + 1
@@ -288,7 +288,7 @@ def test_appointment_wrong_decryption_key(bitcoin_cli):
 
     # Check that the server has accepted the appointment
     tower_signature = response_json.get("signature")
-    appointment_receipt = Appointment.create_receipt(signature, response_json.get("start_block"))
+    appointment_receipt = receipts.create_appointment_receipt(signature, response_json.get("start_block"))
     rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator
@@ -393,7 +393,7 @@ def test_two_appointment_same_locator_different_penalty_different_users(bitcoin_
     # tmp keys for a different user
     tmp_user_sk = PrivateKey()
     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
-    teos_cli.register(tmp_user_id, teos_base_endpoint)
+    teos_cli.register(tmp_user_id, teos_id, teos_base_endpoint)
 
     appointment_1 = teos_cli.create_appointment(appointment1_data)
     add_appointment(appointment_1)
@@ -480,7 +480,7 @@ def test_add_appointment_trigger_on_cache_cannot_decrypt(bitcoin_cli):
 
     # Check that the server has accepted the appointment
     tower_signature = response_json.get("signature")
-    appointment_receipt = Appointment.create_receipt(signature, response_json.get("start_block"))
+    appointment_receipt = receipts.create_appointment_receipt(signature, response_json.get("start_block"))
     rpk = Cryptographer.recover_pk(appointment_receipt, tower_signature)
     assert teos_id == Cryptographer.get_compressed_pk(rpk)
     assert response_json.get("locator") == appointment.locator

@@ -31,6 +31,19 @@ def is_256b_hex_str(value):
     return isinstance(value, str) and re.match(r"^[0-9A-Fa-f]{64}$", value) is not None
 
 
+def is_u4int(value):
+    """
+    Checks if a given value is an unsigned 4-byte integer.
+
+    Args:
+        value(:mod:`int`): the value to be checked.
+
+    Returns:
+        :obj:`bool`: Whether or not the value matches the format.
+    """
+    return isinstance(value, int) and 0 <= value <= pow(2, 32) - 1
+
+
 def is_locator(value):
     """
     Checks if a given value is a 16-byte hex encoded string.

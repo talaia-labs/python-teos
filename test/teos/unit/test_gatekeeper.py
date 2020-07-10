@@ -73,6 +73,31 @@ def test_add_update_user_wrong_id_prefix(gatekeeper):
         gatekeeper.add_update_user(wrong_id)
 
 
+def test_add_update_user_overflow(gatekeeper):
+    # Make sure that the available_slots in the user subscription cannot overflow
+
+    # First lets add the user
+    user_id = "03" + get_random_value_hex(32)
+    gatekeeper.add_update_user(user_id)
+
+    # Now let's set the available_slots to the max (2**32-1)
+    gatekeeper.registered_users[user_id].available_slots = pow(2, 32) - 1
+
+    # Check that it cannot accept anymore
+    with pytest.raises(InvalidParameter, match="Maximum slots reached"):
+        gatekeeper.add_update_user(user_id)
+
+    # Same if the default amount of slots added per query cannot be added to the current slot count
+    gatekeeper.registered_users[user_id].available_slots = pow(2, 32) - gatekeeper.subscription_slots
+
+    with pytest.raises(InvalidParameter, match="Maximum slots reached"):
+        gatekeeper.add_update_user(user_id)
+
+    # It should work as long as we don't go over the top
+    gatekeeper.registered_users[user_id].available_slots = pow(2, 32) - gatekeeper.subscription_slots - 1
+    gatekeeper.add_update_user(user_id)
+
+
 def test_identify_user(gatekeeper):
     # Identify user should return a user_pk for registered users. It raises
     # IdentificationFailure for invalid parameters or non-registered users.

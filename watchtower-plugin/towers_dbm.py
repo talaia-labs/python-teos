@@ -45,7 +45,8 @@ class TowersDBM(DBManager):
 
             except (json.JSONDecodeError, TypeError):
                 self.plugin.log(
-                    f"Could't add tower to db. Wrong tower data format (tower_id={tower_id}, tower_data={tower_data.to_dict()})"
+                    f"Could't add tower to db. Wrong tower data format (tower_id={tower_id}, "
+                    f"tower_data={tower_data.to_dict()})"
                 )
                 return False
 

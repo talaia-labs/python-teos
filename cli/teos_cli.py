@@ -16,6 +16,7 @@ from cli.help import show_usage, help_add_appointment, help_get_appointment, hel
 
 from common import constants
 from common.logger import Logger
+import common.receipts as receipts
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
@@ -26,16 +27,17 @@ from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compre
 logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
 
 
-def register(user_id, teos_url):
+def register(user_id, teos_id, teos_url):
     """
     Registers the user to the tower.
 
     Args:
         user_id (:obj:`str`): a 33-byte hex-encoded compressed public key representing the user.
+        teos_id (:obj:`str`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`dict`: a dictionary containing the tower response if the registration succeeded.
+        :obj:`tuple`: A tuple containing the available slots count and the subscription expiry
 
     Raises:
         :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `user_id` is invalid.
@@ -54,7 +56,21 @@ def register(user_id, teos_url):
     logger.info("Registering in the Eye of Satoshi")
     response = process_post_response(post_request(data, register_endpoint))
 
-    return response
+    available_slots = response.get("available_slots")
+    subscription_expiry = response.get("subscription_expiry")
+    tower_signature = response.get("subscription_signature")
+
+    # Check that the server signed the response as it should.
+    if not tower_signature:
+        raise TowerResponseError("The response does not contain the signature of the appointment")
+
+    # Check that the signature is correct.
+    subscription_receipt = receipts.create_registration_receipt(user_id, available_slots, subscription_expiry)
+    rpk = Cryptographer.recover_pk(subscription_receipt, tower_signature)
+    if teos_id != Cryptographer.get_compressed_pk(rpk):
+        raise TowerResponseError("The returned appointment's signature is invalid")
+
+    return available_slots, subscription_expiry
 
 
 def create_appointment(appointment_data):
@@ -125,7 +141,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
 
     tower_signature = response.get("signature")
     start_block = response.get("start_block")
-    appointment_receipt = Appointment.create_receipt(signature, start_block)
+    appointment_receipt = receipts.create_appointment_receipt(signature, start_block)
     # Check that the server signed the appointment as it should.
     if not tower_signature:
         raise TowerResponseError("The response does not contain the signature of the appointment")
@@ -422,8 +438,9 @@ def main(command, args, command_line_conf):
         teos_id, user_sk, user_id = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"))
 
         if command == "register":
-            register_data = register(user_id, teos_url)
-            logger.info("Registration succeeded. Available slots: {}".format(register_data.get("available_slots")))
+            available_slots, subscription_expiry = register(user_id, teos_id, teos_url)
+            logger.info("Registration succeeded. Available slots: {}".format(available_slots))
+            logger.info("Subscription expires at block {}".format(subscription_expiry))
 
         if command == "add_appointment":
             appointment_data = parse_add_appointment_args(args)

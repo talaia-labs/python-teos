@@ -20,6 +20,7 @@ from test.teos.unit.conftest import (
     compute_locator,
 )
 
+import common.receipts as receipts
 from common.cryptographer import Cryptographer, hash_160
 from common.constants import (
     HTTP_OK,
@@ -51,6 +52,9 @@ locator_dispute_tx_map = {}
 user_sk, user_pk = generate_keypair()
 user_id = hexlify(user_pk.format(compressed=True)).decode("utf-8")
 
+teos_sk, teos_pk = generate_keypair()
+teos_id = hexlify(teos_pk.format(compressed=True)).decode("utf-8")
+
 
 @pytest.fixture()
 def get_all_db_manager():
@@ -65,15 +69,13 @@ def get_all_db_manager():
 
 @pytest.fixture(scope="module", autouse=True)
 def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
-    sk, pk = generate_keypair()
-
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     watcher = Watcher(
         db_manager,
         gatekeeper,
         block_processor,
         responder,
-        sk.to_der(),
+        teos_sk.to_der(),
         MAX_APPOINTMENTS,
         config.get("LOCATOR_CACHE_SIZE"),
     )
@@ -123,6 +125,12 @@ def test_register(client, api):
     assert r.json.get("available_slots") == config.get("SUBSCRIPTION_SLOTS")
     assert r.json.get("subscription_expiry") == current_height + config.get("SUBSCRIPTION_DURATION")
 
+    slots = r.json.get("available_slots")
+    expiry = r.json.get("subscription_expiry")
+    subscription_receipt = receipts.create_registration_receipt(user_id, slots, expiry)
+    rpk = Cryptographer.recover_pk(subscription_receipt, r.json.get("subscription_signature"))
+    assert Cryptographer.get_compressed_pk(rpk) == teos_id
+
 
 def test_register_top_up(client, api):
     # Calling register more than once will give us SUBSCRIPTION_SLOTS * number_of_calls slots.
@@ -135,10 +143,16 @@ def test_register_top_up(client, api):
 
     for i in range(10):
         r = client.post(register_endpoint, json=data)
+        slots = r.json.get("available_slots")
+        expiry = r.json.get("subscription_expiry")
         assert r.status_code == HTTP_OK
         assert r.json.get("public_key") == tmp_user_id
-        assert r.json.get("available_slots") == config.get("SUBSCRIPTION_SLOTS") * (i + 1)
-        assert r.json.get("subscription_expiry") == current_height + config.get("SUBSCRIPTION_DURATION")
+        assert slots == config.get("SUBSCRIPTION_SLOTS") * (i + 1)
+        assert expiry == current_height + config.get("SUBSCRIPTION_DURATION")
+
+        subscription_receipt = receipts.create_registration_receipt(tmp_user_id, slots, expiry)
+        rpk = Cryptographer.recover_pk(subscription_receipt, r.json.get("subscription_signature"))
+        assert Cryptographer.get_compressed_pk(rpk) == teos_id
 
 
 def test_register_no_client_pk(client):
@@ -503,6 +517,8 @@ def test_get_appointment_not_registered_user(client):
 def test_get_appointment_in_watcher(api, client, appointment):
     # Mock the appointment in the Watcher
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
+    extended_appointment_summary = {"locator": appointment.locator, "user_id": user_id}
+    api.watcher.appointments[uuid] = extended_appointment_summary
     api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
 
     # Next we can request it
@@ -535,7 +551,7 @@ def test_get_appointment_in_responder(api, client, appointment):
     tx_tracker = TransactionTracker.from_dict(tracker_data)
 
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
-    api.watcher.db_manager.create_triggered_appointment_flag(uuid)
+    api.watcher.responder.trackers[uuid] = tx_tracker.get_summary()
     api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_dict())
 
     # Request back the data

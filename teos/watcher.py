@@ -4,6 +4,7 @@ from collections import OrderedDict
 from readerwriterlock import rwlock
 
 from common.logger import Logger
+import common.receipts as receipts
 from common.tools import compute_locator
 from common.exceptions import BasicException
 from common.exceptions import EncryptionError
@@ -24,6 +25,10 @@ class AppointmentLimitReached(BasicException):
 
 class AppointmentAlreadyTriggered(BasicException):
     """Raised when an appointment is sent to the Watcher but that same data has already been sent to the Responder"""
+
+
+class AppointmentNotFound(BasicException):
+    """Raised when an appointment is not found on the tower"""
 
 
 class LocatorCache:
@@ -227,6 +232,56 @@ class Watcher:
 
         return watcher_thread
 
+    def register(self, user_id):
+        """
+        Registers a user.
+
+        Args:
+            user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
+
+        Returns:
+            :obj:`tuple`: A tuple containing the available slots, the subscription expiry, and the signature of the
+            registration receipt by the Watcher.
+        """
+
+        available_slots, subscription_expiry, registration_receipt = self.gatekeeper.add_update_user(user_id)
+        signature = Cryptographer.sign(registration_receipt, self.signing_key)
+
+        return available_slots, subscription_expiry, signature
+
+    def get_appointment(self, locator, user_signature):
+        """
+        Gets information about an appointment.
+
+        The appointment can either be in the Watcher, the Responder, or not found.
+
+        Args:
+            locator (:obj:`str`): a 16-byte hex-encoded value used by the tower to detect channel breaches.
+            user_signature (:obj:`str`): the signature of the request by the user.
+
+        Returns:
+            :obj:`tuple`: A tuple containing the appointment data and the status (either "being_watched" or
+            "dispute_responded").
+
+        Raises:
+            :obj:`AppointmentNotFound`: If the appointment is not found in the tower.
+        """
+
+        message = "get appointment {}".format(locator).encode()
+        user_id = self.gatekeeper.authenticate_user(message, user_signature)
+        uuid = hash_160("{}{}".format(locator, user_id))
+
+        if uuid in self.appointments:
+            appointment_data = self.db_manager.load_watcher_appointment(uuid)
+            status = "being_watched"
+        elif uuid in self.responder.trackers:
+            appointment_data = self.db_manager.load_responder_tracker(uuid)
+            status = "dispute_responded"
+        else:
+            raise AppointmentNotFound("Cannot find {}".format(locator))
+
+        return appointment_data, status
+
     def add_appointment(self, appointment, user_signature):
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
@@ -332,7 +387,7 @@ class Watcher:
 
         try:
             signature = Cryptographer.sign(
-                ExtendedAppointment.create_receipt(user_signature, start_block), self.signing_key
+                receipts.create_appointment_receipt(user_signature, start_block), self.signing_key
             )
 
         except (InvalidParameter, SignatureError):

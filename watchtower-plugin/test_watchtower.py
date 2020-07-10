@@ -8,6 +8,7 @@ from pyln.testing.fixtures import *  # noqa: F401,F403
 
 from common import errors
 from common import constants
+import common.receipts as receipts
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
@@ -47,17 +48,17 @@ class TowerMock:
     def register(self):
         user_id = request.get_json().get("public_key")
 
-        if user_id not in self.users:
-            self.users[user_id] = {"available_slots": 100, "subscription_expiry": CURRENT_HEIGHT + 4320}
-        else:
-            self.users[user_id]["available_slots"] += 100
-            self.users[user_id]["subscription_expiry"] = CURRENT_HEIGHT + 4320
+        available_slots = 100 if user_id not in self.users else self.users[user_id]["available_slots"] + 100
+        subscription_expiry = CURRENT_HEIGHT + 4320
+        self.users[user_id] = {"available_slots": available_slots, "subscription_expiry": subscription_expiry}
+        registration_receipt = receipts.create_registration_receipt(user_id, available_slots, subscription_expiry)
 
         rcode = constants.HTTP_OK
         response = {
             "public_key": user_id,
             "available_slots": self.users[user_id].get("available_slots"),
             "subscription_expiry": self.users[user_id].get("subscription_expiry"),
+            "signature": Cryptographer.sign(registration_receipt, self.sk),
         }
 
         return response, rcode
@@ -105,10 +106,9 @@ class TowerMock:
 
 def add_appointment_success(appointment, signature, user, tower_sk):
     rcode = constants.HTTP_OK
-    current_height = CURRENT_HEIGHT  # this is not checked, so we can made it up
     response = {
         "locator": appointment.locator,
-        "signature": Cryptographer.sign(Appointment.create_receipt(signature, current_height), tower_sk),
+        "signature": Cryptographer.sign(receipts.create_appointment_receipt(signature, CURRENT_HEIGHT), tower_sk),
         "start_block": CURRENT_HEIGHT,
         "available_slots": user.get("available_slots") - 1,
         "subscription_expiry": user.get("subscription_expiry"),
@@ -157,7 +157,7 @@ def add_appointment_service_unavailable():
 def add_appointment_misbehaving_tower(appointment, signature, user, tower_sk):
     # This covers a tower signing with invalid keys
     wrong_sk = PrivateKey.from_hex(get_random_value_hex(32))
-    wrong_sig = Cryptographer.sign(Appointment.create_receipt(signature, CURRENT_HEIGHT), wrong_sk)
+    wrong_sig = Cryptographer.sign(receipts.create_appointment_receipt(signature, CURRENT_HEIGHT), wrong_sk)
 
     response, rcode = add_appointment_success(appointment, signature, user, tower_sk)
     user["appointments"][appointment.locator]["signature"] = wrong_sig

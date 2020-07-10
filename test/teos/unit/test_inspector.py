@@ -2,7 +2,6 @@ import pytest
 from binascii import unhexlify
 
 import common.errors as errors
-from common.appointment import Appointment
 from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
 

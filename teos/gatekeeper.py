@@ -1,8 +1,9 @@
 from math import ceil
 from threading import Lock
 
-from common.tools import is_compressed_pk
+from common.tools import is_compressed_pk, is_u4int
 from common.cryptographer import Cryptographer
+from common.receipts import create_registration_receipt
 from common.constants import ENCRYPTED_BLOB_MAX_SIZE_HEX
 from common.exceptions import InvalidParameter, InvalidKey, SignatureError
 
@@ -84,8 +85,8 @@ class Gatekeeper:
             user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
-            :obj:`tuple`: a tuple with the number of available slots in the user subscription and the subscription
-            expiry (in absolute block height).
+            :obj:`tuple`: a tuple with the number of available slots in the user subscription, the subscription
+            expiry (in absolute block height), and the registration_receipt.
 
         Raises:
             :obj:`InvalidParameter`: if the user_pk does not match the expected format.
@@ -100,14 +101,24 @@ class Gatekeeper:
             )
         else:
             # FIXME: For now new calls to register add subscription_slots to the current count and reset the expiry time
+            if not is_u4int(self.registered_users[user_id].available_slots + self.subscription_slots):
+                raise InvalidParameter("Maximum slots reached for the subscription")
+
             self.registered_users[user_id].available_slots += self.subscription_slots
             self.registered_users[user_id].subscription_expiry = (
                 self.block_processor.get_block_count() + self.subscription_duration
             )
 
         self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
+        receipt = create_registration_receipt(
+            user_id, self.registered_users[user_id].available_slots, self.registered_users[user_id].subscription_expiry
+        )
 
-        return self.registered_users[user_id].available_slots, self.registered_users[user_id].subscription_expiry
+        return (
+            self.registered_users[user_id].available_slots,
+            self.registered_users[user_id].subscription_expiry,
+            receipt,
+        )
 
     def authenticate_user(self, message, signature):
         """

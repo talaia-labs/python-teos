@@ -41,7 +41,7 @@ class TowerInfo:
 
         Returns:
             :obj:`TowerInfo`: A TowerInfo object built with the provided data.
-            
+
         Raises:
             :obj:`ValueError`: If any of the expected fields is missing in the dictionary.
         """

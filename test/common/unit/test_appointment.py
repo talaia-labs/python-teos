@@ -1,33 +1,8 @@
 import struct
 import pytest
 import binascii
-import pyzbase32
-from pytest import fixture
-from coincurve import PrivateKey
 
 from common.appointment import Appointment
-from common.cryptographer import Cryptographer
-from common.constants import LOCATOR_LEN_BYTES
-
-from test.common.unit.conftest import get_random_value_hex
-
-
-# Not much to test here, adding it for completeness
-@fixture
-def appointment_data():
-    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-    start_time = 100
-    end_time = 120
-    to_self_delay = 20
-    encrypted_blob_data = get_random_value_hex(100)
-
-    return {
-        "locator": locator,
-        "start_time": start_time,
-        "end_time": end_time,
-        "to_self_delay": to_self_delay,
-        "encrypted_blob": encrypted_blob_data,
-    }
 
 
 def test_init_appointment(appointment_data):
@@ -91,16 +66,3 @@ def test_serialize(appointment_data):
     assert binascii.hexlify(locator).decode() == appointment.locator
     assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob
     assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
-
-
-def test_create_receipt(appointment_data):
-    # Not much to test here, basically making sure the fields are in the correct order
-    # The receipt format is user_signature | start_block
-    sk = PrivateKey.from_int(42)
-    data = get_random_value_hex(120)
-    signature = Cryptographer.sign(data.encode(), sk)
-    start_block = 200
-    receipt = Appointment.create_receipt(signature, start_block)
-
-    assert pyzbase32.encode_bytes(receipt[:-4]).decode() == signature
-    assert struct.unpack(">I", receipt[-4:])[0] == start_block
