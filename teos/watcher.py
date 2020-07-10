@@ -15,8 +15,6 @@ from teos.cleaner import Cleaner
 from teos.extended_appointment import ExtendedAppointment
 from teos.block_processor import InvalidTransactionFormat
 
-logger = get_logger(component="Watcher")
-
 
 class AppointmentLimitReached(BasicException):
     """Raised when the tower maximum appointment count has been reached"""
@@ -49,6 +47,8 @@ class LocatorCache:
     """
 
     def __init__(self, blocks_in_cache):
+        self.logger = get_logger(component=LocatorCache.__name__)
+
         self.cache = dict()
         self.blocks = OrderedDict()
         self.cache_size = blocks_in_cache
@@ -111,7 +111,7 @@ class LocatorCache:
         with self.rw_lock.gen_wlock():
             self.cache.update(locator_txid_map)
             self.blocks[block_hash] = list(locator_txid_map.keys())
-            logger.debug("Block added to cache", block_hash=block_hash)
+            self.logger.debug("Block added to cache", block_hash=block_hash)
 
         if self.is_full():
             self.remove_oldest_block()
@@ -129,7 +129,7 @@ class LocatorCache:
             for locator in locators:
                 del self.cache[locator]
 
-        logger.debug("Block removed from cache", block_hash=block_hash)
+        self.logger.debug("Block removed from cache", block_hash=block_hash)
 
     def fix(self, last_known_block, block_processor):
         """
@@ -211,6 +211,8 @@ class Watcher:
     """
 
     def __init__(self, db_manager, gatekeeper, block_processor, responder, sk_der, max_appointments, blocks_in_cache):
+        self.logger = get_logger(component=Watcher.__name__)
+
         self.appointments = dict()
         self.locator_uuid_map = dict()
         self.block_queue = Queue()
@@ -314,7 +316,7 @@ class Watcher:
 
         if len(self.appointments) >= self.max_appointments:
             message = "Maximum appointments reached, appointment rejected"
-            logger.info(message, locator=appointment.locator)
+            self.logger.info(message, locator=appointment.locator)
             raise AppointmentLimitReached(message)
 
         user_id = self.gatekeeper.authenticate_user(appointment.serialize(), user_signature)
@@ -335,7 +337,7 @@ class Watcher:
         # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
         if uuid in self.responder.trackers:
             message = "Appointment already in Responder"
-            logger.info(message)
+            self.logger.info(message)
             raise AppointmentAlreadyTriggered(message)
 
         # Add the appointment to the Gatekeeper
@@ -391,10 +393,10 @@ class Watcher:
 
         except (InvalidParameter, SignatureError):
             # This should never happen since data is sanitized, just in case to avoid a crash
-            logger.error("Data couldn't be signed", appointment=extended_appointment.to_dict())
+            self.logger.error("Data couldn't be signed", appointment=extended_appointment.to_dict())
             signature = None
 
-        logger.info("New appointment accepted", locator=extended_appointment.locator)
+        self.logger.info("New appointment accepted", locator=extended_appointment.locator)
 
         return {
             "locator": extended_appointment.locator,
@@ -423,7 +425,7 @@ class Watcher:
         while True:
             block_hash = self.block_queue.get()
             block = self.block_processor.get_block(block_hash)
-            logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
+            self.logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
 
             # If a reorg is detected, the cache is fixed to cover the last `cache_size` blocks of the new chain
             if self.last_known_block != block.get("previousblockhash"):
@@ -454,7 +456,7 @@ class Watcher:
                 appointments_to_delete = []
 
                 for uuid, breach in valid_breaches.items():
-                    logger.info(
+                    self.logger.info(
                         "Notifying responder and deleting appointment",
                         penalty_txid=breach["penalty_txid"],
                         locator=breach["locator"],
@@ -496,7 +498,7 @@ class Watcher:
                 Cleaner.delete_gatekeeper_appointments(self.gatekeeper, appointments_to_delete_gatekeeper)
 
                 if len(self.appointments) != 0:
-                    logger.info("No more pending appointments")
+                    self.logger.info("No more pending appointments")
 
             # Register the last processed block for the Watcher
             self.db_manager.store_last_block_hash_watcher(block_hash)
@@ -521,10 +523,10 @@ class Watcher:
         breaches = {locator: locator_txid_map[locator] for locator in intersection}
 
         if len(breaches) > 0:
-            logger.info("List of breaches", breaches=breaches)
+            self.logger.info("List of breaches", breaches=breaches)
 
         else:
-            logger.info("No breaches found")
+            self.logger.info("No breaches found")
 
         return breaches
 
@@ -551,14 +553,14 @@ class Watcher:
             penalty_tx = self.block_processor.decode_raw_transaction(penalty_rawtx)
 
         except EncryptionError as e:
-            logger.info("Transaction cannot be decrypted", uuid=uuid)
+            self.logger.info("Transaction cannot be decrypted", uuid=uuid)
             raise e
 
         except InvalidTransactionFormat as e:
-            logger.info("The breach contained an invalid transaction", uuid=uuid)
+            self.logger.info("The breach contained an invalid transaction", uuid=uuid)
             raise e
 
-        logger.info(
+        self.logger.info(
             "Breach found for locator", locator=appointment.locator, uuid=uuid, penalty_txid=penalty_tx.get("txid")
         )
 

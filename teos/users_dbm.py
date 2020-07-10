@@ -5,8 +5,6 @@ from common.logger import get_logger
 from common.db_manager import DBManager
 from common.tools import is_compressed_pk
 
-logger = get_logger(component="UsersDBM")
-
 
 class UsersDBM(DBManager):
     """
@@ -23,6 +21,8 @@ class UsersDBM(DBManager):
     """
 
     def __init__(self, db_path):
+        self.logger = get_logger(component="UsersDBM")
+
         if not isinstance(db_path, str):
             raise ValueError("db_path must be a valid path/name")
 
@@ -31,7 +31,7 @@ class UsersDBM(DBManager):
 
         except plyvel.Error as e:
             if "LOCK: Resource temporarily unavailable" in str(e):
-                logger.info("The db is already being used by another process (LOCK)")
+                self.logger.info("The db is already being used by another process (LOCK)")
 
             raise e
 
@@ -50,18 +50,18 @@ class UsersDBM(DBManager):
         if is_compressed_pk(user_id):
             try:
                 self.create_entry(user_id, json.dumps(user_data))
-                logger.info("Adding user to Gatekeeper's db", user_id=user_id)
+                self.logger.info("Adding user to Gatekeeper's db", user_id=user_id)
                 return True
 
             except json.JSONDecodeError:
-                logger.info("Could't add user to db. Wrong user data format", user_id=user_id, user_data=user_data)
+                self.logger.info("Could't add user to db. Wrong user data format", user_id=user_id, user_data=user_data)
                 return False
 
             except TypeError:
-                logger.info("Could't add user to db", user_id=user_id, user_data=user_data)
+                self.logger.info("Could't add user to db", user_id=user_id, user_data=user_data)
                 return False
         else:
-            logger.info("Could't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
+            self.logger.info("Could't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
             return False
 
     def load_user(self, user_id):
@@ -99,11 +99,11 @@ class UsersDBM(DBManager):
 
         try:
             self.delete_entry(user_id)
-            logger.info("Deleting user from Gatekeeper's db", uuid=user_id)
+            self.logger.info("Deleting user from Gatekeeper's db", uuid=user_id)
             return True
 
         except TypeError:
-            logger.info("Cannot delete user from db, user key has wrong type", uuid=user_id)
+            self.logger.info("Cannot delete user from db, user key has wrong type", uuid=user_id)
             return False
 
     def load_all_users(self):

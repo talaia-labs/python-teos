@@ -4,8 +4,6 @@ from threading import Thread, Event, Condition
 
 from common.logger import get_logger
 
-logger = get_logger(component="ChainMonitor")
-
 
 class ChainMonitor:
     """
@@ -39,6 +37,7 @@ class ChainMonitor:
     """
 
     def __init__(self, watcher_queue, responder_queue, block_processor, bitcoind_feed_params):
+        self.logger = get_logger(component=ChainMonitor.__name__)
         self.best_tip = None
         self.last_tips = []
         self.terminate = False
@@ -119,7 +118,7 @@ class ChainMonitor:
                 self.lock.acquire()
                 if self.update_state(current_tip):
                     self.notify_subscribers(current_tip)
-                    logger.info("New block received via polling", block_hash=current_tip)
+                    self.logger.info("New block received via polling", block_hash=current_tip)
                 self.lock.release()
 
     def monitor_chain_zmq(self):
@@ -143,7 +142,7 @@ class ChainMonitor:
                     self.lock.acquire()
                     if self.update_state(block_hash):
                         self.notify_subscribers(block_hash)
-                        logger.info("New block received via zmq", block_hash=block_hash)
+                        self.logger.info("New block received via zmq", block_hash=block_hash)
                     self.lock.release()
 
     def monitor_chain(self):
