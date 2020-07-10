@@ -9,6 +9,7 @@ from common.tools import (
     compute_locator,
     setup_data_folder,
     setup_logging,
+    is_u4int,
 )
 from test.common.unit.conftest import get_random_value_hex
 
@@ -49,6 +50,24 @@ def test_is_256b_hex_str():
 
     for v in range(100):
         assert is_256b_hex_str(get_random_value_hex(32)) is True
+
+
+def test_is_u4int():
+    out_of_range = [-1, pow(2, 32)]
+    in_range = [0, pow(2, 32) // 2, pow(2, 32) - 1]
+    wrong_inputs = [None, str(), 46.67, dict(), "A", bytes(), get_random_value_hex(31)]
+
+    # Test ints out of the range return false
+    for x in out_of_range:
+        assert not is_u4int(x)
+
+    # Same for wrong inputs
+    for x in wrong_inputs:
+        assert not is_u4int(x)
+
+    # True is returned for values in range
+    for x in in_range:
+        assert is_u4int(x)
 
 
 def test_check_locator_format():
