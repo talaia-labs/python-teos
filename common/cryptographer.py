@@ -1,4 +1,6 @@
+import os.path
 import pyzbase32
+from pathlib import Path
 from hashlib import sha256, new
 from binascii import unhexlify, hexlify
 from coincurve.utils import int_to_bytes
@@ -181,6 +183,33 @@ class Cryptographer:
             raise EncryptionError("Cannot decrypt blob with the provided key", blob=encrypted_blob, key=secret)
 
         return blob
+
+    @staticmethod
+    def generate_key():
+        """
+        Generates an ECDSA private key (over secp256k1).
+
+        Returns:
+            :obj:`PrivateKey`: A private key.
+        """
+        return PrivateKey()
+
+    @staticmethod
+    def save_key_file(key, name, data_dir):
+        """
+        Saves a key to disk in DER format.
+
+        Args:
+            key (:obj:`bytes`): the key to be saved to disk.
+            name (:obj:`str`): the name of the key file to be generated.
+            data_dir (:obj:`str`): the data directory where the file will be saved.
+        """
+
+        # Create the output folder it it does not exist (and all the parents if they don't either)
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+
+        with open(os.path.join(data_dir, "{}.der".format(name)), "wb") as der_out:
+            der_out.write(key)
 
     @staticmethod
     def load_key_file(file_path):
