@@ -41,6 +41,7 @@ class Carrier:
             (rpc user, rpc password, host and port)
 
     Attributes:
+        logger: the logger for this component.
         issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
             and over. It should periodically be reset to prevent it from growing unbounded.
 

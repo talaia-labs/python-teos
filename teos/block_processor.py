@@ -17,6 +17,9 @@ class BlockProcessor:
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
             (rpc user, rpc password, host and port)
+
+    Attributes:
+        logger: the logger for this component.
     """
 
     def __init__(self, btc_connect_params):

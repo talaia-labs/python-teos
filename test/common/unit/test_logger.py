@@ -1,8 +1,4 @@
-import os
-import logging
-
-from common.constants import LOCATOR_LEN_BYTES
-from common.logger import get_logger, setup_logging, CustomLogRenderer
+from common.logger import CustomLogRenderer
 
 
 def test_CustomLogRenderer_with_event():

@@ -18,10 +18,13 @@ class UsersDBM(DBManager):
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
+
+    Attributes:
+        logger: the logger for this component.
     """
 
     def __init__(self, db_path):
-        self.logger = get_logger(component="UsersDBM")
+        self.logger = get_logger(component=UsersDBM.__name__)
 
         if not isinstance(db_path, str):
             raise ValueError("db_path must be a valid path/name")

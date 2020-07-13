@@ -38,6 +38,7 @@ class LocatorCache:
         blocks_in_cache (:obj:`int`): the numbers of blocks to keep in the cache.
 
     Attributes:
+        logger: the logger for this component.
         cache (:obj:`dict`): a dictionary of ``locator:dispute_txid`` pairs that received appointments are checked
             against.
         blocks (:obj:`OrderedDict`): An ordered dictionary of the last ``blocks_in_cache`` blocks (block_hash:locators).
@@ -48,7 +49,6 @@ class LocatorCache:
 
     def __init__(self, blocks_in_cache):
         self.logger = get_logger(component=LocatorCache.__name__)
-
         self.cache = dict()
         self.blocks = OrderedDict()
         self.cache_size = blocks_in_cache
@@ -425,7 +425,9 @@ class Watcher:
         while True:
             block_hash = self.block_queue.get()
             block = self.block_processor.get_block(block_hash)
-            self.logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
+            self.logger.info(
+                "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
+            )
 
             # If a reorg is detected, the cache is fixed to cover the last `cache_size` blocks of the new chain
             if self.last_known_block != block.get("previousblockhash"):

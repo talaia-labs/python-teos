@@ -1,7 +1,5 @@
 from common.logger import get_logger
 
-logger = get_logger(component="Cleaner")
-
 
 class Cleaner:
     """
@@ -9,6 +7,8 @@ class Cleaner:
 
     Mutable objects (like dicts) are passed-by-reference in Python, so no return is needed for the Cleaner.
     """
+
+    logger = get_logger(component="Cleaner")
 
     @staticmethod
     def delete_appointment_from_memory(uuid, appointments, locator_uuid_map):
@@ -77,10 +77,10 @@ class Cleaner:
                     db_manager.update_locator_map(locator, locator_map)
 
             else:
-                logger.error("Some UUIDs not found in the db", locator=locator, all_uuids=uuids)
+                Cleaner.logger.error("Some UUIDs not found in the db", locator=locator, all_uuids=uuids)
 
         else:
-            logger.error("Locator map not found in the db", locator=locator)
+            Cleaner.logger.error("Locator map not found in the db", locator=locator)
 
     @staticmethod
     def delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager):
@@ -102,7 +102,7 @@ class Cleaner:
 
         for uuid in expired_appointments:
             locator = appointments[uuid].get("locator")
-            logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
+            Cleaner.logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
 
             Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
 
@@ -141,7 +141,7 @@ class Cleaner:
         for uuid in completed_appointments:
             locator = appointments[uuid].get("locator")
 
-            logger.warning(
+            Cleaner.logger.warning(
                 "Appointment cannot be completed, it contains invalid data. Deleting", locator=locator, uuid=uuid
             )
 
@@ -201,13 +201,13 @@ class Cleaner:
         for uuid in completed_trackers:
 
             if expired:
-                logger.info(
+                Cleaner.logger.info(
                     "Appointment couldn't be completed. Expiry reached but penalty didn't make it to the chain",
                     uuid=uuid,
                     height=height,
                 )
             else:
-                logger.info(
+                Cleaner.logger.info(
                     "Appointment completed. Penalty transaction was irrevocably confirmed", uuid=uuid, height=height
                 )
 
@@ -218,7 +218,7 @@ class Cleaner:
             if len(tx_tracker_map[penalty_txid]) == 1:
                 tx_tracker_map.pop(penalty_txid)
 
-                logger.info("No more trackers for penalty transaction", penalty_txid=penalty_txid)
+                Cleaner.logger.info("No more trackers for penalty transaction", penalty_txid=penalty_txid)
 
             else:
                 tx_tracker_map[penalty_txid].remove(uuid)

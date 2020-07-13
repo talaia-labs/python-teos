@@ -33,6 +33,9 @@ class AppointmentsDBM(DBManager):
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
+
+    Attributes:
+        logger: the logger for this component.
     """
 
     def __init__(self, db_path):
@@ -187,7 +190,9 @@ class AppointmentsDBM(DBManager):
             return True
 
         except json.JSONDecodeError:
-            self.logger.info("Could't add appointment to db. Wrong appointment format.", uuid=uuid, appoinent=appointment)
+            self.logger.info(
+                "Could't add appointment to db. Wrong appointment format.", uuid=uuid, appoinent=appointment
+            )
             return False
 
         except TypeError:

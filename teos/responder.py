@@ -111,6 +111,7 @@ class Responder:
             get data from bitcoind.
 
     Attributes:
+        logger: the logger for this component.
         trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
             required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``user_id``).
             Each entry is identified by a ``uuid``.
@@ -132,7 +133,7 @@ class Responder:
     """
 
     def __init__(self, db_manager, gatekeeper, carrier, block_processor):
-        self.logger = get_logger(component="Responder")
+        self.logger = get_logger(component=Responder.__name__)
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
@@ -266,7 +267,9 @@ class Responder:
         while True:
             block_hash = self.block_queue.get()
             block = self.block_processor.get_block(block_hash)
-            self.logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
+            self.logger.info(
+                "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
+            )
 
             if len(self.trackers) > 0 and block is not None:
                 txids = block.get("tx")
@@ -342,7 +345,9 @@ class Responder:
             else:
                 self.missed_confirmations[tx] = 1
 
-            self.logger.info("Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx])
+            self.logger.info(
+                "Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx]
+            )
 
     def get_txs_to_rebroadcast(self):
         """

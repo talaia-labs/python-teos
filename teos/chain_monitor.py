@@ -21,6 +21,7 @@ class ChainMonitor:
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
     Attributes:
+        logger: the logger for this component.
         best_tip (:obj:`str`): a block hash representing the current best tip.
         last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         terminate (:obj:`bool`): a flag to signal the termination of the :class:`ChainMonitor` (shutdown the tower).
