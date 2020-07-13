@@ -39,7 +39,7 @@ class CustomLogRenderer:
         # Represent all the key=value elements still in event_dict
         key_value_part = ", ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
         if len(key_value_part) > 0:
-            sio.write("\t(" + key_value_part + ")")
+            sio.write("  (" + key_value_part + ")")
 
         return sio.getvalue()
 
