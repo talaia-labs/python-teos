@@ -78,4 +78,3 @@ def setup_data_folder(data_folder):
     """
 
     Path(data_folder).mkdir(parents=True, exist_ok=True)
-

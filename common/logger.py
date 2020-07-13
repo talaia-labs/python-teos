@@ -5,9 +5,7 @@ import structlog
 configured = False  # set to True once setup_logging is called
 
 timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
-pre_chain = [
-    timestamper,
-]
+pre_chain = [timestamper]
 
 
 # Stripped down version of structlog.dev.ConsoleRenderer, adding the "component" instead of the level.
@@ -71,7 +69,7 @@ def setup_logging(log_file_path, silent=False):
                     "()": structlog.stdlib.ProcessorFormatter,
                     "processor": CustomLogRenderer(),
                     "foreign_pre_chain": pre_chain,
-                },
+                }
             },
             "handlers": {
                 "console": {
@@ -86,13 +84,7 @@ def setup_logging(log_file_path, silent=False):
                     "formatter": "plain",
                 },
             },
-            "loggers": {
-                "": {
-                    "handlers": ["console", "file"],
-                    "level": "DEBUG",
-                    "propagate": True,
-                },
-            }
+            "loggers": {"": {"handlers": ["console", "file"], "level": "DEBUG", "propagate": True}},
         }
     )
 
@@ -119,7 +111,7 @@ def get_logger(component=None):
         a proxy obtained from structlog.get_logger with the `component` as bound variable.
 
     Args:
-        component(:obj:`str`): the value of the "component" field that will be attached to all the logs issued by this logger.
+        component(:obj:`str`): the value of the "component" field that will be attached to all the logs issued by this
+            logger.
     """
     return structlog.get_logger(component=component)
-
