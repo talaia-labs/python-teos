@@ -1,15 +1,10 @@
 import re
 
-from common import errors
-from common.logger import Logger
 from common.tools import is_locator
 from common.appointment import Appointment
 from common.constants import LOCATOR_LEN_HEX
+import common.errors as errors
 
-from teos import LOG_PREFIX
-
-
-logger = Logger(actor="Inspector", log_name_prefix=LOG_PREFIX)
 
 # FIXME: The inspector logs the wrong messages sent form the users. A possible attack surface would be to send a really
 #        long field that, even if not accepted by TEOS, would be stored in the logs. This is a possible DoS surface

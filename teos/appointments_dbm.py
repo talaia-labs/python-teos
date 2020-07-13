@@ -1,12 +1,8 @@
 import json
 import plyvel
 
-from teos import LOG_PREFIX
-
-from common.logger import Logger
+from common.logger import get_logger
 from common.db_manager import DBManager
-
-logger = Logger(actor="AppointmentsDBM", log_name_prefix=LOG_PREFIX)
 
 WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"
@@ -37,18 +33,23 @@ class AppointmentsDBM(DBManager):
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
+
+    Attributes:
+        logger: the logger for this component.
     """
 
     def __init__(self, db_path):
         if not isinstance(db_path, str):
             raise ValueError("db_path must be a valid path/name")
 
+        self.logger = get_logger(component=AppointmentsDBM.__name__)
+
         try:
             super().__init__(db_path)
 
         except plyvel.Error as e:
             if "LOCK: Resource temporarily unavailable" in str(e):
-                logger.info("The db is already being used by another process (LOCK)")
+                self.logger.info("The db is already being used by another process (LOCK)")
 
             raise e
 
@@ -185,15 +186,17 @@ class AppointmentsDBM(DBManager):
 
         try:
             self.create_entry(uuid, json.dumps(appointment), prefix=WATCHER_PREFIX)
-            logger.info("Adding appointment to Watchers's db", uuid=uuid)
+            self.logger.info("Adding appointment to Watchers's db", uuid=uuid)
             return True
 
         except json.JSONDecodeError:
-            logger.info("Could't add appointment to db. Wrong appointment format.", uuid=uuid, appoinent=appointment)
+            self.logger.info(
+                "Could't add appointment to db. Wrong appointment format.", uuid=uuid, appoinent=appointment
+            )
             return False
 
         except TypeError:
-            logger.info("Could't add appointment to db.", uuid=uuid, appoinent=appointment)
+            self.logger.info("Could't add appointment to db.", uuid=uuid, appoinent=appointment)
             return False
 
     def store_responder_tracker(self, uuid, tracker):
@@ -210,15 +213,15 @@ class AppointmentsDBM(DBManager):
 
         try:
             self.create_entry(uuid, json.dumps(tracker), prefix=RESPONDER_PREFIX)
-            logger.info("Adding tracker to Responder's db", uuid=uuid)
+            self.logger.info("Adding tracker to Responder's db", uuid=uuid)
             return True
 
         except json.JSONDecodeError:
-            logger.info("Could't add tracker to db. Wrong tracker format.", uuid=uuid, tracker=tracker)
+            self.logger.info("Could't add tracker to db. Wrong tracker format.", uuid=uuid, tracker=tracker)
             return False
 
         except TypeError:
-            logger.info("Could't add tracker to db.", uuid=uuid, tracker=tracker)
+            self.logger.info("Could't add tracker to db.", uuid=uuid, tracker=tracker)
             return False
 
     def load_locator_map(self, locator):
@@ -241,7 +244,7 @@ class AppointmentsDBM(DBManager):
             locator_map = json.loads(locator_map.decode("utf-8"))
 
         else:
-            logger.info("Locator not found in the db", locator=locator)
+            self.logger.info("Locator not found in the db", locator=locator)
 
         return locator_map
 
@@ -261,14 +264,14 @@ class AppointmentsDBM(DBManager):
         if locator_map is not None:
             if uuid not in locator_map:
                 locator_map.append(uuid)
-                logger.info("Updating locator map", locator=locator, uuid=uuid)
+                self.logger.info("Updating locator map", locator=locator, uuid=uuid)
 
             else:
-                logger.info("UUID already in the map", locator=locator, uuid=uuid)
+                self.logger.info("UUID already in the map", locator=locator, uuid=uuid)
 
         else:
             locator_map = [uuid]
-            logger.info("Creating new locator map", locator=locator, uuid=uuid)
+            self.logger.info("Creating new locator map", locator=locator, uuid=uuid)
 
         key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
         self.db.put(key, json.dumps(locator_map).encode("utf-8"))
@@ -290,7 +293,7 @@ class AppointmentsDBM(DBManager):
             self.db.put(key, json.dumps(locator_map).encode("utf-8"))
 
         else:
-            logger.error("Trying to update a locator_map with completely different, or empty, data")
+            self.logger.error("Trying to update a locator_map with completely different, or empty, data")
 
     def delete_locator_map(self, locator):
         """
@@ -305,11 +308,11 @@ class AppointmentsDBM(DBManager):
 
         try:
             self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
-            logger.info("Deleting locator map from db", locator=locator)
+            self.logger.info("Deleting locator map from db", locator=locator)
             return True
 
         except TypeError:
-            logger.info("Couldn't delete locator map from db, locator has wrong type", locator=locator)
+            self.logger.info("Couldn't delete locator map from db, locator has wrong type", locator=locator)
             return False
 
     def delete_watcher_appointment(self, uuid):
@@ -325,11 +328,11 @@ class AppointmentsDBM(DBManager):
 
         try:
             self.delete_entry(uuid, prefix=WATCHER_PREFIX)
-            logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+            self.logger.info("Deleting appointment from Watcher's db", uuid=uuid)
             return True
 
         except TypeError:
-            logger.info("Couldn't delete appointment from db, uuid has wrong type", uuid=uuid)
+            self.logger.info("Couldn't delete appointment from db, uuid has wrong type", uuid=uuid)
             return False
 
     def batch_delete_watcher_appointments(self, uuids):
@@ -343,7 +346,7 @@ class AppointmentsDBM(DBManager):
         with self.db.write_batch() as b:
             for uuid in uuids:
                 b.delete((WATCHER_PREFIX + uuid).encode("utf-8"))
-                logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+                self.logger.info("Deleting appointment from Watcher's db", uuid=uuid)
 
     def delete_responder_tracker(self, uuid):
         """
@@ -358,11 +361,11 @@ class AppointmentsDBM(DBManager):
 
         try:
             self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
-            logger.info("Deleting tracker from Responder's db", uuid=uuid)
+            self.logger.info("Deleting tracker from Responder's db", uuid=uuid)
             return True
 
         except TypeError:
-            logger.info("Couldn't delete tracker from db, uuid has wrong type", uuid=uuid)
+            self.logger.info("Couldn't delete tracker from db, uuid has wrong type", uuid=uuid)
             return False
 
     def batch_delete_responder_trackers(self, uuids):
@@ -376,7 +379,7 @@ class AppointmentsDBM(DBManager):
         with self.db.write_batch() as b:
             for uuid in uuids:
                 b.delete((RESPONDER_PREFIX + uuid).encode("utf-8"))
-                logger.info("Deleting appointment from Responder's db", uuid=uuid)
+                self.logger.info("Deleting appointment from Responder's db", uuid=uuid)
 
     def load_last_block_hash_watcher(self):
         """
@@ -445,7 +448,7 @@ class AppointmentsDBM(DBManager):
         """
 
         self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
-        logger.info("Flagging appointment as triggered", uuid=uuid)
+        self.logger.info("Flagging appointment as triggered", uuid=uuid)
 
     def batch_create_triggered_appointment_flag(self, uuids):
         """
@@ -458,7 +461,7 @@ class AppointmentsDBM(DBManager):
         with self.db.write_batch() as b:
             for uuid in uuids:
                 b.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), b"")
-                logger.info("Flagging appointment as triggered", uuid=uuid)
+                self.logger.info("Flagging appointment as triggered", uuid=uuid)
 
     def load_all_triggered_flags(self):
         """
@@ -486,11 +489,11 @@ class AppointmentsDBM(DBManager):
 
         try:
             self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
-            logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+            self.logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
             return True
 
         except TypeError:
-            logger.info("Couldn't delete triggered flag from db, uuid has wrong type", uuid=uuid)
+            self.logger.info("Couldn't delete triggered flag from db, uuid has wrong type", uuid=uuid)
             return False
 
     def batch_delete_triggered_appointment_flag(self, uuids):
@@ -504,4 +507,4 @@ class AppointmentsDBM(DBManager):
         with self.db.write_batch() as b:
             for uuid in uuids:
                 b.delete((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"))
-                logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+                self.logger.info("Removing triggered flag from appointment appointment", uuid=uuid)

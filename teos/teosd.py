@@ -3,10 +3,10 @@ from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-from common.logger import Logger
+from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
-from common.tools import setup_logging, setup_data_folder
+from common.tools import setup_data_folder
 
 from teos.api import API
 from teos.help import show_usage
@@ -20,10 +20,10 @@ from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
-from teos import LOG_PREFIX, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
+from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
 
-logger = Logger(actor="Daemon", log_name_prefix=LOG_PREFIX)
+logger = get_logger(component="Daemon")
 
 
 def handle_signals(signal_received, frame):
@@ -53,7 +53,7 @@ def main(command_line_conf):
             config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
 
         setup_data_folder(data_dir)
-        setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
+        setup_logging(config.get("LOG_FILE"))
 
         logger.info("Starting TEOS")
 

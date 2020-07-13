@@ -60,7 +60,7 @@ class Gatekeeper:
         expiry_delta (:obj:`int`): the grace period given to the user to renew their subscription.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get block from bitcoind.
-        user_db (:obj:`UserDBM <teos.user_dbm.UserDBM>`): a ``UserDBM`` instance to interact with the database.
+        user_db (:obj:`UsersDBM <teos.user_dbm.UsersDBM>`): a ``UsersDBM`` instance to interact with the database.
         registered_users (:obj:`dict`): a map of user_pk:UserInfo.
         lock (:obj:`Lock`): a Threading.Lock object to lock access to the Gatekeeper on updates.
 

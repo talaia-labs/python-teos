@@ -2,13 +2,12 @@ import os
 import logging
 from flask import Flask, request, abort, jsonify
 
-from teos import LOG_PREFIX
 import common.errors as errors
 from teos.inspector import InspectionFailed
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
-from common.logger import Logger
+from common.logger import get_logger
 from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
@@ -16,7 +15,6 @@ from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE
 
 # ToDo: #5-add-async-to-api
 app = Flask(__name__)
-logger = Logger(actor="API", log_name_prefix=LOG_PREFIX)
 
 
 # NOTCOVERED: not sure how to monkey path this one. May be related to #77
@@ -72,9 +70,13 @@ class API:
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
+
+    Attributes:
+        logger: the logger for this component.
     """
 
     def __init__(self, host, port, inspector, watcher):
+        self.logger = get_logger(component=API.__name__)
         self.host = host
         self.port = port
         self.inspector = inspector
@@ -110,14 +112,14 @@ class API:
         """
 
         remote_addr = get_remote_addr()
-        logger.info("Received register request", from_addr="{}".format(remote_addr))
+        self.logger.info("Received register request", from_addr="{}".format(remote_addr))
 
         # Check that data type and content are correct. Abort otherwise.
         try:
             request_data = get_request_data_json(request)
 
         except InvalidParameter as e:
-            logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
+            self.logger.info("Received invalid register request", from_addr="{}".format(remote_addr))
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
         user_id = request_data.get("public_key")
@@ -144,7 +146,7 @@ class API:
                 "error_code": errors.REGISTRATION_WRONG_FIELD_FORMAT,
             }
 
-        logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
+        self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
 
         return jsonify(response), rcode
 
@@ -164,7 +166,7 @@ class API:
 
         # Getting the real IP if the server is behind a reverse proxy
         remote_addr = get_remote_addr()
-        logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
+        self.logger.info("Received add_appointment request", from_addr="{}".format(remote_addr))
 
         # Check that data type and content are correct. Abort otherwise.
         try:
@@ -200,7 +202,7 @@ class API:
                 "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
             }
 
-        logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
+        self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
 
     def get_appointment(self):
@@ -230,14 +232,14 @@ class API:
             request_data = get_request_data_json(request)
 
         except InvalidParameter as e:
-            logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
+            self.logger.info("Received invalid get_appointment request", from_addr="{}".format(remote_addr))
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
         locator = request_data.get("locator")
 
         try:
             self.inspector.check_locator(locator)
-            logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
+            self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
             appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
 
             if status == "being_watched":
@@ -283,9 +285,7 @@ class API:
 
     def start(self):
         """ This function starts the Flask server used to run the API """
-
-        # Setting Flask log to ERROR only so it does not mess with our logging. Also disabling flask initial messages
-        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        # Disable flask initial messages
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
         app.run(host=self.host, port=self.port)

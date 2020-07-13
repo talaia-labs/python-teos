@@ -1,11 +1,8 @@
-from teos import LOG_PREFIX
-from common.logger import Logger
+from common.logger import get_logger
 from teos.tools import bitcoin_cli
 import teos.rpc_errors as rpc_errors
 from teos.utils.auth_proxy import JSONRPCException
 from common.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
-
-logger = Logger(actor="Carrier", log_name_prefix=LOG_PREFIX)
 
 # FIXME: This class is not fully covered by unit tests
 
@@ -44,12 +41,14 @@ class Carrier:
             (rpc user, rpc password, host and port)
 
     Attributes:
+        logger: the logger for this component.
         issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
             and over. It should periodically be reset to prevent it from growing unbounded.
 
     """
 
     def __init__(self, btc_connect_params):
+        self.logger = get_logger(component=Carrier.__name__)
         self.btc_connect_params = btc_connect_params
         self.issued_receipts = {}
 
@@ -67,13 +66,13 @@ class Carrier:
         """
 
         if txid in self.issued_receipts:
-            logger.info("Transaction already sent", txid=txid)
+            self.logger.info("Transaction already sent", txid=txid)
             receipt = self.issued_receipts[txid]
 
             return receipt
 
         try:
-            logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
+            self.logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
             bitcoin_cli(self.btc_connect_params).sendrawtransaction(rawtx)
 
             receipt = Receipt(delivered=True)
@@ -84,15 +83,15 @@ class Carrier:
             if errno == rpc_errors.RPC_VERIFY_REJECTED:
                 # DISCUSS: 37-transaction-rejection
                 receipt = Receipt(delivered=False, reason=rpc_errors.RPC_VERIFY_REJECTED)
-                logger.error("Transaction couldn't be broadcast", error=e.error)
+                self.logger.error("Transaction couldn't be broadcast", error=e.error)
 
             elif errno == rpc_errors.RPC_VERIFY_ERROR:
                 # DISCUSS: 37-transaction-rejection
                 receipt = Receipt(delivered=False, reason=rpc_errors.RPC_VERIFY_ERROR)
-                logger.error("Transaction couldn't be broadcast", error=e.error)
+                self.logger.error("Transaction couldn't be broadcast", error=e.error)
 
             elif errno == rpc_errors.RPC_VERIFY_ALREADY_IN_CHAIN:
-                logger.info("Transaction is already in the blockchain. Getting confirmation count", txid=txid)
+                self.logger.info("Transaction is already in the blockchain. Getting confirmation count", txid=txid)
 
                 # If the transaction is already in the chain, we get the number of confirmations and watch the tracker
                 # until the end of the appointment
@@ -114,12 +113,12 @@ class Carrier:
                 # Adding this here just for completeness. We should never end up here. The Carrier only sends txs
                 # handed by the Responder, who receives them from the Watcher, who checks that the tx can be properly
                 # deserialized
-                logger.info("Transaction cannot be deserialized".format(txid))
+                self.logger.info("Transaction cannot be deserialized".format(txid))
                 receipt = Receipt(delivered=False, reason=rpc_errors.RPC_DESERIALIZATION_ERROR)
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException", method="Carrier.send_transaction", error=e.error)
+                self.logger.error("JSONRPCException", method="Carrier.send_transaction", error=e.error)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
         self.issued_receipts[txid] = receipt
@@ -147,10 +146,10 @@ class Carrier:
             # reorged while we were querying bitcoind to get the confirmation count. In that case we just restart
             # the tracker
             if e.error.get("code") == rpc_errors.RPC_INVALID_ADDRESS_OR_KEY:
-                logger.info("Transaction not found in mempool nor blockchain", txid=txid)
+                self.logger.info("Transaction not found in mempool nor blockchain", txid=txid)
 
             else:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
-                logger.error("JSONRPCException", method="Carrier.get_transaction", error=e.error)
+                self.logger.error("JSONRPCException", method="Carrier.get_transaction", error=e.error)
 
             return None

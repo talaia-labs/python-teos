@@ -11,20 +11,20 @@ from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
 from cli.exceptions import TowerResponseError
-from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME, LOG_PREFIX
+from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
 
 from common import constants
-from common.logger import Logger
+from common.logger import get_logger, setup_logging
 import common.receipts as receipts
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
-from common.tools import setup_logging, setup_data_folder
+from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
-logger = Logger(actor="Client", log_name_prefix=LOG_PREFIX)
+logger = get_logger(component="Client")
 
 
 def register(user_id, teos_id, teos_url):
@@ -426,7 +426,7 @@ def main(command, args, command_line_conf):
     config = config_loader.build_config()
 
     setup_data_folder(DATA_DIR)
-    setup_logging(config.get("LOG_FILE"), LOG_PREFIX)
+    setup_logging(config.get("LOG_FILE"))
 
     # Set the teos url
     teos_url = "{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))

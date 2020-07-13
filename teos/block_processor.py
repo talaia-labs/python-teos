@@ -1,11 +1,8 @@
-from common.logger import Logger
+from common.logger import get_logger
 from common.exceptions import BasicException
 
-from teos import LOG_PREFIX
 from teos.tools import bitcoin_cli
 from teos.utils.auth_proxy import JSONRPCException
-
-logger = Logger(actor="BlockProcessor", log_name_prefix=LOG_PREFIX)
 
 
 class InvalidTransactionFormat(BasicException):
@@ -20,9 +17,13 @@ class BlockProcessor:
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
             (rpc user, rpc password, host and port)
+
+    Attributes:
+        logger: the logger for this component.
     """
 
     def __init__(self, btc_connect_params):
+        self.logger = get_logger(component=BlockProcessor.__name__)
         self.btc_connect_params = btc_connect_params
 
     def get_block(self, block_hash):
@@ -43,7 +44,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block = None
-            logger.error("Couldn't get block from bitcoind", error=e.error)
+            self.logger.error("Couldn't get block from bitcoind", error=e.error)
 
         return block
 
@@ -62,7 +63,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block_hash = None
-            logger.error("Couldn't get block hash", error=e.error)
+            self.logger.error("Couldn't get block hash", error=e.error)
 
         return block_hash
 
@@ -81,7 +82,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             block_count = None
-            logger.error("Couldn't get block count", error=e.error)
+            self.logger.error("Couldn't get block count", error=e.error)
 
         return block_count
 
@@ -105,7 +106,7 @@ class BlockProcessor:
 
         except JSONRPCException as e:
             msg = "Cannot build transaction from decoded data"
-            logger.error(msg, error=e.error)
+            self.logger.error(msg, error=e.error)
             raise InvalidTransactionFormat(msg)
 
         return tx

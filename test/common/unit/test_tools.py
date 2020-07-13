@@ -1,16 +1,7 @@
 import os
-import logging
 
 from common.constants import LOCATOR_LEN_BYTES
-from common.tools import (
-    is_compressed_pk,
-    is_256b_hex_str,
-    is_locator,
-    compute_locator,
-    setup_data_folder,
-    setup_logging,
-    is_u4int,
-)
+from common.tools import is_compressed_pk, is_256b_hex_str, is_locator, compute_locator, setup_data_folder, is_u4int
 from test.common.unit.conftest import get_random_value_hex
 
 
@@ -111,22 +102,3 @@ def test_setup_data_folder():
     assert os.path.isdir(test_folder)
 
     os.rmdir(test_folder)
-
-
-def test_setup_logging():
-    # Check that setup_logging creates two new logs for every prefix
-    prefix = "foo"
-    log_file = "var.log"
-
-    f_log_suffix = "_file_log"
-    c_log_suffix = "_console_log"
-
-    assert len(logging.getLogger(prefix + f_log_suffix).handlers) == 0
-    assert len(logging.getLogger(prefix + c_log_suffix).handlers) == 0
-
-    setup_logging(log_file, prefix)
-
-    assert len(logging.getLogger(prefix + f_log_suffix).handlers) == 1
-    assert len(logging.getLogger(prefix + c_log_suffix).handlers) == 1
-
-    os.remove(log_file)

@@ -2,10 +2,7 @@ import zmq
 import binascii
 from threading import Thread, Event, Condition
 
-from teos import LOG_PREFIX
-from common.logger import Logger
-
-logger = Logger(actor="ChainMonitor", log_name_prefix=LOG_PREFIX)
+from common.logger import get_logger
 
 
 class ChainMonitor:
@@ -24,6 +21,7 @@ class ChainMonitor:
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
     Attributes:
+        logger: the logger for this component.
         best_tip (:obj:`str`): a block hash representing the current best tip.
         last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         terminate (:obj:`bool`): a flag to signal the termination of the :class:`ChainMonitor` (shutdown the tower).
@@ -40,6 +38,7 @@ class ChainMonitor:
     """
 
     def __init__(self, watcher_queue, responder_queue, block_processor, bitcoind_feed_params):
+        self.logger = get_logger(component=ChainMonitor.__name__)
         self.best_tip = None
         self.last_tips = []
         self.terminate = False
@@ -120,7 +119,7 @@ class ChainMonitor:
                 self.lock.acquire()
                 if self.update_state(current_tip):
                     self.notify_subscribers(current_tip)
-                    logger.info("New block received via polling", block_hash=current_tip)
+                    self.logger.info("New block received via polling", block_hash=current_tip)
                 self.lock.release()
 
     def monitor_chain_zmq(self):
@@ -144,7 +143,7 @@ class ChainMonitor:
                     self.lock.acquire()
                     if self.update_state(block_hash):
                         self.notify_subscribers(block_hash)
-                        logger.info("New block received via zmq", block_hash=block_hash)
+                        self.logger.info("New block received via zmq", block_hash=block_hash)
                     self.lock.release()
 
     def monitor_chain(self):

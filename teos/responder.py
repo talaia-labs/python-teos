@@ -1,16 +1,13 @@
 from queue import Queue
 from threading import Thread
 
-from teos import LOG_PREFIX
 from teos.cleaner import Cleaner
 
-from common.logger import Logger
+from common.logger import get_logger
 from common.constants import IRREVOCABLY_RESOLVED
 
 CONFIRMATIONS_BEFORE_RETRY = 6
 MIN_CONFIRMATIONS = 6
-
-logger = Logger(actor="Responder", log_name_prefix=LOG_PREFIX)
 
 
 class TransactionTracker:
@@ -114,6 +111,7 @@ class Responder:
             get data from bitcoind.
 
     Attributes:
+        logger: the logger for this component.
         trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
             required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``user_id``).
             Each entry is identified by a ``uuid``.
@@ -135,6 +133,7 @@ class Responder:
     """
 
     def __init__(self, db_manager, gatekeeper, carrier, block_processor):
+        self.logger = get_logger(component=Responder.__name__)
         self.trackers = dict()
         self.tx_tracker_map = dict()
         self.unconfirmed_txs = []
@@ -209,7 +208,7 @@ class Responder:
         else:
             # TODO: Add the missing reasons (e.g. RPC_VERIFY_REJECTED)
             # TODO: Use self.on_sync(block_hash) to check whether or not we failed because we are out of sync
-            logger.warning(
+            self.logger.warning(
                 "Tracker cannot be created", reason=receipt.reason, uuid=uuid, on_sync=self.on_sync(block_hash)
             )
 
@@ -250,7 +249,7 @@ class Responder:
 
         self.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
-        logger.info("New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, user_id=user_id)
+        self.logger.info("New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, user_id=user_id)
 
     def do_watch(self):
         """
@@ -268,7 +267,9 @@ class Responder:
         while True:
             block_hash = self.block_queue.get()
             block = self.block_processor.get_block(block_hash)
-            logger.info("New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash"))
+            self.logger.info(
+                "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
+            )
 
             if len(self.trackers) > 0 and block is not None:
                 txids = block.get("tx")
@@ -298,7 +299,7 @@ class Responder:
 
                 # NOTCOVERED
                 else:
-                    logger.warning(
+                    self.logger.warning(
                         "Reorg found",
                         local_prev_block_hash=self.last_known_block,
                         remote_prev_block_hash=block.get("previousblockhash"),
@@ -311,7 +312,7 @@ class Responder:
                 self.carrier.issued_receipts = {}
 
                 if len(self.trackers) == 0:
-                    logger.info("No more pending trackers")
+                    self.logger.info("No more pending trackers")
 
             # Register the last processed block for the responder
             self.db_manager.store_last_block_hash_responder(block_hash)
@@ -334,7 +335,7 @@ class Responder:
             if tx in self.tx_tracker_map and tx in self.unconfirmed_txs:
                 self.unconfirmed_txs.remove(tx)
 
-                logger.info("Confirmation received for transaction", tx=tx)
+                self.logger.info("Confirmation received for transaction", tx=tx)
 
         # We also add a missing confirmation to all those txs waiting to be confirmed that have not been confirmed in
         # the current block
@@ -344,7 +345,9 @@ class Responder:
             else:
                 self.missed_confirmations[tx] = 1
 
-            logger.info("Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx])
+            self.logger.info(
+                "Transaction missed a confirmation", tx=tx, missed_confirmations=self.missed_confirmations[tx]
+            )
 
     def get_txs_to_rebroadcast(self):
         """
@@ -445,7 +448,7 @@ class Responder:
             #   should we do it only once?
             for uuid in self.tx_tracker_map[txid]:
                 tracker = TransactionTracker.from_dict(self.db_manager.load_responder_tracker(uuid))
-                logger.warning(
+                self.logger.warning(
                     "Transaction has missed many confirmations. Rebroadcasting", penalty_txid=tracker.penalty_txid
                 )
 
@@ -454,7 +457,7 @@ class Responder:
 
                 if not receipt.delivered:
                     # FIXME: Can this actually happen?
-                    logger.warning("Transaction failed", penalty_txid=tracker.penalty_txid)
+                    self.logger.warning("Transaction failed", penalty_txid=tracker.penalty_txid)
 
         return receipts
 
@@ -486,7 +489,7 @@ class Responder:
                     if penalty_tx.get("confirmations") is None:
                         self.unconfirmed_txs.append(tracker.penalty_txid)
 
-                        logger.info(
+                        self.logger.info(
                             "Penalty transaction back in mempool. Updating unconfirmed transactions",
                             penalty_txid=tracker.penalty_txid,
                         )
@@ -503,7 +506,7 @@ class Responder:
                         block_hash,
                     )
 
-                    logger.warning(
+                    self.logger.warning(
                         "Penalty transaction banished. Resetting the tracker", penalty_tx=tracker.penalty_txid
                     )
 
@@ -511,5 +514,5 @@ class Responder:
                 # ToDo: #24-properly-handle-reorgs
                 # FIXME: if the dispute is not on chain (either in mempool or not there at all), we need to call the
                 #        reorg manager
-                logger.warning("Dispute and penalty transaction missing. Calling the reorg manager")
-                logger.error("Reorg manager not yet implemented")
+                self.logger.warning("Dispute and penalty transaction missing. Calling the reorg manager")
+                self.logger.error("Reorg manager not yet implemented")

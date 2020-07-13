@@ -7,3 +7,4 @@ pyzbase32
 requests
 plyvel
 readerwriterlock
+structlog
