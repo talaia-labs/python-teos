@@ -285,9 +285,7 @@ class API:
 
     def start(self):
         """ This function starts the Flask server used to run the API """
-
-        # Setting Flask log to ERROR only so it does not mess with our logging. Also disabling flask initial messages
-        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        # Disable flask initial messages
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
         app.run(host=self.host, port=self.port)
