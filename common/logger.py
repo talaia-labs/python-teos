@@ -119,7 +119,7 @@ def get_logger(component=None):
         a proxy obtained from structlog.get_logger with the `component` as bound variable.
 
     Args:
-        component(:obj:`str`): the name of the "component" field that will be attached to all the logs issued by this logger.
+        component(:obj:`str`): the value of the "component" field that will be attached to all the logs issued by this logger.
     """
     return structlog.get_logger(component=component)
 
