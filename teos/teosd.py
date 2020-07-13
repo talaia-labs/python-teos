@@ -3,6 +3,8 @@ from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+import daemon
+
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
@@ -215,6 +217,7 @@ if __name__ == "__main__":
                 "btcfeedconnect=",
                 "btcfeedport=",
                 "datadir=",
+                "daemon",
                 "overwritekey",
                 "help",
             ],
@@ -249,6 +252,8 @@ if __name__ == "__main__":
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
+            if opt in ["--daemon"]:
+                command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:
                 command_line_conf["OVERWRITE_KEY"] = True
             if opt in ["-h", "--help"]:
@@ -258,5 +263,9 @@ if __name__ == "__main__":
         exit(e)
 
     config = get_config(command_line_conf)
-
-    main(config)
+    if config.get("DAEMON"):
+        print("Starting TEOS in daemon mode.")
+        with daemon.DaemonContext():
+            main(config)
+    else:
+        main(config)
