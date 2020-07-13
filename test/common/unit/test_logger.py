@@ -37,4 +37,4 @@ def test_CustomLogRenderer_with_event_and_timestamp_and_component_and_extra_keys
         "aKeyBefore": 42,  # should be rendered before "key", because it comes lexicographically before
     }
     renderer = CustomLogRenderer()
-    assert renderer(None, None, event_dict) == "today [MyAwesomeComponent] Test\taKeyBefore=42 key=6"
+    assert renderer(None, None, event_dict) == "today [MyAwesomeComponent] Test\t(aKeyBefore=42, key=6)"

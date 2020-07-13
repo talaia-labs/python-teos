@@ -2,7 +2,7 @@ import logging.config
 from io import StringIO
 import structlog
 
-configured = False # set to True once setup_logging is called
+configured = False  # set to True once setup_logging is called
 
 timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
 pre_chain = [
@@ -38,12 +38,11 @@ class CustomLogRenderer:
         sio.write(event)
 
         # Represent all the key=value elements still in event_dict
-        key_value_part = " ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
+        key_value_part = ", ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
         if len(key_value_part) > 0:
-            sio.write("\t" + key_value_part)
+            sio.write("\t(" + key_value_part + ")")
 
         return sio.getvalue()
-
 
 
 def setup_logging(log_file_path, silent=False):
@@ -63,7 +62,8 @@ def setup_logging(log_file_path, silent=False):
     if configured:
         raise RuntimeError("Logging was already configured")
 
-    logging.config.dictConfig({
+    logging.config.dictConfig(
+        {
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
@@ -93,7 +93,8 @@ def setup_logging(log_file_path, silent=False):
                     "propagate": True,
                 },
             }
-    })
+        }
+    )
 
     structlog.configure(
         processors=[
