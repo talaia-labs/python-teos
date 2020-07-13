@@ -45,7 +45,7 @@ and / or
 
 ### Tower id and signing key
 
-`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. You can follow [generate keys](#generate-keys) to generate them.
+`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. This keys are automatically generated on the first run, and can be refreshed by running `teos` with the `--overwritekey` flag.
 
 ### Starting the TEOS daemon 👁
 
@@ -168,31 +168,9 @@ Since `teos_cli` works independently of `teos`, it uses a different configuratio
 - Some options ca also be changed via command line. 
 - The configuration file template can be found at [cli/template.conf](cli/template.conf))
 
-`teos_cli` needs an independent set of keys and, top of that, a copy of tower's the public key (`teos_pk.der`). Check [generate keys](#generate-keys) for more on how to set this.
+`teos_cli` needs an independent set of keys that are also automatically generated in the same way as `teos`.
 
 Notice that `teos_cli` is a simple way to interact with `teos`, but ideally that should be part of your wallet functionality (therefore why they are independent entities). `teos_cli` can be used as an example for how to send data to a [BOLT13](https://github.com/sr-gi/bolt13) compliant watchtower.
-
-## Generate Keys
-
-In order to generate a pair of keys for `teos` (or `teos_cli`) you can use `generate_keys.py`. 
-
-The script generates and stores a set of keys on disk (by default it outputs them in the current directory and names them `teos_sk.der` and `teos_pk.der`). The name and output directory can be changed using `-n` and `-d` respectively.
-
-The following command will generate a set of keys for `teos` and store it in the default data directory (`~/.teos`):
-```
-python generate_keys.py -d ~/.teos
-``` 
-
-The following command will generate a set of keys for `teos_cli` and store it in the default data directory (`~/.teos_cli`):
-```
-python generate_keys.py -n cli -d ~/.teos_cli
-``` 
-
-Notice that `cli` needs a copy of the tower public key, so you should make a copy of that if you're using different data directories (as in this example):
-
-```
-cp ~/.teos/teos_pk.der ~/.teos_cli/teos_pk.der 
-```
 
 ## Contributing 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md)
