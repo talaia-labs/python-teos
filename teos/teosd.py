@@ -35,7 +35,26 @@ def handle_signals(signal_received, frame):
     exit(0)
 
 
-def main(command_line_conf):
+def get_config(command_line_conf):
+    """
+    Combines the command line config with the config loaded from the file (or the default config)
+    in order to construct the final config object.
+    """
+    data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+    config = config_loader.build_config()
+
+    # make sure the "DATA_DIR" is present in the config object
+    config["DATA_DIR"] = data_dir
+
+    # Set default RPC port if not overwritten by the user.
+    if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
+        config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
+
+    return config
+
+
+def main(config):
     global db_manager, chain_monitor
 
     try:
@@ -43,17 +62,9 @@ def main(command_line_conf):
         signal(SIGTERM, handle_signals)
         signal(SIGQUIT, handle_signals)
 
-        # Loads config and sets up the base data folder and log file
-        data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
-        config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
-        config = config_loader.build_config()
-
+        # sets up the base data folder and log file
         network = config.get("BTC_NETWORK")
-
-        # Set default RPC port if not overwritten by the user.
-        if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
-            config["BTC_RPC_PORT"] = get_default_rpc_port(network)
-
+        data_dir = config.get("DATA_DIR")
         # if not on mainnet, data is in the appropriate subfolder
         data_dir_network = data_dir if network == "mainnet" else os.path.join(data_dir, network)
 
@@ -246,4 +257,6 @@ if __name__ == "__main__":
     except GetoptError as e:
         exit(e)
 
-    main(command_line_conf)
+    config = get_config(command_line_conf)
+
+    main(config)
