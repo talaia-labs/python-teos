@@ -72,7 +72,7 @@ def watcher(db_manager, gatekeeper):
         gatekeeper,
         block_processor,
         responder,
-        signing_key.to_der(),
+        signing_key,
         MAX_APPOINTMENTS,
         config.get("LOCATOR_CACHE_SIZE"),
     )
