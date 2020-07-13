@@ -122,5 +122,6 @@ class ConfigLoader:
 
         for key, field in self.conf_fields.items():
             if field.get("path") and isinstance(field.get("value"), str):
-                base_path = os.path.join(self.data_dir, self.conf_fields[key]["value"])
-                self.conf_fields[key]["value"] = os.path.join(self.data_dir, network_suffix, self.conf_fields[key]["value"])
+                self.conf_fields[key]["value"] = os.path.join(
+                    self.data_dir, network_suffix, self.conf_fields[key]["value"]
+                )
