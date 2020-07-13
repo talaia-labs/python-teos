@@ -1,3 +1,4 @@
+import logging
 import logging.config
 from io import StringIO
 import structlog
@@ -71,17 +72,22 @@ def setup_logging(log_file_path, silent=False):
                     "foreign_pre_chain": pre_chain,
                 }
             },
+            "filters": {  # filter out logs that do not come from teos
+                "onlyteos": {"()": logging.Filter, "name": "teos"}
+            },
             "handlers": {
                 "console": {
                     "level": "INFO" if not silent else "CRITICAL",
                     "class": "logging.StreamHandler",
                     "formatter": "plain",
+                    "filters": ["onlyteos"],
                 },
                 "file": {
                     "level": "DEBUG",
                     "class": "logging.handlers.WatchedFileHandler",
                     "filename": log_file_path,
                     "formatter": "plain",
+                    "filters": ["onlyteos"],
                 },
             },
             "loggers": {"": {"handlers": ["console", "file"], "level": "DEBUG", "propagate": True}},
@@ -114,4 +120,4 @@ def get_logger(component=None):
         component(:obj:`str`): the value of the "component" field that will be attached to all the logs issued by this
             logger.
     """
-    return structlog.get_logger(component=component)
+    return structlog.get_logger("teos", component=component)
