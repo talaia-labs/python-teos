@@ -1,15 +1,7 @@
 import os
-import logging
 
 from common.constants import LOCATOR_LEN_BYTES
-from common.tools import (
-    is_compressed_pk,
-    is_256b_hex_str,
-    is_locator,
-    compute_locator,
-    setup_data_folder,
-    is_u4int,
-)
+from common.tools import is_compressed_pk, is_256b_hex_str, is_locator, compute_locator, setup_data_folder, is_u4int
 from test.common.unit.conftest import get_random_value_hex
 
 

@@ -2,9 +2,7 @@ from common.logger import CustomLogRenderer, get_logger
 
 
 def test_CustomLogRenderer_with_event():
-    event_dict = {
-        "event": "Test",
-    }
+    event_dict = {"event": "Test"}
     renderer = CustomLogRenderer()
     assert renderer(None, None, event_dict) == "Test"
 
