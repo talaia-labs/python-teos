@@ -1,3 +1,4 @@
+import os
 import json
 import pytest
 from time import sleep
@@ -9,6 +10,7 @@ from cli.exceptions import TowerResponseError
 from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 import common.receipts as receipts
+from common.exceptions import InvalidKey
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
@@ -29,7 +31,7 @@ from test.teos.e2e.conftest import (
 
 cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
 teos_config = get_config(TEOS_DATA_DIR, TEOS_CONF_FILE_NAME, TEOS_CONF)
-
+teos_datadir_network = os.path.join(TEOS_DATA_DIR, teos_config.get("BTC_NETWORK"))
 
 teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
@@ -37,10 +39,14 @@ teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
 
 # Run teosd
-teosd_process = run_teosd()
+teosd_process, teos_id = run_teosd(teos_datadir_network)
 
-user_sk, user_id = teos_cli.load_keys(cli_config.get("CLI_PRIVATE_KEY"))
-teos_id = teos_cli.load_teos_id(cli_config.get("TEOS_PUBLIC_KEY"))
+try:
+    user_sk, user_id = teos_cli.load_keys(cli_config.get("CLI_PRIVATE_KEY"))
+except InvalidKey:
+    user_sk = Cryptographer.generate_key()
+    user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
+
 
 appointments_in_watcher = 0
 appointments_in_responder = 0
@@ -508,7 +514,7 @@ def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
 
     # Restart teos
     teosd_process.terminate()
-    teosd_process = run_teosd()
+    teosd_process, _ = run_teosd(teos_datadir_network)
 
     assert teos_pid != teosd_process.pid
 
@@ -553,7 +559,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(bitcoin_cli):
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
 
     # Restart
-    teosd_process = run_teosd()
+    teosd_process, _ = run_teosd(teos_datadir_network)
     assert teos_pid != teosd_process.pid
 
     # The appointment should have been moved to the Responder
