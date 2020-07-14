@@ -451,7 +451,15 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
+        if os.path.exists(config.get("CLI_PRIVATE_KEY")):
+            logger.info("Client id found. Loading keys")
+            user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
+
+        else:
+            logger.info("Client id not found. Generating new keys")
+            user_sk = Cryptographer.generate_key()
+            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", DATA_DIR)
+            user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
         if command == "register":
             if not args:
@@ -465,8 +473,8 @@ def main(command, args, command_line_conf):
                 logger.info("Registration succeeded. Available slots: {}".format(available_slots))
                 logger.info("Subscription expires at block {}".format(subscription_expiry))
 
-                teos_id_file = os.path.join(DATA_DIR, "teos_pk.der")
-                Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file)
+                teos_id_file = os.path.join(DATA_DIR, "teos_pk")
+                Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, DATA_DIR)
         else:
             teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
 
