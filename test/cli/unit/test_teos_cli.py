@@ -8,7 +8,7 @@ from coincurve import PrivateKey
 from requests.exceptions import ConnectionError, Timeout
 
 import common.receipts as receipts
-from common.tools import compute_locator
+from common.tools import compute_locator, is_compressed_pk
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter, InvalidKey
@@ -304,6 +304,23 @@ def test_load_keys_empty(keyfiles):
     # If the file is empty, InvalidKey should be raised
     with pytest.raises(InvalidKey):
         teos_cli.load_keys(keyfiles.empty_file_path)
+
+
+def test_load_teos_id(keyfiles):
+    # Test that it correctly returns the teos id
+    assert is_compressed_pk(teos_cli.load_teos_id(keyfiles.public_key_file_path))
+
+
+def test_load_teos_id_none(keyfiles):
+    # If the param does not match the expected, we should get an InvalidKey exception
+    with pytest.raises(InvalidKey, match="public key file not found"):
+        teos_cli.load_teos_id(None)
+
+
+def test_load_teos_id_empty(keyfiles):
+    # If the file is empty, InvalidKey should be raised
+    with pytest.raises(InvalidKey, match="public key cannot be loaded"):
+        teos_cli.load_teos_id(keyfiles.empty_file_path)
 
 
 @responses.activate
