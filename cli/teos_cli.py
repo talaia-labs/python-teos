@@ -274,7 +274,7 @@ def load_teos_id(teos_pk_path):
         :obj:`str`: The tower id.
 
     Raises:
-        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if any the key is invalid or cannot be loaded.
+        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if the public key is invalid or cannot be loaded.
     """
 
     if not teos_pk_path:

@@ -45,7 +45,7 @@ and / or
 
 ### Tower id and signing key
 
-`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. This keys are automatically generated on the first run, and can be refreshed by running `teos` with the `--overwritekey` flag.
+`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. These keys are automatically generated on the first run, and can be refreshed by running `teos` with the `--overwritekey` flag.
 
 ### Starting the TEOS daemon 👁
 
