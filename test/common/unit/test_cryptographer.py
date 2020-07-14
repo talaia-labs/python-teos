@@ -1,9 +1,6 @@
 import os
 import pytest
 from coincurve import PrivateKey, PublicKey
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
 
 from common.exceptions import InvalidKey, InvalidParameter, EncryptionError, SignatureError
 from common.cryptographer import Cryptographer
@@ -102,12 +99,8 @@ def test_decrypt():
 
 
 def test_load_key_file():
-    dummy_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    dummy_sk_der = dummy_sk.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
+    dummy_sk = PrivateKey()
+    dummy_sk_der = dummy_sk.to_der()
 
     # If file exists and has data in it, function should work.
     with open("key_test_file", "wb") as f:

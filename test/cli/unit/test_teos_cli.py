@@ -288,32 +288,22 @@ def test_get_appointment_connection_error():
 
 
 def test_load_keys(keyfiles):
-    # Test that it correctly returns a tuple of 3 elements with the correct keys
-    r = teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.private_key_file_path)
+    # Test that it correctly returns a tuple of 2 elements with the correct keys
+    r = teos_cli.load_keys(keyfiles.private_key_file_path)
     assert isinstance(r, tuple)
-    assert len(r) == 3
+    assert len(r) == 2
 
 
 def test_load_keys_none(keyfiles):
-    # If any param does not match the expected, we should get an InvalidKey exception
+    # If the param does not match the expected, we should get an InvalidKey exception
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(None, keyfiles.private_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(keyfiles.public_key_file_path, None)
-
-
-def test_load_keys_wrong_order(keyfiles):
-    # InvalidKey should be raised if the keys are passed in the wrong order
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(keyfiles.private_key_file_path, keyfiles.public_key_file_path)
+        teos_cli.load_keys(None)
 
 
 def test_load_keys_empty(keyfiles):
-    # If any of the files is empty, InvalidKey should be raised
+    # If the file is empty, InvalidKey should be raised
     with pytest.raises(InvalidKey):
-        teos_cli.load_keys(keyfiles.empty_file_path, keyfiles.private_key_file_path)
-    with pytest.raises(InvalidKey):
-        teos_cli.load_keys(keyfiles.public_key_file_path, keyfiles.empty_file_path)
+        teos_cli.load_keys(keyfiles.empty_file_path)
 
 
 @responses.activate
