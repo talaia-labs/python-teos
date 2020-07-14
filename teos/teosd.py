@@ -207,7 +207,7 @@ if __name__ == "__main__":
     try:
         opts, _ = getopt(
             argv[1:],
-            "h",
+            "hd",
             [
                 "apibind=",
                 "apiport=",
@@ -254,7 +254,7 @@ if __name__ == "__main__":
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
-            if opt in ["--daemon"]:
+            if opt in ["-d", "--daemon"]:
                 command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:
                 command_line_conf["OVERWRITE_KEY"] = True
