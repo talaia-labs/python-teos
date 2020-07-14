@@ -14,5 +14,6 @@ def show_usage():
         "\n\t--btcfeedconnect \tbitcoind zmq hostname (for blocks). Defaults to 'localhost'."
         "\n\t--btcfeedport \t\tbitcoind zmq port (for blocks). Defaults to '28332'."
         "\n\t--datadir \t\tspecify data directory. Defaults to '~\.teos'."
+        "\n\t--overwritekey \t\toverwrites the tower secret key. THIS IS IRREVERSIBLE AND WILL CHANGE YOUR TOWER ID."
         "\n\t-h --help \t\tshows this message."
     )
