@@ -71,13 +71,7 @@ def get_all_db_manager():
 def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     watcher = Watcher(
-        db_manager,
-        gatekeeper,
-        block_processor,
-        responder,
-        teos_sk.to_der(),
-        MAX_APPOINTMENTS,
-        config.get("LOCATOR_CACHE_SIZE"),
+        db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
     inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))

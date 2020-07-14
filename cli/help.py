@@ -21,9 +21,9 @@ def help_register():
         "NAME:"
         "\n\n\tregister"
         "\n\nUSAGE:"
-        "\n\n\tpython teos_cli.py register"
+        "\n\n\tpython teos_cli.py register tower_id"
         "\n\nDESCRIPTION:"
-        "\n\n\tRegisters your user public key with the tower."
+        "\n\n\tRegisters your user public key with the tower"
     )
 
 

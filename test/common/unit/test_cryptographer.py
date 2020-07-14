@@ -1,9 +1,7 @@
 import os
 import pytest
+from shutil import rmtree
 from coincurve import PrivateKey, PublicKey
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
 
 from common.exceptions import InvalidKey, InvalidParameter, EncryptionError, SignatureError
 from common.cryptographer import Cryptographer
@@ -101,13 +99,53 @@ def test_decrypt():
     assert Cryptographer.decrypt(encrypted_data, key) == data
 
 
+def test_generate_key():
+    # Not much to test here in the current approach, this simply shadows PrivateKey()
+    assert isinstance(Cryptographer.generate_key(), PrivateKey)
+
+    # Making sure multiple calls to the function do not return the same key
+    issued_keys = []
+    for _ in range(100):
+        sk = Cryptographer.generate_key()
+        sk_der = sk.to_der()
+        assert sk_der not in issued_keys
+        issued_keys.append(sk_der)
+
+
+def test_save_key_file():
+    # If the params are of the right type, the key is saved no matter if the dir exists or not.
+    key_name = "test_key"
+    key_dir = "test_key_dir"
+    assert not os.path.exists(key_dir)
+    assert not os.path.exists(os.path.join(key_dir, key_name))
+
+    Cryptographer.save_key_file(bytes(33), key_name, key_dir)
+
+    assert os.path.exists(key_dir)
+    assert os.path.exists(os.path.join(key_dir, key_name + ".der"))
+    rmtree(key_dir)
+
+
+def test_save_key_file_wrong_params():
+    # Function fails if the args are not of the proper type
+    no_str_nor_byte = [None, 1, 1.5, object, {}, Exception()]
+
+    for wrong_val in no_str_nor_byte:
+        with pytest.raises(InvalidParameter, match="Key must be bytes"):
+            Cryptographer.save_key_file(wrong_val, "name", "dir")
+
+    for wrong_val in no_str_nor_byte:
+        with pytest.raises(InvalidParameter, match="Key name must be str"):
+            Cryptographer.save_key_file(bytes(33), wrong_val, "dir")
+
+    for wrong_val in no_str_nor_byte:
+        with pytest.raises(InvalidParameter, match="Data dir must be str"):
+            Cryptographer.save_key_file(bytes(33), "name", wrong_val)
+
+
 def test_load_key_file():
-    dummy_sk = ec.generate_private_key(ec.SECP256K1, default_backend())
-    dummy_sk_der = dummy_sk.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
+    dummy_sk = PrivateKey()
+    dummy_sk_der = dummy_sk.to_der()
 
     # If file exists and has data in it, function should work.
     with open("key_test_file", "wb") as f:

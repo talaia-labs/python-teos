@@ -1,3 +1,4 @@
+import os
 import pytest
 import random
 from time import sleep
@@ -9,7 +10,7 @@ from teos import DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF
 from teos.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 
 from common.config_loader import ConfigLoader
-
+from common.cryptographer import Cryptographer
 
 getcontext().prec = 10
 utxos = []
@@ -81,11 +82,21 @@ def create_txs(bitcoin_cli, n=1):
         return signed_commitment_txs[0], signed_penalty_txs[0]
 
 
-def run_teosd():
+def run_teosd(datadir):
+    sk_file_path = os.path.join(datadir, "teos_sk.der")
+    if not os.path.exists(sk_file_path):
+        # Generating teos sk so we can return the teos_id
+        teos_sk = Cryptographer.generate_key()
+        Cryptographer.save_key_file(teos_sk.to_der(), "teos_sk", datadir)
+    else:
+        teos_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(sk_file_path))
+
+    teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
+
     teosd_process = Process(target=main, kwargs={"command_line_conf": {}}, daemon=True)
     teosd_process.start()
 
-    return teosd_process
+    return teosd_process, teos_id
 
 
 def get_random_value_hex(nbytes):

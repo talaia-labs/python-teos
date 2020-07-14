@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import json
+import binascii
 import requests
 from sys import argv
 from uuid import uuid4
@@ -228,34 +229,23 @@ def get_all_appointments(teos_url):
         return None
 
 
-def load_keys(teos_pk_path, user_sk_path):
+def load_keys(user_sk_path):
     """
-    Loads all the keys required to sign, send, and verify the appointment.
+    Loads all the user private key and id.
 
     Args:
-        teos_pk_path (:obj:`str`): path to the tower's public key file.
         user_sk_path (:obj:`str`): path to the user's private key file.
 
     Returns:
-        :obj:`tuple`: a three-item tuple containing a ``str``, a ``PrivateKey`` and a ``str``
-        representing the tower id (compressed pk), user sk and user id (compressed pk) respectively.
+        :obj:`tuple`: a tuple containing a ``PrivateKey`` and a ``str`` representing the user sk and user id
+        (compressed pk) respectively.
 
     Raises:
         :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if any of the keys is invalid or cannot be loaded.
     """
 
-    if not teos_pk_path:
-        raise InvalidKey("TEOS's public key file not found. Please check your settings")
-
     if not user_sk_path:
         raise InvalidKey("Client's private key file not found. Please check your settings")
-
-    try:
-        teos_pk_der = Cryptographer.load_key_file(teos_pk_path)
-        teos_id = Cryptographer.get_compressed_pk(PublicKey(teos_pk_der))
-
-    except (InvalidParameter, InvalidKey, ValueError):
-        raise InvalidKey("TEOS public key cannot be loaded")
 
     try:
         user_sk_der = Cryptographer.load_key_file(user_sk_path)
@@ -270,7 +260,33 @@ def load_keys(teos_pk_path, user_sk_path):
     except (InvalidParameter, InvalidKey):
         raise InvalidKey("Client public key cannot be loaded")
 
-    return teos_id, user_sk, user_id
+    return user_sk, user_id
+
+
+def load_teos_id(teos_pk_path):
+    """
+    Loads the tower id from disk.
+
+    Args:
+        teos_pk_path (:obj:`str`): path to the tower's public key file.
+
+    Returns:
+        :obj:`str`: The tower id.
+
+    Raises:
+        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if the public key is invalid or cannot be loaded.
+    """
+
+    if not teos_pk_path:
+        raise InvalidKey("TEOS's public key file not found. Have you registered with the tower?")
+
+    try:
+        teos_id = Cryptographer.get_compressed_pk(PublicKey(Cryptographer.load_key_file(teos_pk_path)))
+
+    except (InvalidParameter, InvalidKey, ValueError):
+        raise InvalidKey("TEOS public key cannot be loaded. Try registering again")
+
+    return teos_id
 
 
 def post_request(data, endpoint):
@@ -435,12 +451,32 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        teos_id, user_sk, user_id = load_keys(config.get("TEOS_PUBLIC_KEY"), config.get("CLI_PRIVATE_KEY"))
+        if os.path.exists(config.get("CLI_PRIVATE_KEY")):
+            logger.info("Client id found. Loading keys")
+            user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
+
+        else:
+            logger.info("Client id not found. Generating new keys")
+            user_sk = Cryptographer.generate_key()
+            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", DATA_DIR)
+            user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
         if command == "register":
-            available_slots, subscription_expiry = register(user_id, teos_id, teos_url)
-            logger.info("Registration succeeded. Available slots: {}".format(available_slots))
-            logger.info("Subscription expires at block {}".format(subscription_expiry))
+            if not args:
+                raise InvalidParameter("Cannot register. No tower id was given")
+            else:
+                teos_id = args.pop(0)
+                if not is_compressed_pk(teos_id):
+                    raise InvalidParameter("Cannot register. Tower id has invalid format")
+
+                available_slots, subscription_expiry = register(user_id, teos_id, teos_url)
+                logger.info("Registration succeeded. Available slots: {}".format(available_slots))
+                logger.info("Subscription expires at block {}".format(subscription_expiry))
+
+                teos_id_file = os.path.join(DATA_DIR, "teos_pk")
+                Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, DATA_DIR)
+        else:
+            teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
 
         if command == "add_appointment":
             appointment_data = parse_add_appointment_args(args)

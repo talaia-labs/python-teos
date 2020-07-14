@@ -43,16 +43,21 @@ def main(command_line_conf):
         signal(SIGTERM, handle_signals)
         signal(SIGQUIT, handle_signals)
 
-        # Loads config and sets up the data folder and log file
+        # Loads config and sets up the base data folder and log file
         data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
         config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
         config = config_loader.build_config()
 
+        network = config.get("BTC_NETWORK")
+
         # Set default RPC port if not overwritten by the user.
         if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
-            config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
+            config["BTC_RPC_PORT"] = get_default_rpc_port(network)
 
-        setup_data_folder(data_dir)
+        # if not on mainnet, data is in the appropriate subfolder
+        data_dir_network = data_dir if network == "mainnet" else os.path.join(data_dir, network)
+
+        setup_data_folder(data_dir_network)
         setup_logging(config.get("LOG_FILE"))
 
         logger.info("Starting TEOS")
@@ -63,19 +68,24 @@ def main(command_line_conf):
         if not can_connect_to_bitcoind(bitcoind_connect_params):
             logger.error("Cannot connect to bitcoind. Shutting down")
 
-        elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
+        elif not in_correct_network(bitcoind_connect_params, network):
             logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
         else:
-            secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
-            if not secret_key_der:
-                raise IOError("TEOS private key cannot be loaded")
+            if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
+                logger.info("Generating a new key pair")
+                sk = Cryptographer.generate_key()
+                Cryptographer.save_key_file(sk.to_der(), "teos_sk", data_dir_network)
 
-            logger.info(
-                "tower_id = {}".format(
-                    Cryptographer.get_compressed_pk(Cryptographer.load_private_key_der(secret_key_der).public_key)
-                )
-            )
+            else:
+                logger.info("Tower identity found. Loading keys")
+                secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
+
+                if not secret_key_der:
+                    raise IOError("TEOS private key cannot be loaded")
+                sk = Cryptographer.load_private_key_der(secret_key_der)
+
+            logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
             block_processor = BlockProcessor(bitcoind_connect_params)
             carrier = Carrier(bitcoind_connect_params)
 
@@ -93,7 +103,7 @@ def main(command_line_conf):
                 gatekeeper,
                 block_processor,
                 responder,
-                secret_key_der,
+                sk,
                 config.get("MAX_APPOINTMENTS"),
                 config.get("LOCATOR_CACHE_SIZE"),
             )
@@ -194,6 +204,7 @@ if __name__ == "__main__":
                 "btcfeedconnect=",
                 "btcfeedport=",
                 "datadir=",
+                "overwritekey",
                 "help",
             ],
         )
@@ -227,6 +238,8 @@ if __name__ == "__main__":
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
+            if opt in ["--overwritekey"]:
+                command_line_conf["OVERWRITE_KEY"] = True
             if opt in ["-h", "--help"]:
                 exit(show_usage())
 

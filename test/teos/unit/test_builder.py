@@ -100,7 +100,7 @@ def test_update_states_empty_list(db_manager, gatekeeper, carrier, block_process
         gatekeeper=gatekeeper,
         block_processor=block_processor,
         responder=Responder(db_manager, gatekeeper, carrier, block_processor),
-        sk_der=generate_keypair()[0].to_der(),
+        sk=generate_keypair()[0],
         max_appointments=config.get("MAX_APPOINTMENTS"),
         blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
     )
@@ -122,7 +122,7 @@ def test_update_states_responder_misses_more(run_bitcoind, db_manager, gatekeepe
         gatekeeper=gatekeeper,
         block_processor=block_processor,
         responder=Responder(db_manager, gatekeeper, carrier, block_processor),
-        sk_der=generate_keypair()[0].to_der(),
+        sk=generate_keypair()[0],
         max_appointments=config.get("MAX_APPOINTMENTS"),
         blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
     )
@@ -148,7 +148,7 @@ def test_update_states_watcher_misses_more(db_manager, gatekeeper, carrier, bloc
         gatekeeper=gatekeeper,
         block_processor=block_processor,
         responder=Responder(db_manager, gatekeeper, carrier, block_processor),
-        sk_der=generate_keypair()[0].to_der(),
+        sk=generate_keypair()[0],
         max_appointments=config.get("MAX_APPOINTMENTS"),
         blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
     )

@@ -110,9 +110,18 @@ class ConfigLoader:
         """
         Extends the relative paths of the ``conf_fields`` dictionary with ``data_dir``.
 
-        If an absolute path is given, it'll remain the same.
+        If an absolute path is given, it will remain the same.
+
+        If the config contains a BTC_NETWORK field whose value is not "mainnet", it is also appended to the path.
         """
+
+        # if there is a BTC_NETWORK parameter whose value is not "mainnet", we append it to the data_dir when expanding
+        network_field = self.conf_fields.get("BTC_NETWORK")
+        network = network_field["value"] if network_field else ""
+        network_suffix = "" if network == "mainnet" else network
 
         for key, field in self.conf_fields.items():
             if field.get("path") and isinstance(field.get("value"), str):
-                self.conf_fields[key]["value"] = os.path.join(self.data_dir, self.conf_fields[key]["value"])
+                self.conf_fields[key]["value"] = os.path.join(
+                    self.data_dir, network_suffix, self.conf_fields[key]["value"]
+                )
