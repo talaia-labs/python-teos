@@ -82,7 +82,7 @@ def create_txs(bitcoin_cli, n=1):
         return signed_commitment_txs[0], signed_penalty_txs[0]
 
 
-def run_teosd(datadir):
+def run_teosd(config, datadir):
     sk_file_path = os.path.join(datadir, "teos_sk.der")
     if not os.path.exists(sk_file_path):
         # Generating teos sk so we can return the teos_id
@@ -93,7 +93,7 @@ def run_teosd(datadir):
 
     teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
 
-    teosd_process = Process(target=main, kwargs={"command_line_conf": {}}, daemon=True)
+    teosd_process = Process(target=main, kwargs={"config": config}, daemon=True)
     teosd_process.start()
 
     return teosd_process, teos_id
