@@ -203,7 +203,19 @@ class Cryptographer:
             key (:obj:`bytes`): the key to be saved to disk.
             name (:obj:`str`): the name of the key file to be generated.
             data_dir (:obj:`str`): the data directory where the file will be saved.
+
+        Raises:
+            :obj:InvalidParameter: If the given key is not bytes or the name or data_dir are not strings.
         """
+
+        if not isinstance(key, bytes):
+            raise InvalidParameter("Key must be bytes, {} received".format(type(key)))
+
+        if not isinstance(name, str):
+            raise InvalidParameter("Key name must be str, {} received".format(type(name)))
+
+        if not isinstance(data_dir, str):
+            raise InvalidParameter("Data dir must be str, {} received".format(type(data_dir)))
 
         # Create the output folder it it does not exist (and all the parents if they don't either)
         Path(data_dir).mkdir(parents=True, exist_ok=True)
