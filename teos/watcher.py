@@ -210,7 +210,7 @@ class Watcher:
 
     """
 
-    def __init__(self, db_manager, gatekeeper, block_processor, responder, sk_der, max_appointments, blocks_in_cache):
+    def __init__(self, db_manager, gatekeeper, block_processor, responder, sk, max_appointments, blocks_in_cache):
         self.logger = get_logger(component=Watcher.__name__)
 
         self.appointments = dict()
@@ -221,7 +221,7 @@ class Watcher:
         self.block_processor = block_processor
         self.responder = responder
         self.max_appointments = max_appointments
-        self.signing_key = Cryptographer.load_private_key_der(sk_der)
+        self.signing_key = sk
         self.last_known_block = db_manager.load_last_block_hash_watcher()
         self.locator_cache = LocatorCache(blocks_in_cache)
 

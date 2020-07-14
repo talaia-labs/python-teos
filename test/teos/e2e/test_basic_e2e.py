@@ -39,7 +39,8 @@ teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_
 # Run teosd
 teosd_process = run_teosd()
 
-teos_id, user_sk, user_id = teos_cli.load_keys(cli_config.get("TEOS_PUBLIC_KEY"), cli_config.get("CLI_PRIVATE_KEY"))
+user_sk, user_id = teos_cli.load_keys(cli_config.get("CLI_PRIVATE_KEY"))
+teos_id = teos_cli.load_teos_id(cli_config.get("TEOS_PUBLIC_KEY"))
 
 appointments_in_watcher = 0
 appointments_in_responder = 0
