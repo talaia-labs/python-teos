@@ -39,7 +39,7 @@ def prng_seed():
 @pytest.fixture(scope="session", autouse=True)
 def setup_node(bitcoin_cli):
 
-    # Check that the nodes is up and running (specially for circleci)
+    # Check that the node is up and running (especially for circleci)
     while True:
         try:
             new_addr = bitcoin_cli.getnewaddress()
@@ -48,7 +48,7 @@ def setup_node(bitcoin_cli):
             if "Loading wallet..." in str(e):
                 sleep(1)
 
-    # This method will create a new address a mine bitcoin so the node can be used for testing
+    # This method will create a new address and mine bitcoin so the node can be used for testing
     bitcoin_cli.generatetoaddress(200, new_addr)
 
 
@@ -106,7 +106,7 @@ def get_random_value_hex(nbytes):
 
 
 def create_commitment_tx(bitcoin_cli, utxo, destination=None):
-    # We will set the recipient to ourselves is destination is None
+    # We will set the recipient to ourselves if destination is None
     if destination is None:
         destination = utxo.get("address")
 
@@ -123,7 +123,7 @@ def create_commitment_tx(bitcoin_cli, utxo, destination=None):
 
 
 def create_penalty_tx(bitcoin_cli, decoded_commitment_tx, destination=None):
-    # We will set the recipient to ourselves is destination is None
+    # We will set the recipient to ourselves if destination is None
     if destination is None:
         destination = decoded_commitment_tx.get("vout")[0].get("scriptPubKey").get("addresses")[0]
 
