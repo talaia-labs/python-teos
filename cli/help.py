@@ -3,7 +3,7 @@ def show_usage():
         "USAGE: "
         "\n\tpython teos_cli.py [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
-        "\n\tregister \tRegisters your user public key with the tower."
+        "\n\tregister \t\tRegisters your user public key with the tower."
         "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
         "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
         "\n\tget_all_appointments \tGets information about all appointments stored in the tower."
