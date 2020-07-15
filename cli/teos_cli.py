@@ -475,10 +475,9 @@ def main(command, args, command_line_conf):
 
                 teos_id_file = os.path.join(DATA_DIR, "teos_pk")
                 Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, DATA_DIR)
-        else:
-            teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
 
         if command == "add_appointment":
+            teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
             appointment_data = parse_add_appointment_args(args)
             appointment = create_appointment(appointment_data)
             start_block, signature = add_appointment(appointment, user_sk, teos_id, teos_url)
@@ -496,6 +495,7 @@ def main(command, args, command_line_conf):
                 if arg_opt in ["-h", "--help"]:
                     sys.exit(help_get_appointment())
 
+                teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
                 appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
                 if appointment_data:
                     print(appointment_data)
