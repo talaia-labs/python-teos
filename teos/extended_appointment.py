@@ -62,14 +62,11 @@ class ExtendedAppointment(Appointment):
         if any(v is None for v in [user_id, user_signature, start_block]):
             raise ValueError("Wrong appointment data, some fields are missing")
 
-        else:
-            appointment = cls(
-                appointment.locator,
-                appointment.encrypted_blob,
-                appointment.to_self_delay,
-                user_id,
-                user_signature,
-                start_block,
-            )
-
-        return appointment
+        return cls(
+            appointment.locator,
+            appointment.encrypted_blob,
+            appointment.to_self_delay,
+            user_id,
+            user_signature,
+            start_block,
+        )

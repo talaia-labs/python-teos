@@ -43,10 +43,7 @@ class Appointment:
         if any(v is None for v in [locator, to_self_delay, encrypted_blob]):
             raise ValueError("Wrong appointment data, some fields are missing")
 
-        else:
-            appointment = cls(locator, encrypted_blob, to_self_delay)
-
-        return appointment
+        return cls(locator, encrypted_blob, to_self_delay)
 
     def to_dict(self):
         """
