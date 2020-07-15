@@ -452,7 +452,7 @@ def main(command, args, command_line_conf):
 
     try:
         if os.path.exists(config.get("CLI_PRIVATE_KEY")):
-            logger.info("Client id found. Loading keys")
+            logger.debug("Client id found. Loading keys")
             user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
 
         else:
