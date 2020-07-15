@@ -143,7 +143,7 @@ or
 1. Register with the tower. A tower with the given id should be running (replace the id with the one you'll be using).
 
 ```
-python teos_cli.py register 02f695cd372bcd949ff29465e72296eb959468e013a9b080742fb60fff27edc5f2
+python teos_cli.py register 03a3a3e196def1950f332556d046648d960102da33f61665a910febe38a1c3f825
 ```
 
 2. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not correspond to a valid transaction. However it can be used to interact with the Eye of Satoshi's API.
@@ -174,7 +174,7 @@ By default, `teos_cli` will connect to your local instance (running on localhost
 
 - testnet endpoint = `teos-testnet.pisa.watch:443`
 - mainnet endpoint = `teos.pisa.watch:443` or `theeyeofsatoshi.pisa.watch:443`
-- `tower_id` is `02f695cd372bcd949ff29465e72296eb959468e013a9b080742fb60fff27edc5f2` for both.
+- `tower_id` is `03a3a3e196def1950f332556d046648d960102da33f61665a910febe38a1c3f825` for both.
 
 ### Connecting to the mainnet instance
 Add `--apiconnect  --apiport 443` to your calls, for example:
