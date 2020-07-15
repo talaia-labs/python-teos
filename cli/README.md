@@ -35,7 +35,7 @@ Notice that you need to be register before sending any other type of request to 
 
 #### Usage
 
-	python teos_cli.py register
+	python teos_cli.py register tower_id
 	
 	
 ### add_appointment
@@ -50,11 +50,7 @@ This command is used to send appointments to the watchtower. Appointments **must
 
 `tx_id` **must** match the **commitment transaction id**, and will be used to encrypt the **penalty transaction** and **generate the locator**. `type(tx_id) = hex encoded str`
 
-`s` is the time when the watchtower will start watching your transaction, and will normally match to whenever you will be offline. `s` is measured in block height, and must be **higher than the current block height**. `type(s) = int`
-
-`e` is the time where the watchtower will stop watching your transaction, and will normally match with whenever you should be back online. `e` is also measured in block height, and must be **higher than** `s`. `type(e) = int`
-
-`d` is the time the watchtower would have to respond with the **penalty transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the to\_self\_delay does not match the `OP_CSV`, the watchtower will try to respond with the penalty transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be at least `20`. `type(d) = int`
+`to_self_delay` is the time the watchtower would have to respond with the **penalty transaction** once the **dispute transaction** is seen in the blockchain. `d` must match with the `OP_CSV` specified in the dispute transaction. If the to\_self\_delay does not match the `OP_CSV`, the watchtower will try to respond with the penalty transaction anyway, but success is not guaranteed. `d` is measured in blocks and should be at least `20`. `type(d) = int`
 
 The API will return a `application/json` HTTP response code `200/OK` if the appointment is accepted, with the locator encoded in the response text, or a `400/Bad Request` if the appointment is rejected, with the rejection reason encoded in the response text. 
 
@@ -144,10 +140,10 @@ or
 	python teos_cli.py help command
 
 ## Example
-1. Register with the tower.
+1. Register with the tower. A tower with the given id should be running (replace the id with the one you'll be using).
 
 ```
-python teos_cli.py register
+python teos_cli.py register 02f695cd372bcd949ff29465e72296eb959468e013a9b080742fb60fff27edc5f2
 ```
 
 2. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not correspond to a valid transaction. However it can be used to interact with the Eye of Satoshi's API.
@@ -178,6 +174,7 @@ By default, `teos_cli` will connect to your local instance (running on localhost
 
 - testnet endpoint = `teos-testnet.pisa.watch:443`
 - mainnet endpoint = `teos.pisa.watch:443` or `theeyeofsatoshi.pisa.watch:443`
+- `tower_id` is `02f695cd372bcd949ff29465e72296eb959468e013a9b080742fb60fff27edc5f2` for both.
 
 ### Connecting to the mainnet instance
 Add `--apiconnect  --apiport 443` to your calls, for example:
