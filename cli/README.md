@@ -180,7 +180,7 @@ By default, `teos_cli` will connect to your local instance (running on localhost
 Add `--apiconnect  --apiport 443` to your calls, for example:
 
 ```
-python teos_cli.py --apiconnect=https://teos.pisa.watch add_appointment --apiport=443 -f dummy_appointment_data.json 
+python teos_cli.py --apiconnect=https://teos.pisa.watch --apiport=443 add_appointment   -f dummy_appointment_data.json 
 ```
 
 You can also change the config file to avoid specifying the server every time:
