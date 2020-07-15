@@ -36,7 +36,7 @@ class AppointmentsDBM(DBManager):
 
     Attributes:
         logger: the logger for this component.
-    """
+    """  # noqa: E501
 
     def __init__(self, db_path):
         if not isinstance(db_path, str):
@@ -71,7 +71,7 @@ class AppointmentsDBM(DBManager):
 
         for k, v in self.db.iterator(prefix=prefix.encode("utf-8")):
             # Get uuid and appointment_data from the db
-            uuid = k[len(prefix) :].decode("utf-8")
+            uuid = k[len(prefix) :].decode("utf-8")  # noqa: E203
             data[uuid] = json.loads(v)
 
         return data
@@ -472,7 +472,7 @@ class AppointmentsDBM(DBManager):
         """
 
         return [
-            k.decode()[len(TRIGGERED_APPOINTMENTS_PREFIX) :]
+            k.decode()[len(TRIGGERED_APPOINTMENTS_PREFIX) :]  # noqa: E203
             for k, v in self.db.iterator(prefix=TRIGGERED_APPOINTMENTS_PREFIX.encode("utf-8"))
         ]
 

@@ -1,5 +1,4 @@
 import os
-import logging
 from flask import Flask, request, abort, jsonify
 
 import common.errors as errors

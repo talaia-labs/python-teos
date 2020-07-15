@@ -222,7 +222,7 @@ def test_recover_pk():
 
 def test_recover_pk_invalid_sigrec():
     message = "Hey, it's me".encode("utf-8")
-    signature = "ddbfb019e4d56155b4175066c2b615ab765d317ae7996d188b4a5fae4cc394adf98fef46034d0553149392219ca6d37dca9abdfa6366a8e54b28f19d3e5efa8a14b556205dc7f33a"
+    signature = "ddbfb019e4d56155b4175066c2b615ab765d317ae7996d188b4a5fae4cc394adf98fef46034d0553149392219ca6d37dca9abdfa6366a8e54b28f19d3e5efa8a14b556205dc7f33a"  # noqa: E501
 
     # The given signature, when zbase32 decoded, has a fist byte with value lower than 31.
     # The first byte of the signature should be 31 + SigRec, so this should fail
