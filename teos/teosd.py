@@ -1,7 +1,9 @@
 import os
+import daemon
 from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
+
 
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
@@ -35,7 +37,30 @@ def handle_signals(signal_received, frame):
     exit(0)
 
 
-def main(command_line_conf):
+def get_config(command_line_conf):
+    """
+    Combines the command line config with the config loaded from the file and the default config in order to construct
+    the final config object.
+
+    Args:
+        command_line_conf (:obj:`dict`): a collection of the command line parameters.
+
+    Returns:
+        :obj:`dict`: A dictionary containing all the system's configuration parameters.
+    """
+
+    data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
+    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+    config = config_loader.build_config()
+
+    # Set default RPC port if not overwritten by the user.
+    if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
+        config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
+
+    return config
+
+
+def main(config):
     global db_manager, chain_monitor
 
     try:
@@ -43,19 +68,9 @@ def main(command_line_conf):
         signal(SIGTERM, handle_signals)
         signal(SIGQUIT, handle_signals)
 
-        # Loads config and sets up the base data folder and log file
-        data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
-        config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
-        config = config_loader.build_config()
-
+        # Creates the base data dir based on the network the tower is running on
         network = config.get("BTC_NETWORK")
-
-        # Set default RPC port if not overwritten by the user.
-        if "BTC_RPC_PORT" not in config_loader.overwritten_fields:
-            config["BTC_RPC_PORT"] = get_default_rpc_port(network)
-
-        # if not on mainnet, data is in the appropriate subfolder
-        data_dir_network = data_dir if network == "mainnet" else os.path.join(data_dir, network)
+        data_dir_network = DATA_DIR if network == "mainnet" else os.path.join(DATA_DIR, network)
 
         setup_data_folder(data_dir_network)
         setup_logging(config.get("LOG_FILE"))
@@ -192,7 +207,7 @@ if __name__ == "__main__":
     try:
         opts, _ = getopt(
             argv[1:],
-            "h",
+            "hd",
             [
                 "apibind=",
                 "apiport=",
@@ -204,6 +219,7 @@ if __name__ == "__main__":
                 "btcfeedconnect=",
                 "btcfeedport=",
                 "datadir=",
+                "daemon",
                 "overwritekey",
                 "help",
             ],
@@ -238,6 +254,8 @@ if __name__ == "__main__":
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
+            if opt in ["-d", "--daemon"]:
+                command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:
                 command_line_conf["OVERWRITE_KEY"] = True
             if opt in ["-h", "--help"]:
@@ -246,4 +264,10 @@ if __name__ == "__main__":
     except GetoptError as e:
         exit(e)
 
-    main(command_line_conf)
+    config = get_config(command_line_conf)
+    if config.get("DAEMON"):
+        print("Starting TEOS")
+        with daemon.DaemonContext():
+            main(config)
+    else:
+        main(config)

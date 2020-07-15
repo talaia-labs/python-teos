@@ -39,7 +39,7 @@ teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
 
 # Run teosd
-teosd_process, teos_id = run_teosd(teos_datadir_network)
+teosd_process, teos_id = run_teosd(teos_config, teos_datadir_network)
 
 try:
     user_sk, user_id = teos_cli.load_keys(cli_config.get("CLI_PRIVATE_KEY"))
@@ -514,7 +514,7 @@ def test_appointment_shutdown_teos_trigger_back_online(bitcoin_cli):
 
     # Restart teos
     teosd_process.terminate()
-    teosd_process, _ = run_teosd(teos_datadir_network)
+    teosd_process, _ = run_teosd(teos_config, teos_datadir_network)
 
     assert teos_pid != teosd_process.pid
 
@@ -559,7 +559,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(bitcoin_cli):
     broadcast_transaction_and_mine_block(bitcoin_cli, commitment_tx, new_addr)
 
     # Restart
-    teosd_process, _ = run_teosd(teos_datadir_network)
+    teosd_process, _ = run_teosd(teos_config, teos_datadir_network)
     assert teos_pid != teosd_process.pid
 
     # The appointment should have been moved to the Responder

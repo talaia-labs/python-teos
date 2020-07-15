@@ -8,3 +8,4 @@ requests
 plyvel
 readerwriterlock
 structlog
+python-daemon

@@ -39,7 +39,7 @@ def prng_seed():
 @pytest.fixture(scope="session", autouse=True)
 def setup_node(bitcoin_cli):
 
-    # Check that the nodes is up and running (specially for circleci)
+    # Check that the node is up and running (especially for circleci)
     while True:
         try:
             new_addr = bitcoin_cli.getnewaddress()
@@ -48,7 +48,7 @@ def setup_node(bitcoin_cli):
             if "Loading wallet..." in str(e):
                 sleep(1)
 
-    # This method will create a new address a mine bitcoin so the node can be used for testing
+    # This method will create a new address and mine bitcoin so the node can be used for testing
     bitcoin_cli.generatetoaddress(200, new_addr)
 
 
@@ -82,7 +82,7 @@ def create_txs(bitcoin_cli, n=1):
         return signed_commitment_txs[0], signed_penalty_txs[0]
 
 
-def run_teosd(datadir):
+def run_teosd(config, datadir):
     sk_file_path = os.path.join(datadir, "teos_sk.der")
     if not os.path.exists(sk_file_path):
         # Generating teos sk so we can return the teos_id
@@ -93,7 +93,7 @@ def run_teosd(datadir):
 
     teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
 
-    teosd_process = Process(target=main, kwargs={"command_line_conf": {}}, daemon=True)
+    teosd_process = Process(target=main, kwargs={"config": config}, daemon=True)
     teosd_process.start()
 
     return teosd_process, teos_id
@@ -106,7 +106,7 @@ def get_random_value_hex(nbytes):
 
 
 def create_commitment_tx(bitcoin_cli, utxo, destination=None):
-    # We will set the recipient to ourselves is destination is None
+    # We will set the recipient to ourselves if destination is None
     if destination is None:
         destination = utxo.get("address")
 
@@ -123,7 +123,7 @@ def create_commitment_tx(bitcoin_cli, utxo, destination=None):
 
 
 def create_penalty_tx(bitcoin_cli, decoded_commitment_tx, destination=None):
-    # We will set the recipient to ourselves is destination is None
+    # We will set the recipient to ourselves if destination is None
     if destination is None:
         destination = decoded_commitment_tx.get("vout")[0].get("scriptPubKey").get("addresses")[0]
 

@@ -16,6 +16,7 @@ DEFAULT_CONF = {
     "BTC_FEED_PROTOCOL": {"value": "tcp", "type": str},
     "BTC_FEED_CONNECT": {"value": "localhost", "type": str},
     "BTC_FEED_PORT": {"value": 28332, "type": int},
+    "DAEMON": {"value": False, "type": bool},
     "MAX_APPOINTMENTS": {"value": 1000000, "type": int},
     "SUBSCRIPTION_SLOTS": {"value": 100, "type": int},
     "SUBSCRIPTION_DURATION": {"value": 4320, "type": int},
