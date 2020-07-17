@@ -3,7 +3,7 @@ import daemon
 from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
-
+import threading
 
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
@@ -11,6 +11,7 @@ from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
 from teos.api import API
+from teos.rpc import RPC
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -58,6 +59,12 @@ def get_config(command_line_conf):
         config["BTC_RPC_PORT"] = get_default_rpc_port(config.get("BTC_NETWORK"))
 
     return config
+
+
+def rpc_thread_function(inspector, watcher):
+    logger.info("Starting RPC Server")
+    # TODO: host/port should be in the settings
+    RPC("localhost", 9000, inspector, watcher).start()
 
 
 def main(config):
@@ -195,7 +202,14 @@ def main(config):
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
+
+            # start the RPC server
+            rpc_thread = threading.Thread(target=rpc_thread_function, args=(inspector, watcher), daemon=True)
+            rpc_thread.start()
+
+            # start the API server
             API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher).start()
+
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         exit(1)
