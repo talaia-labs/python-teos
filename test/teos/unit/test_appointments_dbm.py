@@ -272,7 +272,7 @@ def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
         assert db_manager.store_watcher_appointment(uuid, appointment.to_dict()) is True
 
     first_half = list(watcher_appointments.keys())[: len(watcher_appointments) // 2]
-    second_half = list(watcher_appointments.keys())[len(watcher_appointments) // 2 :]
+    second_half = list(watcher_appointments.keys())[len(watcher_appointments) // 2 :]  # noqa: E203
 
     # Let's now delete half of them in a batch update
     db_manager.batch_delete_watcher_appointments(first_half)
@@ -310,7 +310,7 @@ def test_batch_delete_responder_trackers(db_manager, responder_trackers):
         assert db_manager.store_responder_tracker(uuid, {"value": value}) is True
 
     first_half = list(responder_trackers.keys())[: len(responder_trackers) // 2]
-    second_half = list(responder_trackers.keys())[len(responder_trackers) // 2 :]
+    second_half = list(responder_trackers.keys())[len(responder_trackers) // 2 :]  # noqa: E203
 
     # Let's now delete half of them in a batch update
     db_manager.batch_delete_responder_trackers(first_half)
@@ -414,7 +414,7 @@ def test_batch_delete_triggered_appointment_flag(db_manager):
 
     # And now let's delete in batch
     first_half = keys[: len(keys) // 2]
-    second_half = keys[len(keys) // 2 :]
+    second_half = keys[len(keys) // 2 :]  # noqa: E203
 
     db_manager.batch_delete_triggered_appointment_flag(first_half)
     db_falgs = db_manager.load_all_triggered_flags()

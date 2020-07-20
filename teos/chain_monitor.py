@@ -116,11 +116,13 @@ class ChainMonitor:
             if not self.terminate:
                 current_tip = self.block_processor.get_best_block_hash()
 
-                self.lock.acquire()
-                if self.update_state(current_tip):
-                    self.notify_subscribers(current_tip)
-                    self.logger.info("New block received via polling", block_hash=current_tip)
-                self.lock.release()
+                # get_best_block_hash may return None if the RPC times out.
+                if current_tip:
+                    self.lock.acquire()
+                    if self.update_state(current_tip):
+                        self.notify_subscribers(current_tip)
+                        self.logger.info("New block received via polling", block_hash=current_tip)
+                    self.lock.release()
 
     def monitor_chain_zmq(self):
         """

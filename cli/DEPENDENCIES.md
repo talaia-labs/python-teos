@@ -79,3 +79,4 @@ and for `pip3`:
 
 - `cryptography`
 - `requests`
+- `structlog`

@@ -29,6 +29,14 @@ Make sure bitcoind is running before running TEOS (it will fail at startup if it
 
 Before you can run TEOS, you need to follow a few more configuration steps.
 
+### Starting the TEOS daemon 👁
+
+You can run `teos` by running `teosd.py` under `teos`:
+
+```
+python -m teos.teosd
+```
+
 ### Configuration file and command line parameters
 
 `teos` comes with a default configuration that can be found at [teos/\_\_init\_\_.py](teos/__init__.py). 
@@ -42,18 +50,6 @@ To change the configuration defaults you can:
 and / or 
 
 - Add some global options when running the daemon (run `teosd.py -h` for more info).
-
-### Tower id and signing key
-
-`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. These keys are automatically generated on the first run, and can be refreshed by running `teos` with the `--overwritekey` flag.
-
-### Starting the TEOS daemon 👁
-
-Now that everything is ready, you can run `teos` by running `teosd.py` under `teos`:
-
-```
-python -m teos.teosd
-```
 
 ### Passing command line options to `teosd`
 
@@ -157,6 +153,11 @@ docker run -p 9814:9814 \
 
 Notice that we also needed to add `API_BIND=0.0.0.0` to bind the API to all interfaces of the container.
 Otherwise it will bind to `localost` and we won't be able to send requests to the tower from the host.
+
+### Tower id and signing key
+
+`teos` needs a pair of keys that will serve as tower id and signing key. The former can be used by users to identify the tower, whereas the latter is used by the tower to sign responses. These keys are automatically generated on the first run, and can be refreshed by running `teos` with the `--overwritekey` flag.
+
 
 ## Interacting with a TEOS Instance
 

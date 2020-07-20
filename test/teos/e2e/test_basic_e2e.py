@@ -340,8 +340,8 @@ def test_two_identical_appointments(bitcoin_cli):
 # def test_two_identical_appointments_different_users(bitcoin_cli):
 #     # Tests sending two identical appointments from different users to the tower.
 #     # This tests sending an appointment with two valid transaction with the same locator.
-#     # If they come from different users, both will be kept, but one will be dropped fro double-spending when passing to
-#     # the responder
+#     # If they come from different users, both will be kept, but one will be dropped fro double-spending when passing
+#     to the responder
 #     commitment_tx, penalty_tx = create_txs(bitcoin_cli)
 #     commitment_tx_id = bitcoin_cli.decoderawtransaction(commitment_tx).get("txid")
 #

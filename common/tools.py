@@ -1,5 +1,4 @@
 import re
-import logging
 from pathlib import Path
 from common.constants import LOCATOR_LEN_HEX
 

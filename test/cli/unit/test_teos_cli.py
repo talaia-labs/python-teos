@@ -209,7 +209,7 @@ def test_add_appointment_with_missing_signature():
     responses.add(responses.POST, add_appointment_endpoint, json=response, status=200)
 
     with pytest.raises(TowerResponseError, match="does not contain the signature"):
-        teos_cli.add_appointment(Appointment.from_dict(dummy_appointment_data), dummy_user_sk, dummy_teos_id, teos_url)
+        teos_cli.add_appointment(appointment, dummy_user_sk, dummy_teos_id, teos_url)
 
     # should have performed exactly 1 network request
     assert len(responses.calls) == 1

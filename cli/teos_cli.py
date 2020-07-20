@@ -25,7 +25,7 @@ from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
-logger = get_logger(component="Client")
+logger = get_logger()
 
 
 def register(user_id, teos_id, teos_url):
@@ -452,7 +452,7 @@ def main(command, args, command_line_conf):
 
     try:
         if os.path.exists(config.get("CLI_PRIVATE_KEY")):
-            logger.info("Client id found. Loading keys")
+            logger.debug("Client id found. Loading keys")
             user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
 
         else:
@@ -475,10 +475,9 @@ def main(command, args, command_line_conf):
 
                 teos_id_file = os.path.join(DATA_DIR, "teos_pk")
                 Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, DATA_DIR)
-        else:
-            teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
 
         if command == "add_appointment":
+            teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
             appointment_data = parse_add_appointment_args(args)
             appointment = create_appointment(appointment_data)
             start_block, signature = add_appointment(appointment, user_sk, teos_id, teos_url)
@@ -496,6 +495,7 @@ def main(command, args, command_line_conf):
                 if arg_opt in ["-h", "--help"]:
                     sys.exit(help_get_appointment())
 
+                teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
                 appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
                 if appointment_data:
                     print(appointment_data)
@@ -561,9 +561,9 @@ if __name__ == "__main__":
         if command in commands:
             main(command, args, command_line_conf)
         elif not command:
-            logger.error("No command provided. Use help to check the list of available commands")
+            sys.exit("No command provided. Use help to check the list of available commands")
         else:
-            logger.error("Unknown command. Use help to check the list of available commands")
+            sys.exit("Unknown command. Use help to check the list of available commands")
 
     except GetoptError as e:
-        logger.error("{}".format(e))
+        sys.exit("{}".format(e))
