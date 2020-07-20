@@ -89,7 +89,6 @@ class API:
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
-            "/get_all_appointments": (self.get_all_appointments, ["GET"]),
         }
 
         for url, params in routes.items():
@@ -260,31 +259,6 @@ class API:
             response = {"locator": locator, "status": "not_found"}
 
         return jsonify(response), rcode
-
-    def get_all_appointments(self):
-        """
-        Gives information about all the appointments in the Watchtower.
-
-          This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
-
-        Returns:
-            :obj:`str`: A json formatted dictionary containing all the appointments hold by the ``Watcher``
-            (``watcher_appointments``) and by the ``Responder>`` (``responder_trackers``).
-        """
-
-        # ToDo: #15-add-system-monitor
-        response = None
-
-        if request.remote_addr in request.host or request.remote_addr == "127.0.0.1":
-            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
-            responder_trackers = self.watcher.db_manager.load_responder_trackers()
-
-            response = jsonify({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
-
-        else:
-            abort(404)
-
-        return response
 
     def start(self):
         """ This function starts the Flask server used to run the API """

@@ -36,9 +36,9 @@ class RPC:
         self.watcher = watcher
         self.logger.info("Initialized")
 
-        @jsonrpc.method("echo")
-        def echo(msg: str) -> str:
-            return msg
+        @jsonrpc.method("get_all_appointments")
+        def get_all_appointments() -> dict:
+            return self.get_all_appointments()
 
     def start(self):
         """ This function starts the Flask server used to run the RPC """
@@ -46,3 +46,22 @@ class RPC:
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
         self.app.run(host=self.host, port=self.port)
+
+    def get_all_appointments(self):
+        """
+        Gives information about all the appointments in the Watchtower.
+
+          This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
+
+        Returns:
+            :obj:`str`: A dictionary containing all the appointments hold by the ``Watcher``
+            (``watcher_appointments``) and by the ``Responder`` (``responder_trackers``).
+        """
+
+        # ToDo: #15-add-system-monitor
+
+        watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
+        responder_trackers = self.watcher.db_manager.load_responder_trackers()
+
+        return {"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers}
+
