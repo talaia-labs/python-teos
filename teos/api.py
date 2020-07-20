@@ -66,6 +66,7 @@ class API:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
+        lock (:obj:`Lock <threading.Lock>`): the ``Lock`` that must be acquired before writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
@@ -74,10 +75,11 @@ class API:
         logger: the logger for this component.
     """
 
-    def __init__(self, host, port, inspector, watcher):
+    def __init__(self, host, port, lock, inspector, watcher):
         self.logger = get_logger(component=API.__name__)
         self.host = host
         self.port = port
+        self.lock = lock
         self.inspector = inspector
         self.watcher = watcher
         self.app = app
@@ -124,19 +126,20 @@ class API:
         user_id = request_data.get("public_key")
 
         if user_id:
-            try:
-                rcode = HTTP_OK
-                available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
-                response = {
-                    "public_key": user_id,
-                    "available_slots": available_slots,
-                    "subscription_expiry": subscription_expiry,
-                    "subscription_signature": subscription_signature,
-                }
+            with self.lock:
+                try:
+                    rcode = HTTP_OK
+                    available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
+                    response = {
+                        "public_key": user_id,
+                        "available_slots": available_slots,
+                        "subscription_expiry": subscription_expiry,
+                        "subscription_signature": subscription_signature,
+                    }
 
-            except InvalidParameter as e:
-                rcode = HTTP_BAD_REQUEST
-                response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                except InvalidParameter as e:
+                    rcode = HTTP_BAD_REQUEST
+                    response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
@@ -174,32 +177,33 @@ class API:
         except InvalidParameter as e:
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
-        try:
-            appointment = self.inspector.inspect(request_data.get("appointment"))
-            response = self.watcher.add_appointment(appointment, request_data.get("signature"))
-            rcode = HTTP_OK
+        with self.lock:
+            try:
+                appointment = self.inspector.inspect(request_data.get("appointment"))
+                response = self.watcher.add_appointment(appointment, request_data.get("signature"))
+                rcode = HTTP_OK
 
-        except InspectionFailed as e:
-            rcode = HTTP_BAD_REQUEST
-            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
+            except InspectionFailed as e:
+                rcode = HTTP_BAD_REQUEST
+                response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
 
-        except (AuthenticationFailure, NotEnoughSlots):
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": "appointment rejected. Invalid signature or user does not have enough slots available",
-                "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-            }
+            except (AuthenticationFailure, NotEnoughSlots):
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": "appointment rejected. Invalid signature or user does not have enough slots available",
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                }
 
-        except AppointmentLimitReached:
-            rcode = HTTP_SERVICE_UNAVAILABLE
-            response = {"error": "appointment rejected"}
+            except AppointmentLimitReached:
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": "appointment rejected"}
 
-        except AppointmentAlreadyTriggered:
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": "appointment rejected. The provided appointment has already been triggered",
-                "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
-            }
+            except AppointmentAlreadyTriggered:
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": "appointment rejected. The provided appointment has already been triggered",
+                    "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
+                }
 
         self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode

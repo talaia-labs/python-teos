@@ -61,10 +61,10 @@ def get_config(command_line_conf):
     return config
 
 
-def rpc_thread_function(inspector, watcher):
+def rpc_thread_function(lock, inspector, watcher):
     logger.info("Starting RPC Server")
     # TODO: host/port should be in the settings
-    RPC("localhost", 9000, inspector, watcher).start()
+    RPC("localhost", 9000, lock, inspector, watcher).start()
 
 
 def main(config):
@@ -198,17 +198,20 @@ def main(config):
                 elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
                     Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
 
+            # lock to be acquired before interacting with the watchtower's state with write access
+            lock = threading.Lock()
+
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
 
             # start the RPC server
-            rpc_thread = threading.Thread(target=rpc_thread_function, args=(inspector, watcher), daemon=True)
+            rpc_thread = threading.Thread(target=rpc_thread_function, args=(lock, inspector, watcher), daemon=True)
             rpc_thread.start()
 
             # start the API server
-            API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher).start()
+            API(config.get("API_BIND"), config.get("API_PORT"), lock, inspector, watcher).start()
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

@@ -12,6 +12,7 @@ class RPC:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
+        lock (:obj:`Lock <threading.Lock>`): the ``Lock`` that must be acquired before writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
@@ -20,7 +21,7 @@ class RPC:
         logger: the logger for this component.
     """
 
-    def __init__(self, host, port, inspector, watcher):
+    def __init__(self, host, port, lock, inspector, watcher):
         app = Flask(__name__)
         jsonrpc = JSONRPC(app, "/rpc", enable_web_browsable_api=True)
         self.app = app
@@ -30,6 +31,7 @@ class RPC:
 
         self.host = host
         self.port = port
+        self.lock = lock
         self.inspector = inspector
         self.watcher = watcher
         self.logger.info("Initialized")
