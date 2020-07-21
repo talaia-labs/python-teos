@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, jsonify
 
 import common.errors as errors
 from teos.inspector import InspectionFailed
@@ -66,7 +66,7 @@ class API:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
-        lock (:obj:`Lock <threading.Lock>`): the ``Lock`` that must be acquired before writing to the watchtower's state.
+        lock (:obj:`Lock <threading.Lock>`): ``Lock`` that must be acquired before writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
