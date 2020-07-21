@@ -60,7 +60,7 @@ def get_all_appointments(rpc_url):
         return response_json
 
     except ConnectionError:
-        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
+        logger.error("Can't connect to the Eye of Satoshi. RPC server cannot be reached")
         return None
 
     except requests.exceptions.Timeout:

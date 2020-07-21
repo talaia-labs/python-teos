@@ -61,10 +61,11 @@ def get_config(command_line_conf):
     return config
 
 
-def rpc_thread_function(lock, inspector, watcher):
-    logger.info("Starting RPC Server")
-    # TODO: host/port should be in the settings
-    RPC("localhost", 9000, lock, inspector, watcher).start()
+def rpc_thread_function(config, lock, inspector, watcher):
+    host = config.get("RPC_BIND")
+    port = config.get("RPC_PORT")
+    logger.info(f"Starting RPC Server on {host}:{port}")
+    RPC(host, port, lock, inspector, watcher).start()
 
 
 def main(config):
@@ -207,7 +208,9 @@ def main(config):
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
 
             # start the RPC server
-            rpc_thread = threading.Thread(target=rpc_thread_function, args=(lock, inspector, watcher), daemon=True)
+            rpc_thread = threading.Thread(
+                target=rpc_thread_function, args=(config, lock, inspector, watcher), daemon=True
+            )
             rpc_thread.start()
 
             # start the API server
@@ -228,6 +231,8 @@ if __name__ == "__main__":
             [
                 "apibind=",
                 "apiport=",
+                "rpcbind=",
+                "rpcport=",
                 "btcnetwork=",
                 "btcrpcuser=",
                 "btcrpcpassword=",
@@ -249,6 +254,13 @@ if __name__ == "__main__":
                     command_line_conf["API_PORT"] = int(arg)
                 except ValueError:
                     exit("apiport must be an integer")
+            if opt in ["--rpcbind"]:
+                command_line_conf["RPC_BIND"] = arg
+            if opt in ["--rpcport"]:
+                try:
+                    command_line_conf["RPC_PORT"] = int(arg)
+                except ValueError:
+                    exit("rpcport must be an integer")
             if opt in ["--btcnetwork"]:
                 command_line_conf["BTC_NETWORK"] = arg
             if opt in ["--btcrpcuser"]:

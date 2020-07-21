@@ -6,8 +6,8 @@ def show_usage():
         "\n\tget_all_appointments \tGets information about all appointments stored in the tower."
         "\n\thelp \t\t\tShows a list of commands or help for a specific command."
         "\n\nGLOBAL OPTIONS:"
-        "\n\t--rpcconnect \tAPI server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
-        "\n\t--rpcport \tAPI port where to send the requests. Defaults to '9000' (modifiable in conf file)."
+        "\n\t--rpcconnect \tRPC server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
+        "\n\t--rpcport \tRPC port where to send the requests. Defaults to '9000' (modifiable in conf file)."
         "\n\t-d, --debug \tShows debug information and stores it in teos_cli.log."
         "\n\t-h, --help \tShows this message."
     )
