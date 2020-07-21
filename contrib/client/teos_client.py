@@ -11,10 +11,6 @@ from getopt import getopt, GetoptError
 from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from client.exceptions import TowerResponseError
-from client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from client.help import show_usage, help_add_appointment, help_get_appointment, help_register
-
 from common import constants
 from common.logger import get_logger, setup_logging
 import common.receipts as receipts
@@ -24,6 +20,10 @@ from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
+
+from . import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
+from .exceptions import TowerResponseError
+from .help import show_usage, help_add_appointment, help_get_appointment, help_register
 
 logger = get_logger(component="Client")
 
