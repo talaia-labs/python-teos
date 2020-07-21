@@ -12,7 +12,8 @@ class RPC:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
-        lock (:obj:`Lock <threading.Lock>`): ``Lock`` that must be acquired before writing to the watchtower's state.
+        rw_lock (:obj:`RWLockWrite <readwritelock.rwlock.RWLockWrite>`): lock that must be acquired before reading or
+            writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
@@ -21,7 +22,7 @@ class RPC:
         logger: the logger for this component.
     """
 
-    def __init__(self, host, port, lock, inspector, watcher):
+    def __init__(self, host, port, rw_lock, inspector, watcher):
         app = Flask(__name__)
         jsonrpc = JSONRPC(app, "/rpc", enable_web_browsable_api=True)
         self.app = app
@@ -31,7 +32,7 @@ class RPC:
 
         self.host = host
         self.port = port
-        self.lock = lock
+        self.rw_lock = rw_lock
         self.inspector = inspector
         self.watcher = watcher
         self.logger.info("Initialized")
@@ -42,6 +43,7 @@ class RPC:
 
     def start(self):
         """ This function starts the Flask server used to run the RPC """
+        # TODO: figure out what to do of this
         # Disable flask initial messages
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
@@ -60,7 +62,8 @@ class RPC:
 
         # ToDo: #15-add-system-monitor
 
-        watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
-        responder_trackers = self.watcher.db_manager.load_responder_trackers()
+        with self.rw_lock.gen_rlock():
+            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
+            responder_trackers = self.watcher.db_manager.load_responder_trackers()
 
         return {"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers}

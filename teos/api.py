@@ -66,7 +66,8 @@ class API:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
-        lock (:obj:`Lock <threading.Lock>`): ``Lock`` that must be acquired before writing to the watchtower's state.
+        rw_lock (:obj:`RWLockWrite <readwritelock.rwlock.RWLockWrite>`): lock that must be acquired before reading or
+            writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
@@ -75,11 +76,11 @@ class API:
         logger: the logger for this component.
     """
 
-    def __init__(self, host, port, lock, inspector, watcher):
+    def __init__(self, host, port, rw_lock, inspector, watcher):
         self.logger = get_logger(component=API.__name__)
         self.host = host
         self.port = port
-        self.lock = lock
+        self.rw_lock = rw_lock
         self.inspector = inspector
         self.watcher = watcher
         self.app = app
@@ -125,7 +126,7 @@ class API:
         user_id = request_data.get("public_key")
 
         if user_id:
-            with self.lock:
+            with self.rw_lock.gen_wlock():
                 try:
                     rcode = HTTP_OK
                     available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
@@ -176,7 +177,7 @@ class API:
         except InvalidParameter as e:
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
-        with self.lock:
+        with self.rw_lock.gen_wlock():
             try:
                 appointment = self.inspector.inspect(request_data.get("appointment"))
                 response = self.watcher.add_appointment(appointment, request_data.get("signature"))
@@ -240,9 +241,12 @@ class API:
         locator = request_data.get("locator")
 
         try:
-            self.inspector.check_locator(locator)
-            self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
-            appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
+            with self.rw_lock.gen_rlock():
+                self.inspector.check_locator(locator)
+                self.logger.info(
+                    "Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator
+                )
+                appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
 
             if status == "being_watched":
                 # Cast the ExtendedAppointment to Appointment to remove all the tower-specific data
@@ -262,6 +266,8 @@ class API:
 
     def start(self):
         """ This function starts the Flask server used to run the API """
+
+        # TODO: figure out what to do of this
         # Disable flask initial messages
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
 

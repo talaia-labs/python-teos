@@ -5,6 +5,8 @@ from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 import threading
 
+from readerwriterlock import rwlock
+
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
@@ -61,11 +63,11 @@ def get_config(command_line_conf):
     return config
 
 
-def rpc_thread_function(config, lock, inspector, watcher):
+def rpc_thread_function(config, rw_lock, inspector, watcher):
     host = config.get("RPC_BIND")
     port = config.get("RPC_PORT")
     logger.info(f"Starting RPC Server on {host}:{port}")
-    RPC(host, port, lock, inspector, watcher).start()
+    RPC(host, port, rw_lock, inspector, watcher).start()
 
 
 def main(config):
@@ -199,8 +201,8 @@ def main(config):
                 elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
                     Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
 
-            # lock to be acquired before interacting with the watchtower's state with write access
-            lock = threading.Lock()
+            # lock to be acquired before interacting with the watchtower's state
+            rw_lock = rwlock.RWLockWrite()
 
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
@@ -209,12 +211,12 @@ def main(config):
 
             # start the RPC server
             rpc_thread = threading.Thread(
-                target=rpc_thread_function, args=(config, lock, inspector, watcher), daemon=True
+                target=rpc_thread_function, args=(config, rw_lock, inspector, watcher), daemon=True
             )
             rpc_thread.start()
 
             # start the API server
-            API(config.get("API_BIND"), config.get("API_PORT"), lock, inspector, watcher).start()
+            API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher).start()
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
