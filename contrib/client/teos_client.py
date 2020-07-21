@@ -520,9 +520,6 @@ def main(command, args, command_line_conf):
                 elif command == "get_appointment":
                     sys.exit(help_get_appointment())
 
-                elif command == "get_all_appointments":
-                    sys.exit(help_get_all_appointments())
-
                 else:
                     logger.error("Unknown command. Use help to check the list of available commands")
 

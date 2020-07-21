@@ -1,27 +1,17 @@
 #!/usr/bin/env python3
 
-import os
 import sys
-import time
 import json
-import binascii
 import requests
 from sys import argv
-from uuid import uuid4
-from coincurve import PublicKey
 from getopt import getopt, GetoptError
-from requests import Timeout, ConnectionError
-from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
+from requests import ConnectionError
 
 from common import constants
 from common.logger import get_logger, setup_logging
-import common.receipts as receipts
-from common.appointment import Appointment
 from common.config_loader import ConfigLoader
-from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError
-from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 from .exceptions import TowerResponseError
 from . import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
