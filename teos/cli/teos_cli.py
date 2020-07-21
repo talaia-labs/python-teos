@@ -6,6 +6,7 @@ import requests
 from sys import argv
 from getopt import getopt, GetoptError
 from requests import ConnectionError
+from uuid import uuid4
 
 from common import constants
 from common.logger import get_logger, setup_logging
@@ -18,6 +19,12 @@ from . import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from .help import show_usage, help_get_all_appointments
 
 logger = get_logger()
+
+
+def make_rpc_request(rpc_url, method, *args):
+    return requests.post(
+        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5,
+    )
 
 
 def get_all_appointments(rpc_url):
@@ -33,17 +40,7 @@ def get_all_appointments(rpc_url):
     """
 
     try:
-        response = requests.post(
-            url=rpc_url,
-            json={
-                "method": "get_all_appointments",
-                "params": [],
-                "jsonrpc": "2.0",
-                "id": 0,  # TODO: handle ids correctly
-            },
-            timeout=5,
-        )
-
+        response = make_rpc_request(rpc_url, "get_all_appointments")
         if response.status_code != constants.HTTP_OK:
             logger.error("The server returned an error", status_code=response.status_code, reason=response.reason)
             return None
