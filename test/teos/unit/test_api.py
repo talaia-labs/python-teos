@@ -2,6 +2,8 @@ import pytest
 from shutil import rmtree
 from binascii import hexlify
 
+from readerwriterlock import rwlock
+
 from teos.api import API
 import common.errors as errors
 from teos.watcher import Watcher
@@ -33,7 +35,7 @@ from common.constants import (
 
 config = get_config()
 
-TEOS_API = "http://{}:{}".format(config.get("API_HOST"), config.get("API_PORT"))
+TEOS_API = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
 register_endpoint = "{}/register".format(TEOS_API)
 add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
 get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
@@ -70,12 +72,13 @@ def get_all_db_manager():
 @pytest.fixture(scope="module", autouse=True)
 def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+    rw_lock = rwlock.RWLockWrite()
     watcher = Watcher(
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
     inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
-    api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher)
+    api = API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher)
 
     return api
 

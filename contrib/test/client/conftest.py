@@ -1,7 +1,7 @@
 import pytest
 import random
 
-from cli import DEFAULT_CONF
+from contrib.client import DEFAULT_CONF
 
 from common.config_loader import ConfigLoader
 
@@ -18,7 +18,7 @@ def get_random_value_hex(nbytes):
 
 
 def get_config():
-    config_loader = ConfigLoader(".", "teos_cli.conf", DEFAULT_CONF, {})
+    config_loader = ConfigLoader(".", "teos_client.conf", DEFAULT_CONF, {})
     config = config_loader.build_config()
 
     return config
