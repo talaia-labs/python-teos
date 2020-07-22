@@ -9,7 +9,7 @@ DEFAULT_CONF = {
     "API_BIND": {"value": "localhost", "type": str},
     "API_PORT": {"value": 9814, "type": int},
     "RPC_BIND": {"value": "localhost", "type": str},
-    "RPC_PORT": {"value": 9000, "type": int},
+    "RPC_PORT": {"value": 8814, "type": int},
     "BTC_RPC_USER": {"value": "user", "type": str},
     "BTC_RPC_PASSWORD": {"value": "passwd", "type": str},
     "BTC_RPC_CONNECT": {"value": "127.0.0.1", "type": str},
