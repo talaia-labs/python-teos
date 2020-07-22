@@ -8,9 +8,7 @@ from common import errors
 from common import constants
 import common.receipts as receipts
 from common.cryptographer import Cryptographer
-from common.exceptions import SignatureError, InvalidParameter
-
-from exceptions import TowerConnectionError, TowerResponseError
+from common.exceptions import SignatureError, InvalidParameter, TowerConnectionError, TowerResponseError
 
 
 def add_appointment(plugin, tower_id, tower, appointment_dict, signature):

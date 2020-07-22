@@ -12,9 +12,8 @@ from common import constants
 from common.logger import get_logger, setup_logging
 from common.config_loader import ConfigLoader
 from common.tools import setup_data_folder
-from common.exceptions import InvalidKey, InvalidParameter, SignatureError
+from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 
-from .exceptions import TowerResponseError
 from . import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from .help import show_usage, help_get_all_appointments
 
@@ -23,7 +22,7 @@ logger = get_logger()
 
 def make_rpc_request(rpc_url, method, *args):
     return requests.post(
-        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5,
+        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5
     )
 
 

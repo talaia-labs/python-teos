@@ -35,3 +35,11 @@ class EncryptionError(BasicException):
 
 class SignatureError(BasicException):
     """Raised when there is an with the signature related functions, covers EC recover"""
+
+
+class TowerConnectionError(BasicException):
+    """Raised when the tower responds with an error"""
+
+
+class TowerResponseError(BasicException):
+    """Raised when the tower responds with an error"""
