@@ -1,6 +1,6 @@
-import os
 from flask import Flask
 from flask_jsonrpc import JSONRPC
+from gevent.pywsgi import WSGIServer
 
 from common.logger import get_logger
 
@@ -43,11 +43,9 @@ class RPC:
 
     def start(self):
         """ This function starts the Flask server used to run the RPC """
-        # TODO: figure out what to do of this
-        # Disable flask initial messages
-        os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
-        self.app.run(host=self.host, port=self.port)
+        http_server = WSGIServer((self.host, self.port), self.app, log=self.logger, error_log=self.logger)
+        http_server.serve_forever()
 
     def get_all_appointments(self):
         """

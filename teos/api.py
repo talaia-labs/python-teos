@@ -1,5 +1,5 @@
-import os
 from flask import Flask, request, jsonify
+from gevent.pywsgi import WSGIServer
 
 import common.errors as errors
 from teos.inspector import InspectionFailed
@@ -10,10 +10,6 @@ from common.logger import get_logger
 from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
-
-
-# ToDo: #5-add-async-to-api
-app = Flask(__name__)
 
 
 # NOTCOVERED: not sure how to monkey path this one. May be related to #77
@@ -83,7 +79,9 @@ class API:
         self.rw_lock = rw_lock
         self.inspector = inspector
         self.watcher = watcher
-        self.app = app
+
+        # ToDo: #5-add-async-to-api
+        self.app = Flask(__name__)
 
         # Adds all the routes to the functions listed above.
         routes = {
@@ -93,7 +91,7 @@ class API:
         }
 
         for url, params in routes.items():
-            app.add_url_rule(url, view_func=params[0], methods=params[1])
+            self.app.add_url_rule(url, view_func=params[0], methods=params[1])
 
     def register(self):
         """
@@ -267,8 +265,5 @@ class API:
     def start(self):
         """ This function starts the Flask server used to run the API """
 
-        # TODO: figure out what to do of this
-        # Disable flask initial messages
-        os.environ["WERKZEUG_RUN_MAIN"] = "true"
-
-        app.run(host=self.host, port=self.port)
+        http_server = WSGIServer((self.host, self.port), self.app, log=self.logger, error_log=self.logger)
+        http_server.serve_forever()
