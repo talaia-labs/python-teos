@@ -12,7 +12,7 @@ jobs:
 
       - restore_cache:
             keys:
-              - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+              - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
 
       - run:
           name: Install dependencies
@@ -23,12 +23,12 @@ jobs:
             sudo pip install --upgrade pip
             pip install -r requirements.txt
             pip install -r requirements-dev.txt
-            pip install -r cli/requirements.txt
+            pip install -r contrib/client/requirements.txt
 
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
 
       - run:
           name: Run teos unit tests
@@ -43,10 +43,10 @@ jobs:
             pytest test/common/unit
 
       - run:
-          name: Run cli unit tests
+          name: Run contrib unit tests
           command: |
             . venv/bin/activate
-            pytest test/cli/unit
+            pytest contrib/test
 
   e2e_tests:
     machine:
@@ -57,7 +57,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+            - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
 
       - run:
           name: Install bitcoind
