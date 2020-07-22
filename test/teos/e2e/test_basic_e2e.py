@@ -1,12 +1,21 @@
 import os
 import json
+import requests
 import pytest
 from time import sleep
 from riemann.tx import Tx
 from binascii import hexlify
 from coincurve import PrivateKey
+from uuid import uuid4
 
-from contrib.client import teos_client, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
+from contrib.client import (
+    teos_client,
+    DATA_DIR as CLIENT_DATA_DIR,
+    DEFAULT_CONF as CLIENT_DEFAULT_CONF,
+    CONF_FILE_NAME as CLIENT_CONF_FILE_NAME,
+)
+
+from teos.cli import DATA_DIR as CLI_DATA_DIR, DEFAULT_CONF as CLI_DEFAULT_CONF, CONF_FILE_NAME as CLI_CONF_FILE_NAME
 
 import common.receipts as receipts
 from common.exceptions import InvalidKey, TowerResponseError
@@ -14,8 +23,8 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-from teos import DEFAULT_CONF as TEOS_CONF
 from teos import DATA_DIR as TEOS_DATA_DIR
+from teos import DEFAULT_CONF as TEOS_DEFAULT_CONF
 from teos import CONF_FILE_NAME as TEOS_CONF_FILE_NAME
 from teos.utils.auth_proxy import JSONRPCException
 
@@ -28,14 +37,17 @@ from test.teos.e2e.conftest import (
     create_txs,
 )
 
-cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
-teos_config = get_config(TEOS_DATA_DIR, TEOS_CONF_FILE_NAME, TEOS_CONF)
+client_config = get_config(CLIENT_DATA_DIR, CLIENT_CONF_FILE_NAME, CLIENT_DEFAULT_CONF)
+cli_config = get_config(CLI_DATA_DIR, CLI_CONF_FILE_NAME, CLI_DEFAULT_CONF)
+teos_config = get_config(TEOS_DATA_DIR, TEOS_CONF_FILE_NAME, TEOS_DEFAULT_CONF)
 teos_datadir_network = os.path.join(TEOS_DATA_DIR, teos_config.get("BTC_NETWORK"))
 
-teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
+teos_base_endpoint = "http://{}:{}".format(client_config.get("API_CONNECT"), client_config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
+
+teos_rpc_endpoint = "http://{}:{}/rpc".format(cli_config.get("RPC_CONNECT"), cli_config.get("RPC_PORT"))
 
 # Run teosd
 teosd_process, teos_id = run_teosd(teos_config, teos_datadir_network)
@@ -66,9 +78,16 @@ def add_appointment(appointment_data, sk=user_sk):
     return teos_client.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
 
 
+def make_rpc_request(rpc_url, method, *args):
+    return requests.post(
+        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5,
+    )
+
+
 def get_all_appointments():
-    r = teos_client.get_all_appointments(teos_base_endpoint)
-    return json.loads(r)
+    response = make_rpc_request(teos_rpc_endpoint, "get_all_appointments")
+    jsonrpc_response = response.json()
+    return jsonrpc_response["result"]
 
 
 def test_commands_non_registered(bitcoin_cli):
@@ -566,3 +585,79 @@ def test_appointment_shutdown_teos_trigger_while_offline(bitcoin_cli):
     assert appointment_info.get("status") == "dispute_responded"
 
     teosd_process.terminate()
+
+
+# def test_get_all_appointments_watcher(api, client, get_all_db_manager):
+#     # Let's reset the dbs so we can test this clean
+#     api.watcher.db_manager = get_all_db_manager
+#     api.watcher.responder.db_manager = get_all_db_manager
+
+#     # Check that they are wiped clean
+#     r = client.get(get_all_appointment_endpoint)
+#     assert r.status_code == HTTP_OK
+#     assert len(r.json.get("watcher_appointments")) == 0 and len(r.json.get("responder_trackers")) == 0
+
+#     # Add some appointments to the Watcher db
+#     non_triggered_appointments = {}
+#     for _ in range(10):
+#         uuid = get_random_value_hex(16)
+#         appointment, _ = generate_dummy_appointment()
+#         appointment.locator = get_random_value_hex(16)
+#         non_triggered_appointments[uuid] = appointment.to_dict()
+#         api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+
+#     triggered_appointments = {}
+#     for _ in range(10):
+#         uuid = get_random_value_hex(16)
+#         appointment, _ = generate_dummy_appointment()
+#         appointment.locator = get_random_value_hex(16)
+#         triggered_appointments[uuid] = appointment.to_dict()
+#         api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+#         api.watcher.db_manager.create_triggered_appointment_flag(uuid)
+
+#     # We should only get the non-triggered appointments
+#     r = client.get(get_all_appointment_endpoint)
+#     assert r.status_code == HTTP_OK
+
+#     watcher_locators = [v["locator"] for k, v in r.json["watcher_appointments"].items()]
+#     local_locators = [appointment["locator"] for uuid, appointment in non_triggered_appointments.items()]
+
+#     assert set(watcher_locators) == set(local_locators)
+#     assert len(r.json["responder_trackers"]) == 0
+
+
+# def test_get_all_appointments_responder(api, client, get_all_db_manager):
+#     # Let's reset the dbs so we can test this clean
+#     api.watcher.db_manager = get_all_db_manager
+#     api.watcher.responder.db_manager = get_all_db_manager
+
+#     # Check that they are wiped clean
+#     r = client.get(get_all_appointment_endpoint)
+#     assert r.status_code == HTTP_OK
+#     assert len(r.json.get("watcher_appointments")) == 0 and len(r.json.get("responder_trackers")) == 0
+
+#     # Add some trackers to the Responder db
+#     tx_trackers = {}
+#     for _ in range(10):
+#         uuid = get_random_value_hex(16)
+#         tracker_data = {
+#             "locator": get_random_value_hex(16),
+#             "dispute_txid": get_random_value_hex(32),
+#             "penalty_txid": get_random_value_hex(32),
+#             "penalty_rawtx": get_random_value_hex(250),
+#             "user_id": get_random_value_hex(16),
+#         }
+#         tracker = TransactionTracker.from_dict(tracker_data)
+#         tx_trackers[uuid] = tracker.to_dict()
+#         api.watcher.responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
+#         api.watcher.db_manager.create_triggered_appointment_flag(uuid)
+
+#     # Get all appointments
+#     r = client.get(get_all_appointment_endpoint)
+
+#     # Make sure there is not pending locator in the watcher
+#     responder_trackers = [v["locator"] for k, v in r.json["responder_trackers"].items()]
+#     local_locators = [tracker["locator"] for uuid, tracker in tx_trackers.items()]
+
+#     assert set(responder_trackers) == set(local_locators)
+#     assert len(r.json["watcher_appointments"]) == 0
