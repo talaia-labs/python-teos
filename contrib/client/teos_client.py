@@ -559,9 +559,9 @@ if __name__ == "__main__":
         if command in commands:
             main(command, args, command_line_conf)
         elif not command:
-            logger.error("No command provided. Use help to check the list of available commands")
+            sys.exit("No command provided. Use help to check the list of available commands")
         else:
-            logger.error("Unknown command. Use help to check the list of available commands")
+            sys.exit("Unknown command. Use help to check the list of available commands")
 
     except GetoptError as e:
-        logger.error("{}".format(e))
+        sys.exit("{}".format(e))

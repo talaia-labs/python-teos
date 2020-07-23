@@ -1,5 +1,4 @@
 import os
-import json
 import requests
 import pytest
 from time import sleep
@@ -80,7 +79,7 @@ def add_appointment(appointment_data, sk=user_sk):
 
 def make_rpc_request(rpc_url, method, *args):
     return requests.post(
-        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5,
+        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5
     )
 
 
