@@ -121,7 +121,7 @@ def test_locator_cache_init_not_enough_blocks(block_processor):
     # Make sure there are at least 3 blocks
     block_count = block_processor.get_block_count()
     if block_count < 3:
-        generate_blocks_w_delay(3 - block_count)
+        generate_blocks(3 - block_count)
 
     # Simulate there are only 3 blocks
     third_block_hash = bitcoin_cli.getblockhash(2)
@@ -262,7 +262,7 @@ def test_locator_remove_oldest_block(block_processor):
 def test_fix_cache(block_processor):
     # This tests how a reorg will create a new version of the cache
     # Let's start setting a full cache. We'll mine ``cache_size`` bocks to be sure it's full
-    generate_blocks_w_delay(config.get("LOCATOR_CACHE_SIZE"))
+    generate_blocks(config.get("LOCATOR_CACHE_SIZE"))
 
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
     locator_cache.init(block_processor.get_best_block_hash(), block_processor)
@@ -289,7 +289,7 @@ def test_fix_cache(block_processor):
     # trigger a fix. We'll use a new cache to compare with the old
     old_cache_blocks = deepcopy(locator_cache.blocks)
 
-    generate_blocks_w_delay((config.get("LOCATOR_CACHE_SIZE") * 2))
+    generate_blocks((config.get("LOCATOR_CACHE_SIZE") * 2))
     locator_cache.fix(block_processor.get_best_block_hash(), block_processor)
 
     # None of the data from the old cache is in the new cache
