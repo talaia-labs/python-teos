@@ -76,10 +76,9 @@ def generate_keypair():
     return sk, pk
 
 
-def fork(block_hash):
-    # fork_endpoint = "http://{}:{}/fork".format(BTC_RPC_HOST, BTC_RPC_PORT)
-    # requests.post(fork_endpoint, json={"parent": block_hash})
-    pass
+def fork(block_hash, blocks):
+    bitcoin_cli.invalidateblock(block_hash)
+    bitcoin_cli.generatetoaddress(blocks, bitcoin_cli.getnewaddress())
 
 
 def generate_dummy_appointment():

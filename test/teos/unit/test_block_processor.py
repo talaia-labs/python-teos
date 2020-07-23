@@ -1,7 +1,7 @@
 import pytest
 from teos.watcher import InvalidTransactionFormat
 from test.teos.conftest import generate_blocks
-from test.teos.unit.conftest import get_random_value_hex, fork
+from test.teos.unit.conftest import get_random_value_hex, fork, bitcoin_cli
 
 
 hex_tx = (
@@ -87,8 +87,7 @@ def test_is_block_in_best_chain(block_processor):
 
     assert block_processor.is_block_in_best_chain(best_block_hash)
 
-    fork(best_block.get("previousblockhash"))
-    generate_blocks(2)
+    fork(best_block.get("previousblockhash"), 2)
 
     assert not block_processor.is_block_in_best_chain(best_block_hash)
 
@@ -98,11 +97,8 @@ def test_find_last_common_ancestor(block_processor):
     blocks = generate_blocks(3)
     best_block_hash = blocks[-1]
 
-    # Create a fork (forking creates a block if the mock is set by events)
-    fork(ancestor)
-
-    # Create another block to make the best tip change (now both chains are at the same height)
-    generate_blocks(5)
+    # Create a fork (invalidate the next block after the ancestor amd mine 4 blocks on top)
+    fork(blocks[0], 4)
 
     # The last common ancestor between the old best and the new best should be the "ancestor"
     last_common_ancestor, dropped_txs = block_processor.find_last_common_ancestor(best_block_hash)
