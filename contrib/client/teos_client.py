@@ -44,7 +44,7 @@ def register(user_id, teos_id, teos_url):
     Raises:
         :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `user_id` is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -129,7 +129,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
     Raises:
         :obj:`ValueError`: if the appointment cannot be signed.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -176,7 +176,7 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
         :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `appointment_data` or any of its fields is
         invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -332,7 +332,7 @@ def process_post_response(response):
         ``HTTP_OK``.
 
     Raises:
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
