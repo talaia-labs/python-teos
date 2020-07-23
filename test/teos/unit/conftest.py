@@ -1,14 +1,6 @@
 import pytest
-import random
-import requests
-from time import sleep
 from shutil import rmtree
-from threading import Thread
 from coincurve import PrivateKey
-
-from bitcoind_mock.bitcoind import BitcoindMock
-from bitcoind_mock.conf import BTC_RPC_HOST, BTC_RPC_PORT
-from bitcoind_mock.transaction import create_dummy_transaction
 
 from teos import DEFAULT_CONF
 from teos.carrier import Carrier
@@ -21,30 +13,16 @@ from teos.extended_appointment import ExtendedAppointment
 
 from common.tools import compute_locator
 from common.constants import LOCATOR_LEN_HEX
-from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
+
+from test.teos.conftest import get_config as general_get_config
+from test.teos.conftest import bitcoin_cli, get_random_value_hex, create_txs, create_commitment_tx, create_penalty_tx
 
 # Set params to connect to regtest for testing
 DEFAULT_CONF["BTC_RPC_PORT"]["value"] = 18443
 DEFAULT_CONF["BTC_NETWORK"]["value"] = "regtest"
 
 bitcoind_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
-bitcoind_feed_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC_FEED")}
-
-
-@pytest.fixture(scope="session")
-def run_bitcoind():
-    bitcoind_thread = Thread(target=BitcoindMock().run, kwargs={"mode": "event", "verbose": True})
-    bitcoind_thread.daemon = True
-    bitcoind_thread.start()
-
-    # It takes a little bit of time to start the API (otherwise the requests are sent too early and they fail)
-    sleep(0.1)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def prng_seed():
-    random.seed(0)
 
 
 @pytest.fixture(scope="module")
@@ -97,77 +75,46 @@ def generate_keypair():
     return sk, pk
 
 
-def get_random_value_hex(nbytes):
-    pseudo_random_value = random.getrandbits(8 * nbytes)
-    prv_hex = "{:x}".format(pseudo_random_value)
-    return prv_hex.zfill(2 * nbytes)
-
-
-def generate_block_w_delay():
-    requests.post(url="http://{}:{}/generate".format(BTC_RPC_HOST, BTC_RPC_PORT), timeout=5)
-    sleep(0.5)
-
-
-def generate_blocks_w_delay(n):
-    for _ in range(n):
-        generate_block()
-        sleep(0.2)
-
-
-def generate_block():
-    requests.post(url="http://{}:{}/generate".format(BTC_RPC_HOST, BTC_RPC_PORT), timeout=5)
-
-
-def generate_blocks(n):
-    for _ in range(n):
-        generate_block()
-
-
 def fork(block_hash):
-    fork_endpoint = "http://{}:{}/fork".format(BTC_RPC_HOST, BTC_RPC_PORT)
-    requests.post(fork_endpoint, json={"parent": block_hash})
+    # fork_endpoint = "http://{}:{}/fork".format(BTC_RPC_HOST, BTC_RPC_PORT)
+    # requests.post(fork_endpoint, json={"parent": block_hash})
+    pass
 
 
 def generate_dummy_appointment():
-    dispute_tx = create_dummy_transaction()
-    dispute_txid = dispute_tx.tx_id.hex()
-    penalty_tx = create_dummy_transaction(dispute_txid)
+    commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    locator = compute_locator(dispute_txid)
-    dummy_appointment_data = {"tx": penalty_tx.hex(), "tx_id": dispute_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id"))
+    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
 
     appointment_data = {
-        "locator": locator,
+        "locator": compute_locator(commitment_txid),
         "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-        "encrypted_blob": encrypted_blob,
+        "encrypted_blob": Cryptographer.encrypt(penalty_tx, commitment_txid),
         "user_id": get_random_value_hex(16),
         "user_signature": get_random_value_hex(50),
         "start_block": 200,
     }
 
-    return ExtendedAppointment.from_dict(appointment_data), dispute_tx.hex()
+    return ExtendedAppointment.from_dict(appointment_data), commitment_tx
 
 
-def generate_dummy_tracker():
-    dispute_txid = get_random_value_hex(32)
-    penalty_txid = get_random_value_hex(32)
-    penalty_rawtx = get_random_value_hex(100)
-    locator = dispute_txid[:LOCATOR_LEN_HEX]
+def generate_dummy_tracker(commitment_tx=None):
+    if not commitment_tx:
+        commitment_tx = create_commitment_tx()
+    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(commitment_tx)
+    penalty_tx = create_penalty_tx(decoded_commitment_tx)
+    locator = decoded_commitment_tx.get("txid")[:LOCATOR_LEN_HEX]
 
     tracker_data = dict(
         locator=locator,
-        dispute_txid=dispute_txid,
-        penalty_txid=penalty_txid,
-        penalty_rawtx=penalty_rawtx,
-        user_id=get_random_value_hex(16),
+        dispute_txid=bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"),
+        penalty_txid=bitcoin_cli.decoderawtransaction(penalty_tx).get("txid"),
+        penalty_rawtx=penalty_tx,
+        user_id="02" + get_random_value_hex(32),
     )
 
     return TransactionTracker.from_dict(tracker_data)
 
 
 def get_config():
-    config_loader = ConfigLoader(".", "teos.conf", DEFAULT_CONF, {})
-    config = config_loader.build_config()
-
-    return config
+    return general_get_config(".", "teos.conf", DEFAULT_CONF)
