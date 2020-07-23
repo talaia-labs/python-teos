@@ -6,7 +6,7 @@ from test.teos.unit.conftest import bitcoind_connect_params
 from common.constants import MAINNET_RPC_PORT, TESTNET_RPC_PORT, REGTEST_RPC_PORT
 
 
-def test_in_correct_network(run_bitcoind):
+def test_in_correct_network():
     # The simulator runs as if it was regtest, so every other network should fail
     assert in_correct_network(bitcoind_connect_params, "mainnet") is False
     assert in_correct_network(bitcoind_connect_params, "testnet") is False

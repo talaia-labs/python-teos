@@ -23,6 +23,7 @@ DEFAULT_CONF["BTC_RPC_PORT"]["value"] = 18443
 DEFAULT_CONF["BTC_NETWORK"]["value"] = "regtest"
 
 bitcoind_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
+bitcoind_feed_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC_FEED")}
 
 
 @pytest.fixture(scope="module")

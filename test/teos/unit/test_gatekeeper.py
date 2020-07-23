@@ -14,7 +14,7 @@ from test.teos.unit.conftest import get_random_value_hex, generate_keypair, get_
 config = get_config()
 
 
-def test_init(gatekeeper, run_bitcoind):
+def test_init(gatekeeper):
     assert isinstance(gatekeeper.subscription_slots, int) and gatekeeper.subscription_slots == config.get(
         "SUBSCRIPTION_SLOTS"
     )

@@ -5,10 +5,11 @@ from threading import Thread, Event, Condition
 
 from teos.chain_monitor import ChainMonitor
 
-from test.teos.unit.conftest import get_random_value_hex, generate_block, bitcoind_feed_params
+from test.teos.conftest import generate_blocks
+from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
 
 
-def test_init(run_bitcoind, block_processor):
+def test_init(block_processor):
     # run_bitcoind is started here instead of later on to avoid race conditions while it initializes
 
     # Not much to test here, just sanity checks to make sure nothing goes south in the future
@@ -79,13 +80,12 @@ def test_monitor_chain_polling(db_manager, block_processor):
         time.sleep(0.1)
 
     # And that it does if we generate a block
-    generate_block()
+    generate_blocks(1)
 
     chain_monitor.watcher_queue.get()
     assert chain_monitor.watcher_queue.empty()
 
     chain_monitor.terminate = True
-    polling_thread.join()
 
 
 def test_monitor_chain_zmq(db_manager, block_processor):
@@ -101,16 +101,19 @@ def test_monitor_chain_zmq(db_manager, block_processor):
 
     # And have a new block every time we generate one
     for _ in range(3):
-        generate_block()
+        generate_blocks(1)
+
         chain_monitor.responder_queue.get()
         assert chain_monitor.responder_queue.empty()
+
+    chain_monitor.terminate = True
+    # The zmq thread needs a block generation to release from the recv method.
+    generate_blocks(1)
 
 
 def test_monitor_chain(db_manager, block_processor):
     # Not much to test here, this should launch two threads (one per monitor approach) and finish on terminate
     chain_monitor = ChainMonitor(Queue(), Queue(), block_processor, bitcoind_feed_params)
-
-    chain_monitor.best_tip = None
     chain_monitor.monitor_chain()
 
     # The tip is updated before starting the threads, so it should have changed.
@@ -118,17 +121,16 @@ def test_monitor_chain(db_manager, block_processor):
 
     # Blocks should be received
     for _ in range(5):
-        generate_block()
+        generate_blocks(1)
         watcher_block = chain_monitor.watcher_queue.get()
         responder_block = chain_monitor.responder_queue.get()
         assert watcher_block == responder_block
         assert chain_monitor.watcher_queue.empty()
         assert chain_monitor.responder_queue.empty()
 
-    # And the thread be terminated on terminate
     chain_monitor.terminate = True
     # The zmq thread needs a block generation to release from the recv method.
-    generate_block()
+    generate_blocks(1)
 
 
 def test_monitor_chain_single_update(db_manager, block_processor):
@@ -141,7 +143,7 @@ def test_monitor_chain_single_update(db_manager, block_processor):
     # We will create a block and wait for the polling thread. Then check the queues to see that the block hash has only
     # been added once.
     chain_monitor.monitor_chain()
-    generate_block()
+    generate_blocks(1)
 
     watcher_block = chain_monitor.watcher_queue.get()
     responder_block = chain_monitor.responder_queue.get()

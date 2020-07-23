@@ -1,6 +1,7 @@
 import pytest
 from teos.watcher import InvalidTransactionFormat
-from test.teos.unit.conftest import get_random_value_hex, generate_block, generate_blocks, fork
+from test.teos.conftest import generate_blocks
+from test.teos.unit.conftest import get_random_value_hex, fork
 
 
 hex_tx = (
@@ -13,9 +14,9 @@ hex_tx = (
 )
 
 
-def test_get_best_block_hash(run_bitcoind, block_processor):
+def test_get_best_block_hash(block_processor):
     best_block_hash = block_processor.get_best_block_hash()
-    # As long as bitcoind is running (or mocked in this case) we should always a block hash
+    # As long as bitcoind is running we should always a block hash
     assert best_block_hash is not None and isinstance(best_block_hash, str)
 
 
@@ -25,7 +26,6 @@ def test_get_block(block_processor):
     block = block_processor.get_block(best_block_hash)
 
     # Checking that the received block has at least the fields we need
-    # FIXME: We could be more strict here, but we'll need to add those restrictions to bitcoind_sim too
     assert isinstance(block, dict)
     assert block.get("hash") == best_block_hash and "height" in block and "previousblockhash" in block and "tx" in block
 
@@ -56,10 +56,7 @@ def test_get_missed_blocks(block_processor):
     target_block = block_processor.get_best_block_hash()
 
     # Generate some blocks and store the hash in a list
-    missed_blocks = []
-    for _ in range(5):
-        generate_block()
-        missed_blocks.append(block_processor.get_best_block_hash())
+    missed_blocks = generate_blocks(5)
 
     # Check what we've missed
     assert block_processor.get_missed_blocks(target_block) == missed_blocks
@@ -98,8 +95,8 @@ def test_is_block_in_best_chain(block_processor):
 
 def test_find_last_common_ancestor(block_processor):
     ancestor = block_processor.get_best_block_hash()
-    generate_blocks(3)
-    best_block_hash = block_processor.get_best_block_hash()
+    blocks = generate_blocks(3)
+    best_block_hash = blocks[-1]
 
     # Create a fork (forking creates a block if the mock is set by events)
     fork(ancestor)

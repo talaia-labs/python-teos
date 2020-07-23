@@ -1,30 +1,34 @@
-from bitcoind_mock.transaction import create_dummy_transaction
-from test.teos.unit.conftest import generate_blocks, get_random_value_hex
+from test.teos.conftest import generate_blocks
+from test.teos.unit.conftest import get_random_value_hex
 from teos.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
+
+from test.teos.conftest import create_commitment_tx, bitcoin_cli
 
 
 # FIXME: This test do not fully cover the carrier since the simulator does not support every single error bitcoind may
 #        return for RPC_VERIFY_REJECTED and RPC_VERIFY_ERROR. Further development of the simulator / mocks or simulation
 #        with bitcoind is required
+# TODO: Given we are getting rid of the mock, test the uncovered cases.
 
 
 sent_txs = []
 
 
-def test_send_transaction(run_bitcoind, carrier):
-    tx = create_dummy_transaction()
+def test_send_transaction(carrier):
+    tx = create_commitment_tx()
+    txid = bitcoin_cli.decoderawtransaction(tx).get("txid")
 
-    receipt = carrier.send_transaction(tx.hex(), tx.tx_id.hex())
+    receipt = carrier.send_transaction(tx, txid)
 
     assert receipt.delivered is True
 
 
 def test_send_double_spending_transaction(carrier):
     # We can test what happens if the same transaction is sent twice
-    tx = create_dummy_transaction()
-    txid = tx.tx_id.hex()
+    tx = create_commitment_tx()
+    txid = bitcoin_cli.decoderawtransaction(tx).get("txid")
 
-    receipt = carrier.send_transaction(tx.hex(), txid)
+    receipt = carrier.send_transaction(tx, txid)
     sent_txs.append(txid)
 
     # Wait for a block to be mined. Issued receipts is reset from the Responder every block, so we should do it too.
@@ -32,7 +36,7 @@ def test_send_double_spending_transaction(carrier):
     carrier.issued_receipts = {}
 
     # Try to send it again
-    receipt2 = carrier.send_transaction(tx.hex(), txid)
+    receipt2 = carrier.send_transaction(tx, txid)
 
     # The carrier should report delivered True for both, but in the second case the transaction was already delivered
     # (either by himself or someone else)
@@ -42,7 +46,7 @@ def test_send_double_spending_transaction(carrier):
 
 def test_send_transaction_invalid_format(carrier):
     # Test sending a transaction that does not fits the format
-    txid = create_dummy_transaction().tx_id.hex()
+    txid = create_commitment_tx()[::-1]
     receipt = carrier.send_transaction(txid, txid)
 
     assert receipt.delivered is False and receipt.reason == RPC_DESERIALIZATION_ERROR
