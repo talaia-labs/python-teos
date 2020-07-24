@@ -1,4 +1,3 @@
-import os
 import json
 import pytest
 from time import sleep
@@ -6,52 +5,43 @@ from riemann.tx import Tx
 from binascii import hexlify
 from coincurve import PrivateKey
 
+from cli import teos_cli
 from cli.exceptions import TowerResponseError
-from cli import teos_cli, DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 
 import common.receipts as receipts
-from common.exceptions import InvalidKey
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-from teos import DEFAULT_CONF as TEOS_CONF
-from teos import DATA_DIR as TEOS_DATA_DIR
-from teos import CONF_FILE_NAME as TEOS_CONF_FILE_NAME
+
 from teos.utils.auth_proxy import JSONRPCException
 
 from test.teos.conftest import (
-    get_config,
     get_random_value_hex,
     create_txs,
     create_penalty_tx,
     bitcoin_cli,
     generate_block_with_transactions,
     generate_blocks,
+    config,
 )
 from test.teos.e2e.conftest import build_appointment_data, run_teosd
 
-cli_config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
-teos_config = get_config(TEOS_DATA_DIR, TEOS_CONF_FILE_NAME, TEOS_CONF)
-teos_datadir_network = os.path.join(TEOS_DATA_DIR, teos_config.get("BTC_NETWORK"))
-
-teos_base_endpoint = "http://{}:{}".format(cli_config.get("API_CONNECT"), cli_config.get("API_PORT"))
+teos_base_endpoint = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
 
-# Run teosd
-teosd_process, teos_id = run_teosd(teos_config, teos_datadir_network)
 
-try:
-    user_sk, user_id = teos_cli.load_keys(cli_config.get("CLI_PRIVATE_KEY"))
-except InvalidKey:
-    user_sk = Cryptographer.generate_key()
-    user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
+user_sk = Cryptographer.generate_key()
+user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
 
 appointments_in_watcher = 0
 appointments_in_responder = 0
+
+
+teosd_process, teos_id = None, None
 
 
 def get_appointment_info(locator, sk=user_sk):
@@ -68,8 +58,10 @@ def get_all_appointments():
     return json.loads(r)
 
 
-def test_commands_non_registered():
+def test_commands_non_registered(teosd):
     # All commands should fail if the user is not registered
+    global teosd_process, teos_id
+    teosd_process, teos_id = teosd
 
     # Add appointment
     commitment_tx, commitment_tx_id, penalty_tx = create_txs()
@@ -155,7 +147,7 @@ def test_appointment_life_cycle():
         assert False
 
     # Now let's mine some blocks so the appointment reaches its end. We need 100 + EXPIRY_DELTA -1
-    generate_blocks(100 + teos_config.get("EXPIRY_DELTA") - 1)
+    generate_blocks(100 + config.get("EXPIRY_DELTA") - 1)
     appointments_in_responder -= 1
 
     # The appointment is no longer in the tower
@@ -167,11 +159,7 @@ def test_appointment_life_cycle():
     available_slots_response, _ = teos_cli.register(user_id, teos_id, teos_base_endpoint)
     assert (
         available_slots_response
-        == available_slots
-        + teos_config.get("SUBSCRIPTION_SLOTS")
-        + 1
-        - appointments_in_watcher
-        - appointments_in_responder
+        == available_slots + config.get("SUBSCRIPTION_SLOTS") + 1 - appointments_in_watcher - appointments_in_responder
     )
 
 
@@ -222,7 +210,7 @@ def test_multiple_appointments_life_cycle():
 
     new_addr = bitcoin_cli.getnewaddress()
     # Now let's mine some blocks so the appointment reaches its end. We need 100 + EXPIRY_DELTA -1
-    bitcoin_cli.generatetoaddress(100 + teos_config.get("EXPIRY_DELTA") - 1, new_addr)
+    bitcoin_cli.generatetoaddress(100 + config.get("EXPIRY_DELTA") - 1, new_addr)
 
     # The appointment is no longer in the tower
     with pytest.raises(TowerResponseError):
@@ -476,10 +464,9 @@ def test_add_appointment_trigger_on_cache_cannot_decrypt():
 
 
 def test_appointment_shutdown_teos_trigger_back_online():
+    global teosd_process
     # This tests data persistence. An appointment is sent to the tower, the tower is restarted and the appointment is
     # then triggered.
-    global teosd_process
-
     teos_pid = teosd_process.pid
 
     commitment_tx, commitment_txid, penalty_tx = create_txs()
@@ -491,7 +478,7 @@ def test_appointment_shutdown_teos_trigger_back_online():
 
     # Restart teos
     teosd_process.terminate()
-    teosd_process, _ = run_teosd(teos_config, teos_datadir_network)
+    teosd_process, _ = run_teosd()
 
     assert teos_pid != teosd_process.pid
 
@@ -510,10 +497,9 @@ def test_appointment_shutdown_teos_trigger_back_online():
 
 
 def test_appointment_shutdown_teos_trigger_while_offline():
+    global teosd_process
     # This tests data persistence. An appointment is sent to the tower and the tower is stopped. The appointment is then
     # triggered with the tower offline, and then the tower is brought back online.
-    global teosd_process
-
     teos_pid = teosd_process.pid
 
     commitment_tx, commitment_txid, penalty_tx = create_txs()
@@ -533,7 +519,7 @@ def test_appointment_shutdown_teos_trigger_while_offline():
     generate_block_with_transactions(commitment_tx)
 
     # Restart
-    teosd_process, _ = run_teosd(teos_config, teos_datadir_network)
+    teosd_process, _ = run_teosd()
     assert teos_pid != teosd_process.pid
 
     # The appointment should have been moved to the Responder
