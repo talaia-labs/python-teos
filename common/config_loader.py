@@ -73,10 +73,11 @@ class ConfigLoader:
             self.overwritten_fields.add(k)
 
         # Extend relative paths
-        self.extend_paths()
+        expanded_data_dir = self.extend_paths()
 
         # Sanity check fields and build config dictionary
         config = self.create_config_dict()
+        config["DATA_DIR"] = expanded_data_dir
 
         return config
 
@@ -117,11 +118,13 @@ class ConfigLoader:
 
         # if there is a BTC_NETWORK parameter whose value is not "mainnet", we append it to the data_dir when expanding
         network_field = self.conf_fields.get("BTC_NETWORK")
-        network = network_field["value"] if network_field else ""
-        network_suffix = "" if network == "mainnet" else network
+        if network_field and network_field.get("value") != "mainnet":
+            expanded_data_dir = os.path.join(self.data_dir, network_field.get("value"))
+        else:
+            expanded_data_dir = self.data_dir
 
         for key, field in self.conf_fields.items():
             if field.get("path") and isinstance(field.get("value"), str):
-                self.conf_fields[key]["value"] = os.path.join(
-                    self.data_dir, network_suffix, self.conf_fields[key]["value"]
-                )
+                self.conf_fields[key]["value"] = os.path.join(expanded_data_dir, self.conf_fields[key]["value"])
+
+        return expanded_data_dir
