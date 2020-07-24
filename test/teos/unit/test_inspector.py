@@ -7,7 +7,8 @@ from teos.inspector import Inspector, InspectionFailed
 
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
-from test.teos.unit.conftest import get_random_value_hex, bitcoind_connect_params, get_config
+from test.teos.conftest import config
+from test.teos.unit.conftest import get_random_value_hex, bitcoind_connect_params
 
 NO_HEX_STRINGS = [
     "R" * LOCATOR_LEN_HEX,
@@ -29,7 +30,6 @@ WRONG_TYPES = [
 ]
 WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
 
-config = get_config()
 MIN_TO_SELF_DELAY = config.get("MIN_TO_SELF_DELAY")
 block_processor = BlockProcessor(bitcoind_connect_params)
 inspector = Inspector(block_processor, MIN_TO_SELF_DELAY)

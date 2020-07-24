@@ -7,17 +7,14 @@ from teos.watcher import Watcher
 from teos.tools import bitcoin_cli
 from teos.responder import Responder
 
-from test.teos.conftest import generate_blocks
+from test.teos.conftest import config, generate_blocks
 from test.teos.unit.conftest import (
     get_random_value_hex,
     generate_dummy_appointment,
     generate_dummy_tracker,
-    get_config,
     bitcoind_connect_params,
     generate_keypair,
 )
-
-config = get_config()
 
 
 def test_build_appointments():

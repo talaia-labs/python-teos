@@ -15,16 +15,14 @@ from teos.responder import Responder, TransactionTracker, CONFIRMATIONS_BEFORE_R
 
 from common.constants import LOCATOR_LEN_HEX
 from test.teos.conftest import (
+    config,
     bitcoin_cli,
     generate_blocks,
     generate_blocks_w_delay,
     create_commitment_tx,
     generate_block_with_transactions,
 )
-from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params, get_config, generate_dummy_tracker
-
-
-config = get_config()
+from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params, generate_dummy_tracker
 
 
 @pytest.fixture(scope="module")

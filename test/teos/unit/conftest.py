@@ -15,15 +15,18 @@ from common.tools import compute_locator
 from common.constants import LOCATOR_LEN_HEX
 from common.cryptographer import Cryptographer
 
-from test.teos.conftest import get_config as general_get_config
-from test.teos.conftest import bitcoin_cli, get_random_value_hex, create_txs, create_commitment_tx, create_penalty_tx
+from test.teos.conftest import (
+    config,
+    bitcoin_cli,
+    get_random_value_hex,
+    create_txs,
+    create_commitment_tx,
+    create_penalty_tx,
+)
 
-# Set params to connect to regtest for testing
-DEFAULT_CONF["BTC_RPC_PORT"]["value"] = 18443
-DEFAULT_CONF["BTC_NETWORK"]["value"] = "regtest"
 
-bitcoind_connect_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC")}
-bitcoind_feed_params = {k: v["value"] for k, v in DEFAULT_CONF.items() if k.startswith("BTC_FEED")}
+bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
+bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
 
 @pytest.fixture(scope="module")
@@ -63,9 +66,9 @@ def gatekeeper(user_db_manager, block_processor):
     return Gatekeeper(
         user_db_manager,
         block_processor,
-        get_config().get("SUBSCRIPTION_SLOTS"),
-        get_config().get("SUBSCRIPTION_DURATION"),
-        get_config().get("EXPIRY_DELTA"),
+        config.get("SUBSCRIPTION_SLOTS"),
+        config.get("SUBSCRIPTION_DURATION"),
+        config.get("EXPIRY_DELTA"),
     )
 
 
@@ -114,7 +117,3 @@ def generate_dummy_tracker(commitment_tx=None):
     )
 
     return TransactionTracker.from_dict(tracker_data)
-
-
-def get_config():
-    return general_get_config(".", "teos.conf", DEFAULT_CONF)

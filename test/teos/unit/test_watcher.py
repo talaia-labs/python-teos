@@ -27,6 +27,7 @@ from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
 from test.teos.conftest import (
+    config,
     generate_blocks,
     generate_blocks_w_delay,
     create_txs,
@@ -37,15 +38,12 @@ from test.teos.unit.conftest import (
     generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
-    get_config,
     bitcoind_feed_params,
     bitcoind_connect_params,
 )
 
 APPOINTMENTS = 5
 TEST_SET_SIZE = 200
-
-config = get_config()
 
 signing_key, public_key = generate_keypair()
 

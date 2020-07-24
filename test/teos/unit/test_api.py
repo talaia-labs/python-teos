@@ -11,14 +11,8 @@ from common.appointment import Appointment
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
-from test.teos.conftest import create_txs
-from test.teos.unit.conftest import (
-    get_random_value_hex,
-    generate_dummy_appointment,
-    generate_keypair,
-    get_config,
-    compute_locator,
-)
+from test.teos.conftest import config, create_txs
+from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_keypair, compute_locator
 
 import common.receipts as receipts
 from common.cryptographer import Cryptographer, hash_160
@@ -30,8 +24,6 @@ from common.constants import (
     LOCATOR_LEN_BYTES,
     ENCRYPTED_BLOB_MAX_SIZE_HEX,
 )
-
-config = get_config()
 
 TEOS_API = "http://{}:{}".format(config.get("API_HOST"), config.get("API_PORT"))
 register_endpoint = "{}/register".format(TEOS_API)
