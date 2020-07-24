@@ -1,26 +1,23 @@
 import pytest
 import random
+import subprocess
 from time import sleep
+from os import makedirs
+from shutil import rmtree, copy
 from decimal import Decimal, getcontext
 
-from teos import DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF
+from teos.teosd import get_config
 from teos.utils.auth_proxy import AuthServiceProxy, JSONRPCException
 
-from common.config_loader import ConfigLoader
 
 getcontext().prec = 10
 utxos = list()
 btc_addr = None
 
 
-def get_config(data_folder, conf_file_name, default_conf):
-    config_loader = ConfigLoader(data_folder, conf_file_name, default_conf, {})
-    config = config_loader.build_config()
+cmd_args = {"BTC_NETWORK": "regtest"}
+config = get_config(cmd_args, ".teos")
 
-    return config
-
-
-config = get_config(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF)
 bitcoin_cli = AuthServiceProxy(
     "http://%s:%s@%s:%d"
     % (
@@ -38,14 +35,42 @@ def prng_seed():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def run_bitcoind(dirname=".test_bitcoin"):
+    # Run bitcoind in a separate folder
+    makedirs(dirname, exist_ok=True)
+    copy("bitcoin.conf", dirname)
+    subprocess.Popen(["bitcoind", f"--datadir={dirname}"])
+
+    # Generate some initial blocks
+    setup_node()
+    yield
+
+    bitcoin_cli.stop()
+    rmtree(dirname)
+
+
 def setup_node():
     global btc_addr
 
     # Check bitcoind is running while generating the address
     while True:
+        # FIXME: Not creating a new bitcoin_cli here creates one of those Request-Sent errors I don't know how to fix
+        #        Not a big deal, but it would be nicer not having to.
+        bitcoin_cli = AuthServiceProxy(
+            "http://%s:%s@%s:%d"
+            % (
+                config.get("BTC_RPC_USER"),
+                config.get("BTC_RPC_PASSWORD"),
+                config.get("BTC_RPC_CONNECT"),
+                config.get("BTC_RPC_PORT"),
+            )
+        )
         try:
             btc_addr = bitcoin_cli.getnewaddress()
             break
+
+        except ConnectionError:
+            sleep(1)
         except JSONRPCException as e:
             if "Loading wallet..." in str(e):
                 sleep(1)
