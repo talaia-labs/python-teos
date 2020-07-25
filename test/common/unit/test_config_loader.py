@@ -65,6 +65,8 @@ def test_build_conf_only_default():
     conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, {})
     config = conf_loader.build_config()
 
+    assert foo_data_dir == config.pop("DATA_DIR")
+
     for k, v in config.items():
         assert k in DEFAULT_CONF
         assert isinstance(v, DEFAULT_CONF[k].get("type"))
@@ -83,6 +85,8 @@ def test_build_conf_with_conf_file(conf_file_conf):
 
     conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, {})
     config = conf_loader.build_config()
+
+    assert data_dir == config.pop("DATA_DIR")
 
     for k, v in config.items():
         # Check that we have only loaded parameters that were already in the default conf. Additional params are not
@@ -113,6 +117,8 @@ def test_build_conf_with_command_line():
     conf_loader = ConfigLoader(foo_data_dir, conf_file_name, default_conf_copy, cmd_data)
     config = conf_loader.build_config()
 
+    assert foo_data_dir == config.pop("DATA_DIR")
+
     for k, v in config.items():
         # Check that we have only loaded parameters that were already in the default conf. Additional params are not
         # loaded
@@ -140,6 +146,8 @@ def test_build_conf_with_all(conf_file_conf):
 
     conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, cmd_data)
     config = conf_loader.build_config()
+
+    assert data_dir == config.pop("DATA_DIR")
 
     for k, v in config.items():
         # Check that we have only loaded parameters that were already in the default conf. Additional params are not
