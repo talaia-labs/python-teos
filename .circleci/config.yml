@@ -12,7 +12,7 @@ jobs:
 
       - restore_cache:
             keys:
-              - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+              - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}}
 
       - run:
           name: Install dependencies
@@ -25,15 +25,18 @@ jobs:
             pip install -r requirements-dev.txt
             pip install -r cli/requirements.txt
 
+      - run:
+          name: Install bitcoind (0.20.0)
+          command: |
+            wget https://bitcoin.org/bin/bitcoin-core-0.20.0/bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+            tar -xzf bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+            mv bitcoin-0.20.0 bitcoin
+
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
-
-      - run:
-          name: Install bitcoind
-          command: |
-            sudo snap install `cat test/teos/e2e/bitcoind_snap.sh`
+            - bitcoin
+          key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}}
 
       - run:
           name: Setup teos
@@ -57,14 +60,13 @@ jobs:
           name: Run teos unit tests
           command: |
             . venv/bin/activate
-            pytest test/teos/unit/
+            BITCOIND=/home/circleci/project/bitcoin/bin/bitcoind pytest test/teos/unit/
 
       - run:
           name: Run e2e tests
           command: |
             . venv/bin/activate
-            python -m test.teos.e2e.wait_bitcoind_bootstrap
-            pytest test/teos/e2e/
+            BITCOIND=/home/circleci/project/bitcoin/bin/bitcoind pytest test/teos/e2e/
 
   # Update Docker image
   # publish jobs require $DOCKERHUB_REPO, $DOCKERHUB_USER, $DOCKERHUB_PASS defined

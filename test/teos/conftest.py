@@ -40,8 +40,10 @@ def run_bitcoind(dirname=".test_bitcoin"):
     # Run bitcoind in a separate folder
     makedirs(dirname, exist_ok=True)
 
+    bitcoind = os.getenv("BITCOIND", "bitcoind")
+
     copy(os.path.join(os.path.dirname(__file__), "bitcoin.conf"), dirname)
-    subprocess.Popen(["bitcoind", f"--datadir={dirname}"])
+    subprocess.Popen([bitcoind, f"--datadir={dirname}"])
 
     # Generate some initial blocks
     setup_node()

@@ -1,1 +1,0 @@
-bitcoin-core --channel=0.19/stable
