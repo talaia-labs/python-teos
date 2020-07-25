@@ -1,3 +1,4 @@
+import os
 import pytest
 import random
 import subprocess
@@ -38,7 +39,8 @@ def prng_seed():
 def run_bitcoind(dirname=".test_bitcoin"):
     # Run bitcoind in a separate folder
     makedirs(dirname, exist_ok=True)
-    copy("bitcoin.conf", dirname)
+
+    copy(os.path.join(os.path.dirname(__file__), "bitcoin.conf"), dirname)
     subprocess.Popen(["bitcoind", f"--datadir={dirname}"])
 
     # Generate some initial blocks
