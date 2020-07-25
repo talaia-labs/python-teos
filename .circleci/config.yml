@@ -3,7 +3,7 @@ version: 2
 jobs:
 
   # TESTS
-  unit_tests:
+  run_tests:
     machine:
       image: ubuntu-1604:201903-01
 
@@ -31,10 +31,21 @@ jobs:
           key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
 
       - run:
-          name: Run teos unit tests
+          name: Install bitcoind
+          command: |
+            sudo snap install `cat test/teos/e2e/bitcoind_snap.sh`
+
+      - run:
+          name: Setup teos
+          command: |
+            mkdir ~/.teos/
+            cp test/teos/e2e/teos.conf ~/.teos/
+
+      - run:
+          name: Run cli unit tests
           command: |
             . venv/bin/activate
-            pytest test/teos/unit/
+            pytest test/cli/unit
 
       - run:
           name: Run common unit tests
@@ -43,40 +54,10 @@ jobs:
             pytest test/common/unit
 
       - run:
-          name: Run cli unit tests
+          name: Run teos unit tests
           command: |
             . venv/bin/activate
-            pytest test/cli/unit
-
-  e2e_tests:
-    machine:
-      image: ubuntu-1604:201903-01
-
-    steps:
-      - checkout
-
-      - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
-
-      - run:
-          name: Install bitcoind
-          command: |
-            sudo snap install `cat test/teos/e2e/bitcoind_snap.sh`
-
-      - run:
-          name: Run bitcoind
-          command: |
-            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            cp test/teos/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            /snap/bin/bitcoin-core.daemon
-
-      - run:
-          name: Setup teos
-          command: |
-            . venv/bin/activate
-            mkdir ~/.teos/
-            cp test/teos/e2e/teos.conf ~/.teos/
+            pytest test/teos/unit/
 
       - run:
           name: Run e2e tests
@@ -175,12 +156,9 @@ jobs:
 workflows:
   version: 2
 
-  run_tests:
+  tests:
     jobs:
-      - unit_tests
-      - e2e_tests:
-          requires:
-            - unit_tests
+      - run_tests
 
   publish:
     jobs:
