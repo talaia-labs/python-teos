@@ -1,15 +1,12 @@
 version: 2
 
 jobs:
-
-  # TESTS
-  run_tests:
+  tests:
     machine:
       image: ubuntu-1604:201903-01
 
     steps:
       - checkout
-
       - restore_cache:
             keys:
               - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}}
@@ -28,9 +25,11 @@ jobs:
       - run:
           name: Install bitcoind (0.20.0)
           command: |
-            wget https://bitcoin.org/bin/bitcoin-core-0.20.0/bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
-            tar -xzf bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
-            mv bitcoin-0.20.0 bitcoin
+            if [ ! -d "bitcoin" ]; then
+              wget https://bitcoin.org/bin/bitcoin-core-0.20.0/bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+              tar -xzf bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+              mv bitcoin-0.20.0 bitcoin
+            fi
 
       - save_cache:
           paths:
@@ -158,9 +157,9 @@ jobs:
 workflows:
   version: 2
 
-  tests:
+  run_tests:
     jobs:
-      - run_tests
+      - tests
 
   publish:
     jobs:
