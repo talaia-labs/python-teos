@@ -222,10 +222,8 @@ def test_appointment_malformed_penalty():
     # Lets start by creating two valid transaction
     commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    # Now we can modify the penalty so it is invalid when broadcast
-    mod_penalty_tx = Tx.from_hex(penalty_tx)
-    tx_in = mod_penalty_tx.tx_ins[0].copy(redeem_script=b"")
-    mod_penalty_tx = mod_penalty_tx.copy(tx_ins=[tx_in])
+    # Now we can modify the penalty so it is invalid when broadcast (removing the witness should do)
+    mod_penalty_tx = Tx.from_hex(penalty_tx).no_witness()
 
     appointment_data = build_appointment_data(commitment_txid, mod_penalty_tx.hex())
     locator = compute_locator(commitment_txid)
