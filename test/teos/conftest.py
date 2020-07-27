@@ -80,7 +80,25 @@ def setup_node():
                 sleep(1)
 
     # Mine enough blocks so coinbases are mature and we have enough funds to run everything
-    bitcoin_cli.generatetoaddress(200, btc_addr)
+    bitcoin_cli.generatetoaddress(105, btc_addr)
+    create_initial_transactions()
+
+
+def create_initial_transactions(fee=Decimal(5 / pow(10, 5))):
+    utxos = bitcoin_cli.listunspent()
+    btc_addresses = [bitcoin_cli.getnewaddress() for _ in range(100)]
+    for utxo in utxos:
+        # Create 100 outputs per utxo and mine a new block.
+        tx_ins = {"txid": utxo.get("txid"), "vout": utxo.get("vout")}
+
+        tx_outs = {btc_address: utxo.get("amount") / 100 for btc_address in btc_addresses[:-1]}
+        tx_outs[btc_addresses[-1]] = (utxo.get("amount") / 100) - fee
+
+        raw_tx = bitcoin_cli.createrawtransaction([tx_ins], tx_outs)
+        signed_tx = bitcoin_cli.signrawtransactionwithwallet(raw_tx)
+        bitcoin_cli.sendrawtransaction(signed_tx.get("hex"))
+
+        bitcoin_cli.generatetoaddress(1, btc_addr)
 
 
 def get_random_value_hex(nbytes):
