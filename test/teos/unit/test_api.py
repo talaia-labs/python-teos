@@ -13,14 +13,8 @@ from common.appointment import Appointment
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
-from test.teos.unit.conftest import (
-    get_random_value_hex,
-    generate_dummy_appointment,
-    generate_keypair,
-    get_config,
-    create_dummy_transaction,
-    compute_locator,
-)
+from test.teos.conftest import config, create_txs
+from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_keypair, compute_locator
 
 import common.receipts as receipts
 from common.cryptographer import Cryptographer, hash_160
@@ -33,9 +27,7 @@ from common.constants import (
     ENCRYPTED_BLOB_MAX_SIZE_HEX,
 )
 
-config = get_config()
-
-TEOS_API = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
+TEOS_API = "http://{}:{}".format(config.get("API_HOST"), config.get("API_PORT"))
 register_endpoint = "{}/register".format(TEOS_API)
 add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
 get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
@@ -70,7 +62,7 @@ def get_all_db_manager():
 
 
 @pytest.fixture(scope="module", autouse=True)
-def api(db_manager, carrier, block_processor, gatekeeper, run_bitcoind):
+def api(db_manager, carrier, block_processor, gatekeeper):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     rw_lock = rwlock.RWLockWrite()
     watcher = Watcher(
@@ -114,6 +106,7 @@ def add_appointment(client, appointment_data, user_id):
 
 
 def test_register(client, api):
+    # Tests registering a user withing the tower
     current_height = api.watcher.block_processor.get_block_count()
     data = {"public_key": user_id}
     r = client.post(register_endpoint, json=data)
@@ -153,24 +146,28 @@ def test_register_top_up(client, api):
 
 
 def test_register_no_client_pk(client):
+    # Test trying to register a user without sending the user public key in the request
     data = {}
     r = client.post(register_endpoint, json=data)
     assert r.status_code == HTTP_BAD_REQUEST
 
 
 def test_register_wrong_client_pk(client):
+    # Test trying to register a user sending an invalid user public key
     data = {"public_key": user_id + user_id}
     r = client.post(register_endpoint, json=data)
     assert r.status_code == HTTP_BAD_REQUEST
 
 
 def test_register_no_json(client):
+    # Test trying to register a user sending a non json body
     r = client.post(register_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
 def test_register_json_no_inner_dict(client):
+    # Test trying to register a user sending an incorrectly formatted json body
     r = client.post(register_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
@@ -289,13 +286,13 @@ def test_add_appointment_multiple_times_different_users(
     # Add one slot per public key
     for pair in user_keys:
         tmp_compressed_pk = hexlify(pair[1].format(compressed=True)).decode("utf-8")
-        api.watcher.gatekeeper.registered_users[tmp_compressed_pk] = UserInfo(available_slots=2, subscription_expiry=0)
+        api.watcher.gatekeeper.registered_users[tmp_compressed_pk] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Send the appointments
     for compressed_pk, signature in zip(compressed_pks, signatures):
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": signature}, compressed_pk)
         assert r.status_code == HTTP_OK
-        assert r.json.get("available_slots") == 1
+        assert r.json.get("available_slots") == 0
         assert r.json.get("start_block") == block_processor.get_block_count()
 
     # Check that all the appointments have been added and that there are no duplicates
@@ -376,62 +373,15 @@ def test_add_appointment_update_smaller(api, client, appointment, block_processo
     )
 
 
-def test_add_appointment_in_cache(api, client, block_processor):
-    api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-    appointment, dispute_tx = generate_dummy_appointment()
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-
-    # Add the data to the cache
-    dispute_txid = api.watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
-    api.watcher.locator_cache.cache[appointment.locator] = dispute_txid
-
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-    # Trying to add it again should fail, since it is already in the Responder
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_BAD_REQUEST and r.json.get("error_code") == errors.APPOINTMENT_ALREADY_TRIGGERED
-
-    # The appointment would be rejected even if the data is not in the cache provided it has been triggered
-    del api.watcher.locator_cache.cache[appointment.locator]
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_BAD_REQUEST and r.json.get("error_code") == errors.APPOINTMENT_ALREADY_TRIGGERED
-
-
-def test_add_appointment_in_cache_cannot_decrypt(api, client, block_processor):
-    api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-    appointment, dispute_tx = generate_dummy_appointment()
-    appointment.encrypted_blob = appointment.encrypted_blob[::-1]
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-
-    # Add the data to the cache
-    dispute_txid = api.watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
-    api.watcher.locator_cache.cache[dispute_txid] = appointment.locator
-
-    # The appointment should be accepted
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-
 def test_add_appointment_in_cache_invalid_transaction(api, client, block_processor):
     api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # We need to create the appointment manually
-    dispute_tx = create_dummy_transaction()
-    dispute_txid = dispute_tx.tx_id.hex()
-    penalty_tx = create_dummy_transaction(dispute_txid)
+    commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    locator = compute_locator(dispute_txid)
-    dummy_appointment_data = {"tx": penalty_tx.hex(), "tx_id": dispute_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(dummy_appointment_data.get("tx")[::-1], dummy_appointment_data.get("tx_id"))
+    locator = compute_locator(commitment_tx)
+    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
+    encrypted_blob = Cryptographer.encrypt(penalty_tx[::-1], commitment_txid)
 
     appointment_data = {
         "locator": locator,
@@ -440,11 +390,11 @@ def test_add_appointment_in_cache_invalid_transaction(api, client, block_process
     }
 
     appointment = Appointment.from_dict(appointment_data)
-    api.watcher.locator_cache.cache[appointment.locator] = dispute_tx.tx_id.hex()
+    api.watcher.locator_cache.cache[appointment.locator] = commitment_txid
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
     # Add the data to the cache
-    api.watcher.locator_cache.cache[dispute_txid] = appointment.locator
+    api.watcher.locator_cache.cache[commitment_txid] = appointment.locator
 
     # The appointment should be accepted
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)

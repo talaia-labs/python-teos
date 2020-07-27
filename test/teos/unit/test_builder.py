@@ -7,17 +7,14 @@ from teos.watcher import Watcher
 from teos.tools import bitcoin_cli
 from teos.responder import Responder
 
+from test.teos.conftest import config, generate_blocks
 from test.teos.unit.conftest import (
     get_random_value_hex,
     generate_dummy_appointment,
     generate_dummy_tracker,
-    generate_block,
-    get_config,
     bitcoind_connect_params,
     generate_keypair,
 )
-
-config = get_config()
 
 
 def test_build_appointments():
@@ -116,7 +113,7 @@ def test_update_states_empty_list(db_manager, gatekeeper, carrier, block_process
         Builder.update_states(w, missed_blocks_responder, missed_blocks_watcher)
 
 
-def test_update_states_responder_misses_more(run_bitcoind, db_manager, gatekeeper, carrier, block_processor):
+def test_update_states_responder_misses_more(db_manager, gatekeeper, carrier, block_processor):
     w = Watcher(
         db_manager=db_manager,
         gatekeeper=gatekeeper,
@@ -127,10 +124,7 @@ def test_update_states_responder_misses_more(run_bitcoind, db_manager, gatekeepe
         blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
     )
 
-    blocks = []
-    for _ in range(5):
-        generate_block()
-        blocks.append(bitcoin_cli(bitcoind_connect_params).getbestblockhash())
+    blocks = generate_blocks(5)
 
     # Updating the states should bring both to the same last known block.
     w.awake()
@@ -153,10 +147,7 @@ def test_update_states_watcher_misses_more(db_manager, gatekeeper, carrier, bloc
         blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
     )
 
-    blocks = []
-    for _ in range(5):
-        generate_block()
-        blocks.append(bitcoin_cli(bitcoind_connect_params).getbestblockhash())
+    blocks = generate_blocks(5)
 
     w.awake()
     w.responder.awake()

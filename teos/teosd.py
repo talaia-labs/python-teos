@@ -40,7 +40,7 @@ def handle_signals(signal_received, frame):
     exit(0)
 
 
-def get_config(command_line_conf):
+def get_config(command_line_conf, data_dir):
     """
     Combines the command line config with the config loaded from the file and the default config in order to construct
     the final config object.
@@ -52,7 +52,6 @@ def get_config(command_line_conf):
         :obj:`dict`: A dictionary containing all the system's configuration parameters.
     """
 
-    data_dir = command_line_conf.pop("DATA_DIR") if "DATA_DIR" in command_line_conf else DATA_DIR
     config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
 
@@ -78,11 +77,7 @@ def main(config):
         signal(SIGTERM, handle_signals)
         signal(SIGQUIT, handle_signals)
 
-        # Creates the base data dir based on the network the tower is running on
-        network = config.get("BTC_NETWORK")
-        data_dir_network = DATA_DIR if network == "mainnet" else os.path.join(DATA_DIR, network)
-
-        setup_data_folder(data_dir_network)
+        setup_data_folder(config.get("DATA_DIR"))
         setup_logging(config.get("LOG_FILE"))
 
         logger.info("Starting TEOS")
@@ -93,14 +88,14 @@ def main(config):
         if not can_connect_to_bitcoind(bitcoind_connect_params):
             logger.error("Cannot connect to bitcoind. Shutting down")
 
-        elif not in_correct_network(bitcoind_connect_params, network):
+        elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
             logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
         else:
             if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
                 logger.info("Generating a new key pair")
                 sk = Cryptographer.generate_key()
-                Cryptographer.save_key_file(sk.to_der(), "teos_sk", data_dir_network)
+                Cryptographer.save_key_file(sk.to_der(), "teos_sk", config.get("DATA_DIR"))
 
             else:
                 logger.info("Tower identity found. Loading keys")
@@ -225,6 +220,7 @@ def main(config):
 
 if __name__ == "__main__":
     command_line_conf = {}
+    data_dir = DATA_DIR
 
     try:
         opts, _ = getopt(
@@ -284,7 +280,7 @@ if __name__ == "__main__":
                 except ValueError:
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
-                command_line_conf["DATA_DIR"] = os.path.expanduser(arg)
+                data_dir = os.path.expanduser(arg)
             if opt in ["-d", "--daemon"]:
                 command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:
@@ -295,7 +291,8 @@ if __name__ == "__main__":
     except GetoptError as e:
         exit(e)
 
-    config = get_config(command_line_conf)
+    config = get_config(command_line_conf, data_dir)
+
     if config.get("DAEMON"):
         print("Starting TEOS")
         with daemon.DaemonContext():

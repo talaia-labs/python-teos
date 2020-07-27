@@ -6,7 +6,6 @@ from threading import Thread
 from coincurve import PrivateKey
 
 from teos.carrier import Carrier
-from teos.tools import bitcoin_cli
 from teos.responder import Responder
 from teos.gatekeeper import UserInfo
 from teos.chain_monitor import ChainMonitor
@@ -27,22 +26,24 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-from test.teos.unit.conftest import (
-    generate_blocks_w_delay,
+from test.teos.conftest import (
+    config,
     generate_blocks,
+    generate_blocks_w_delay,
+    create_txs,
+    bitcoin_cli,
+    generate_block_with_transactions,
+)
+from test.teos.unit.conftest import (
     generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
-    get_config,
     bitcoind_feed_params,
     bitcoind_connect_params,
-    create_dummy_transaction,
 )
 
 APPOINTMENTS = 5
 TEST_SET_SIZE = 200
-
-config = get_config()
 
 signing_key, public_key = generate_keypair()
 
@@ -113,15 +114,15 @@ def create_appointments(n):
     return appointments, locator_uuid_map, dispute_txs
 
 
-def test_locator_cache_init_not_enough_blocks(run_bitcoind, block_processor):
+def test_locator_cache_init_not_enough_blocks(block_processor):
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
     # Make sure there are at least 3 blocks
     block_count = block_processor.get_block_count()
     if block_count < 3:
-        generate_blocks_w_delay(3 - block_count)
+        generate_blocks(3 - block_count)
 
     # Simulate there are only 3 blocks
-    third_block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(2)
+    third_block_hash = bitcoin_cli.getblockhash(2)
     locator_cache.init(third_block_hash, block_processor)
     assert len(locator_cache.blocks) == 3
     for k, v in locator_cache.blocks.items():
@@ -259,7 +260,7 @@ def test_locator_remove_oldest_block(block_processor):
 def test_fix_cache(block_processor):
     # This tests how a reorg will create a new version of the cache
     # Let's start setting a full cache. We'll mine ``cache_size`` bocks to be sure it's full
-    generate_blocks_w_delay(config.get("LOCATOR_CACHE_SIZE"))
+    generate_blocks(config.get("LOCATOR_CACHE_SIZE"))
 
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
     locator_cache.init(block_processor.get_best_block_hash(), block_processor)
@@ -286,7 +287,7 @@ def test_fix_cache(block_processor):
     # trigger a fix. We'll use a new cache to compare with the old
     old_cache_blocks = deepcopy(locator_cache.blocks)
 
-    generate_blocks_w_delay((config.get("LOCATOR_CACHE_SIZE") * 2))
+    generate_blocks((config.get("LOCATOR_CACHE_SIZE") * 2))
     locator_cache.fix(block_processor.get_best_block_hash(), block_processor)
 
     # None of the data from the old cache is in the new cache
@@ -298,7 +299,7 @@ def test_fix_cache(block_processor):
     # The data in the new cache corresponds to the last ``cache_size`` blocks.
     block_count = block_processor.get_block_count()
     for i in range(block_count, block_count - locator_cache.cache_size, -1):
-        block_hash = bitcoin_cli(bitcoind_connect_params).getblockhash(i)
+        block_hash = bitcoin_cli.getblockhash(i)
         assert block_hash in locator_cache.blocks
         for locator in locator_cache.blocks[block_hash]:
             assert locator in locator_cache.cache
@@ -401,6 +402,9 @@ def test_add_appointment_in_cache(watcher):
     watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
 
     appointment, dispute_tx = generate_dummy_appointment()
+
+    # Broadcast the transaction and add it manually to the Watcher cache (since the Watcher is not currently watching)
+    generate_block_with_transactions(dispute_tx)
     dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
     watcher.locator_cache.cache[appointment.locator] = dispute_txid
 
@@ -433,13 +437,11 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
     watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
 
     # We need to create the appointment manually
-    dispute_tx = create_dummy_transaction()
-    dispute_txid = dispute_tx.tx_id.hex()
-    penalty_tx = create_dummy_transaction(dispute_txid)
+    commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    locator = compute_locator(dispute_txid)
-    dummy_appointment_data = {"tx": penalty_tx.hex(), "tx_id": dispute_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(dummy_appointment_data.get("tx")[::-1], dummy_appointment_data.get("tx_id"))
+    locator = compute_locator(commitment_tx)
+    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
+    encrypted_blob = Cryptographer.encrypt(penalty_tx[::-1], commitment_txid)
 
     appointment_data = {
         "locator": locator,
@@ -449,7 +451,7 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
     }
 
     appointment = Appointment.from_dict(appointment_data)
-    watcher.locator_cache.cache[appointment.locator] = dispute_tx.tx_id.hex()
+    watcher.locator_cache.cache[appointment.locator] = commitment_txid
 
     # Try to add the appointment
     user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -554,7 +556,7 @@ def test_do_watch(watcher, temp_db_manager):
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
-        bitcoin_cli(bitcoind_connect_params).sendrawtransaction(dispute_tx)
+        bitcoin_cli.sendrawtransaction(dispute_tx)
 
     # After generating a block, the appointment count should have been reduced by 2 (two breaches)
     generate_blocks_w_delay(1)

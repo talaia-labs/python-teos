@@ -442,7 +442,7 @@ def main(command, args, command_line_conf):
     config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
 
-    setup_data_folder(DATA_DIR)
+    setup_data_folder(config.get("DATA_DIR"))
     setup_logging(config.get("LOG_FILE"))
 
     # Set the teos url
@@ -459,7 +459,7 @@ def main(command, args, command_line_conf):
         else:
             logger.info("Client id not found. Generating new keys")
             user_sk = Cryptographer.generate_key()
-            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", DATA_DIR)
+            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", config.get("DATA_DIR"))
             user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
         if command == "register":
@@ -474,8 +474,8 @@ def main(command, args, command_line_conf):
                 logger.info("Registration succeeded. Available slots: {}".format(available_slots))
                 logger.info("Subscription expires at block {}".format(subscription_expiry))
 
-                teos_id_file = os.path.join(DATA_DIR, "teos_pk")
-                Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, DATA_DIR)
+                teos_id_file = os.path.join(config.get("DATA_DIR"), "teos_pk")
+                Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, config.get("DATA_DIR"))
 
         if command == "add_appointment":
             teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))

@@ -1,18 +1,15 @@
 version: 2
 
 jobs:
-
-  # TESTS
-  unit_tests:
+  tests:
     machine:
       image: ubuntu-1604:201903-01
 
     steps:
       - checkout
-
       - restore_cache:
-            keys:
-              - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+          keys:
+            - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
       - run:
           name: Install dependencies
@@ -25,16 +22,32 @@ jobs:
             pip install -r requirements-dev.txt
             pip install -r contrib/client/requirements.txt
 
+      - run:
+          name: Install bitcoind (0.20.0)
+          command: |
+            if [ ! -d "bitcoin" ]; then
+              wget https://bitcoin.org/bin/bitcoin-core-0.20.0/bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+              tar -xzf bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+              mv bitcoin-0.20.0 bitcoin
+            fi
+
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
+            - bitcoin
+          key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
       - run:
-          name: Run teos unit tests
+          name: Setup teos
+          command: |
+            mkdir ~/.teos/
+            cp test/teos/e2e/teos.conf ~/.teos/
+
+      - run:
+          name: Run contrib unit tests
           command: |
             . venv/bin/activate
-            pytest test/teos/unit/
+            pytest contrib/test
 
       - run:
           name: Run common unit tests
@@ -43,47 +56,16 @@ jobs:
             pytest test/common/unit
 
       - run:
-          name: Run contrib unit tests
+          name: Run teos unit tests
           command: |
             . venv/bin/activate
-            pytest contrib/test
-
-  e2e_tests:
-    machine:
-      image: ubuntu-1604:201903-01
-
-    steps:
-      - checkout
-
-      - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}-{{ checksum "test/teos/e2e/bitcoind_snap.sh" }}
-
-      - run:
-          name: Install bitcoind
-          command: |
-            sudo snap install `cat test/teos/e2e/bitcoind_snap.sh`
-
-      - run:
-          name: Run bitcoind
-          command: |
-            mkdir -p /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            cp test/teos/e2e/bitcoin.conf /home/circleci/snap/bitcoin-core/common/.bitcoin/
-            /snap/bin/bitcoin-core.daemon
-
-      - run:
-          name: Setup teos
-          command: |
-            . venv/bin/activate
-            mkdir ~/.teos/
-            cp test/teos/e2e/teos.conf ~/.teos/
+            BITCOIND=/home/circleci/project/bitcoin/bin/bitcoind pytest test/teos/unit/
 
       - run:
           name: Run e2e tests
           command: |
             . venv/bin/activate
-            python -m test.teos.e2e.wait_bitcoind_bootstrap
-            pytest test/teos/e2e/
+            BITCOIND=/home/circleci/project/bitcoin/bin/bitcoind pytest test/teos/e2e/
 
   # Update Docker image
   # publish jobs require $DOCKERHUB_REPO, $DOCKERHUB_USER, $DOCKERHUB_PASS defined
@@ -177,10 +159,7 @@ workflows:
 
   run_tests:
     jobs:
-      - unit_tests
-      - e2e_tests:
-          requires:
-            - unit_tests
+      - tests
 
   publish:
     jobs:

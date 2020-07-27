@@ -1,5 +1,4 @@
 import pytest
-from pytest import fixture
 
 from common.constants import LOCATOR_LEN_BYTES
 from common.cryptographer import Cryptographer
@@ -9,7 +8,7 @@ from test.teos.unit.conftest import get_random_value_hex, generate_keypair
 
 
 # Parent methods are not tested.
-@fixture
+@pytest.fixture
 def appointment_data():
     sk, pk = generate_keypair()
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
