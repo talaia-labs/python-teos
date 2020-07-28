@@ -4,7 +4,6 @@ from queue import Queue
 
 from teos.builder import Builder
 from teos.watcher import Watcher
-from teos.tools import bitcoin_cli
 from teos.responder import Responder
 
 from test.teos.conftest import config, generate_blocks
@@ -12,7 +11,6 @@ from test.teos.unit.conftest import (
     get_random_value_hex,
     generate_dummy_appointment,
     generate_dummy_tracker,
-    bitcoind_connect_params,
     generate_keypair,
 )
 

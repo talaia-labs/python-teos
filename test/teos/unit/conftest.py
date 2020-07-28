@@ -2,7 +2,6 @@ import pytest
 from shutil import rmtree
 from coincurve import PrivateKey
 
-from teos import DEFAULT_CONF
 from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
 from teos.gatekeeper import Gatekeeper
