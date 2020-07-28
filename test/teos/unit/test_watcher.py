@@ -29,7 +29,7 @@ from common.cryptographer import Cryptographer
 from test.teos.conftest import (
     config,
     generate_blocks,
-    generate_blocks_w_delay,
+    generate_blocks_with_delay,
     create_txs,
     bitcoin_cli,
     generate_block_with_transactions,
@@ -559,13 +559,13 @@ def test_do_watch(watcher, temp_db_manager):
         bitcoin_cli.sendrawtransaction(dispute_tx)
 
     # After generating a block, the appointment count should have been reduced by 2 (two breaches)
-    generate_blocks_w_delay(1)
+    generate_blocks_with_delay(1)
 
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
     # The rest of appointments will timeout after the subscription times-out (9 more blocks) + EXPIRY_DELTA
     # Wait for an additional block to be safe
-    generate_blocks_w_delay(10 + config.get("EXPIRY_DELTA"))
+    generate_blocks_with_delay(10 + config.get("EXPIRY_DELTA"))
     assert len(watcher.appointments) == 0
 
     # Check that they are not in the Gatekeeper either, only the two that passed to the Responder should remain
@@ -584,7 +584,7 @@ def test_do_watch_cache_update(watcher):
         rest_of_blocks = list(blocks_in_cache.keys())[1:]
         assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
 
-        generate_blocks_w_delay(1)
+        generate_blocks_with_delay(1)
 
         # The last oldest block is gone but the rest remain
         assert oldest_block_hash not in watcher.locator_cache.blocks

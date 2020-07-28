@@ -9,7 +9,7 @@ from common.cryptographer import Cryptographer
 from test.teos.conftest import config
 
 
-# This fixture needs to be manully run on the first E2E.
+# This fixture needs to be manually run on the first E2E.
 @pytest.fixture(scope="session")
 def teosd():
     teosd_process, teos_id = run_teosd()

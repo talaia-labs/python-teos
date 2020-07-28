@@ -84,7 +84,7 @@ def setup_node():
     create_initial_transactions()
 
 
-def create_initial_transactions(fee=Decimal(5 / pow(10, 5))):
+def create_initial_transactions(fee=Decimal("0.00005")):
     utxos = bitcoin_cli.listunspent()
     btc_addresses = [bitcoin_cli.getnewaddress() for _ in range(100)]
     for utxo in utxos:
@@ -116,7 +116,7 @@ def get_utxo():
         raise ValueError("There are no UTXOs.")
 
     utxo = utxos.pop(0)
-    while utxo.get("amount") < Decimal(2 / pow(10, 5)):
+    while utxo.get("amount") < Decimal("0.00002"):
         utxo = utxos.pop(0)
 
     return utxo
@@ -126,7 +126,7 @@ def generate_blocks(n):
     return bitcoin_cli.generatetoaddress(n, btc_addr)
 
 
-def generate_blocks_w_delay(n):
+def generate_blocks_with_delay(n):
     block_ids = []
     for _ in range(n):
         block_ids.append(generate_blocks(1))
@@ -146,7 +146,7 @@ def generate_block_with_transactions(commitment_txs):
     return generate_blocks(1)
 
 
-def create_commitment_tx(utxo=None, destination=None, fee=Decimal(1 / pow(10, 5))):
+def create_commitment_tx(utxo=None, destination=None, fee=Decimal("0.00001")):
     if not utxo:
         utxo = get_utxo()
 
@@ -166,7 +166,7 @@ def create_commitment_tx(utxo=None, destination=None, fee=Decimal(1 / pow(10, 5)
     return signed_commitment_tx.get("hex")
 
 
-def create_penalty_tx(decoded_commitment_tx, destination=None, fee=Decimal(1 / pow(10, 5))):
+def create_penalty_tx(decoded_commitment_tx, destination=None, fee=Decimal("0.00001")):
     # We will set the recipient to ourselves if destination is None
     if destination is None:
         destination = decoded_commitment_tx.get("vout")[0].get("scriptPubKey").get("addresses")[0]
