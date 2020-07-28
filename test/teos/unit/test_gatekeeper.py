@@ -8,13 +8,11 @@ from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter
 from common.constants import ENCRYPTED_BLOB_MAX_SIZE_HEX
 
-from test.teos.unit.conftest import get_random_value_hex, generate_keypair, get_config, generate_dummy_appointment
+from test.teos.conftest import config
+from test.teos.unit.conftest import get_random_value_hex, generate_keypair, generate_dummy_appointment
 
 
-config = get_config()
-
-
-def test_init(gatekeeper, run_bitcoind):
+def test_init(gatekeeper):
     assert isinstance(gatekeeper.subscription_slots, int) and gatekeeper.subscription_slots == config.get(
         "SUBSCRIPTION_SLOTS"
     )
