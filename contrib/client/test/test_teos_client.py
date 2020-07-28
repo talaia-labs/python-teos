@@ -15,7 +15,7 @@ from common.exceptions import InvalidParameter, InvalidKey, TowerResponseError
 
 import contrib.client.teos_client as teos_client
 
-from contrib.test.client.conftest import get_random_value_hex, get_config
+from contrib.client.test.conftest import get_random_value_hex, get_config
 
 config = get_config()
 
