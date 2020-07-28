@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-from gevent.pywsgi import WSGIServer
 
 import common.errors as errors
 from teos.inspector import InspectionFailed
@@ -265,5 +264,5 @@ class API:
     def start(self):
         """ This function starts the Flask server used to run the API """
 
-        http_server = WSGIServer((self.host, self.port), self.app, log=self.logger, error_log=self.logger)
-        http_server.serve_forever()
+        # ToDo: #185-serve-teosd-production
+        self.app.run(host=self.host, port=self.port)
