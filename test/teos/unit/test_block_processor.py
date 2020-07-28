@@ -16,7 +16,7 @@ hex_tx = (
 
 def test_get_best_block_hash(block_processor):
     best_block_hash = block_processor.get_best_block_hash()
-    # As long as bitcoind is running we should always a block hash
+    # As long as bitcoind is running we should always get a block hash
     assert best_block_hash is not None and isinstance(best_block_hash, str)
 
 
@@ -97,7 +97,7 @@ def test_find_last_common_ancestor(block_processor):
     blocks = generate_blocks(3)
     best_block_hash = blocks[-1]
 
-    # Create a fork (invalidate the next block after the ancestor amd mine 4 blocks on top)
+    # Create a fork (invalidate the next block after the ancestor and mine 4 blocks on top)
     fork(blocks[0], 4)
 
     # The last common ancestor between the old best and the new best should be the "ancestor"

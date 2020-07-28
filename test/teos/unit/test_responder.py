@@ -18,7 +18,7 @@ from test.teos.conftest import (
     config,
     bitcoin_cli,
     generate_blocks,
-    generate_blocks_w_delay,
+    generate_blocks_with_delay,
     create_commitment_tx,
     generate_block_with_transactions,
 )
@@ -323,18 +323,18 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor):
         broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
-    generate_blocks_w_delay(1)
+    generate_blocks_with_delay(1)
 
     # The transactions we sent shouldn't be in the unconfirmed transaction list anymore
     assert not set(broadcast_txs).issubset(responder.unconfirmed_txs)
 
     # CONFIRMATIONS_BEFORE_RETRY+1 blocks after, the responder should rebroadcast the unconfirmed txs (15 remaining)
-    generate_blocks_w_delay(CONFIRMATIONS_BEFORE_RETRY + 1)
+    generate_blocks_with_delay(CONFIRMATIONS_BEFORE_RETRY + 1)
     assert len(responder.unconfirmed_txs) == 0
     assert len(responder.trackers) == 20
 
     # Generating 100 - CONFIRMATIONS_BEFORE_RETRY -2 additional blocks should complete the first 5 trackers
-    generate_blocks_w_delay(100 - CONFIRMATIONS_BEFORE_RETRY - 2)
+    generate_blocks_with_delay(100 - CONFIRMATIONS_BEFORE_RETRY - 2)
     assert len(responder.unconfirmed_txs) == 0
     assert len(responder.trackers) == 15
     # Check they are not in the Gatekeeper either
@@ -342,7 +342,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor):
         assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
 
     # CONFIRMATIONS_BEFORE_RETRY additional blocks should complete the rest
-    generate_blocks_w_delay(CONFIRMATIONS_BEFORE_RETRY)
+    generate_blocks_with_delay(CONFIRMATIONS_BEFORE_RETRY)
     assert len(responder.unconfirmed_txs) == 0
     assert len(responder.trackers) == 0
     # Check they are not in the Gatekeeper either
@@ -438,13 +438,13 @@ def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor
     for uuid, tracker in trackers_ir_resolved.items():
         bitcoin_cli.sendrawtransaction(tracker.penalty_rawtx)
 
-    generate_blocks_w_delay(1)
+    generate_blocks_with_delay(1)
 
     for uuid, tracker in trackers_confirmed.items():
         bitcoin_cli.sendrawtransaction(tracker.penalty_rawtx)
 
     # ir_resolved have 100 confirmations and confirmed have 99
-    generate_blocks_w_delay(99)
+    generate_blocks_with_delay(99)
 
     # Let's check
     completed_trackers = responder.get_completed_trackers()
@@ -452,7 +452,7 @@ def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor
     assert set(completed_trackers) == set(ended_trackers_keys)
 
     # Generating 1 additional blocks should also include confirmed
-    generate_blocks_w_delay(1)
+    generate_blocks_with_delay(1)
 
     completed_trackers = responder.get_completed_trackers()
     ended_trackers_keys.extend(list(trackers_confirmed.keys()))
