@@ -1,7 +1,7 @@
 import pytest
 from teos.watcher import InvalidTransactionFormat
 from test.teos.conftest import generate_blocks
-from test.teos.unit.conftest import get_random_value_hex, fork, bitcoin_cli
+from test.teos.unit.conftest import get_random_value_hex, fork
 
 
 hex_tx = (
