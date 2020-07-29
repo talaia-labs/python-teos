@@ -44,7 +44,7 @@ def get_all_appointments(rpc_url):
             )
             return None
 
-        response_json = json.dumps(response.json(), indent=4, sort_keys=True)
+        response_json = json.dumps(response.json()["result"], indent=4, sort_keys=True)
         return response_json
 
     except ConnectionError:
