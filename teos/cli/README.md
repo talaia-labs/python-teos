@@ -2,22 +2,15 @@
 
 `teos_cli` is a command line interface to interact with the Eye of Satoshi watchtower server, written in Python3.
 
-## Dependencies
-Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
-
-## Installation
-
-Refer to [INSTALL.md](INSTALL.md)
-
 ## Usage
 
 	python -m teos_cli [global options] command [command options] [arguments]
 	
 #### Global options
 
-- `--rpcconnect`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
-- `--rpcport` :	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
-- `-h --help`: 	shows a list of commands or help for a specific command.
+- `--rpcbind`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
+- `--rpcport`:	API port where to send the requests. Defaults to '9814' (modifiable in conf file).
+- `-h --help`:	shows a list of commands or help for a specific command.
 
 #### Commands
 
@@ -37,7 +30,7 @@ This command returns all appointments stored in the watchtower. More precisely, 
 
 #### Usage
 
-        python -m teos_cli get_all_appointments
+    python -m teos_cli get_all_appointments
 
 ### help
 

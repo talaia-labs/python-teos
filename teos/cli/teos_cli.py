@@ -9,15 +9,12 @@ from requests import ConnectionError
 from uuid import uuid4
 
 from common import constants
-from common.logger import get_logger, setup_logging
 from common.config_loader import ConfigLoader
 from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from teos.help import show_usage, help_get_all_appointments
-
-logger = get_logger()
+from teos.cli.help import show_usage, help_get_all_appointments
 
 
 def make_rpc_request(rpc_url, method, *args):
@@ -41,18 +38,21 @@ def get_all_appointments(rpc_url):
     try:
         response = make_rpc_request(rpc_url, "get_all_appointments")
         if response.status_code != constants.HTTP_OK:
-            logger.error("The server returned an error", status_code=response.status_code, reason=response.reason)
+            print(
+                f"The server returned an error. Status code: {response.status_code}. Reason: {response.reason}",
+                file=sys.stderr,
+            )
             return None
 
         response_json = json.dumps(response.json(), indent=4, sort_keys=True)
         return response_json
 
     except ConnectionError:
-        logger.error("Can't connect to the Eye of Satoshi. RPC server cannot be reached")
+        print("Can't connect to the Eye of Satoshi. RPC server cannot be reached", file=sys.stderr)
         return None
 
     except requests.exceptions.Timeout:
-        logger.error("The request timed out")
+        print("The request timed out", file=sys.stderr)
         return None
 
 
@@ -62,10 +62,10 @@ def main(command, args, command_line_conf):
     config = config_loader.build_config()
 
     setup_data_folder(DATA_DIR)
-    setup_logging(config.get("LOG_FILE"))
 
     # Set the teos url
-    teos_rpc_url = "{}:{}/rpc".format(config.get("RPC_CONNECT"), config.get("RPC_PORT"))
+    teos_rpc_url = "{}:{}/rpc".format(config.get("RPC_BIND"), config.get("RPC_PORT"))
+
     # If an http or https prefix if found, leaves the server as is. Otherwise defaults to http.
     if not teos_rpc_url.startswith("http"):
         teos_rpc_url = "http://" + teos_rpc_url
@@ -84,17 +84,17 @@ def main(command, args, command_line_conf):
                     sys.exit(help_get_all_appointments())
 
                 else:
-                    logger.error("Unknown command. Use help to check the list of available commands")
+                    sys.exit("Unknown command. Use help to check the list of available commands")
 
             else:
                 sys.exit(show_usage())
 
     except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
-        logger.error(str(e))
+        sys.exit(str(e))
     except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
-        logger.error(e.msg, **e.kwargs)
+        sys.exit(f"{e.msg}. Error arguments: {e.kwargs}")
     except Exception as e:
-        logger.error("Unknown error occurred", error=str(e))
+        sys.exit(f"Unknown error occurred: {str(e)}")
 
 
 if __name__ == "__main__":
@@ -102,12 +102,12 @@ if __name__ == "__main__":
     commands = ["get_all_appointments", "help"]
 
     try:
-        opts, args = getopt(argv[1:], "h", ["rpcconnect=", "rpcport=", "help"])
+        opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "help"])
 
         for opt, arg in opts:
-            if opt in ["--rpcconnect"]:
+            if opt in ["--rpcbind"]:
                 if arg:
-                    command_line_conf["RPC_CONNECT"] = arg
+                    command_line_conf["RPC_BIND"] = arg
 
             if opt in ["--rpcport"]:
                 if arg:
