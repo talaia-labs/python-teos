@@ -61,13 +61,6 @@ def get_config(command_line_conf, data_dir):
     return config
 
 
-def rpc_thread_function(config, rw_lock, inspector, watcher):
-    host = config.get("RPC_BIND")
-    port = config.get("RPC_PORT")
-    logger.info(f"Starting RPC Server on {host}:{port}")
-    RPC(host, port, rw_lock, inspector, watcher).start()
-
-
 def main(config):
     global db_manager, chain_monitor
 
@@ -204,10 +197,9 @@ def main(config):
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
 
             # start the RPC server
-            rpc_thread = threading.Thread(
-                target=rpc_thread_function, args=(config, rw_lock, inspector, watcher), daemon=True
-            )
-            rpc_thread.start()
+            logger.info(f'Starting RPC Server on {config.get("RPC_BIND")}:{config.get("RPC_PORT")}')
+            rpc = RPC(config.get("RPC_BIND"), config.get("RPC_PORT"), rw_lock, inspector, watcher)
+            threading.Thread(target=rpc.start, daemon=True).start()
 
             # start the API server
             API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher).start()
