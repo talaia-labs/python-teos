@@ -14,8 +14,8 @@ from common.config_loader import ConfigLoader
 from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 
-from . import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from .help import show_usage, help_get_all_appointments
+from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
+from teos.help import show_usage, help_get_all_appointments
 
 logger = get_logger()
 
