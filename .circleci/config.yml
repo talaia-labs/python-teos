@@ -9,7 +9,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "teos/cli/requirements.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
+            - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
       - run:
           name: Install dependencies
@@ -20,7 +20,6 @@ jobs:
             sudo pip install --upgrade pip
             pip install -r requirements.txt
             pip install -r requirements-dev.txt
-            pip install -r teos/cli/requirements.txt
             pip install -r contrib/client/requirements.txt
 
       - run:
@@ -36,7 +35,7 @@ jobs:
           paths:
             - ./venv
             - bitcoin
-          key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "teos/cli/requirements.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
+          key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
       - run:
           name: Setup teos
