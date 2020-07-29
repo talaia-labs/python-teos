@@ -69,6 +69,7 @@ class API:
 
     Attributes:
         logger: the logger for this component.
+        app: the Flask app of the API server.
     """
 
     def __init__(self, host, port, rw_lock, inspector, watcher):

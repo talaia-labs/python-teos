@@ -1,10 +1,9 @@
 import os
-import daemon
 from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 import threading
-
+import daemon
 from readerwriterlock import rwlock
 
 from common.logger import setup_logging, get_logger
