@@ -452,14 +452,14 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        if os.path.exists(config.get("CLI_PRIVATE_KEY")):
+        if os.path.exists(config.get("USER_PRIVATE_KEY")):
             logger.debug("Client id found. Loading keys")
-            user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
+            user_sk, user_id = load_keys(config.get("USER_PRIVATE_KEY"))
 
         else:
             logger.info("Client id not found. Generating new keys")
             user_sk = Cryptographer.generate_key()
-            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", config.get("DATA_DIR"))
+            Cryptographer.save_key_file(user_sk.to_der(), "user_sk", config.get("DATA_DIR"))
             user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
         if command == "register":

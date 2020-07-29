@@ -1,6 +1,8 @@
 # teos_client
 
-`teos_client` is a command line interface to interact with the Eye of Satoshi watchtower server, written in Python3.
+`teos_client` is an example command line client to interact with the Eye of Satoshi watchtower server, written in
+Python3. It has commands to register a user to the watchtower (generating user keys if necessary), to add an
+appointment and to retrieve information about appointments.
 
 ## Dependencies
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
