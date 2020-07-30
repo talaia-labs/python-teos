@@ -11,6 +11,7 @@ from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
+from teos.grpc_server import serve
 from teos.api import API
 from teos.rpc import RPC
 from teos.help import show_usage
@@ -202,7 +203,9 @@ def main(config):
             threading.Thread(target=rpc.start, daemon=True).start()
 
             # start the API server
-            API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher).start()
+            api = API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher)
+            threading.Thread(target=api.start).start()
+            serve(rw_lock, inspector, watcher)
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

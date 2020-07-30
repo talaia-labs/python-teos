@@ -1,7 +1,9 @@
+import grpc
 from flask import Flask, request, jsonify
 
 import common.errors as errors
 from teos.inspector import InspectionFailed
+from teos.protobuf import user_pb2, api_pb2_grpc
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
@@ -124,20 +126,17 @@ class API:
         user_id = request_data.get("public_key")
 
         if user_id:
-            with self.rw_lock.gen_wlock():
-                try:
-                    rcode = HTTP_OK
-                    available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
-                    response = {
-                        "public_key": user_id,
-                        "available_slots": available_slots,
-                        "subscription_expiry": subscription_expiry,
-                        "subscription_signature": subscription_signature,
-                    }
+            with grpc.insecure_channel("localhost:50051") as channel:
+                stub = api_pb2_grpc.APIStub(channel)
+                r = stub.register(user_pb2.User(user_id=user_id))
 
-                except InvalidParameter as e:
-                    rcode = HTTP_BAD_REQUEST
-                    response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                rcode = HTTP_OK
+                response = {
+                    "public_key": user_id,
+                    "available_slots": r.available_slots,
+                    "subscription_expiry": r.subscription_expiry,
+                    "subscription_signature": r.signature,
+                }
 
         else:
             rcode = HTTP_BAD_REQUEST
