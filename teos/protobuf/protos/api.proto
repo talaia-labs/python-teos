@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package teos;
+
+import "appointment.proto";
+import "user.proto";
+
+service API {
+  rpc register(User) returns (Subscription) {}
+  rpc add_appointment(AddAppointmentRequest) returns (AddAppointmentResponse) {}
+  rpc get_appointment(GetAppointmentRequest) returns (GetAppointmentResponse) {}
+}
