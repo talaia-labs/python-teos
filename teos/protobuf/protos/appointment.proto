@@ -2,43 +2,48 @@ syntax = "proto3";
 
 package teos;
 
-message Locator {
-  string value = 1;
-}
-
-message Signature {
-  string value = 1;
-}
-
 message Appointment {
-  Locator locator = 1;
-  string encrypted_block = 2;
+  string locator = 1;
+  string encrypted_blob = 2;
   uint32 to_self_delay = 3;
 
 }
 
+message Tracker {
+  string locator = 1;
+  string dispute_txid = 2;
+  string penalty_txid = 3;
+  string penalty_rawtx = 4;
+}
+
+message AppointmentData{
+  Appointment appointment = 1;
+  Tracker tracker = 2;
+}
+
 message AddAppointmentRequest {
   Appointment appointment = 1;
-  Signature signature = 2;
+  string signature = 2;
 }
 
 message AddAppointmentResponse {
-  Locator locator = 1;
+  string locator = 1;
   uint32 start_block = 2;
-  Signature signature = 3;
+  string signature = 3;
   uint32 available_slots = 4;
   uint32 subscription_expiry = 5;
 }
 
 message GetAppointmentRequest {
-  Locator locator = 1;
-  Signature signature = 2;
+  string locator = 1;
+  string signature = 2;
 }
 
 message GetAppointmentResponse {
-  Locator locator = 1;
+  AppointmentData appointment_data = 1;
   string status = 2;
-  Appointment appointment = 3;
 }
+
+
 
 

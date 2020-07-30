@@ -6,7 +6,7 @@ import "appointment.proto";
 import "user.proto";
 
 service API {
-  rpc register(User) returns (Subscription) {}
+  rpc register(RegisterRequest) returns (RegisterResponse) {}
   rpc add_appointment(AddAppointmentRequest) returns (AddAppointmentResponse) {}
   rpc get_appointment(GetAppointmentRequest) returns (GetAppointmentResponse) {}
 }

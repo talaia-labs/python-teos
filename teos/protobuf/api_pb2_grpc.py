@@ -17,8 +17,8 @@ class APIStub(object):
         """
         self.register = channel.unary_unary(
             "/teos.API/register",
-            request_serializer=user__pb2.User.SerializeToString,
-            response_deserializer=user__pb2.Subscription.FromString,
+            request_serializer=user__pb2.RegisterRequest.SerializeToString,
+            response_deserializer=user__pb2.RegisterResponse.FromString,
         )
         self.add_appointment = channel.unary_unary(
             "/teos.API/add_appointment",
@@ -58,8 +58,8 @@ def add_APIServicer_to_server(servicer, server):
     rpc_method_handlers = {
         "register": grpc.unary_unary_rpc_method_handler(
             servicer.register,
-            request_deserializer=user__pb2.User.FromString,
-            response_serializer=user__pb2.Subscription.SerializeToString,
+            request_deserializer=user__pb2.RegisterRequest.FromString,
+            response_serializer=user__pb2.RegisterResponse.SerializeToString,
         ),
         "add_appointment": grpc.unary_unary_rpc_method_handler(
             servicer.add_appointment,
@@ -96,8 +96,8 @@ class API(object):
             request,
             target,
             "/teos.API/register",
-            user__pb2.User.SerializeToString,
-            user__pb2.Subscription.FromString,
+            user__pb2.RegisterRequest.SerializeToString,
+            user__pb2.RegisterResponse.FromString,
             options,
             channel_credentials,
             call_credentials,

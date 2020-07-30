@@ -18,13 +18,13 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\nuser.proto\x12\x04teos"\x17\n\x04User\x12\x0f\n\x07user_id\x18\x01 \x01(\t"q\n\x0cSubscription\x12\x18\n\x04user\x18\x01 \x01(\x0b\x32\n.teos.User\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x11\n\tsignature\x18\x04 \x01(\tb\x06proto3',
+    serialized_pb=b'\n\nuser.proto\x12\x04teos""\n\x0fRegisterRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"l\n\x10RegisterResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x11\n\tsignature\x18\x04 \x01(\tb\x06proto3',
 )
 
 
-_USER = _descriptor.Descriptor(
-    name="User",
-    full_name="teos.User",
+_REGISTERREQUEST = _descriptor.Descriptor(
+    name="RegisterRequest",
+    full_name="teos.RegisterRequest",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -32,7 +32,7 @@ _USER = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="user_id",
-            full_name="teos.User.user_id",
+            full_name="teos.RegisterRequest.user_id",
             index=0,
             number=1,
             type=9,
@@ -59,28 +59,28 @@ _USER = _descriptor.Descriptor(
     extension_ranges=[],
     oneofs=[],
     serialized_start=20,
-    serialized_end=43,
+    serialized_end=54,
 )
 
 
-_SUBSCRIPTION = _descriptor.Descriptor(
-    name="Subscription",
-    full_name="teos.Subscription",
+_REGISTERRESPONSE = _descriptor.Descriptor(
+    name="RegisterResponse",
+    full_name="teos.RegisterResponse",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
     create_key=_descriptor._internal_create_key,
     fields=[
         _descriptor.FieldDescriptor(
-            name="user",
-            full_name="teos.Subscription.user",
+            name="user_id",
+            full_name="teos.RegisterResponse.user_id",
             index=0,
             number=1,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -92,7 +92,7 @@ _SUBSCRIPTION = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="available_slots",
-            full_name="teos.Subscription.available_slots",
+            full_name="teos.RegisterResponse.available_slots",
             index=1,
             number=2,
             type=13,
@@ -111,7 +111,7 @@ _SUBSCRIPTION = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="subscription_expiry",
-            full_name="teos.Subscription.subscription_expiry",
+            full_name="teos.RegisterResponse.subscription_expiry",
             index=2,
             number=3,
             type=13,
@@ -130,7 +130,7 @@ _SUBSCRIPTION = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="signature",
-            full_name="teos.Subscription.signature",
+            full_name="teos.RegisterResponse.signature",
             index=3,
             number=4,
             type=9,
@@ -156,36 +156,35 @@ _SUBSCRIPTION = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=45,
-    serialized_end=158,
+    serialized_start=56,
+    serialized_end=164,
 )
 
-_SUBSCRIPTION.fields_by_name["user"].message_type = _USER
-DESCRIPTOR.message_types_by_name["User"] = _USER
-DESCRIPTOR.message_types_by_name["Subscription"] = _SUBSCRIPTION
+DESCRIPTOR.message_types_by_name["RegisterRequest"] = _REGISTERREQUEST
+DESCRIPTOR.message_types_by_name["RegisterResponse"] = _REGISTERRESPONSE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
-User = _reflection.GeneratedProtocolMessageType(
-    "User",
+RegisterRequest = _reflection.GeneratedProtocolMessageType(
+    "RegisterRequest",
     (_message.Message,),
     {
-        "DESCRIPTOR": _USER,
+        "DESCRIPTOR": _REGISTERREQUEST,
         "__module__": "user_pb2"
-        # @@protoc_insertion_point(class_scope:teos.User)
+        # @@protoc_insertion_point(class_scope:teos.RegisterRequest)
     },
 )
-_sym_db.RegisterMessage(User)
+_sym_db.RegisterMessage(RegisterRequest)
 
-Subscription = _reflection.GeneratedProtocolMessageType(
-    "Subscription",
+RegisterResponse = _reflection.GeneratedProtocolMessageType(
+    "RegisterResponse",
     (_message.Message,),
     {
-        "DESCRIPTOR": _SUBSCRIPTION,
+        "DESCRIPTOR": _REGISTERRESPONSE,
         "__module__": "user_pb2"
-        # @@protoc_insertion_point(class_scope:teos.Subscription)
+        # @@protoc_insertion_point(class_scope:teos.RegisterResponse)
     },
 )
-_sym_db.RegisterMessage(Subscription)
+_sym_db.RegisterMessage(RegisterResponse)
 
 
 # @@protoc_insertion_point(module_scope)

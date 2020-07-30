@@ -18,89 +18,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\x11\x61ppointment.proto\x12\x04teos"\x18\n\x07Locator\x12\r\n\x05value\x18\x01 \x01(\t"\x1a\n\tSignature\x12\r\n\x05value\x18\x01 \x01(\t"]\n\x0b\x41ppointment\x12\x1e\n\x07locator\x18\x01 \x01(\x0b\x32\r.teos.Locator\x12\x17\n\x0f\x65ncrypted_block\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"c\n\x15\x41\x64\x64\x41ppointmentRequest\x12&\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32\x11.teos.Appointment\x12"\n\tsignature\x18\x02 \x01(\x0b\x32\x0f.teos.Signature"\xa7\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x1e\n\x07locator\x18\x01 \x01(\x0b\x32\r.teos.Locator\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12"\n\tsignature\x18\x03 \x01(\x0b\x32\x0f.teos.Signature\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r"[\n\x15GetAppointmentRequest\x12\x1e\n\x07locator\x18\x01 \x01(\x0b\x32\r.teos.Locator\x12"\n\tsignature\x18\x02 \x01(\x0b\x32\x0f.teos.Signature"p\n\x16GetAppointmentResponse\x12\x1e\n\x07locator\x18\x01 \x01(\x0b\x32\r.teos.Locator\x12\x0e\n\x06status\x18\x02 \x01(\t\x12&\n\x0b\x61ppointment\x18\x03 \x01(\x0b\x32\x11.teos.Appointmentb\x06proto3',
-)
-
-
-_LOCATOR = _descriptor.Descriptor(
-    name="Locator",
-    full_name="teos.Locator",
-    filename=None,
-    file=DESCRIPTOR,
-    containing_type=None,
-    create_key=_descriptor._internal_create_key,
-    fields=[
-        _descriptor.FieldDescriptor(
-            name="value",
-            full_name="teos.Locator.value",
-            index=0,
-            number=1,
-            type=9,
-            cpp_type=9,
-            label=1,
-            has_default_value=False,
-            default_value=b"".decode("utf-8"),
-            message_type=None,
-            enum_type=None,
-            containing_type=None,
-            is_extension=False,
-            extension_scope=None,
-            serialized_options=None,
-            file=DESCRIPTOR,
-            create_key=_descriptor._internal_create_key,
-        )
-    ],
-    extensions=[],
-    nested_types=[],
-    enum_types=[],
-    serialized_options=None,
-    is_extendable=False,
-    syntax="proto3",
-    extension_ranges=[],
-    oneofs=[],
-    serialized_start=27,
-    serialized_end=51,
-)
-
-
-_SIGNATURE = _descriptor.Descriptor(
-    name="Signature",
-    full_name="teos.Signature",
-    filename=None,
-    file=DESCRIPTOR,
-    containing_type=None,
-    create_key=_descriptor._internal_create_key,
-    fields=[
-        _descriptor.FieldDescriptor(
-            name="value",
-            full_name="teos.Signature.value",
-            index=0,
-            number=1,
-            type=9,
-            cpp_type=9,
-            label=1,
-            has_default_value=False,
-            default_value=b"".decode("utf-8"),
-            message_type=None,
-            enum_type=None,
-            containing_type=None,
-            is_extension=False,
-            extension_scope=None,
-            serialized_options=None,
-            file=DESCRIPTOR,
-            create_key=_descriptor._internal_create_key,
-        )
-    ],
-    extensions=[],
-    nested_types=[],
-    enum_types=[],
-    serialized_options=None,
-    is_extendable=False,
-    syntax="proto3",
-    extension_ranges=[],
-    oneofs=[],
-    serialized_start=53,
-    serialized_end=79,
+    serialized_pb=b'\n\x11\x61ppointment.proto\x12\x04teos"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t"Y\n\x0f\x41ppointmentData\x12&\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32\x11.teos.Appointment\x12\x1e\n\x07tracker\x18\x02 \x01(\x0b\x32\r.teos.Tracker"R\n\x15\x41\x64\x64\x41ppointmentRequest\x12&\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32\x11.teos.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t"Y\n\x16GetAppointmentResponse\x12/\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32\x15.teos.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\tb\x06proto3',
 )
 
 
@@ -117,11 +35,11 @@ _APPOINTMENT = _descriptor.Descriptor(
             full_name="teos.Appointment.locator",
             index=0,
             number=1,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -132,8 +50,8 @@ _APPOINTMENT = _descriptor.Descriptor(
             create_key=_descriptor._internal_create_key,
         ),
         _descriptor.FieldDescriptor(
-            name="encrypted_block",
-            full_name="teos.Appointment.encrypted_block",
+            name="encrypted_blob",
+            full_name="teos.Appointment.encrypted_blob",
             index=1,
             number=2,
             type=9,
@@ -178,8 +96,166 @@ _APPOINTMENT = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=81,
-    serialized_end=174,
+    serialized_start=27,
+    serialized_end=104,
+)
+
+
+_TRACKER = _descriptor.Descriptor(
+    name="Tracker",
+    full_name="teos.Tracker",
+    filename=None,
+    file=DESCRIPTOR,
+    containing_type=None,
+    create_key=_descriptor._internal_create_key,
+    fields=[
+        _descriptor.FieldDescriptor(
+            name="locator",
+            full_name="teos.Tracker.locator",
+            index=0,
+            number=1,
+            type=9,
+            cpp_type=9,
+            label=1,
+            has_default_value=False,
+            default_value=b"".decode("utf-8"),
+            message_type=None,
+            enum_type=None,
+            containing_type=None,
+            is_extension=False,
+            extension_scope=None,
+            serialized_options=None,
+            file=DESCRIPTOR,
+            create_key=_descriptor._internal_create_key,
+        ),
+        _descriptor.FieldDescriptor(
+            name="dispute_txid",
+            full_name="teos.Tracker.dispute_txid",
+            index=1,
+            number=2,
+            type=9,
+            cpp_type=9,
+            label=1,
+            has_default_value=False,
+            default_value=b"".decode("utf-8"),
+            message_type=None,
+            enum_type=None,
+            containing_type=None,
+            is_extension=False,
+            extension_scope=None,
+            serialized_options=None,
+            file=DESCRIPTOR,
+            create_key=_descriptor._internal_create_key,
+        ),
+        _descriptor.FieldDescriptor(
+            name="penalty_txid",
+            full_name="teos.Tracker.penalty_txid",
+            index=2,
+            number=3,
+            type=9,
+            cpp_type=9,
+            label=1,
+            has_default_value=False,
+            default_value=b"".decode("utf-8"),
+            message_type=None,
+            enum_type=None,
+            containing_type=None,
+            is_extension=False,
+            extension_scope=None,
+            serialized_options=None,
+            file=DESCRIPTOR,
+            create_key=_descriptor._internal_create_key,
+        ),
+        _descriptor.FieldDescriptor(
+            name="penalty_rawtx",
+            full_name="teos.Tracker.penalty_rawtx",
+            index=3,
+            number=4,
+            type=9,
+            cpp_type=9,
+            label=1,
+            has_default_value=False,
+            default_value=b"".decode("utf-8"),
+            message_type=None,
+            enum_type=None,
+            containing_type=None,
+            is_extension=False,
+            extension_scope=None,
+            serialized_options=None,
+            file=DESCRIPTOR,
+            create_key=_descriptor._internal_create_key,
+        ),
+    ],
+    extensions=[],
+    nested_types=[],
+    enum_types=[],
+    serialized_options=None,
+    is_extendable=False,
+    syntax="proto3",
+    extension_ranges=[],
+    oneofs=[],
+    serialized_start=106,
+    serialized_end=199,
+)
+
+
+_APPOINTMENTDATA = _descriptor.Descriptor(
+    name="AppointmentData",
+    full_name="teos.AppointmentData",
+    filename=None,
+    file=DESCRIPTOR,
+    containing_type=None,
+    create_key=_descriptor._internal_create_key,
+    fields=[
+        _descriptor.FieldDescriptor(
+            name="appointment",
+            full_name="teos.AppointmentData.appointment",
+            index=0,
+            number=1,
+            type=11,
+            cpp_type=10,
+            label=1,
+            has_default_value=False,
+            default_value=None,
+            message_type=None,
+            enum_type=None,
+            containing_type=None,
+            is_extension=False,
+            extension_scope=None,
+            serialized_options=None,
+            file=DESCRIPTOR,
+            create_key=_descriptor._internal_create_key,
+        ),
+        _descriptor.FieldDescriptor(
+            name="tracker",
+            full_name="teos.AppointmentData.tracker",
+            index=1,
+            number=2,
+            type=11,
+            cpp_type=10,
+            label=1,
+            has_default_value=False,
+            default_value=None,
+            message_type=None,
+            enum_type=None,
+            containing_type=None,
+            is_extension=False,
+            extension_scope=None,
+            serialized_options=None,
+            file=DESCRIPTOR,
+            create_key=_descriptor._internal_create_key,
+        ),
+    ],
+    extensions=[],
+    nested_types=[],
+    enum_types=[],
+    serialized_options=None,
+    is_extendable=False,
+    syntax="proto3",
+    extension_ranges=[],
+    oneofs=[],
+    serialized_start=201,
+    serialized_end=290,
 )
 
 
@@ -215,11 +291,11 @@ _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
             full_name="teos.AddAppointmentRequest.signature",
             index=1,
             number=2,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -238,8 +314,8 @@ _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=176,
-    serialized_end=275,
+    serialized_start=292,
+    serialized_end=374,
 )
 
 
@@ -256,11 +332,11 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
             full_name="teos.AddAppointmentResponse.locator",
             index=0,
             number=1,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -294,11 +370,11 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
             full_name="teos.AddAppointmentResponse.signature",
             index=2,
             number=3,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -355,8 +431,8 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=278,
-    serialized_end=445,
+    serialized_start=377,
+    serialized_end=512,
 )
 
 
@@ -373,11 +449,11 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
             full_name="teos.GetAppointmentRequest.locator",
             index=0,
             number=1,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -392,11 +468,11 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
             full_name="teos.GetAppointmentRequest.signature",
             index=1,
             number=2,
-            type=11,
-            cpp_type=10,
+            type=9,
+            cpp_type=9,
             label=1,
             has_default_value=False,
-            default_value=None,
+            default_value=b"".decode("utf-8"),
             message_type=None,
             enum_type=None,
             containing_type=None,
@@ -415,8 +491,8 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=447,
-    serialized_end=538,
+    serialized_start=514,
+    serialized_end=573,
 )
 
 
@@ -429,8 +505,8 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     create_key=_descriptor._internal_create_key,
     fields=[
         _descriptor.FieldDescriptor(
-            name="locator",
-            full_name="teos.GetAppointmentResponse.locator",
+            name="appointment_data",
+            full_name="teos.GetAppointmentResponse.appointment_data",
             index=0,
             number=1,
             type=11,
@@ -466,25 +542,6 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
             file=DESCRIPTOR,
             create_key=_descriptor._internal_create_key,
         ),
-        _descriptor.FieldDescriptor(
-            name="appointment",
-            full_name="teos.GetAppointmentResponse.appointment",
-            index=2,
-            number=3,
-            type=11,
-            cpp_type=10,
-            label=1,
-            has_default_value=False,
-            default_value=None,
-            message_type=None,
-            enum_type=None,
-            containing_type=None,
-            is_extension=False,
-            extension_scope=None,
-            serialized_options=None,
-            file=DESCRIPTOR,
-            create_key=_descriptor._internal_create_key,
-        ),
     ],
     extensions=[],
     nested_types=[],
@@ -494,49 +551,22 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=540,
-    serialized_end=652,
+    serialized_start=575,
+    serialized_end=664,
 )
 
-_APPOINTMENT.fields_by_name["locator"].message_type = _LOCATOR
+_APPOINTMENTDATA.fields_by_name["appointment"].message_type = _APPOINTMENT
+_APPOINTMENTDATA.fields_by_name["tracker"].message_type = _TRACKER
 _ADDAPPOINTMENTREQUEST.fields_by_name["appointment"].message_type = _APPOINTMENT
-_ADDAPPOINTMENTREQUEST.fields_by_name["signature"].message_type = _SIGNATURE
-_ADDAPPOINTMENTRESPONSE.fields_by_name["locator"].message_type = _LOCATOR
-_ADDAPPOINTMENTRESPONSE.fields_by_name["signature"].message_type = _SIGNATURE
-_GETAPPOINTMENTREQUEST.fields_by_name["locator"].message_type = _LOCATOR
-_GETAPPOINTMENTREQUEST.fields_by_name["signature"].message_type = _SIGNATURE
-_GETAPPOINTMENTRESPONSE.fields_by_name["locator"].message_type = _LOCATOR
-_GETAPPOINTMENTRESPONSE.fields_by_name["appointment"].message_type = _APPOINTMENT
-DESCRIPTOR.message_types_by_name["Locator"] = _LOCATOR
-DESCRIPTOR.message_types_by_name["Signature"] = _SIGNATURE
+_GETAPPOINTMENTRESPONSE.fields_by_name["appointment_data"].message_type = _APPOINTMENTDATA
 DESCRIPTOR.message_types_by_name["Appointment"] = _APPOINTMENT
+DESCRIPTOR.message_types_by_name["Tracker"] = _TRACKER
+DESCRIPTOR.message_types_by_name["AppointmentData"] = _APPOINTMENTDATA
 DESCRIPTOR.message_types_by_name["AddAppointmentRequest"] = _ADDAPPOINTMENTREQUEST
 DESCRIPTOR.message_types_by_name["AddAppointmentResponse"] = _ADDAPPOINTMENTRESPONSE
 DESCRIPTOR.message_types_by_name["GetAppointmentRequest"] = _GETAPPOINTMENTREQUEST
 DESCRIPTOR.message_types_by_name["GetAppointmentResponse"] = _GETAPPOINTMENTRESPONSE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
-
-Locator = _reflection.GeneratedProtocolMessageType(
-    "Locator",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _LOCATOR,
-        "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.Locator)
-    },
-)
-_sym_db.RegisterMessage(Locator)
-
-Signature = _reflection.GeneratedProtocolMessageType(
-    "Signature",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SIGNATURE,
-        "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.Signature)
-    },
-)
-_sym_db.RegisterMessage(Signature)
 
 Appointment = _reflection.GeneratedProtocolMessageType(
     "Appointment",
@@ -548,6 +578,28 @@ Appointment = _reflection.GeneratedProtocolMessageType(
     },
 )
 _sym_db.RegisterMessage(Appointment)
+
+Tracker = _reflection.GeneratedProtocolMessageType(
+    "Tracker",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _TRACKER,
+        "__module__": "appointment_pb2"
+        # @@protoc_insertion_point(class_scope:teos.Tracker)
+    },
+)
+_sym_db.RegisterMessage(Tracker)
+
+AppointmentData = _reflection.GeneratedProtocolMessageType(
+    "AppointmentData",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _APPOINTMENTDATA,
+        "__module__": "appointment_pb2"
+        # @@protoc_insertion_point(class_scope:teos.AppointmentData)
+    },
+)
+_sym_db.RegisterMessage(AppointmentData)
 
 AddAppointmentRequest = _reflection.GeneratedProtocolMessageType(
     "AddAppointmentRequest",

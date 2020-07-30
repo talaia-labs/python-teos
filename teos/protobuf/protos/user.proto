@@ -2,12 +2,11 @@ syntax = "proto3";
 
 package teos;
 
-message User {
+message RegisterRequest {
   string user_id = 1;
 }
-
-message Subscription {
-  User user = 1;
+message RegisterResponse {
+  string user_id = 1;
   uint32 available_slots = 2;
   uint32 subscription_expiry = 3;
   string signature = 4;
