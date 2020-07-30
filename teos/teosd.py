@@ -203,9 +203,9 @@ def main(config):
             threading.Thread(target=rpc.start, daemon=True).start()
 
             # start the API server
-            api = API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher)
+            api = API(config.get("API_BIND"), config.get("API_PORT"), inspector)
             threading.Thread(target=api.start).start()
-            serve(rw_lock, inspector, watcher)
+            serve(rw_lock, watcher)
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

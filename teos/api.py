@@ -1,14 +1,12 @@
 import grpc
+from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
 import common.errors as errors
 from teos.inspector import InspectionFailed
-from teos.protobuf import user_pb2, api_pb2_grpc
-from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
-from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
+from teos.protobuf import user_pb2, appointment_pb2, api_pb2_grpc
 
 from common.logger import get_logger
-from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
@@ -63,24 +61,21 @@ class API:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
-        rw_lock (:obj:`RWLockWrite <readwritelock.rwlock.RWLockWrite>`): lock that must be acquired before reading or
-            writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
-        watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
 
     Attributes:
         logger: the logger for this component.
         app: the Flask app of the API server.
     """
 
-    def __init__(self, host, port, rw_lock, inspector, watcher):
+    def __init__(self, host, port, inspector, internal_rpc_host="localhost", internal_rpc_port=50051):
         self.logger = get_logger(component=API.__name__)
         self.host = host
         self.port = port
-        self.rw_lock = rw_lock
         self.inspector = inspector
-        self.watcher = watcher
+        self.internal_rpc_host = internal_rpc_host
+        self.internal_rpc_port = internal_rpc_port
 
         # ToDo: #5-add-async-to-api
         self.app = Flask(__name__)
@@ -126,17 +121,20 @@ class API:
         user_id = request_data.get("public_key")
 
         if user_id:
-            with grpc.insecure_channel("localhost:50051") as channel:
-                stub = api_pb2_grpc.APIStub(channel)
-                r = stub.register(user_pb2.User(user_id=user_id))
+            try:
+                with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
+                    stub = api_pb2_grpc.APIStub(channel)
+                    r = stub.register(user_pb2.RegisterRequest(user_id=user_id))
 
-                rcode = HTTP_OK
-                response = {
-                    "public_key": user_id,
-                    "available_slots": r.available_slots,
-                    "subscription_expiry": r.subscription_expiry,
-                    "subscription_signature": r.signature,
-                }
+                    rcode = HTTP_OK
+                    response = json_format.MessageToDict(
+                        r, including_default_value_fields=True, preserving_proto_field_name=True
+                    )
+                    response["public_key"] = user_id
+
+            except grpc.RpcError as e:
+                rcode = HTTP_BAD_REQUEST
+                response = {"error": e.details(), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
@@ -174,33 +172,46 @@ class API:
         except InvalidParameter as e:
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
-        with self.rw_lock.gen_wlock():
-            try:
-                appointment = self.inspector.inspect(request_data.get("appointment"))
-                response = self.watcher.add_appointment(appointment, request_data.get("signature"))
+        try:
+            appointment = self.inspector.inspect(request_data.get("appointment"))
+            with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
+                stub = api_pb2_grpc.APIStub(channel)
+                r = stub.add_appointment(
+                    appointment_pb2.AddAppointmentRequest(
+                        appointment=appointment_pb2.Appointment(
+                            locator=appointment.locator,
+                            encrypted_blob=appointment.encrypted_blob,
+                            to_self_delay=appointment.to_self_delay,
+                        ),
+                        signature=request_data.get("signature"),
+                    )
+                )
+
                 rcode = HTTP_OK
+                response = json_format.MessageToDict(
+                    r, including_default_value_fields=True, preserving_proto_field_name=True
+                )
+        except InspectionFailed as e:
+            rcode = HTTP_BAD_REQUEST
+            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
 
-            except InspectionFailed as e:
-                rcode = HTTP_BAD_REQUEST
-                response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
-
-            except (AuthenticationFailure, NotEnoughSlots):
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.UNAUTHENTICATED:
                 rcode = HTTP_BAD_REQUEST
                 response = {
-                    "error": "appointment rejected. Invalid signature or user does not have enough slots available",
+                    "error": f"appointment rejected. {e.details()}",
                     "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
                 }
-
-            except AppointmentLimitReached:
-                rcode = HTTP_SERVICE_UNAVAILABLE
-                response = {"error": "appointment rejected"}
-
-            except AppointmentAlreadyTriggered:
+            elif e.code() == grpc.StatusCode.ALREADY_EXISTS:
                 rcode = HTTP_BAD_REQUEST
                 response = {
-                    "error": "appointment rejected. The provided appointment has already been triggered",
+                    "error": f"appointment rejected. {e.details()}",
                     "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
                 }
+            else:
+                # This covers grpc.StatusCode.RESOURCE_EXHAUSTED (and any other return).
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": "appointment rejected"}
 
         self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
@@ -238,24 +249,25 @@ class API:
         locator = request_data.get("locator")
 
         try:
-            with self.rw_lock.gen_rlock():
-                self.inspector.check_locator(locator)
-                self.logger.info(
-                    "Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator
+            self.inspector.check_locator(locator)
+            self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
+
+            with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
+                stub = api_pb2_grpc.APIStub(channel)
+                r = stub.get_appointment(
+                    appointment_pb2.GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )
-                appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
 
-            if status == "being_watched":
-                # Cast the ExtendedAppointment to Appointment to remove all the tower-specific data
-                appointment_data = Appointment.from_dict(appointment_data).to_dict()
-            else:
-                # Remove user_id field from appointment data since it is an internal field.
-                appointment_data.pop("user_id")
+                rcode = HTTP_OK
+                response = {
+                    "locator": locator,
+                    "status": r.status,
+                    "appointment": json_format.MessageToDict(
+                        r.appointment_data, including_default_value_fields=True, preserving_proto_field_name=True
+                    ),
+                }
 
-            rcode = HTTP_OK
-            response = {"locator": locator, "status": status, "appointment": appointment_data}
-
-        except (InspectionFailed, AuthenticationFailure, AppointmentNotFound):
+        except (InspectionFailed, grpc.RpcError):
             rcode = HTTP_NOT_FOUND
             response = {"locator": locator, "status": "not_found"}
 
