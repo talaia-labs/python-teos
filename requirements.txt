@@ -10,3 +10,4 @@ plyvel
 readerwriterlock
 structlog
 python-daemon
+gunicorn
