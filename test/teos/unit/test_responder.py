@@ -63,7 +63,7 @@ def test_tracker_init():
     )
 
 
-def test_tracker_to_dict():
+def test_tracker_to_dict(run_bitcoind):
     tracker = generate_dummy_tracker()
     tracker_dict = tracker.to_dict()
 
@@ -76,14 +76,14 @@ def test_tracker_to_dict():
     )
 
 
-def test_tracker_from_dict():
+def test_tracker_from_dict(run_bitcoind):
     tracker_dict = generate_dummy_tracker().to_dict()
     new_tracker = TransactionTracker.from_dict(tracker_dict)
 
     assert tracker_dict == new_tracker.to_dict()
 
 
-def test_tracker_from_dict_invalid_data():
+def test_tracker_from_dict_invalid_data(run_bitcoind):
     tracker_dict = generate_dummy_tracker().to_dict()
 
     for value in ["locator", "dispute_txid", "penalty_txid", "penalty_rawtx", "user_id"]:
@@ -94,7 +94,7 @@ def test_tracker_from_dict_invalid_data():
             TransactionTracker.from_dict(tracker_dict_copy)
 
 
-def test_tracker_get_summary():
+def test_tracker_get_summary(run_bitcoind):
     tracker = generate_dummy_tracker()
     assert tracker.get_summary() == {
         "locator": tracker.locator,
@@ -413,7 +413,7 @@ def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor
 
     commitment_txs = [create_commitment_tx() for _ in range(30)]
     generate_block_with_transactions(commitment_txs)
-    # A complete tracker is a tracker which penalty transaction has been irrevocably resolved (i.e. has reached 100
+    # A complete tracker is a tracker whose penalty transaction has been irrevocably resolved (i.e. has reached 100
     # confirmations)
     # We'll create 3 type of txs: irrevocably resolved, confirmed but not irrevocably resolved, and unconfirmed
     trackers_ir_resolved = {uuid4().hex: generate_dummy_tracker(commitment_tx) for commitment_tx in commitment_txs[:10]}
@@ -460,11 +460,11 @@ def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor
 
 
 def test_get_expired_trackers(responder):
-    # Expired trackers are those who's subscription has reached the expiry block and have not been confirmed.
+    # Expired trackers are those whose subscription has reached the expiry block and have not been confirmed.
     # Confirmed trackers that have reached their expiry will be kept until completed
     current_block = responder.block_processor.get_block_count()
 
-    # Lets first register a couple of users
+    # Let's first register a couple of users
     user1_id = get_random_value_hex(16)
     responder.gatekeeper.registered_users[user1_id] = UserInfo(
         available_slots=10, subscription_expiry=current_block + 15

@@ -18,7 +18,7 @@ from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appoint
 
 
 @pytest.fixture(scope="module")
-def watcher_appointments():
+def watcher_appointments(run_bitcoind):
     return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
@@ -164,6 +164,7 @@ def test_update_locator_map_empty(db_manager):
     assert locator_map_after == locator_map
 
 
+# TODO: depends on previous test
 def test_delete_locator_map(db_manager):
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
     assert len(locator_maps) != 0
@@ -208,7 +209,7 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
         assert appointment.to_dict() == db_watcher_appointments[uuid]
 
 
-def test_store_load_triggered_appointment(db_manager):
+def test_store_load_triggered_appointment(run_bitcoind, db_manager):
     db_watcher_appointments = db_manager.load_watcher_appointments()
     db_watcher_appointments_with_triggered = db_manager.load_watcher_appointments(include_triggered=True)
 
@@ -251,6 +252,7 @@ def test_store_load_responder_trackers(db_manager, responder_trackers):
     assert set(responder_trackers.values()) == set(values) and len(responder_trackers) == len(values)
 
 
+# TODO: depends on previous test
 def test_delete_watcher_appointment(db_manager, watcher_appointments):
     # Let's delete all we added
     db_watcher_appointments = db_manager.load_watcher_appointments(include_triggered=True)
@@ -289,6 +291,7 @@ def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
     assert not db_watcher_appointments
 
 
+# TODO: depends on previous test
 def test_delete_responder_tracker(db_manager, responder_trackers):
     # Same for the responder
     db_responder_trackers = db_manager.load_responder_trackers()

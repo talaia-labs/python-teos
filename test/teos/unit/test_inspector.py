@@ -33,7 +33,7 @@ MIN_TO_SELF_DELAY = config.get("MIN_TO_SELF_DELAY")
 inspector = Inspector(MIN_TO_SELF_DELAY)
 
 
-def test_check_locator():
+def test_check_locator(run_bitcoind):
     # Right appointment type, size and format
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     assert inspector.check_locator(locator) is None
@@ -92,7 +92,7 @@ def test_check_locator():
                 raise e
 
 
-def test_check_to_self_delay():
+def test_check_to_self_delay(run_bitcoind):
     # Right value, right format
     to_self_delays = [MIN_TO_SELF_DELAY, MIN_TO_SELF_DELAY + 1, MIN_TO_SELF_DELAY + 1000]
     for to_self_delay in to_self_delays:
@@ -131,7 +131,7 @@ def test_check_to_self_delay():
                 raise e
 
 
-def test_check_blob():
+def test_check_blob(run_bitcoind):
     # Right format and length
     encrypted_blob = get_random_value_hex(120)
     assert inspector.check_blob(encrypted_blob) is None
@@ -169,7 +169,7 @@ def test_check_blob():
                 raise e
 
 
-def test_inspect():
+def test_inspect(run_bitcoind):
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     to_self_delay = MIN_TO_SELF_DELAY
@@ -186,7 +186,7 @@ def test_inspect():
     )
 
 
-def test_inspect_wrong():
+def test_inspect_wrong(run_bitcoind):
     # Wrong types (taking out empty dict, since that's a different error)
     wrong_types = WRONG_TYPES.pop(WRONG_TYPES.index({}))
     for data in wrong_types:

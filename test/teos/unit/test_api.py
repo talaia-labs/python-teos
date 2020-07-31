@@ -62,7 +62,7 @@ def get_all_db_manager():
 
 
 @pytest.fixture(scope="module", autouse=True)
-def internal_api(db_manager, gatekeeper, carrier, block_processor):
+def internal_api(run_bitcoind, db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     watcher = Watcher(
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
@@ -474,6 +474,7 @@ def test_get_appointment_not_registered_user(client):
     test_get_random_appointment_registered_user(client, tmp_sk)
 
 
+# TODO: depends on previous test
 def test_get_appointment_in_watcher(internal_api, client, appointment):
     # Mock the appointment in the Watcher
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
@@ -499,6 +500,7 @@ def test_get_appointment_in_watcher(internal_api, client, appointment):
     assert appointment.to_dict() == r.json.get("appointment")
 
 
+# TODO: depends on previous test
 def test_get_appointment_in_responder(internal_api, client, appointment):
     # Mock the appointment in the Responder
     tracker_data = {

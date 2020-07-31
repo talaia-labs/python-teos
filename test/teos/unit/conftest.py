@@ -51,12 +51,12 @@ def user_db_manager():
 
 
 @pytest.fixture(scope="module")
-def carrier():
+def carrier(run_bitcoind):
     return Carrier(bitcoind_connect_params)
 
 
 @pytest.fixture(scope="module")
-def block_processor():
+def block_processor(run_bitcoind):
     return BlockProcessor(bitcoind_connect_params)
 
 

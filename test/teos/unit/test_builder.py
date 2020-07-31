@@ -15,7 +15,7 @@ from test.teos.unit.conftest import (
 )
 
 
-def test_build_appointments():
+def test_build_appointments(run_bitcoind):
     appointments_data = {}
 
     # Create some appointment data
@@ -45,7 +45,7 @@ def test_build_appointments():
         assert uuid in locator_uuid_map[appointment.get("locator")]
 
 
-def test_build_trackers():
+def test_build_trackers(run_bitcoind):
     trackers_data = {}
 
     # Create some trackers data

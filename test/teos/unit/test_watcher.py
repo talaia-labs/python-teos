@@ -63,7 +63,7 @@ def temp_db_manager():
 
 
 @pytest.fixture(scope="module")
-def watcher(db_manager, gatekeeper):
+def watcher(run_bitcoind, db_manager, gatekeeper):
     block_processor = BlockProcessor(bitcoind_connect_params)
     carrier = Carrier(bitcoind_connect_params)
 
@@ -574,6 +574,7 @@ def test_do_watch(watcher, temp_db_manager):
     # FIXME: We should also add cases where the transactions are invalid. bitcoind_mock needs to be extended for this.
 
 
+# TODO: depends on previous test
 def test_do_watch_cache_update(watcher):
     # Test that data is properly added/remove to/from the cache
 
