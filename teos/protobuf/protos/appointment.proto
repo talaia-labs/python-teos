@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package teos;
 
+import "google/protobuf/struct.proto";
+
 message Appointment {
   string locator = 1;
   string encrypted_blob = 2;
@@ -42,6 +44,10 @@ message GetAppointmentRequest {
 message GetAppointmentResponse {
   AppointmentData appointment_data = 1;
   string status = 2;
+}
+
+message GetAllAppointmentsResponse {
+  google.protobuf.Struct appointments = 1;
 }
 
 

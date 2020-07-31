@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package teos;
+
+import "appointment.proto";
+import "google/protobuf/empty.proto";
+
+service RPC_SERVER {
+  rpc get_all_appointments(google.protobuf.Empty) returns (GetAllAppointmentsResponse) {}
+}

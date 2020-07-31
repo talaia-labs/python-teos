@@ -18,7 +18,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\nuser.proto\x12\x04teos""\n\x0fRegisterRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"l\n\x10RegisterResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x11\n\tsignature\x18\x04 \x01(\tb\x06proto3',
+    serialized_pb=b'\n\nuser.proto\x12\x04teos""\n\x0fRegisterRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"y\n\x10RegisterResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x1e\n\x16subscription_signature\x18\x04 \x01(\tb\x06proto3',
 )
 
 
@@ -129,8 +129,8 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
             create_key=_descriptor._internal_create_key,
         ),
         _descriptor.FieldDescriptor(
-            name="signature",
-            full_name="teos.RegisterResponse.signature",
+            name="subscription_signature",
+            full_name="teos.RegisterResponse.subscription_signature",
             index=3,
             number=4,
             type=9,
@@ -157,7 +157,7 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
     extension_ranges=[],
     oneofs=[],
     serialized_start=56,
-    serialized_end=164,
+    serialized_end=177,
 )
 
 DESCRIPTOR.message_types_by_name["RegisterRequest"] = _REGISTERREQUEST
