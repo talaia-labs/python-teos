@@ -3,11 +3,15 @@ from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
 import common.errors as errors
-from teos.inspector import InspectionFailed
-from teos.protobuf import user_pb2, appointment_pb2, api_pb2_grpc
+from teos.protobuf.api_pb2_grpc import APIStub
+from teos.block_processor import BlockProcessor
+from teos.protobuf.user_pb2 import RegisterRequest
+from teos.inspector import Inspector, InspectionFailed
+from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
-from common.logger import get_logger
+
 from common.exceptions import InvalidParameter
+from common.logger import setup_logging, get_logger
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
@@ -69,16 +73,13 @@ class API:
         app: the Flask app of the API server.
     """
 
-    def __init__(self, host, port, inspector, internal_rpc_host="localhost", internal_rpc_port=50051):
+    def __init__(self, inspector, internal_rpc_host="localhost", internal_rpc_port=50051):
+
         self.logger = get_logger(component=API.__name__)
-        self.host = host
-        self.port = port
+        self.app = Flask(__name__)
         self.inspector = inspector
         self.internal_rpc_host = internal_rpc_host
         self.internal_rpc_port = internal_rpc_port
-
-        # ToDo: #5-add-async-to-api
-        self.app = Flask(__name__)
 
         # Adds all the routes to the functions listed above.
         routes = {
@@ -123,8 +124,8 @@ class API:
         if user_id:
             try:
                 with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                    stub = api_pb2_grpc.APIStub(channel)
-                    r = stub.register(user_pb2.RegisterRequest(user_id=user_id))
+                    stub = APIStub(channel)
+                    r = stub.register(RegisterRequest(user_id=user_id))
 
                     rcode = HTTP_OK
                     response = json_format.MessageToDict(
@@ -175,10 +176,10 @@ class API:
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
             with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                stub = api_pb2_grpc.APIStub(channel)
+                stub = APIStub(channel)
                 r = stub.add_appointment(
-                    appointment_pb2.AddAppointmentRequest(
-                        appointment=appointment_pb2.Appointment(
+                    AddAppointmentRequest(
+                        appointment=Appointment(
                             locator=appointment.locator,
                             encrypted_blob=appointment.encrypted_blob,
                             to_self_delay=appointment.to_self_delay,
@@ -253,9 +254,9 @@ class API:
             self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
             with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                stub = api_pb2_grpc.APIStub(channel)
+                stub = APIStub(channel)
                 r = stub.get_appointment(
-                    appointment_pb2.GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
+                    GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )
 
                 rcode = HTTP_OK
@@ -273,8 +274,19 @@ class API:
 
         return jsonify(response), rcode
 
-    def start(self):
-        """ This function starts the Flask server used to run the API """
 
-        # ToDo: #185-serve-teosd-production
-        self.app.run(host=self.host, port=self.port)
+def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_self_delay, log_file):
+    setup_logging(log_file)
+    inspector = Inspector(
+        BlockProcessor(
+            {
+                "btc_rpc_user": btc_rpc_user,
+                "btc_rpc_password": btc_rpc_password,
+                "btc_rpc_connect": btc_rpc_connect,
+                "btc_rpc_port": btc_rpc_port,
+            }
+        ),
+        min_to_self_delay,
+    )
+    api = API(inspector)
+    return api.app
