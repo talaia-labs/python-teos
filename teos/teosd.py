@@ -1,25 +1,22 @@
 import os
+import daemon
+import subprocess
 from sys import argv, exit
+from readerwriterlock import rwlock
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
-import threading
-import daemon
-from readerwriterlock import rwlock
 
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
-from teos.grpc_server import serve
-from teos.api import API
-from teos.rpc import RPC
+import teos.grpc_server as RPC
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
 from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
-from teos.inspector import Inspector
 from teos.responder import Responder
 from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
@@ -195,17 +192,21 @@ def main(config):
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
 
-            # start the RPC server
-            logger.info(f'Starting RPC Server on {config.get("RPC_BIND")}:{config.get("RPC_PORT")}')
-            rpc = RPC(config.get("RPC_BIND"), config.get("RPC_PORT"), rw_lock, inspector, watcher)
-            threading.Thread(target=rpc.start, daemon=True).start()
-
-            # start the API server
-            api = API(config.get("API_BIND"), config.get("API_PORT"), inspector)
-            threading.Thread(target=api.start).start()
-            serve(rw_lock, watcher)
+            # FIXME: We may like to add workers depending on a config value
+            # start the API server using gunicorn
+            subprocess.Popen(
+                [
+                    "gunicorn",
+                    "--log-level=error",
+                    f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
+                    f"teos.api:serve(btc_rpc_user='{config.get('BTC_RPC_USER')}', "
+                    f"btc_rpc_password='{config.get('BTC_RPC_PASSWORD')}', "
+                    f"btc_rpc_connect='{config.get('BTC_RPC_CONNECT')}', btc_rpc_port='{config.get('BTC_RPC_PORT')}'"
+                    f", min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
+                ]
+            )
+            RPC.serve(rw_lock, watcher)
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
