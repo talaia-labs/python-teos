@@ -15,9 +15,12 @@ class RPC(RPC_APIServicer):
 
 def serve(rpc_bind, rpc_port):
     logger = get_logger(component=RPC.__name__)
-    logger.info("Initialized")
+    endpoint = f"{rpc_bind}:{rpc_port}"
+
     rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     add_RPC_APIServicer_to_server(RPC(), rpc_server)
-    rpc_server.add_insecure_port(f"{rpc_bind}:{rpc_port}")
+    rpc_server.add_insecure_port(endpoint)
     rpc_server.start()
+
+    logger.info(f"Initialized. Serving at {endpoint}")
     rpc_server.wait_for_termination()

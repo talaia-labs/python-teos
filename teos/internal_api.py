@@ -28,7 +28,6 @@ class InternalAPI:
         self.watcher = watcher
         # lock to be acquired before interacting with the watchtower's state
         self.rw_lock = rwlock.RWLockWrite()
-        self.logger.info("Initialized")
 
 
 class InternalAPIHTTP(HTTP_APIServicer):
@@ -126,10 +125,15 @@ class InternalAPIRPC(RPC_APIServicer):
 
 
 def serve(watcher):
+    # FIXME: Do we want to make this configurable? It should only be accesible from localhost
+    endpoint = "localhost:50051"
+
     internal_api = InternalAPI(watcher)
     rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     add_HTTP_APIServicer_to_server(InternalAPIHTTP(internal_api), rpc_server)
     add_RPC_APIServicer_to_server(InternalAPIRPC(internal_api), rpc_server)
-    rpc_server.add_insecure_port("localhost:50051")
+    rpc_server.add_insecure_port(endpoint)
     rpc_server.start()
+
+    internal_api.logger.info(f"Initialized. Serving at {endpoint}")
     rpc_server.wait_for_termination()
