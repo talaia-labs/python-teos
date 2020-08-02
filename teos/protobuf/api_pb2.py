@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\tapi.proto\x12\x04teos\x1a\x11\x61ppointment.proto\x1a\nuser.proto2\xe2\x01\n\x03\x41PI\x12;\n\x08register\x12\x15.teos.RegisterRequest\x1a\x16.teos.RegisterResponse"\x00\x12N\n\x0f\x61\x64\x64_appointment\x12\x1b.teos.AddAppointmentRequest\x1a\x1c.teos.AddAppointmentResponse"\x00\x12N\n\x0fget_appointment\x12\x1b.teos.GetAppointmentRequest\x1a\x1c.teos.GetAppointmentResponse"\x00\x62\x06proto3',
+    serialized_pb=b'\n\tapi.proto\x12\x04teos\x1a\x11\x61ppointment.proto\x1a\nuser.proto2\xe7\x01\n\x08HTTP_API\x12;\n\x08register\x12\x15.teos.RegisterRequest\x1a\x16.teos.RegisterResponse"\x00\x12N\n\x0f\x61\x64\x64_appointment\x12\x1b.teos.AddAppointmentRequest\x1a\x1c.teos.AddAppointmentResponse"\x00\x12N\n\x0fget_appointment\x12\x1b.teos.GetAppointmentRequest\x1a\x1c.teos.GetAppointmentResponse"\x00\x62\x06proto3',
     dependencies=[appointment__pb2.DESCRIPTOR, user__pb2.DESCRIPTOR],
 )
 
@@ -30,19 +30,19 @@ DESCRIPTOR = _descriptor.FileDescriptor(
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
-_API = _descriptor.ServiceDescriptor(
-    name="API",
-    full_name="teos.API",
+_HTTP_API = _descriptor.ServiceDescriptor(
+    name="HTTP_API",
+    full_name="teos.HTTP_API",
     file=DESCRIPTOR,
     index=0,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
     serialized_start=51,
-    serialized_end=277,
+    serialized_end=282,
     methods=[
         _descriptor.MethodDescriptor(
             name="register",
-            full_name="teos.API.register",
+            full_name="teos.HTTP_API.register",
             index=0,
             containing_service=None,
             input_type=user__pb2._REGISTERREQUEST,
@@ -52,7 +52,7 @@ _API = _descriptor.ServiceDescriptor(
         ),
         _descriptor.MethodDescriptor(
             name="add_appointment",
-            full_name="teos.API.add_appointment",
+            full_name="teos.HTTP_API.add_appointment",
             index=1,
             containing_service=None,
             input_type=appointment__pb2._ADDAPPOINTMENTREQUEST,
@@ -62,7 +62,7 @@ _API = _descriptor.ServiceDescriptor(
         ),
         _descriptor.MethodDescriptor(
             name="get_appointment",
-            full_name="teos.API.get_appointment",
+            full_name="teos.HTTP_API.get_appointment",
             index=2,
             containing_service=None,
             input_type=appointment__pb2._GETAPPOINTMENTREQUEST,
@@ -72,8 +72,8 @@ _API = _descriptor.ServiceDescriptor(
         ),
     ],
 )
-_sym_db.RegisterServiceDescriptor(_API)
+_sym_db.RegisterServiceDescriptor(_HTTP_API)
 
-DESCRIPTOR.services_by_name["API"] = _API
+DESCRIPTOR.services_by_name["HTTP_API"] = _HTTP_API
 
 # @@protoc_insertion_point(module_scope)

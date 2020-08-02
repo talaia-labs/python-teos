@@ -6,7 +6,7 @@ import teos.protobuf.appointment_pb2 as appointment__pb2
 import teos.protobuf.user_pb2 as user__pb2
 
 
-class APIStub(object):
+class HTTP_APIStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -16,23 +16,23 @@ class APIStub(object):
             channel: A grpc.Channel.
         """
         self.register = channel.unary_unary(
-            "/teos.API/register",
+            "/teos.HTTP_API/register",
             request_serializer=user__pb2.RegisterRequest.SerializeToString,
             response_deserializer=user__pb2.RegisterResponse.FromString,
         )
         self.add_appointment = channel.unary_unary(
-            "/teos.API/add_appointment",
+            "/teos.HTTP_API/add_appointment",
             request_serializer=appointment__pb2.AddAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.AddAppointmentResponse.FromString,
         )
         self.get_appointment = channel.unary_unary(
-            "/teos.API/get_appointment",
+            "/teos.HTTP_API/get_appointment",
             request_serializer=appointment__pb2.GetAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.GetAppointmentResponse.FromString,
         )
 
 
-class APIServicer(object):
+class HTTP_APIServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def register(self, request, context):
@@ -54,7 +54,7 @@ class APIServicer(object):
         raise NotImplementedError("Method not implemented!")
 
 
-def add_APIServicer_to_server(servicer, server):
+def add_HTTP_APIServicer_to_server(servicer, server):
     rpc_method_handlers = {
         "register": grpc.unary_unary_rpc_method_handler(
             servicer.register,
@@ -72,12 +72,12 @@ def add_APIServicer_to_server(servicer, server):
             response_serializer=appointment__pb2.GetAppointmentResponse.SerializeToString,
         ),
     }
-    generic_handler = grpc.method_handlers_generic_handler("teos.API", rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler("teos.HTTP_API", rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
 # This class is part of an EXPERIMENTAL API.
-class API(object):
+class HTTP_API(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -95,7 +95,7 @@ class API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.API/register",
+            "/teos.HTTP_API/register",
             user__pb2.RegisterRequest.SerializeToString,
             user__pb2.RegisterResponse.FromString,
             options,
@@ -122,7 +122,7 @@ class API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.API/add_appointment",
+            "/teos.HTTP_API/add_appointment",
             appointment__pb2.AddAppointmentRequest.SerializeToString,
             appointment__pb2.AddAppointmentResponse.FromString,
             options,
@@ -149,7 +149,7 @@ class API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.API/get_appointment",
+            "/teos.HTTP_API/get_appointment",
             appointment__pb2.GetAppointmentRequest.SerializeToString,
             appointment__pb2.GetAppointmentResponse.FromString,
             options,

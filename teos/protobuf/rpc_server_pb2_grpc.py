@@ -6,7 +6,7 @@ import teos.protobuf.appointment_pb2 as appointment__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-class RPC_SERVERStub(object):
+class RPC_APIStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -16,13 +16,13 @@ class RPC_SERVERStub(object):
             channel: A grpc.Channel.
         """
         self.get_all_appointments = channel.unary_unary(
-            "/teos.RPC_SERVER/get_all_appointments",
+            "/teos.RPC_API/get_all_appointments",
             request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             response_deserializer=appointment__pb2.GetAllAppointmentsResponse.FromString,
         )
 
 
-class RPC_SERVERServicer(object):
+class RPC_APIServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def get_all_appointments(self, request, context):
@@ -32,7 +32,7 @@ class RPC_SERVERServicer(object):
         raise NotImplementedError("Method not implemented!")
 
 
-def add_RPC_SERVERServicer_to_server(servicer, server):
+def add_RPC_APIServicer_to_server(servicer, server):
     rpc_method_handlers = {
         "get_all_appointments": grpc.unary_unary_rpc_method_handler(
             servicer.get_all_appointments,
@@ -40,12 +40,12 @@ def add_RPC_SERVERServicer_to_server(servicer, server):
             response_serializer=appointment__pb2.GetAllAppointmentsResponse.SerializeToString,
         )
     }
-    generic_handler = grpc.method_handlers_generic_handler("teos.RPC_SERVER", rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler("teos.RPC_API", rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
 # This class is part of an EXPERIMENTAL API.
-class RPC_SERVER(object):
+class RPC_API(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -63,7 +63,7 @@ class RPC_SERVER(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.RPC_SERVER/get_all_appointments",
+            "/teos.RPC_API/get_all_appointments",
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             appointment__pb2.GetAllAppointmentsResponse.FromString,
             options,

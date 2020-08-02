@@ -5,7 +5,7 @@ package teos;
 import "appointment.proto";
 import "user.proto";
 
-service API {
+service HTTP_API {
   rpc register(RegisterRequest) returns (RegisterResponse) {}
   rpc add_appointment(AddAppointmentRequest) returns (AddAppointmentResponse) {}
   rpc get_appointment(GetAppointmentRequest) returns (GetAppointmentResponse) {}

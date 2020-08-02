@@ -1,5 +1,6 @@
 import grpc
 from concurrent import futures
+from readerwriterlock import rwlock
 from google.protobuf.struct_pb2 import Struct
 
 from common.logger import get_logger
@@ -15,23 +16,31 @@ from teos.protobuf.appointment_pb2 import (
     GetAllAppointmentsResponse,
 )
 from teos.protobuf.user_pb2 import RegisterResponse
-from teos.protobuf.api_pb2_grpc import APIServicer, add_APIServicer_to_server
-from teos.protobuf.rpc_server_pb2_grpc import RPC_SERVERServicer, add_RPC_SERVERServicer_to_server
+from teos.protobuf.api_pb2_grpc import HTTP_APIServicer, add_HTTP_APIServicer_to_server
+from teos.protobuf.rpc_server_pb2_grpc import RPC_APIServicer, add_RPC_APIServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
 
-class API(APIServicer):
-    def __init__(self, rw_lock, watcher):
-        self.logger = get_logger(component=API.__name__)
+class InternalAPI:
+    def __init__(self, watcher):
+        self.logger = get_logger(component=InternalAPI.__name__)
         self.watcher = watcher
-        self.rw_lock = rw_lock
+        # lock to be acquired before interacting with the watchtower's state
+        self.rw_lock = rwlock.RWLockWrite()
         self.logger.info("Initialized")
 
+
+class InternalAPIHTTP(HTTP_APIServicer):
+    def __init__(self, internal_api):
+        self.internal_api = internal_api
+
     def register(self, request, context):
-        with self.rw_lock.gen_wlock():
+        with self.internal_api.rw_lock.gen_wlock():
             try:
-                available_slots, subscription_expiry, subscription_signature = self.watcher.register(request.user_id)
+                available_slots, subscription_expiry, subscription_signature = self.internal_api.watcher.register(
+                    request.user_id
+                )
 
                 return RegisterResponse(
                     user_id=request.user_id,
@@ -46,12 +55,14 @@ class API(APIServicer):
                 return RegisterResponse()
 
     def add_appointment(self, request, context):
-        with self.rw_lock.gen_wlock():
+        with self.internal_api.rw_lock.gen_wlock():
             try:
                 appointment = Appointment(
                     request.appointment.locator, request.appointment.encrypted_blob, request.appointment.to_self_delay
                 )
-                return AddAppointmentResponse(**self.watcher.add_appointment(appointment, request.signature))
+                return AddAppointmentResponse(
+                    **self.internal_api.watcher.add_appointment(appointment, request.signature)
+                )
 
             except (AuthenticationFailure, NotEnoughSlots):
                 msg = "Invalid signature or user does not have enough slots available"
@@ -71,9 +82,9 @@ class API(APIServicer):
             return AddAppointmentResponse()
 
     def get_appointment(self, request, context):
-        with self.rw_lock.gen_wlock():
+        with self.internal_api.rw_lock.gen_rlock():
             try:
-                data, status = self.watcher.get_appointment(request.locator, request.signature)
+                data, status = self.internal_api.watcher.get_appointment(request.locator, request.signature)
                 if status == "being_watched":
                     data = AppointmentData(
                         appointment=AppointmentProto(
@@ -99,18 +110,14 @@ class API(APIServicer):
                 return GetAppointmentResponse()
 
 
-# FIXME: This should inherit from another grpc file
-class RPCServer(RPC_SERVERServicer):
-    def __init__(self, rw_lock, watcher):
-        self.logger = get_logger(component=RPCServer.__name__)
-        self.watcher = watcher
-        self.rw_lock = rw_lock
-        self.logger.info("Initialized")
+class InternalAPIRPC(RPC_APIServicer):
+    def __init__(self, internal_api):
+        self.internal_api = internal_api
 
     def get_all_appointments(self, request, context):
-        with self.rw_lock.gen_rlock():
-            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
-            responder_trackers = self.watcher.db_manager.load_responder_trackers()
+        with self.internal_api.rw_lock.gen_rlock():
+            watcher_appointments = self.internal_api.watcher.db_manager.load_watcher_appointments()
+            responder_trackers = self.internal_api.watcher.db_manager.load_responder_trackers()
 
         appointments = Struct()
         appointments.update({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
@@ -118,16 +125,11 @@ class RPCServer(RPC_SERVERServicer):
         return GetAllAppointmentsResponse(appointments=appointments)
 
 
-def serve(rwlock, watcher):
-    api_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    add_APIServicer_to_server(API(rwlock, watcher), api_server)
-    api_server.add_insecure_port("[::]:50051")
-    api_server.start()
-
+def serve(watcher):
+    internal_api = InternalAPI(watcher)
     rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    add_RPC_SERVERServicer_to_server(RPCServer(rwlock, watcher), rpc_server)
-    rpc_server.add_insecure_port("[::]:8814")
+    add_HTTP_APIServicer_to_server(InternalAPIHTTP(internal_api), rpc_server)
+    add_RPC_APIServicer_to_server(InternalAPIRPC(internal_api), rpc_server)
+    rpc_server.add_insecure_port("localhost:50051")
     rpc_server.start()
-
-    api_server.wait_for_termination()
     rpc_server.wait_for_termination()

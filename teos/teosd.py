@@ -2,7 +2,6 @@ import os
 import daemon
 import subprocess
 from sys import argv, exit
-from readerwriterlock import rwlock
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
@@ -11,7 +10,6 @@ from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
-import teos.grpc_server as RPC
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -19,6 +17,7 @@ from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
 from teos.responder import Responder
 from teos.gatekeeper import Gatekeeper
+import teos.internal_api as InternalAPI
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
@@ -186,15 +185,12 @@ def main(config):
                 elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
                     Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
 
-            # lock to be acquired before interacting with the watchtower's state
-            rw_lock = rwlock.RWLockWrite()
-
-            # Fire the API and the ChainMonitor
+            # Fire ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
 
+            # Start the API (using gunicorn) and the RPC server
             # FIXME: We may like to add workers depending on a config value
-            # start the API server using gunicorn
             subprocess.Popen(
                 [
                     "gunicorn",
@@ -206,7 +202,7 @@ def main(config):
                     f", min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
                 ]
             )
-            RPC.serve(rw_lock, watcher)
+            InternalAPI.serve(watcher)
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

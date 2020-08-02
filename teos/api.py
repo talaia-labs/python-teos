@@ -3,7 +3,7 @@ from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
 import common.errors as errors
-from teos.protobuf.api_pb2_grpc import APIStub
+from teos.protobuf.api_pb2_grpc import HTTP_APIStub
 from teos.block_processor import BlockProcessor
 from teos.protobuf.user_pb2 import RegisterRequest
 from teos.inspector import Inspector, InspectionFailed
@@ -124,7 +124,7 @@ class API:
         if user_id:
             try:
                 with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                    stub = APIStub(channel)
+                    stub = HTTP_APIStub(channel)
                     r = stub.register(RegisterRequest(user_id=user_id))
 
                     rcode = HTTP_OK
@@ -176,7 +176,7 @@ class API:
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
             with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                stub = APIStub(channel)
+                stub = HTTP_APIStub(channel)
                 r = stub.add_appointment(
                     AddAppointmentRequest(
                         appointment=Appointment(
@@ -254,7 +254,7 @@ class API:
             self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
             with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                stub = APIStub(channel)
+                stub = HTTP_APIStub(channel)
                 r = stub.get_appointment(
                     GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )
