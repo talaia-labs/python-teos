@@ -2,6 +2,7 @@ import os
 import daemon
 import subprocess
 from sys import argv, exit
+from multiprocessing import Process
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
@@ -10,6 +11,7 @@ from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
+import teos.rpc as rpc
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -202,6 +204,7 @@ def main(config):
                     f", min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
                 ]
             )
+            Process(target=rpc.serve, args=(config.get("RPC_BIND"), config.get("RPC_PORT")), daemon=True).start()
             InternalAPI.serve(watcher)
 
     except Exception as e:
