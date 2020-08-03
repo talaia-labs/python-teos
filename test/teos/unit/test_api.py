@@ -27,7 +27,7 @@ from common.constants import (
     ENCRYPTED_BLOB_MAX_SIZE_HEX,
 )
 
-TEOS_API = "http://{}:{}".format(config.get("API_HOST"), config.get("API_PORT"))
+TEOS_API = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
 register_endpoint = "{}/register".format(TEOS_API)
 add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
 get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
@@ -115,7 +115,7 @@ def add_appointment(client, appointment_data, user_id):
 
 
 def test_register(internal_api, client):
-    # Tests registering a user withing the tower
+    # Tests registering a user within the tower
     current_height = internal_api.watcher.block_processor.get_block_count()
     data = {"public_key": user_id}
     r = client.post(register_endpoint, json=data)
@@ -474,13 +474,19 @@ def test_get_appointment_not_registered_user(client):
     test_get_random_appointment_registered_user(client, tmp_sk)
 
 
-# TODO: depends on previous test
-def test_get_appointment_in_watcher(internal_api, client, appointment):
+# FIXME: 194 will do with dummy appointment
+def test_get_appointment_in_watcher(internal_api, client, appointment, monkeypatch):
     # Mock the appointment in the Watcher
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
     extended_appointment_summary = {"locator": appointment.locator, "user_id": user_id}
     internal_api.watcher.appointments[uuid] = extended_appointment_summary
     internal_api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+
+    def mock_authenticate_user(*args, **kwargs):
+        return user_id
+
+    # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
+    monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
 
     # Next we can request it
     message = "get appointment {}".format(appointment.locator)
@@ -500,21 +506,19 @@ def test_get_appointment_in_watcher(internal_api, client, appointment):
     assert appointment.to_dict() == r.json.get("appointment")
 
 
-# TODO: depends on previous test
-def test_get_appointment_in_responder(internal_api, client, appointment):
-    # Mock the appointment in the Responder
-    tracker_data = {
-        "locator": appointment.locator,
-        "dispute_txid": get_random_value_hex(32),
-        "penalty_txid": get_random_value_hex(32),
-        "penalty_rawtx": get_random_value_hex(250),
-        "user_id": get_random_value_hex(16),
-    }
-    tx_tracker = TransactionTracker.from_dict(tracker_data)
+# FIXME: 194 will do with dummy tracker
+def test_get_appointment_in_responder(internal_api, client, generate_dummy_tracker, monkeypatch):
+    tx_tracker = generate_dummy_tracker()
 
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
     internal_api.watcher.responder.trackers[uuid] = tx_tracker.get_summary()
     internal_api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_dict())
+
+    def mock_authenticate_user(*args, **kwargs):
+        return user_id
+
+    # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
+    monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
 
     # Request back the data
     message = "get appointment {}".format(appointment.locator)
