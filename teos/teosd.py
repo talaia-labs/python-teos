@@ -27,14 +27,17 @@ from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
 
 logger = get_logger(component="Daemon")
+parent_pid = os.getpid()
 
 
 def handle_signals(signal_received, frame):
-    logger.info("Closing connection with appointments db")
-    db_manager.db.close()
-    chain_monitor.terminate = True
+    if os.getpid() == parent_pid:
+        logger.info("Closing connection with appointments db")
+        db_manager.db.close()
+        chain_monitor.terminate = True
 
-    logger.info("Shutting down TEOS")
+        logger.info("Shutting down TEOS")
+
     exit(0)
 
 
