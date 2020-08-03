@@ -76,7 +76,7 @@ def main(config):
 
         logger.info("Starting TEOS")
 
-        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
+        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
         bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
         if not can_connect_to_bitcoind(bitcoind_connect_params):

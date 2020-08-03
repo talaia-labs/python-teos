@@ -281,13 +281,13 @@ def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_
     inspector = Inspector(
         BlockProcessor(
             {
-                "btc_rpc_user": btc_rpc_user,
-                "btc_rpc_password": btc_rpc_password,
-                "btc_rpc_connect": btc_rpc_connect,
-                "btc_rpc_port": btc_rpc_port,
+                "BTC_RPC_USER": btc_rpc_user,
+                "BTC_RPC_PASSWORD": btc_rpc_password,
+                "BTC_RPC_CONNECT": btc_rpc_connect,
+                "BTC_RPC_PORT": int(btc_rpc_port),
             }
         ),
-        min_to_self_delay,
+        int(min_to_self_delay),
     )
     api = API(inspector)
     return api.app
