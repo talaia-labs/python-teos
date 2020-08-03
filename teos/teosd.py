@@ -1,9 +1,10 @@
 import os
-import daemon
 from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
-
+import threading
+import daemon
+from readerwriterlock import rwlock
 
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
@@ -11,6 +12,7 @@ from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
 from teos.api import API
+from teos.rpc import RPC
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -186,11 +188,22 @@ def main(config):
                 elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
                     Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
 
+            # lock to be acquired before interacting with the watchtower's state
+            rw_lock = rwlock.RWLockWrite()
+
             # Fire the API and the ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
             inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
-            API(config.get("API_BIND"), config.get("API_PORT"), inspector, watcher).start()
+
+            # start the RPC server
+            logger.info(f'Starting RPC Server on {config.get("RPC_BIND")}:{config.get("RPC_PORT")}')
+            rpc = RPC(config.get("RPC_BIND"), config.get("RPC_PORT"), rw_lock, inspector, watcher)
+            threading.Thread(target=rpc.start, daemon=True).start()
+
+            # start the API server
+            API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher).start()
+
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         exit(1)
@@ -207,6 +220,8 @@ if __name__ == "__main__":
             [
                 "apibind=",
                 "apiport=",
+                "rpcbind=",
+                "rpcport=",
                 "btcnetwork=",
                 "btcrpcuser=",
                 "btcrpcpassword=",
@@ -228,6 +243,13 @@ if __name__ == "__main__":
                     command_line_conf["API_PORT"] = int(arg)
                 except ValueError:
                     exit("apiport must be an integer")
+            if opt in ["--rpcbind"]:
+                command_line_conf["RPC_BIND"] = arg
+            if opt in ["--rpcport"]:
+                try:
+                    command_line_conf["RPC_PORT"] = int(arg)
+                except ValueError:
+                    exit("rpcport must be an integer")
             if opt in ["--btcnetwork"]:
                 command_line_conf["BTC_NETWORK"] = arg
             if opt in ["--btcrpcuser"]:

@@ -2,6 +2,8 @@ import pytest
 from shutil import rmtree
 from binascii import hexlify
 
+from readerwriterlock import rwlock
+
 from teos.api import API
 import common.errors as errors
 from teos.watcher import Watcher
@@ -62,12 +64,13 @@ def get_all_db_manager():
 @pytest.fixture(scope="module", autouse=True)
 def api(db_manager, carrier, block_processor, gatekeeper):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+    rw_lock = rwlock.RWLockWrite()
     watcher = Watcher(
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
     inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
-    api = API(config.get("API_HOST"), config.get("API_PORT"), inspector, watcher)
+    api = API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher)
 
     return api
 
@@ -515,79 +518,3 @@ def test_get_appointment_in_responder(api, client, appointment):
     assert tx_tracker.dispute_txid == r.json.get("appointment").get("dispute_txid")
     assert tx_tracker.penalty_txid == r.json.get("appointment").get("penalty_txid")
     assert tx_tracker.penalty_rawtx == r.json.get("appointment").get("penalty_rawtx")
-
-
-def test_get_all_appointments_watcher(api, client, get_all_db_manager):
-    # Let's reset the dbs so we can test this clean
-    api.watcher.db_manager = get_all_db_manager
-    api.watcher.responder.db_manager = get_all_db_manager
-
-    # Check that they are wiped clean
-    r = client.get(get_all_appointment_endpoint)
-    assert r.status_code == HTTP_OK
-    assert len(r.json.get("watcher_appointments")) == 0 and len(r.json.get("responder_trackers")) == 0
-
-    # Add some appointments to the Watcher db
-    non_triggered_appointments = {}
-    for _ in range(10):
-        uuid = get_random_value_hex(16)
-        appointment, _ = generate_dummy_appointment()
-        appointment.locator = get_random_value_hex(16)
-        non_triggered_appointments[uuid] = appointment.to_dict()
-        api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-
-    triggered_appointments = {}
-    for _ in range(10):
-        uuid = get_random_value_hex(16)
-        appointment, _ = generate_dummy_appointment()
-        appointment.locator = get_random_value_hex(16)
-        triggered_appointments[uuid] = appointment.to_dict()
-        api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-        api.watcher.db_manager.create_triggered_appointment_flag(uuid)
-
-    # We should only get the non-triggered appointments
-    r = client.get(get_all_appointment_endpoint)
-    assert r.status_code == HTTP_OK
-
-    watcher_locators = [v["locator"] for k, v in r.json["watcher_appointments"].items()]
-    local_locators = [appointment["locator"] for uuid, appointment in non_triggered_appointments.items()]
-
-    assert set(watcher_locators) == set(local_locators)
-    assert len(r.json["responder_trackers"]) == 0
-
-
-def test_get_all_appointments_responder(api, client, get_all_db_manager):
-    # Let's reset the dbs so we can test this clean
-    api.watcher.db_manager = get_all_db_manager
-    api.watcher.responder.db_manager = get_all_db_manager
-
-    # Check that they are wiped clean
-    r = client.get(get_all_appointment_endpoint)
-    assert r.status_code == HTTP_OK
-    assert len(r.json.get("watcher_appointments")) == 0 and len(r.json.get("responder_trackers")) == 0
-
-    # Add some trackers to the Responder db
-    tx_trackers = {}
-    for _ in range(10):
-        uuid = get_random_value_hex(16)
-        tracker_data = {
-            "locator": get_random_value_hex(16),
-            "dispute_txid": get_random_value_hex(32),
-            "penalty_txid": get_random_value_hex(32),
-            "penalty_rawtx": get_random_value_hex(250),
-            "user_id": get_random_value_hex(16),
-        }
-        tracker = TransactionTracker.from_dict(tracker_data)
-        tx_trackers[uuid] = tracker.to_dict()
-        api.watcher.responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
-        api.watcher.db_manager.create_triggered_appointment_flag(uuid)
-
-    # Get all appointments
-    r = client.get(get_all_appointment_endpoint)
-
-    # Make sure there is not pending locator in the watcher
-    responder_trackers = [v["locator"] for k, v in r.json["responder_trackers"].items()]
-    local_locators = [tracker["locator"] for uuid, tracker in tx_trackers.items()]
-
-    assert set(responder_trackers) == set(local_locators)
-    assert len(r.json["watcher_appointments"]) == 0

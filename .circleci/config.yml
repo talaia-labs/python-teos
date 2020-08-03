@@ -8,8 +8,8 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-            keys:
-              - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}}
+          keys:
+            - v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
       - run:
           name: Install dependencies
@@ -20,7 +20,7 @@ jobs:
             sudo pip install --upgrade pip
             pip install -r requirements.txt
             pip install -r requirements-dev.txt
-            pip install -r cli/requirements.txt
+            pip install -r contrib/client/requirements.txt
 
       - run:
           name: Install bitcoind (0.20.0)
@@ -35,7 +35,7 @@ jobs:
           paths:
             - ./venv
             - bitcoin
-          key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "cli/requirements.txt" }}}
+          key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
       - run:
           name: Setup teos
@@ -44,10 +44,10 @@ jobs:
             cp test/teos/e2e/teos.conf ~/.teos/
 
       - run:
-          name: Run cli unit tests
+          name: Run contrib unit tests
           command: |
             . venv/bin/activate
-            pytest test/cli/unit
+            pytest contrib/**/test
 
       - run:
           name: Run common unit tests

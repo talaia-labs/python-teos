@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import time
@@ -11,10 +13,6 @@ from getopt import getopt, GetoptError
 from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from cli.exceptions import TowerResponseError
-from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
-
 from common import constants
 from common.logger import get_logger, setup_logging
 import common.receipts as receipts
@@ -22,10 +20,13 @@ from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
-from common.exceptions import InvalidKey, InvalidParameter, SignatureError
+from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
-logger = get_logger()
+from contrib.client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
+from contrib.client.help import show_usage, help_add_appointment, help_get_appointment, help_register
+
+logger = get_logger(component="Client")
 
 
 def register(user_id, teos_id, teos_url):
@@ -43,7 +44,7 @@ def register(user_id, teos_id, teos_url):
     Raises:
         :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `user_id` is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -128,7 +129,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
     Raises:
         :obj:`ValueError`: if the appointment cannot be signed.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -175,7 +176,7 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
         :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `appointment_data` or any of its fields is
         invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -331,7 +332,7 @@ def process_post_response(response):
         ``HTTP_OK``.
 
     Raises:
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 
@@ -451,14 +452,14 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        if os.path.exists(config.get("CLI_PRIVATE_KEY")):
+        if os.path.exists(config.get("USER_PRIVATE_KEY")):
             logger.debug("Client id found. Loading keys")
-            user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
+            user_sk, user_id = load_keys(config.get("USER_PRIVATE_KEY"))
 
         else:
             logger.info("Client id not found. Generating new keys")
             user_sk = Cryptographer.generate_key()
-            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", config.get("DATA_DIR"))
+            Cryptographer.save_key_file(user_sk.to_der(), "user_sk", config.get("DATA_DIR"))
             user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
         if command == "register":
@@ -518,9 +519,6 @@ def main(command, args, command_line_conf):
                 elif command == "get_appointment":
                     sys.exit(help_get_appointment())
 
-                elif command == "get_all_appointments":
-                    sys.exit(help_get_all_appointments())
-
                 else:
                     logger.error("Unknown command. Use help to check the list of available commands")
 
@@ -537,7 +535,7 @@ def main(command, args, command_line_conf):
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["register", "add_appointment", "get_appointment", "get_all_appointments", "help"]
+    commands = ["register", "add_appointment", "get_appointment", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["apiconnect=", "apiport=", "help"])

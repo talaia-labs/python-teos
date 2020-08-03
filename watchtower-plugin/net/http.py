@@ -8,9 +8,7 @@ from common import errors
 from common import constants
 import common.receipts as receipts
 from common.cryptographer import Cryptographer
-from common.exceptions import SignatureError, InvalidParameter
-
-from exceptions import TowerConnectionError, TowerResponseError
+from common.exceptions import SignatureError, InvalidParameter, TowerConnectionError, TowerResponseError
 
 
 def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
@@ -139,7 +137,7 @@ def process_post_response(response):
         ``HTTP_OK``.
 
     Raises:
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
+        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
         response was invalid.
     """
 

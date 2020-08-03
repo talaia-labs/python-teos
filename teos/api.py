@@ -1,5 +1,4 @@
-import os
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, jsonify
 
 import common.errors as errors
 from teos.inspector import InspectionFailed
@@ -10,10 +9,6 @@ from common.logger import get_logger
 from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
-
-
-# ToDo: #5-add-async-to-api
-app = Flask(__name__)
 
 
 # NOTCOVERED: not sure how to monkey path this one. May be related to #77
@@ -66,32 +61,37 @@ class API:
     Args:
         host (:obj:`str`): the hostname to listen on.
         port (:obj:`int`): the port of the webserver.
+        rw_lock (:obj:`RWLockWrite <readwritelock.rwlock.RWLockWrite>`): lock that must be acquired before reading or
+            writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
 
     Attributes:
         logger: the logger for this component.
+        app: the Flask app of the API server.
     """
 
-    def __init__(self, host, port, inspector, watcher):
+    def __init__(self, host, port, rw_lock, inspector, watcher):
         self.logger = get_logger(component=API.__name__)
         self.host = host
         self.port = port
+        self.rw_lock = rw_lock
         self.inspector = inspector
         self.watcher = watcher
-        self.app = app
+
+        # ToDo: #5-add-async-to-api
+        self.app = Flask(__name__)
 
         # Adds all the routes to the functions listed above.
         routes = {
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
-            "/get_all_appointments": (self.get_all_appointments, ["GET"]),
         }
 
         for url, params in routes.items():
-            app.add_url_rule(url, view_func=params[0], methods=params[1])
+            self.app.add_url_rule(url, view_func=params[0], methods=params[1])
 
     def register(self):
         """
@@ -124,19 +124,20 @@ class API:
         user_id = request_data.get("public_key")
 
         if user_id:
-            try:
-                rcode = HTTP_OK
-                available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
-                response = {
-                    "public_key": user_id,
-                    "available_slots": available_slots,
-                    "subscription_expiry": subscription_expiry,
-                    "subscription_signature": subscription_signature,
-                }
+            with self.rw_lock.gen_wlock():
+                try:
+                    rcode = HTTP_OK
+                    available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
+                    response = {
+                        "public_key": user_id,
+                        "available_slots": available_slots,
+                        "subscription_expiry": subscription_expiry,
+                        "subscription_signature": subscription_signature,
+                    }
 
-            except InvalidParameter as e:
-                rcode = HTTP_BAD_REQUEST
-                response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                except InvalidParameter as e:
+                    rcode = HTTP_BAD_REQUEST
+                    response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
@@ -174,32 +175,33 @@ class API:
         except InvalidParameter as e:
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
-        try:
-            appointment = self.inspector.inspect(request_data.get("appointment"))
-            response = self.watcher.add_appointment(appointment, request_data.get("signature"))
-            rcode = HTTP_OK
+        with self.rw_lock.gen_wlock():
+            try:
+                appointment = self.inspector.inspect(request_data.get("appointment"))
+                response = self.watcher.add_appointment(appointment, request_data.get("signature"))
+                rcode = HTTP_OK
 
-        except InspectionFailed as e:
-            rcode = HTTP_BAD_REQUEST
-            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
+            except InspectionFailed as e:
+                rcode = HTTP_BAD_REQUEST
+                response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
 
-        except (AuthenticationFailure, NotEnoughSlots):
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": "appointment rejected. Invalid signature or user does not have enough slots available",
-                "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-            }
+            except (AuthenticationFailure, NotEnoughSlots):
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": "appointment rejected. Invalid signature or user does not have enough slots available",
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                }
 
-        except AppointmentLimitReached:
-            rcode = HTTP_SERVICE_UNAVAILABLE
-            response = {"error": "appointment rejected"}
+            except AppointmentLimitReached:
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": "appointment rejected"}
 
-        except AppointmentAlreadyTriggered:
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": "appointment rejected. The provided appointment has already been triggered",
-                "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
-            }
+            except AppointmentAlreadyTriggered:
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": "appointment rejected. The provided appointment has already been triggered",
+                    "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
+                }
 
         self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
@@ -237,9 +239,12 @@ class API:
         locator = request_data.get("locator")
 
         try:
-            self.inspector.check_locator(locator)
-            self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
-            appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
+            with self.rw_lock.gen_rlock():
+                self.inspector.check_locator(locator)
+                self.logger.info(
+                    "Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator
+                )
+                appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
 
             if status == "being_watched":
                 # Cast the ExtendedAppointment to Appointment to remove all the tower-specific data
@@ -257,34 +262,8 @@ class API:
 
         return jsonify(response), rcode
 
-    def get_all_appointments(self):
-        """
-        Gives information about all the appointments in the Watchtower.
-
-          This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
-
-        Returns:
-            :obj:`str`: A json formatted dictionary containing all the appointments hold by the ``Watcher``
-            (``watcher_appointments``) and by the ``Responder>`` (``responder_trackers``).
-        """
-
-        # ToDo: #15-add-system-monitor
-        response = None
-
-        if request.remote_addr in request.host or request.remote_addr == "127.0.0.1":
-            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
-            responder_trackers = self.watcher.db_manager.load_responder_trackers()
-
-            response = jsonify({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
-
-        else:
-            abort(404)
-
-        return response
-
     def start(self):
         """ This function starts the Flask server used to run the API """
-        # Disable flask initial messages
-        os.environ["WERKZEUG_RUN_MAIN"] = "true"
 
-        app.run(host=self.host, port=self.port)
+        # ToDo: #185-serve-teosd-production
+        self.app.run(host=self.host, port=self.port)

@@ -1,18 +1,19 @@
-import json
+import requests
 import pytest
 from time import sleep
 from riemann.tx import Tx
 from binascii import hexlify
 from coincurve import PrivateKey
+from uuid import uuid4
 
-from cli import teos_cli
-from cli.exceptions import TowerResponseError
+from contrib.client import teos_client
+
 
 import common.receipts as receipts
+from common.exceptions import TowerResponseError
 from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
-
 
 from teos.utils.auth_proxy import JSONRPCException
 
@@ -31,6 +32,7 @@ teos_base_endpoint = "http://{}:{}".format(config.get("API_BIND"), config.get("A
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
+teos_rpc_endpoint = "http://{}:{}/rpc".format(config.get("RPC_BIND"), config.get("RPC_PORT"))
 
 
 user_sk = Cryptographer.generate_key()
@@ -46,16 +48,23 @@ teosd_process, teos_id = None, None
 
 def get_appointment_info(locator, sk=user_sk):
     sleep(1)  # Let's add a bit of delay so the state can be updated
-    return teos_cli.get_appointment(locator, sk, teos_id, teos_base_endpoint)
+    return teos_client.get_appointment(locator, sk, teos_id, teos_base_endpoint)
 
 
 def add_appointment(appointment_data, sk=user_sk):
-    return teos_cli.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
+    return teos_client.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
+
+
+def make_rpc_request(rpc_url, method, *args):
+    return requests.post(
+        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5
+    )
 
 
 def get_all_appointments():
-    r = teos_cli.get_all_appointments(teos_base_endpoint)
-    return json.loads(r)
+    response = make_rpc_request(teos_rpc_endpoint, "get_all_appointments")
+    jsonrpc_response = response.json()
+    return jsonrpc_response["result"]
 
 
 def test_commands_non_registered(teosd):
@@ -68,7 +77,7 @@ def test_commands_non_registered(teosd):
     appointment_data = build_appointment_data(commitment_tx_id, penalty_tx)
 
     with pytest.raises(TowerResponseError):
-        appointment = teos_cli.create_appointment(appointment_data)
+        appointment = teos_client.create_appointment(appointment_data)
         add_appointment(appointment)
 
     # Get appointment
@@ -80,13 +89,13 @@ def test_commands_registered():
     global appointments_in_watcher
 
     # Test registering and trying again
-    teos_cli.register(user_id, teos_id, teos_base_endpoint)
+    teos_client.register(user_id, teos_id, teos_base_endpoint)
 
     # Add appointment
     commitment_tx, commitment_txid, penalty_tx = create_txs()
     appointment_data = build_appointment_data(commitment_txid, penalty_tx)
 
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
 
     # Get appointment
@@ -100,13 +109,13 @@ def test_appointment_life_cycle():
     global appointments_in_watcher, appointments_in_responder
 
     # First of all we need to register
-    available_slots, subscription_expiry = teos_cli.register(user_id, teos_id, teos_base_endpoint)
+    available_slots, subscription_expiry = teos_client.register(user_id, teos_id, teos_base_endpoint)
 
     # After that we can build an appointment and send it to the tower
     commitment_tx, commitment_txid, penalty_tx = create_txs()
     appointment_data = build_appointment_data(commitment_txid, penalty_tx)
     locator = compute_locator(commitment_txid)
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
     appointments_in_watcher += 1
 
@@ -156,7 +165,7 @@ def test_appointment_life_cycle():
 
     # Check that the appointment is not in the Gatekeeper by checking the available slots (should have increase by 1)
     # We can do so by topping up the subscription (FIXME: find a better way to check this).
-    available_slots_response, _ = teos_cli.register(user_id, teos_id, teos_base_endpoint)
+    available_slots_response, _ = teos_client.register(user_id, teos_id, teos_base_endpoint)
     assert (
         available_slots_response
         == available_slots + config.get("SUBSCRIPTION_SLOTS") + 1 - appointments_in_watcher - appointments_in_responder
@@ -187,7 +196,7 @@ def test_multiple_appointments_life_cycle():
 
     # Send all of them to watchtower.
     for appt in appointments:
-        appointment = teos_cli.create_appointment(appt.get("appointment_data"))
+        appointment = teos_client.create_appointment(appt.get("appointment_data"))
         add_appointment(appointment)
         appointments_in_watcher += 1
 
@@ -228,7 +237,7 @@ def test_appointment_malformed_penalty():
     appointment_data = build_appointment_data(commitment_txid, mod_penalty_tx.hex())
     locator = compute_locator(commitment_txid)
 
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
 
     # Get the information from the tower to check that it matches
@@ -253,7 +262,7 @@ def test_appointment_wrong_decryption_key():
     # The appointment data is built using a random 32-byte value.
     appointment_data = build_appointment_data(get_random_value_hex(32), penalty_tx)
 
-    # We cannot use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
+    # We cannot use teos_client.add_appointment here since it computes the locator internally, so let's do it manually.
     # We will encrypt the blob using the random value and derive the locator from the commitment tx.
     appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(penalty_tx, get_random_value_hex(32))
@@ -263,8 +272,8 @@ def test_appointment_wrong_decryption_key():
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
     # Send appointment to the server.
-    response = teos_cli.post_request(data, teos_add_appointment_endpoint)
-    response_json = teos_cli.process_post_response(response)
+    response = teos_client.post_request(data, teos_add_appointment_endpoint)
+    response_json = teos_client.process_post_response(response)
 
     # Check that the server has accepted the appointment
     tower_signature = response_json.get("signature")
@@ -291,7 +300,7 @@ def test_two_identical_appointments():
     locator = compute_locator(commitment_txid)
 
     # Send the appointment twice
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
     add_appointment(appointment)
 
@@ -320,7 +329,7 @@ def test_two_identical_appointments():
 #     # tmp keys from a different user
 #     tmp_user_sk = PrivateKey()
 #     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
-#     teos_cli.register(tmp_user_id, teos_base_endpoint)
+#     teos_client.register(tmp_user_id, teos_base_endpoint)
 #
 #     # Send the appointment twice
 #     assert add_appointment(appointment_data) is True
@@ -367,11 +376,11 @@ def test_two_appointment_same_locator_different_penalty_different_users():
     # tmp keys for a different user
     tmp_user_sk = PrivateKey()
     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
-    teos_cli.register(tmp_user_id, teos_id, teos_base_endpoint)
+    teos_client.register(tmp_user_id, teos_id, teos_base_endpoint)
 
-    appointment_1 = teos_cli.create_appointment(appointment1_data)
+    appointment_1 = teos_client.create_appointment(appointment1_data)
     add_appointment(appointment_1)
-    appointment_2 = teos_cli.create_appointment(appointment2_data)
+    appointment_2 = teos_client.create_appointment(appointment2_data)
     add_appointment(appointment_2, sk=tmp_user_sk)
 
     # Broadcast the commitment transaction and mine a block
@@ -403,7 +412,7 @@ def test_add_appointment_trigger_on_cache():
     generate_block_with_transactions(commitment_tx)
 
     # Send the data to the tower and request it back. It should have gone straightaway to the Responder
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
     assert get_appointment_info(locator).get("status") == "dispute_responded"
 
@@ -421,7 +430,7 @@ def test_add_appointment_invalid_trigger_on_cache():
     sleep(1)
 
     # Send the data to the tower and request it back. It should get accepted but the data will be dropped.
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
     with pytest.raises(TowerResponseError):
         get_appointment_info(locator)
@@ -437,7 +446,7 @@ def test_add_appointment_trigger_on_cache_cannot_decrypt():
     # The appointment data is built using a random 32-byte value.
     appointment_data = build_appointment_data(get_random_value_hex(32), penalty_tx)
 
-    # We cannot use teos_cli.add_appointment here since it computes the locator internally, so let's do it manually.
+    # We cannot use teos_client.add_appointment here since it computes the locator internally, so let's do it manually.
     appointment_data["locator"] = compute_locator(bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"))
     appointment_data["encrypted_blob"] = Cryptographer.encrypt(penalty_tx, get_random_value_hex(32))
     appointment = Appointment.from_dict(appointment_data)
@@ -446,8 +455,8 @@ def test_add_appointment_trigger_on_cache_cannot_decrypt():
     data = {"appointment": appointment.to_dict(), "signature": signature}
 
     # Send appointment to the server.
-    response = teos_cli.post_request(data, teos_add_appointment_endpoint)
-    response_json = teos_cli.process_post_response(response)
+    response = teos_client.post_request(data, teos_add_appointment_endpoint)
+    response_json = teos_client.process_post_response(response)
 
     # Check that the server has accepted the appointment
     tower_signature = response_json.get("signature")
@@ -471,7 +480,7 @@ def test_appointment_shutdown_teos_trigger_back_online():
     appointment_data = build_appointment_data(commitment_txid, penalty_tx)
     locator = compute_locator(commitment_txid)
 
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
 
     # Restart teos
@@ -504,7 +513,7 @@ def test_appointment_shutdown_teos_trigger_while_offline():
     appointment_data = build_appointment_data(commitment_txid, penalty_tx)
     locator = compute_locator(commitment_txid)
 
-    appointment = teos_cli.create_appointment(appointment_data)
+    appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
 
     # Check that the appointment is still in the Watcher
@@ -525,3 +534,79 @@ def test_appointment_shutdown_teos_trigger_while_offline():
     assert appointment_info.get("status") == "dispute_responded"
 
     teosd_process.terminate()
+
+
+# def test_get_all_appointments_watcher(api, client, get_all_db_manager):
+#     # Let's reset the dbs so we can test this clean
+#     api.watcher.db_manager = get_all_db_manager
+#     api.watcher.responder.db_manager = get_all_db_manager
+
+#     # Check that they are wiped clean
+#     r = client.get(get_all_appointment_endpoint)
+#     assert r.status_code == HTTP_OK
+#     assert len(r.json.get("watcher_appointments")) == 0 and len(r.json.get("responder_trackers")) == 0
+
+#     # Add some appointments to the Watcher db
+#     non_triggered_appointments = {}
+#     for _ in range(10):
+#         uuid = get_random_value_hex(16)
+#         appointment, _ = generate_dummy_appointment()
+#         appointment.locator = get_random_value_hex(16)
+#         non_triggered_appointments[uuid] = appointment.to_dict()
+#         api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+
+#     triggered_appointments = {}
+#     for _ in range(10):
+#         uuid = get_random_value_hex(16)
+#         appointment, _ = generate_dummy_appointment()
+#         appointment.locator = get_random_value_hex(16)
+#         triggered_appointments[uuid] = appointment.to_dict()
+#         api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+#         api.watcher.db_manager.create_triggered_appointment_flag(uuid)
+
+#     # We should only get the non-triggered appointments
+#     r = client.get(get_all_appointment_endpoint)
+#     assert r.status_code == HTTP_OK
+
+#     watcher_locators = [v["locator"] for k, v in r.json["watcher_appointments"].items()]
+#     local_locators = [appointment["locator"] for uuid, appointment in non_triggered_appointments.items()]
+
+#     assert set(watcher_locators) == set(local_locators)
+#     assert len(r.json["responder_trackers"]) == 0
+
+
+# def test_get_all_appointments_responder(api, client, get_all_db_manager):
+#     # Let's reset the dbs so we can test this clean
+#     api.watcher.db_manager = get_all_db_manager
+#     api.watcher.responder.db_manager = get_all_db_manager
+
+#     # Check that they are wiped clean
+#     r = client.get(get_all_appointment_endpoint)
+#     assert r.status_code == HTTP_OK
+#     assert len(r.json.get("watcher_appointments")) == 0 and len(r.json.get("responder_trackers")) == 0
+
+#     # Add some trackers to the Responder db
+#     tx_trackers = {}
+#     for _ in range(10):
+#         uuid = get_random_value_hex(16)
+#         tracker_data = {
+#             "locator": get_random_value_hex(16),
+#             "dispute_txid": get_random_value_hex(32),
+#             "penalty_txid": get_random_value_hex(32),
+#             "penalty_rawtx": get_random_value_hex(250),
+#             "user_id": get_random_value_hex(16),
+#         }
+#         tracker = TransactionTracker.from_dict(tracker_data)
+#         tx_trackers[uuid] = tracker.to_dict()
+#         api.watcher.responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
+#         api.watcher.db_manager.create_triggered_appointment_flag(uuid)
+
+#     # Get all appointments
+#     r = client.get(get_all_appointment_endpoint)
+
+#     # Make sure there is not pending locator in the watcher
+#     responder_trackers = [v["locator"] for k, v in r.json["responder_trackers"].items()]
+#     local_locators = [tracker["locator"] for uuid, tracker in tx_trackers.items()]
+
+#     assert set(responder_trackers) == set(local_locators)
+#     assert len(r.json["watcher_appointments"]) == 0

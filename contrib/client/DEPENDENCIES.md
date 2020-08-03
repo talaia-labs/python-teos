@@ -1,10 +1,10 @@
 # Dependencies
 
-`teos_cli` has both system-wide and Python dependencies. This document walks you through how to satisfy them.
+`teos_client` has both system-wide and Python dependencies. This document walks you through how to satisfy them.
 
 ## System-wide dependencies
 
-`teos_cli` has the following system-wide dependencies:
+`teos_client` has the following system-wide dependencies:
 
 - `python3` version 3.6+
 - `pip3`
@@ -28,7 +28,7 @@ It is also likely that, if `python3` is installed in our system, the `python` al
 
 	python3 --version
 
-If `python3` is installed but the `python` alias is not set to it, we should either set it, or use `python3` to run `teos_cli`.
+If `python3` is installed but the `python` alias is not set to it, we should either set it, or use `python3` to run `teos_client`.
 
 Regarding `pip`, we can check what version is installed in our system (if any) by running:
 
@@ -75,7 +75,7 @@ and for `pip3`:
 
 ## Python dependencies
 
-`teos_cli` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
+`teos_client` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
 
 - `cryptography`
 - `requests`

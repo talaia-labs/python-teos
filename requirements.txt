@@ -1,6 +1,7 @@
 wheel
 zmq
 flask
+Flask-JSONRPC
 cryptography==2.8
 coincurve
 pyzbase32
