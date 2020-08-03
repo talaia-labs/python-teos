@@ -258,13 +258,14 @@ class API:
                 r = stub.get_appointment(
                     GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )
+                data = r.appointment_data.appointment if r.status == "being_watched" else r.appointment_data.tracker
 
                 rcode = HTTP_OK
                 response = {
                     "locator": locator,
                     "status": r.status,
                     "appointment": json_format.MessageToDict(
-                        r.appointment_data, including_default_value_fields=True, preserving_proto_field_name=True
+                        data, including_default_value_fields=True, preserving_proto_field_name=True
                     ),
                 }
 
