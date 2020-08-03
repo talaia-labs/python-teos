@@ -35,11 +35,10 @@ def get_all_appointments(rpc_host, rpc_port):
             stub = RPC_APIStub(channel)
             r = stub.get_all_appointments(Empty())
             response = json_format.MessageToDict(
-                r, including_default_value_fields=True, preserving_proto_field_name=True
+                r.appointments, including_default_value_fields=True, preserving_proto_field_name=True
             )
 
-        response_json = json.dumps(response, indent=4, sort_keys=True)
-        return response_json
+        return response
 
     # FIXME: Handle different errors
     except grpc.RpcError:
@@ -58,7 +57,7 @@ def main(command, args, command_line_conf):
         if command == "get_all_appointments":
             appointment_data = get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
             if appointment_data:
-                print(appointment_data)
+                print(json.dumps(appointment_data, indent=4, sort_keys=True))
 
         elif command == "help":
             if args:
