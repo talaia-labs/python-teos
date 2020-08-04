@@ -20,10 +20,11 @@ from teos.protobuf.rpc_api_pb2_grpc import RPC_APIStub
 
 def get_all_appointments(rpc_host, rpc_port):
     """
-    Gets information about all appointments stored in the tower, if the user requesting the data is an administrator.
+    Gets information about all appointments stored in the tower.
 
     Args:
-        rpc_url (:obj:`str`): the url ofr the teos RPC.
+        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
+        rpc_port (:obj:`int`): the port where the rpc server is running.
 
     Returns:
         :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower

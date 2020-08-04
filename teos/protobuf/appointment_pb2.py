@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\x11\x61ppointment.proto\x12\x14teos.protobuf.protos\x1a\x1cgoogle/protobuf/struct.proto"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t"y\n\x0f\x41ppointmentData\x12\x36\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32!.teos.protobuf.protos.Appointment\x12.\n\x07tracker\x18\x02 \x01(\x0b\x32\x1d.teos.protobuf.protos.Tracker"b\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x36\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32!.teos.protobuf.protos.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t"i\n\x16GetAppointmentResponse\x12?\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32%.teos.protobuf.protos.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3',
+    serialized_pb=b'\n\x11\x61ppointment.proto\x12\x14teos.protobuf.protos\x1a\x1cgoogle/protobuf/struct.proto"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t"\x91\x01\n\x0f\x41ppointmentData\x12\x38\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32!.teos.protobuf.protos.AppointmentH\x00\x12\x30\n\x07tracker\x18\x02 \x01(\x0b\x32\x1d.teos.protobuf.protos.TrackerH\x00\x42\x12\n\x10\x61ppointment_data"b\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x36\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32!.teos.protobuf.protos.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t"i\n\x16GetAppointmentResponse\x12?\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32%.teos.protobuf.protos.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3',
     dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR],
 )
 
@@ -257,9 +257,18 @@ _APPOINTMENTDATA = _descriptor.Descriptor(
     is_extendable=False,
     syntax="proto3",
     extension_ranges=[],
-    oneofs=[],
-    serialized_start=247,
-    serialized_end=368,
+    oneofs=[
+        _descriptor.OneofDescriptor(
+            name="appointment_data",
+            full_name="teos.protobuf.protos.AppointmentData.appointment_data",
+            index=0,
+            containing_type=None,
+            create_key=_descriptor._internal_create_key,
+            fields=[],
+        )
+    ],
+    serialized_start=248,
+    serialized_end=393,
 )
 
 
@@ -318,8 +327,8 @@ _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=370,
-    serialized_end=468,
+    serialized_start=395,
+    serialized_end=493,
 )
 
 
@@ -435,8 +444,8 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=471,
-    serialized_end=606,
+    serialized_start=496,
+    serialized_end=631,
 )
 
 
@@ -495,8 +504,8 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=608,
-    serialized_end=667,
+    serialized_start=633,
+    serialized_end=692,
 )
 
 
@@ -555,8 +564,8 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=669,
-    serialized_end=774,
+    serialized_start=694,
+    serialized_end=799,
 )
 
 
@@ -596,12 +605,16 @@ _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=776,
-    serialized_end=851,
+    serialized_start=801,
+    serialized_end=876,
 )
 
 _APPOINTMENTDATA.fields_by_name["appointment"].message_type = _APPOINTMENT
 _APPOINTMENTDATA.fields_by_name["tracker"].message_type = _TRACKER
+_APPOINTMENTDATA.oneofs_by_name["appointment_data"].fields.append(_APPOINTMENTDATA.fields_by_name["appointment"])
+_APPOINTMENTDATA.fields_by_name["appointment"].containing_oneof = _APPOINTMENTDATA.oneofs_by_name["appointment_data"]
+_APPOINTMENTDATA.oneofs_by_name["appointment_data"].fields.append(_APPOINTMENTDATA.fields_by_name["tracker"])
+_APPOINTMENTDATA.fields_by_name["tracker"].containing_oneof = _APPOINTMENTDATA.oneofs_by_name["appointment_data"]
 _ADDAPPOINTMENTREQUEST.fields_by_name["appointment"].message_type = _APPOINTMENT
 _GETAPPOINTMENTRESPONSE.fields_by_name["appointment_data"].message_type = _APPOINTMENTDATA
 _GETALLAPPOINTMENTSRESPONSE.fields_by_name["appointments"].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT

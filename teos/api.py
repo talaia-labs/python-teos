@@ -57,28 +57,65 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
+def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_self_delay, log_file):
+    """
+    Starts the API.
+
+    This method is handled by an external WSGI server, such as gunicorn.
+
+    Notice since this is run via terminal (or via subprocess.Popen) all arguments are strings.
+
+    Args:
+        btc_rpc_user (:obj:`str`): The rpc_user set for bitcoind.
+        btc_rpc_password (:obj:`str`): The rpc_password set for bitcoind.
+        btc_rpc_connect (:obj:`str`): The host where bitcoind is running.
+        btc_rpc_port (:obj:`str`): The port where bitcoind is running.
+        min_to_self_delay (:obj:`str`): The minimum to_self_delay accepted by the Inspector.
+        log_file (:obj:`str`): The file_path where to store logs.
+
+    Returns:
+        The application object needed by the WSGI server to run.
+    """
+
+    setup_logging(log_file)
+    inspector = Inspector(
+        BlockProcessor(
+            {
+                "BTC_RPC_USER": btc_rpc_user,
+                "BTC_RPC_PASSWORD": btc_rpc_password,
+                "BTC_RPC_CONNECT": btc_rpc_connect,
+                "BTC_RPC_PORT": int(btc_rpc_port),
+            }
+        ),
+        int(min_to_self_delay),
+    )
+    api = API(inspector)
+    return api.app
+
+
 class API:
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and serves user requests.
+    The API is connected with the :class:`InternalAPI` <teos.internal_api.InternalAPI> via gRPC.
 
     Args:
-        host (:obj:`str`): the hostname to listen on.
-        port (:obj:`int`): the port of the webserver.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
+        internal_api_host (:obj:`str`): the hostname of the internal api.
+        internal_api_port (:obj:`int`): the port where the internal api is running.
 
     Attributes:
         logger: the logger for this component.
         app: the Flask app of the API server.
     """
 
-    def __init__(self, inspector, internal_rpc_host="localhost", internal_rpc_port=50051):
+    def __init__(self, inspector, internal_api_host="localhost", internal_api_port=50051):
 
         self.logger = get_logger(component=API.__name__)
         self.app = Flask(__name__)
         self.inspector = inspector
-        self.internal_rpc_host = internal_rpc_host
-        self.internal_rpc_port = internal_rpc_port
+        self.internal_rpc_host = internal_api_host
+        self.internal_rpc_port = internal_api_port
 
         # Adds all the routes to the functions listed above.
         routes = {
@@ -277,20 +314,3 @@ class API:
             response = {"locator": locator, "status": "not_found"}
 
         return jsonify(response), rcode
-
-
-def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_self_delay, log_file):
-    setup_logging(log_file)
-    inspector = Inspector(
-        BlockProcessor(
-            {
-                "BTC_RPC_USER": btc_rpc_user,
-                "BTC_RPC_PASSWORD": btc_rpc_password,
-                "BTC_RPC_CONNECT": btc_rpc_connect,
-                "BTC_RPC_PORT": int(btc_rpc_port),
-            }
-        ),
-        int(min_to_self_delay),
-    )
-    api = API(inspector)
-    return api.app
