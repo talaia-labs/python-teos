@@ -26,20 +26,25 @@ class InternalAPI:
     def __init__(self, watcher):
         self.logger = get_logger(component=InternalAPI.__name__)
         self.watcher = watcher
-        # lock to be acquired before interacting with the watchtower's state
-        self.rw_lock = rwlock.RWLockWrite()
+        self.rw_lock = rwlock.RWLockWrite()  # lock to be acquired before interacting with the watchtower's state
+        self.endpoint = "localhost:50051"
+        self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        self.rpc_server.add_insecure_port(self.endpoint)
+
+        add_HTTP_APIServicer_to_server(InternalAPIHTTP(self.rw_lock, watcher, self.logger), self.rpc_server)
+        add_RPC_APIServicer_to_server(InternalAPIRPC(self.rw_lock, watcher, self.logger), self.rpc_server)
 
 
 class InternalAPIHTTP(HTTP_APIServicer):
-    def __init__(self, internal_api):
-        self.internal_api = internal_api
+    def __init__(self, rw_lock, watcher, logger):
+        self.rw_lock = rw_lock
+        self.watcher = watcher
+        self.logger = logger
 
     def register(self, request, context):
-        with self.internal_api.rw_lock.gen_wlock():
+        with self.rw_lock.gen_wlock():
             try:
-                available_slots, subscription_expiry, subscription_signature = self.internal_api.watcher.register(
-                    request.user_id
-                )
+                available_slots, subscription_expiry, subscription_signature = self.watcher.register(request.user_id)
 
                 return RegisterResponse(
                     user_id=request.user_id,
@@ -54,14 +59,12 @@ class InternalAPIHTTP(HTTP_APIServicer):
                 return RegisterResponse()
 
     def add_appointment(self, request, context):
-        with self.internal_api.rw_lock.gen_wlock():
+        with self.rw_lock.gen_wlock():
             try:
                 appointment = Appointment(
                     request.appointment.locator, request.appointment.encrypted_blob, request.appointment.to_self_delay
                 )
-                return AddAppointmentResponse(
-                    **self.internal_api.watcher.add_appointment(appointment, request.signature)
-                )
+                return AddAppointmentResponse(**self.watcher.add_appointment(appointment, request.signature))
 
             except (AuthenticationFailure, NotEnoughSlots):
                 msg = "Invalid signature or user does not have enough slots available"
@@ -81,9 +84,9 @@ class InternalAPIHTTP(HTTP_APIServicer):
             return AddAppointmentResponse()
 
     def get_appointment(self, request, context):
-        with self.internal_api.rw_lock.gen_rlock():
+        with self.rw_lock.gen_rlock():
             try:
-                data, status = self.internal_api.watcher.get_appointment(request.locator, request.signature)
+                data, status = self.watcher.get_appointment(request.locator, request.signature)
                 if status == "being_watched":
                     data = AppointmentData(
                         appointment=AppointmentProto(
@@ -110,30 +113,17 @@ class InternalAPIHTTP(HTTP_APIServicer):
 
 
 class InternalAPIRPC(RPC_APIServicer):
-    def __init__(self, internal_api):
-        self.internal_api = internal_api
+    def __init__(self, rw_lock, watcher, logger):
+        self.rw_lock = rw_lock
+        self.watcher = watcher
+        self.logger = logger
 
     def get_all_appointments(self, request, context):
-        with self.internal_api.rw_lock.gen_rlock():
-            watcher_appointments = self.internal_api.watcher.db_manager.load_watcher_appointments()
-            responder_trackers = self.internal_api.watcher.db_manager.load_responder_trackers()
+        with self.rw_lock.gen_rlock():
+            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
+            responder_trackers = self.watcher.db_manager.load_responder_trackers()
 
         appointments = Struct()
         appointments.update({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
 
         return GetAllAppointmentsResponse(appointments=appointments)
-
-
-def serve(watcher):
-    # FIXME: Do we want to make this configurable? It should only be accesible from localhost
-    endpoint = "localhost:50051"
-
-    internal_api = InternalAPI(watcher)
-    rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    add_HTTP_APIServicer_to_server(InternalAPIHTTP(internal_api), rpc_server)
-    add_RPC_APIServicer_to_server(InternalAPIRPC(internal_api), rpc_server)
-    rpc_server.add_insecure_port(endpoint)
-    rpc_server.start()
-
-    internal_api.logger.info(f"Initialized. Serving at {endpoint}")
-    rpc_server.wait_for_termination()
