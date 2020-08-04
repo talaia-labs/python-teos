@@ -16,8 +16,8 @@ from teos.protobuf.appointment_pb2 import (
     GetAllAppointmentsResponse,
 )
 from teos.protobuf.user_pb2 import RegisterResponse
-from teos.protobuf.api_pb2_grpc import HTTP_APIServicer, add_HTTP_APIServicer_to_server
-from teos.protobuf.rpc_server_pb2_grpc import RPC_APIServicer, add_RPC_APIServicer_to_server
+from teos.protobuf.http_api_pb2_grpc import HTTP_APIServicer, add_HTTP_APIServicer_to_server
+from teos.protobuf.rpc_api_pb2_grpc import RPC_APIServicer, add_RPC_APIServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 

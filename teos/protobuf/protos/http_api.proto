@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package teos;
+package teos.protobuf.protos;
 
 import "appointment.proto";
 import "user.proto";

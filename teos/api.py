@@ -3,12 +3,11 @@ from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
 import common.errors as errors
-from teos.protobuf.api_pb2_grpc import HTTP_APIStub
 from teos.block_processor import BlockProcessor
-from teos.protobuf.user_pb2 import RegisterRequest
 from teos.inspector import Inspector, InspectionFailed
+from teos.protobuf.user_pb2 import RegisterRequest
+from teos.protobuf.http_api_pb2_grpc import HTTP_APIStub
 from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
-
 
 from common.exceptions import InvalidParameter
 from common.logger import setup_logging, get_logger
@@ -258,7 +257,11 @@ class API:
                 r = stub.get_appointment(
                     GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )
-                data = r.appointment_data.appointment if r.status == "being_watched" else r.appointment_data.tracker
+                data = (
+                    r.appointment_data.appointment
+                    if r.appointment_data.WhichOneof("appointment_data") == "appointment"
+                    else r.appointment_data.tracker
+                )
 
                 rcode = HTTP_OK
                 response = {

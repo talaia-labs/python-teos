@@ -16,17 +16,17 @@ class HTTP_APIStub(object):
             channel: A grpc.Channel.
         """
         self.register = channel.unary_unary(
-            "/teos.HTTP_API/register",
+            "/teos.protobuf.protos.HTTP_API/register",
             request_serializer=user__pb2.RegisterRequest.SerializeToString,
             response_deserializer=user__pb2.RegisterResponse.FromString,
         )
         self.add_appointment = channel.unary_unary(
-            "/teos.HTTP_API/add_appointment",
+            "/teos.protobuf.protos.HTTP_API/add_appointment",
             request_serializer=appointment__pb2.AddAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.AddAppointmentResponse.FromString,
         )
         self.get_appointment = channel.unary_unary(
-            "/teos.HTTP_API/get_appointment",
+            "/teos.protobuf.protos.HTTP_API/get_appointment",
             request_serializer=appointment__pb2.GetAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.GetAppointmentResponse.FromString,
         )
@@ -72,7 +72,7 @@ def add_HTTP_APIServicer_to_server(servicer, server):
             response_serializer=appointment__pb2.GetAppointmentResponse.SerializeToString,
         ),
     }
-    generic_handler = grpc.method_handlers_generic_handler("teos.HTTP_API", rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.HTTP_API", rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -95,7 +95,7 @@ class HTTP_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.HTTP_API/register",
+            "/teos.protobuf.protos.HTTP_API/register",
             user__pb2.RegisterRequest.SerializeToString,
             user__pb2.RegisterResponse.FromString,
             options,
@@ -122,7 +122,7 @@ class HTTP_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.HTTP_API/add_appointment",
+            "/teos.protobuf.protos.HTTP_API/add_appointment",
             appointment__pb2.AddAppointmentRequest.SerializeToString,
             appointment__pb2.AddAppointmentResponse.FromString,
             options,
@@ -149,7 +149,7 @@ class HTTP_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.HTTP_API/get_appointment",
+            "/teos.protobuf.protos.HTTP_API/get_appointment",
             appointment__pb2.GetAppointmentRequest.SerializeToString,
             appointment__pb2.GetAppointmentResponse.FromString,
             options,

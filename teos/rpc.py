@@ -3,7 +3,7 @@ from concurrent import futures
 
 from common.logger import get_logger
 
-from teos.protobuf.rpc_server_pb2_grpc import RPC_APIStub, RPC_APIServicer, add_RPC_APIServicer_to_server
+from teos.protobuf.rpc_api_pb2_grpc import RPC_APIStub, RPC_APIServicer, add_RPC_APIServicer_to_server
 
 
 class RPC(RPC_APIServicer):
