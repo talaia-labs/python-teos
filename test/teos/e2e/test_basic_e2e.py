@@ -55,12 +55,6 @@ def add_appointment(appointment_data, sk=user_sk):
     return teos_client.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
 
 
-def make_rpc_request(rpc_url, method, *args):
-    return requests.post(
-        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5
-    )
-
-
 def test_commands_non_registered(teosd):
     # All commands should fail if the user is not registered
     global teosd_process, teos_id
