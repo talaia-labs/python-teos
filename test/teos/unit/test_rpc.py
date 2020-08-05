@@ -9,6 +9,7 @@ from teos.watcher import Watcher
 from teos.responder import Responder
 import teos.cli.teos_cli as teos_cli
 from teos.internal_api import InternalAPI
+from teos.teosd import INTERNAL_API_ENDPOINT
 
 from test.teos.conftest import config
 from test.teos.unit.conftest import generate_keypair, generate_dummy_appointment, generate_dummy_tracker
@@ -24,7 +25,9 @@ teos_id = hexlify(teos_pk.format(compressed=True)).decode("utf-8")
 
 @pytest.fixture(scope="module", autouse=True)
 def rpc_server():
-    Thread(target=rpc.serve, args=[config.get("RPC_BIND"), config.get("RPC_PORT")], daemon=True).start()
+    Thread(
+        target=rpc.serve, args=[config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT], daemon=True
+    ).start()
     time.sleep(1)
 
 
@@ -35,7 +38,7 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher)
+    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
     i_api.rpc_server.start()
 
     yield i_api

@@ -22,21 +22,20 @@ from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, A
 
 
 class InternalAPI:
-    def __init__(self, watcher):
+    def __init__(self, watcher, internal_api_endpoint):
         self.logger = get_logger(component=InternalAPI.__name__)
         self.watcher = watcher
-        self.rw_lock = rwlock.RWLockWrite()  # lock to be acquired before interacting with the watchtower's state
-        self.endpoint = "localhost:50051"
+        self.endpoint = internal_api_endpoint
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
-        add_TowerServicesServicer_to_server(_InternalAPI(self.rw_lock, watcher, self.logger), self.rpc_server)
+        add_TowerServicesServicer_to_server(_InternalAPI(watcher, self.logger), self.rpc_server)
 
 
 class _InternalAPI(TowerServicesServicer):
-    def __init__(self, rw_lock, watcher, logger):
-        self.rw_lock = rw_lock
-        self.watcher = watcher
+    def __init__(self, watcher, logger):
         self.logger = logger
+        self.rw_lock = rwlock.RWLockWrite()  # lock to be acquired before interacting with the watchtower's state
+        self.watcher = watcher
 
     def register(self, request, context):
         with self.rw_lock.gen_wlock():

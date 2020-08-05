@@ -9,6 +9,7 @@ from teos.inspector import Inspector
 from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
 from common.appointment import Appointment
+from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
@@ -67,7 +68,7 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher)
+    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
     i_api.rpc_server.start()
 
     yield i_api
@@ -78,7 +79,7 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
 @pytest.fixture(scope="module", autouse=True)
 def api():
     inspector = Inspector(config.get("MIN_TO_SELF_DELAY"))
-    api = API(inspector)
+    api = API(inspector, INTERNAL_API_ENDPOINT)
 
     return api
 

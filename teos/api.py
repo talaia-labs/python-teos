@@ -56,7 +56,7 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
-def serve(min_to_self_delay, log_file):
+def serve(internal_api_endpoint, min_to_self_delay, log_file):
     """
     Starts the API.
 
@@ -65,6 +65,7 @@ def serve(min_to_self_delay, log_file):
     Notice since this is run via terminal (or via subprocess.Popen) all arguments are strings.
 
     Args:
+        internal_api_endpoint (:obj:`str`): Endpoint where the internal api is running (host:port).
         min_to_self_delay (:obj:`str`): The minimum to_self_delay accepted by the Inspector.
         log_file (:obj:`str`): The file_path where to store logs.
 
@@ -74,7 +75,7 @@ def serve(min_to_self_delay, log_file):
 
     setup_logging(log_file)
     inspector = Inspector(int(min_to_self_delay))
-    api = API(inspector)
+    api = API(inspector, internal_api_endpoint)
     return api.app
 
 
@@ -94,13 +95,12 @@ class API:
         app: the Flask app of the API server.
     """
 
-    def __init__(self, inspector, internal_api_host="localhost", internal_api_port=50051):
+    def __init__(self, inspector, internal_api_endpoint):
 
         self.logger = get_logger(component=API.__name__)
         self.app = Flask(__name__)
         self.inspector = inspector
-        self.internal_rpc_host = internal_api_host
-        self.internal_rpc_port = internal_api_port
+        self.internal_api_endpoint = internal_api_endpoint
 
         # Adds all the routes to the functions listed above.
         routes = {
@@ -144,7 +144,7 @@ class API:
 
         if user_id:
             try:
-                with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
+                with grpc.insecure_channel(self.internal_api_endpoint) as channel:
                     stub = TowerServicesStub(channel)
                     r = stub.register(RegisterRequest(user_id=user_id))
 
@@ -196,7 +196,7 @@ class API:
 
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
-            with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
+            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
                 stub = TowerServicesStub(channel)
                 r = stub.add_appointment(
                     AddAppointmentRequest(
@@ -274,7 +274,7 @@ class API:
             self.inspector.check_locator(locator)
             self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
-            with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
+            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
                 stub = TowerServicesStub(channel)
                 r = stub.get_appointment(
                     GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))

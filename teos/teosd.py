@@ -29,6 +29,10 @@ from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_
 logger = get_logger(component="Daemon")
 parent_pid = os.getpid()
 
+INTERNAL_API_HOST = "localhost"
+INTERNAL_API_PORT = "50051"
+INTERNAL_API_ENDPOINT = f"{INTERNAL_API_HOST}:{INTERNAL_API_PORT}"
+
 
 def handle_signals(signal_received, frame):
     if os.getpid() == parent_pid:
@@ -195,7 +199,7 @@ def main(config):
             chain_monitor.monitor_chain()
 
             # Start the internal API
-            internal_api = InternalAPI(watcher)
+            internal_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
             internal_api.rpc_server.start()
             internal_api.logger.info(f"Initialized. Serving at {internal_api.endpoint}")
 
@@ -205,11 +209,15 @@ def main(config):
                 [
                     "gunicorn",
                     f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
-                    f"teos.api:serve(min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', "
-                    f"log_file='{config.get('LOG_FILE')}')",
+                    f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
+                    f"min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
                 ]
             )
-            Process(target=rpc.serve, args=(config.get("RPC_BIND"), config.get("RPC_PORT")), daemon=True).start()
+            Process(
+                target=rpc.serve,
+                args=(config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT),
+                daemon=True,
+            ).start()
 
             # Hang there until a stop command is received
             internal_api.rpc_server.wait_for_termination()
