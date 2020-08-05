@@ -76,8 +76,8 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def api(block_processor):
-    inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
+def api():
+    inspector = Inspector(config.get("MIN_TO_SELF_DELAY"))
     api = API(inspector)
 
     return api

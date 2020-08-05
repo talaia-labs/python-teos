@@ -1,13 +1,10 @@
-import requests
 import pytest
 from time import sleep
 from riemann.tx import Tx
 from binascii import hexlify
 from coincurve import PrivateKey
-from uuid import uuid4
 
 from contrib.client import teos_client
-
 
 import common.receipts as receipts
 from common.exceptions import TowerResponseError

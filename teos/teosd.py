@@ -206,10 +206,8 @@ def main(config):
                     "gunicorn",
                     "--log-level=error",
                     f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
-                    f"teos.api:serve(btc_rpc_user='{config.get('BTC_RPC_USER')}', "
-                    f"btc_rpc_password='{config.get('BTC_RPC_PASSWORD')}', "
-                    f"btc_rpc_connect='{config.get('BTC_RPC_CONNECT')}', btc_rpc_port='{config.get('BTC_RPC_PORT')}'"
-                    f", min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
+                    f"teos.api:serve(min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', "
+                    f"log_file='{config.get('LOG_FILE')}')",
                 ]
             )
             Process(target=rpc.serve, args=(config.get("RPC_BIND"), config.get("RPC_PORT")), daemon=True).start()

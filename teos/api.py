@@ -3,7 +3,6 @@ from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
 import common.errors as errors
-from teos.block_processor import BlockProcessor
 from teos.inspector import Inspector, InspectionFailed
 from teos.protobuf.user_pb2 import RegisterRequest
 from teos.protobuf.http_api_pb2_grpc import HTTP_APIStub
@@ -57,7 +56,7 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
-def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_self_delay, log_file):
+def serve(min_to_self_delay, log_file):
     """
     Starts the API.
 
@@ -66,10 +65,6 @@ def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_
     Notice since this is run via terminal (or via subprocess.Popen) all arguments are strings.
 
     Args:
-        btc_rpc_user (:obj:`str`): The rpc_user set for bitcoind.
-        btc_rpc_password (:obj:`str`): The rpc_password set for bitcoind.
-        btc_rpc_connect (:obj:`str`): The host where bitcoind is running.
-        btc_rpc_port (:obj:`str`): The port where bitcoind is running.
         min_to_self_delay (:obj:`str`): The minimum to_self_delay accepted by the Inspector.
         log_file (:obj:`str`): The file_path where to store logs.
 
@@ -78,17 +73,7 @@ def serve(btc_rpc_user, btc_rpc_password, btc_rpc_connect, btc_rpc_port, min_to_
     """
 
     setup_logging(log_file)
-    inspector = Inspector(
-        BlockProcessor(
-            {
-                "BTC_RPC_USER": btc_rpc_user,
-                "BTC_RPC_PASSWORD": btc_rpc_password,
-                "BTC_RPC_CONNECT": btc_rpc_connect,
-                "BTC_RPC_PORT": int(btc_rpc_port),
-            }
-        ),
-        int(min_to_self_delay),
-    )
+    inspector = Inspector(int(min_to_self_delay))
     api = API(inspector)
     return api.app
 
