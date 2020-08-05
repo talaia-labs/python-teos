@@ -17,7 +17,7 @@ message Appointment {
 }
 
 message Tracker {
-  // It's the equivalent of an appointment message from data hold by the Responder.
+  // It's the equivalent of an appointment message from data held by the Responder.
 
   string locator = 1;
   string dispute_txid = 2;
@@ -27,7 +27,7 @@ message Tracker {
 
 message AppointmentData{
   /*
-  Encapsulates the data for a GetAppointmentResponse, given it can an appointment (data is on the Watcher) or a
+  Encapsulates the data for a GetAppointmentResponse, given it can be an appointment (data is on the Watcher) or a
   tracker (data is on the Responder).
   */
 
@@ -79,7 +79,3 @@ message GetAllAppointmentsResponse {
 
   google.protobuf.Struct appointments = 1;
 }
-
-
-
-
