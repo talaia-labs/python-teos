@@ -87,8 +87,7 @@ class API:
     Args:
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
-        internal_api_host (:obj:`str`): the hostname of the internal api.
-        internal_api_port (:obj:`int`): the port where the internal api is running.
+        internal_api_endpoint (:obj:`str`): the endpoint where the internal api is served.
 
     Attributes:
         logger: the logger for this component.
