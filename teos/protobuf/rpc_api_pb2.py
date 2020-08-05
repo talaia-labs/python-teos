@@ -18,11 +18,11 @@ from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 DESCRIPTOR = _descriptor.FileDescriptor(
     name="rpc_api.proto",
-    package="teos.protobuf.protos",
+    package="teos.protobuf.protos.v1",
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\rrpc_api.proto\x12\x14teos.protobuf.protos\x1a\x11\x61ppointment.proto\x1a\x1bgoogle/protobuf/empty.proto2m\n\x07RPC_API\x12\x62\n\x14get_all_appointments\x12\x16.google.protobuf.Empty\x1a\x30.teos.protobuf.protos.GetAllAppointmentsResponse"\x00\x62\x06proto3',
+    serialized_pb=b'\n\rrpc_api.proto\x12\x17teos.protobuf.protos.v1\x1a\x11\x61ppointment.proto\x1a\x1bgoogle/protobuf/empty.proto2p\n\x07RPC_API\x12\x65\n\x14get_all_appointments\x12\x16.google.protobuf.Empty\x1a\x33.teos.protobuf.protos.v1.GetAllAppointmentsResponse"\x00\x62\x06proto3',
     dependencies=[appointment__pb2.DESCRIPTOR, google_dot_protobuf_dot_empty__pb2.DESCRIPTOR],
 )
 
@@ -32,17 +32,17 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _RPC_API = _descriptor.ServiceDescriptor(
     name="RPC_API",
-    full_name="teos.protobuf.protos.RPC_API",
+    full_name="teos.protobuf.protos.v1.RPC_API",
     file=DESCRIPTOR,
     index=0,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_start=87,
-    serialized_end=196,
+    serialized_start=90,
+    serialized_end=202,
     methods=[
         _descriptor.MethodDescriptor(
             name="get_all_appointments",
-            full_name="teos.protobuf.protos.RPC_API.get_all_appointments",
+            full_name="teos.protobuf.protos.v1.RPC_API.get_all_appointments",
             index=0,
             containing_service=None,
             input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,

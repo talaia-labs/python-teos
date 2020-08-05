@@ -18,11 +18,11 @@ import teos.protobuf.user_pb2 as user__pb2
 
 DESCRIPTOR = _descriptor.FileDescriptor(
     name="http_api.proto",
-    package="teos.protobuf.protos",
+    package="teos.protobuf.protos.v1",
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\x0ehttp_api.proto\x12\x14teos.protobuf.protos\x1a\x11\x61ppointment.proto\x1a\nuser.proto2\xc7\x02\n\x08HTTP_API\x12[\n\x08register\x12%.teos.protobuf.protos.RegisterRequest\x1a&.teos.protobuf.protos.RegisterResponse"\x00\x12n\n\x0f\x61\x64\x64_appointment\x12+.teos.protobuf.protos.AddAppointmentRequest\x1a,.teos.protobuf.protos.AddAppointmentResponse"\x00\x12n\n\x0fget_appointment\x12+.teos.protobuf.protos.GetAppointmentRequest\x1a,.teos.protobuf.protos.GetAppointmentResponse"\x00\x62\x06proto3',
+    serialized_pb=b'\n\x0ehttp_api.proto\x12\x17teos.protobuf.protos.v1\x1a\x11\x61ppointment.proto\x1a\nuser.proto2\xd9\x02\n\x08HTTP_API\x12\x61\n\x08register\x12(.teos.protobuf.protos.v1.RegisterRequest\x1a).teos.protobuf.protos.v1.RegisterResponse"\x00\x12t\n\x0f\x61\x64\x64_appointment\x12..teos.protobuf.protos.v1.AddAppointmentRequest\x1a/.teos.protobuf.protos.v1.AddAppointmentResponse"\x00\x12t\n\x0fget_appointment\x12..teos.protobuf.protos.v1.GetAppointmentRequest\x1a/.teos.protobuf.protos.v1.GetAppointmentResponse"\x00\x62\x06proto3',
     dependencies=[appointment__pb2.DESCRIPTOR, user__pb2.DESCRIPTOR],
 )
 
@@ -32,17 +32,17 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _HTTP_API = _descriptor.ServiceDescriptor(
     name="HTTP_API",
-    full_name="teos.protobuf.protos.HTTP_API",
+    full_name="teos.protobuf.protos.v1.HTTP_API",
     file=DESCRIPTOR,
     index=0,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_start=72,
-    serialized_end=399,
+    serialized_start=75,
+    serialized_end=420,
     methods=[
         _descriptor.MethodDescriptor(
             name="register",
-            full_name="teos.protobuf.protos.HTTP_API.register",
+            full_name="teos.protobuf.protos.v1.HTTP_API.register",
             index=0,
             containing_service=None,
             input_type=user__pb2._REGISTERREQUEST,
@@ -52,7 +52,7 @@ _HTTP_API = _descriptor.ServiceDescriptor(
         ),
         _descriptor.MethodDescriptor(
             name="add_appointment",
-            full_name="teos.protobuf.protos.HTTP_API.add_appointment",
+            full_name="teos.protobuf.protos.v1.HTTP_API.add_appointment",
             index=1,
             containing_service=None,
             input_type=appointment__pb2._ADDAPPOINTMENTREQUEST,
@@ -62,7 +62,7 @@ _HTTP_API = _descriptor.ServiceDescriptor(
         ),
         _descriptor.MethodDescriptor(
             name="get_appointment",
-            full_name="teos.protobuf.protos.HTTP_API.get_appointment",
+            full_name="teos.protobuf.protos.v1.HTTP_API.get_appointment",
             index=2,
             containing_service=None,
             input_type=appointment__pb2._GETAPPOINTMENTREQUEST,

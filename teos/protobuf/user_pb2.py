@@ -14,17 +14,17 @@ _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor.FileDescriptor(
     name="user.proto",
-    package="teos.protobuf.protos",
+    package="teos.protobuf.protos.v1",
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\nuser.proto\x12\x14teos.protobuf.protos""\n\x0fRegisterRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"y\n\x10RegisterResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x1e\n\x16subscription_signature\x18\x04 \x01(\tb\x06proto3',
+    serialized_pb=b'\n\nuser.proto\x12\x17teos.protobuf.protos.v1""\n\x0fRegisterRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"y\n\x10RegisterResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x1e\n\x16subscription_signature\x18\x04 \x01(\tb\x06proto3',
 )
 
 
 _REGISTERREQUEST = _descriptor.Descriptor(
     name="RegisterRequest",
-    full_name="teos.protobuf.protos.RegisterRequest",
+    full_name="teos.protobuf.protos.v1.RegisterRequest",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -32,7 +32,7 @@ _REGISTERREQUEST = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="user_id",
-            full_name="teos.protobuf.protos.RegisterRequest.user_id",
+            full_name="teos.protobuf.protos.v1.RegisterRequest.user_id",
             index=0,
             number=1,
             type=9,
@@ -58,14 +58,14 @@ _REGISTERREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=36,
-    serialized_end=70,
+    serialized_start=39,
+    serialized_end=73,
 )
 
 
 _REGISTERRESPONSE = _descriptor.Descriptor(
     name="RegisterResponse",
-    full_name="teos.protobuf.protos.RegisterResponse",
+    full_name="teos.protobuf.protos.v1.RegisterResponse",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -73,7 +73,7 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="user_id",
-            full_name="teos.protobuf.protos.RegisterResponse.user_id",
+            full_name="teos.protobuf.protos.v1.RegisterResponse.user_id",
             index=0,
             number=1,
             type=9,
@@ -92,7 +92,7 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="available_slots",
-            full_name="teos.protobuf.protos.RegisterResponse.available_slots",
+            full_name="teos.protobuf.protos.v1.RegisterResponse.available_slots",
             index=1,
             number=2,
             type=13,
@@ -111,7 +111,7 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="subscription_expiry",
-            full_name="teos.protobuf.protos.RegisterResponse.subscription_expiry",
+            full_name="teos.protobuf.protos.v1.RegisterResponse.subscription_expiry",
             index=2,
             number=3,
             type=13,
@@ -130,7 +130,7 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="subscription_signature",
-            full_name="teos.protobuf.protos.RegisterResponse.subscription_signature",
+            full_name="teos.protobuf.protos.v1.RegisterResponse.subscription_signature",
             index=3,
             number=4,
             type=9,
@@ -156,8 +156,8 @@ _REGISTERRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=72,
-    serialized_end=193,
+    serialized_start=75,
+    serialized_end=196,
 )
 
 DESCRIPTOR.message_types_by_name["RegisterRequest"] = _REGISTERREQUEST
@@ -170,7 +170,7 @@ RegisterRequest = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _REGISTERREQUEST,
         "__module__": "user_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.RegisterRequest)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.RegisterRequest)
     },
 )
 _sym_db.RegisterMessage(RegisterRequest)
@@ -181,7 +181,7 @@ RegisterResponse = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _REGISTERRESPONSE,
         "__module__": "user_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.RegisterResponse)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.RegisterResponse)
     },
 )
 _sym_db.RegisterMessage(RegisterResponse)

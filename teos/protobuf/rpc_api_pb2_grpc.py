@@ -16,7 +16,7 @@ class RPC_APIStub(object):
             channel: A grpc.Channel.
         """
         self.get_all_appointments = channel.unary_unary(
-            "/teos.protobuf.protos.RPC_API/get_all_appointments",
+            "/teos.protobuf.protos.v1.RPC_API/get_all_appointments",
             request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             response_deserializer=appointment__pb2.GetAllAppointmentsResponse.FromString,
         )
@@ -40,7 +40,7 @@ def add_RPC_APIServicer_to_server(servicer, server):
             response_serializer=appointment__pb2.GetAllAppointmentsResponse.SerializeToString,
         )
     }
-    generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.RPC_API", rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.v1.RPC_API", rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -63,7 +63,7 @@ class RPC_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.protobuf.protos.RPC_API/get_all_appointments",
+            "/teos.protobuf.protos.v1.RPC_API/get_all_appointments",
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             appointment__pb2.GetAllAppointmentsResponse.FromString,
             options,

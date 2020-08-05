@@ -17,18 +17,18 @@ from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 DESCRIPTOR = _descriptor.FileDescriptor(
     name="appointment.proto",
-    package="teos.protobuf.protos",
+    package="teos.protobuf.protos.v1",
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\x11\x61ppointment.proto\x12\x14teos.protobuf.protos\x1a\x1cgoogle/protobuf/struct.proto"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t"\x91\x01\n\x0f\x41ppointmentData\x12\x38\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32!.teos.protobuf.protos.AppointmentH\x00\x12\x30\n\x07tracker\x18\x02 \x01(\x0b\x32\x1d.teos.protobuf.protos.TrackerH\x00\x42\x12\n\x10\x61ppointment_data"b\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x36\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32!.teos.protobuf.protos.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t"i\n\x16GetAppointmentResponse\x12?\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32%.teos.protobuf.protos.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3',
+    serialized_pb=b'\n\x11\x61ppointment.proto\x12\x17teos.protobuf.protos.v1\x1a\x1cgoogle/protobuf/struct.proto"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t"\x97\x01\n\x0f\x41ppointmentData\x12;\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.AppointmentH\x00\x12\x33\n\x07tracker\x18\x02 \x01(\x0b\x32 .teos.protobuf.protos.v1.TrackerH\x00\x42\x12\n\x10\x61ppointment_data"e\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x39\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t"l\n\x16GetAppointmentResponse\x12\x42\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32(.teos.protobuf.protos.v1.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3',
     dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR],
 )
 
 
 _APPOINTMENT = _descriptor.Descriptor(
     name="Appointment",
-    full_name="teos.protobuf.protos.Appointment",
+    full_name="teos.protobuf.protos.v1.Appointment",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -36,7 +36,7 @@ _APPOINTMENT = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="locator",
-            full_name="teos.protobuf.protos.Appointment.locator",
+            full_name="teos.protobuf.protos.v1.Appointment.locator",
             index=0,
             number=1,
             type=9,
@@ -55,7 +55,7 @@ _APPOINTMENT = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="encrypted_blob",
-            full_name="teos.protobuf.protos.Appointment.encrypted_blob",
+            full_name="teos.protobuf.protos.v1.Appointment.encrypted_blob",
             index=1,
             number=2,
             type=9,
@@ -74,7 +74,7 @@ _APPOINTMENT = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="to_self_delay",
-            full_name="teos.protobuf.protos.Appointment.to_self_delay",
+            full_name="teos.protobuf.protos.v1.Appointment.to_self_delay",
             index=2,
             number=3,
             type=13,
@@ -100,14 +100,14 @@ _APPOINTMENT = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=73,
-    serialized_end=150,
+    serialized_start=76,
+    serialized_end=153,
 )
 
 
 _TRACKER = _descriptor.Descriptor(
     name="Tracker",
-    full_name="teos.protobuf.protos.Tracker",
+    full_name="teos.protobuf.protos.v1.Tracker",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -115,7 +115,7 @@ _TRACKER = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="locator",
-            full_name="teos.protobuf.protos.Tracker.locator",
+            full_name="teos.protobuf.protos.v1.Tracker.locator",
             index=0,
             number=1,
             type=9,
@@ -134,7 +134,7 @@ _TRACKER = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="dispute_txid",
-            full_name="teos.protobuf.protos.Tracker.dispute_txid",
+            full_name="teos.protobuf.protos.v1.Tracker.dispute_txid",
             index=1,
             number=2,
             type=9,
@@ -153,7 +153,7 @@ _TRACKER = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="penalty_txid",
-            full_name="teos.protobuf.protos.Tracker.penalty_txid",
+            full_name="teos.protobuf.protos.v1.Tracker.penalty_txid",
             index=2,
             number=3,
             type=9,
@@ -172,7 +172,7 @@ _TRACKER = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="penalty_rawtx",
-            full_name="teos.protobuf.protos.Tracker.penalty_rawtx",
+            full_name="teos.protobuf.protos.v1.Tracker.penalty_rawtx",
             index=3,
             number=4,
             type=9,
@@ -198,14 +198,14 @@ _TRACKER = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=152,
-    serialized_end=245,
+    serialized_start=155,
+    serialized_end=248,
 )
 
 
 _APPOINTMENTDATA = _descriptor.Descriptor(
     name="AppointmentData",
-    full_name="teos.protobuf.protos.AppointmentData",
+    full_name="teos.protobuf.protos.v1.AppointmentData",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -213,7 +213,7 @@ _APPOINTMENTDATA = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="appointment",
-            full_name="teos.protobuf.protos.AppointmentData.appointment",
+            full_name="teos.protobuf.protos.v1.AppointmentData.appointment",
             index=0,
             number=1,
             type=11,
@@ -232,7 +232,7 @@ _APPOINTMENTDATA = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="tracker",
-            full_name="teos.protobuf.protos.AppointmentData.tracker",
+            full_name="teos.protobuf.protos.v1.AppointmentData.tracker",
             index=1,
             number=2,
             type=11,
@@ -260,21 +260,21 @@ _APPOINTMENTDATA = _descriptor.Descriptor(
     oneofs=[
         _descriptor.OneofDescriptor(
             name="appointment_data",
-            full_name="teos.protobuf.protos.AppointmentData.appointment_data",
+            full_name="teos.protobuf.protos.v1.AppointmentData.appointment_data",
             index=0,
             containing_type=None,
             create_key=_descriptor._internal_create_key,
             fields=[],
         )
     ],
-    serialized_start=248,
-    serialized_end=393,
+    serialized_start=251,
+    serialized_end=402,
 )
 
 
 _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
     name="AddAppointmentRequest",
-    full_name="teos.protobuf.protos.AddAppointmentRequest",
+    full_name="teos.protobuf.protos.v1.AddAppointmentRequest",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -282,7 +282,7 @@ _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="appointment",
-            full_name="teos.protobuf.protos.AddAppointmentRequest.appointment",
+            full_name="teos.protobuf.protos.v1.AddAppointmentRequest.appointment",
             index=0,
             number=1,
             type=11,
@@ -301,7 +301,7 @@ _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="signature",
-            full_name="teos.protobuf.protos.AddAppointmentRequest.signature",
+            full_name="teos.protobuf.protos.v1.AddAppointmentRequest.signature",
             index=1,
             number=2,
             type=9,
@@ -327,14 +327,14 @@ _ADDAPPOINTMENTREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=395,
-    serialized_end=493,
+    serialized_start=404,
+    serialized_end=505,
 )
 
 
 _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     name="AddAppointmentResponse",
-    full_name="teos.protobuf.protos.AddAppointmentResponse",
+    full_name="teos.protobuf.protos.v1.AddAppointmentResponse",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -342,7 +342,7 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="locator",
-            full_name="teos.protobuf.protos.AddAppointmentResponse.locator",
+            full_name="teos.protobuf.protos.v1.AddAppointmentResponse.locator",
             index=0,
             number=1,
             type=9,
@@ -361,7 +361,7 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="start_block",
-            full_name="teos.protobuf.protos.AddAppointmentResponse.start_block",
+            full_name="teos.protobuf.protos.v1.AddAppointmentResponse.start_block",
             index=1,
             number=2,
             type=13,
@@ -380,7 +380,7 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="signature",
-            full_name="teos.protobuf.protos.AddAppointmentResponse.signature",
+            full_name="teos.protobuf.protos.v1.AddAppointmentResponse.signature",
             index=2,
             number=3,
             type=9,
@@ -399,7 +399,7 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="available_slots",
-            full_name="teos.protobuf.protos.AddAppointmentResponse.available_slots",
+            full_name="teos.protobuf.protos.v1.AddAppointmentResponse.available_slots",
             index=3,
             number=4,
             type=13,
@@ -418,7 +418,7 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="subscription_expiry",
-            full_name="teos.protobuf.protos.AddAppointmentResponse.subscription_expiry",
+            full_name="teos.protobuf.protos.v1.AddAppointmentResponse.subscription_expiry",
             index=4,
             number=5,
             type=13,
@@ -444,14 +444,14 @@ _ADDAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=496,
-    serialized_end=631,
+    serialized_start=508,
+    serialized_end=643,
 )
 
 
 _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
     name="GetAppointmentRequest",
-    full_name="teos.protobuf.protos.GetAppointmentRequest",
+    full_name="teos.protobuf.protos.v1.GetAppointmentRequest",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -459,7 +459,7 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="locator",
-            full_name="teos.protobuf.protos.GetAppointmentRequest.locator",
+            full_name="teos.protobuf.protos.v1.GetAppointmentRequest.locator",
             index=0,
             number=1,
             type=9,
@@ -478,7 +478,7 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="signature",
-            full_name="teos.protobuf.protos.GetAppointmentRequest.signature",
+            full_name="teos.protobuf.protos.v1.GetAppointmentRequest.signature",
             index=1,
             number=2,
             type=9,
@@ -504,14 +504,14 @@ _GETAPPOINTMENTREQUEST = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=633,
-    serialized_end=692,
+    serialized_start=645,
+    serialized_end=704,
 )
 
 
 _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     name="GetAppointmentResponse",
-    full_name="teos.protobuf.protos.GetAppointmentResponse",
+    full_name="teos.protobuf.protos.v1.GetAppointmentResponse",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -519,7 +519,7 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="appointment_data",
-            full_name="teos.protobuf.protos.GetAppointmentResponse.appointment_data",
+            full_name="teos.protobuf.protos.v1.GetAppointmentResponse.appointment_data",
             index=0,
             number=1,
             type=11,
@@ -538,7 +538,7 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
         ),
         _descriptor.FieldDescriptor(
             name="status",
-            full_name="teos.protobuf.protos.GetAppointmentResponse.status",
+            full_name="teos.protobuf.protos.v1.GetAppointmentResponse.status",
             index=1,
             number=2,
             type=9,
@@ -564,14 +564,14 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=694,
-    serialized_end=799,
+    serialized_start=706,
+    serialized_end=814,
 )
 
 
 _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
     name="GetAllAppointmentsResponse",
-    full_name="teos.protobuf.protos.GetAllAppointmentsResponse",
+    full_name="teos.protobuf.protos.v1.GetAllAppointmentsResponse",
     filename=None,
     file=DESCRIPTOR,
     containing_type=None,
@@ -579,7 +579,7 @@ _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
     fields=[
         _descriptor.FieldDescriptor(
             name="appointments",
-            full_name="teos.protobuf.protos.GetAllAppointmentsResponse.appointments",
+            full_name="teos.protobuf.protos.v1.GetAllAppointmentsResponse.appointments",
             index=0,
             number=1,
             type=11,
@@ -605,8 +605,8 @@ _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
     syntax="proto3",
     extension_ranges=[],
     oneofs=[],
-    serialized_start=801,
-    serialized_end=876,
+    serialized_start=816,
+    serialized_end=891,
 )
 
 _APPOINTMENTDATA.fields_by_name["appointment"].message_type = _APPOINTMENT
@@ -634,7 +634,7 @@ Appointment = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _APPOINTMENT,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.Appointment)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.Appointment)
     },
 )
 _sym_db.RegisterMessage(Appointment)
@@ -645,7 +645,7 @@ Tracker = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _TRACKER,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.Tracker)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.Tracker)
     },
 )
 _sym_db.RegisterMessage(Tracker)
@@ -656,7 +656,7 @@ AppointmentData = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _APPOINTMENTDATA,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.AppointmentData)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.AppointmentData)
     },
 )
 _sym_db.RegisterMessage(AppointmentData)
@@ -667,7 +667,7 @@ AddAppointmentRequest = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _ADDAPPOINTMENTREQUEST,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.AddAppointmentRequest)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.AddAppointmentRequest)
     },
 )
 _sym_db.RegisterMessage(AddAppointmentRequest)
@@ -678,7 +678,7 @@ AddAppointmentResponse = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _ADDAPPOINTMENTRESPONSE,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.AddAppointmentResponse)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.AddAppointmentResponse)
     },
 )
 _sym_db.RegisterMessage(AddAppointmentResponse)
@@ -689,7 +689,7 @@ GetAppointmentRequest = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _GETAPPOINTMENTREQUEST,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.GetAppointmentRequest)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.GetAppointmentRequest)
     },
 )
 _sym_db.RegisterMessage(GetAppointmentRequest)
@@ -700,7 +700,7 @@ GetAppointmentResponse = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _GETAPPOINTMENTRESPONSE,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.GetAppointmentResponse)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.GetAppointmentResponse)
     },
 )
 _sym_db.RegisterMessage(GetAppointmentResponse)
@@ -711,7 +711,7 @@ GetAllAppointmentsResponse = _reflection.GeneratedProtocolMessageType(
     {
         "DESCRIPTOR": _GETALLAPPOINTMENTSRESPONSE,
         "__module__": "appointment_pb2"
-        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.GetAllAppointmentsResponse)
+        # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.GetAllAppointmentsResponse)
     },
 )
 _sym_db.RegisterMessage(GetAllAppointmentsResponse)

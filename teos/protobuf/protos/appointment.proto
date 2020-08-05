@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package teos.protobuf.protos;
+package teos.protobuf.protos.v1;
 
 import "google/protobuf/struct.proto";
 
@@ -17,7 +17,7 @@ message Appointment {
 }
 
 message Tracker {
-  /* It's the equivalent of an appointment message from data hold by the Responder. */
+  // It's the equivalent of an appointment message from data hold by the Responder.
 
   string locator = 1;
   string dispute_txid = 2;
@@ -38,7 +38,7 @@ message AppointmentData{
 }
 
 message AddAppointmentRequest {
-  /* Request to add an appointment to the backend, contains the appointment data and the user signature */
+  // Request to add an appointment to the backend, contains the appointment data and the user signature
 
   Appointment appointment = 1;
   string signature = 2;
@@ -59,14 +59,14 @@ message AddAppointmentResponse {
 }
 
 message GetAppointmentRequest {
-  /* Request to get information about an appointment. Contains the appointment locator and a signature by the user */
+  // Request to get information about an appointment. Contains the appointment locator and a signature by the user
 
   string locator = 1;
   string signature = 2;
 }
 
 message GetAppointmentResponse {
-  /* Response to a GetAppointmentRequest. Contains the appointment data encapsulated in an AppointmentData message. */
+  // Response to a GetAppointmentRequest. Contains the appointment data encapsulated in an AppointmentData message.
 
   AppointmentData appointment_data = 1;
   string status = 2;
