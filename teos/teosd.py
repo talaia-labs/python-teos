@@ -204,7 +204,6 @@ def main(config):
             subprocess.Popen(
                 [
                     "gunicorn",
-                    "--log-level=error",
                     f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
                     f"teos.api:serve(min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', "
                     f"log_file='{config.get('LOG_FILE')}')",

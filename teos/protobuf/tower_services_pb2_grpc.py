@@ -3,10 +3,11 @@
 import grpc
 
 import teos.protobuf.appointment_pb2 as appointment__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 import teos.protobuf.user_pb2 as user__pb2
 
 
-class HTTP_APIStub(object):
+class TowerServicesStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -16,23 +17,28 @@ class HTTP_APIStub(object):
             channel: A grpc.Channel.
         """
         self.register = channel.unary_unary(
-            "/teos.protobuf.protos.v1.HTTP_API/register",
+            "/teos.protobuf.protos.v1.TowerServices/register",
             request_serializer=user__pb2.RegisterRequest.SerializeToString,
             response_deserializer=user__pb2.RegisterResponse.FromString,
         )
         self.add_appointment = channel.unary_unary(
-            "/teos.protobuf.protos.v1.HTTP_API/add_appointment",
+            "/teos.protobuf.protos.v1.TowerServices/add_appointment",
             request_serializer=appointment__pb2.AddAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.AddAppointmentResponse.FromString,
         )
         self.get_appointment = channel.unary_unary(
-            "/teos.protobuf.protos.v1.HTTP_API/get_appointment",
+            "/teos.protobuf.protos.v1.TowerServices/get_appointment",
             request_serializer=appointment__pb2.GetAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.GetAppointmentResponse.FromString,
         )
+        self.get_all_appointments = channel.unary_unary(
+            "/teos.protobuf.protos.v1.TowerServices/get_all_appointments",
+            request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            response_deserializer=appointment__pb2.GetAllAppointmentsResponse.FromString,
+        )
 
 
-class HTTP_APIServicer(object):
+class TowerServicesServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def register(self, request, context):
@@ -53,8 +59,14 @@ class HTTP_APIServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def get_all_appointments(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
-def add_HTTP_APIServicer_to_server(servicer, server):
+
+def add_TowerServicesServicer_to_server(servicer, server):
     rpc_method_handlers = {
         "register": grpc.unary_unary_rpc_method_handler(
             servicer.register,
@@ -71,13 +83,18 @@ def add_HTTP_APIServicer_to_server(servicer, server):
             request_deserializer=appointment__pb2.GetAppointmentRequest.FromString,
             response_serializer=appointment__pb2.GetAppointmentResponse.SerializeToString,
         ),
+        "get_all_appointments": grpc.unary_unary_rpc_method_handler(
+            servicer.get_all_appointments,
+            request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            response_serializer=appointment__pb2.GetAllAppointmentsResponse.SerializeToString,
+        ),
     }
-    generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.v1.HTTP_API", rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.v1.TowerServices", rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
 # This class is part of an EXPERIMENTAL API.
-class HTTP_API(object):
+class TowerServices(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -95,7 +112,7 @@ class HTTP_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.protobuf.protos.v1.HTTP_API/register",
+            "/teos.protobuf.protos.v1.TowerServices/register",
             user__pb2.RegisterRequest.SerializeToString,
             user__pb2.RegisterResponse.FromString,
             options,
@@ -122,7 +139,7 @@ class HTTP_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.protobuf.protos.v1.HTTP_API/add_appointment",
+            "/teos.protobuf.protos.v1.TowerServices/add_appointment",
             appointment__pb2.AddAppointmentRequest.SerializeToString,
             appointment__pb2.AddAppointmentResponse.FromString,
             options,
@@ -149,9 +166,36 @@ class HTTP_API(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/teos.protobuf.protos.v1.HTTP_API/get_appointment",
+            "/teos.protobuf.protos.v1.TowerServices/get_appointment",
             appointment__pb2.GetAppointmentRequest.SerializeToString,
             appointment__pb2.GetAppointmentResponse.FromString,
+            options,
+            channel_credentials,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def get_all_appointments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/teos.protobuf.protos.v1.TowerServices/get_all_appointments",
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            appointment__pb2.GetAllAppointmentsResponse.FromString,
             options,
             channel_credentials,
             call_credentials,

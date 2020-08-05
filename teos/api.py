@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 import common.errors as errors
 from teos.inspector import Inspector, InspectionFailed
 from teos.protobuf.user_pb2 import RegisterRequest
-from teos.protobuf.http_api_pb2_grpc import HTTP_APIStub
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
 from common.exceptions import InvalidParameter
@@ -145,7 +145,7 @@ class API:
         if user_id:
             try:
                 with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                    stub = HTTP_APIStub(channel)
+                    stub = TowerServicesStub(channel)
                     r = stub.register(RegisterRequest(user_id=user_id))
 
                     rcode = HTTP_OK
@@ -197,7 +197,7 @@ class API:
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
             with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                stub = HTTP_APIStub(channel)
+                stub = TowerServicesStub(channel)
                 r = stub.add_appointment(
                     AddAppointmentRequest(
                         appointment=Appointment(
@@ -275,7 +275,7 @@ class API:
             self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
             with grpc.insecure_channel(f"{self.internal_rpc_host}:{self.internal_rpc_port}") as channel:
-                stub = HTTP_APIStub(channel)
+                stub = TowerServicesStub(channel)
                 r = stub.get_appointment(
                     GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )

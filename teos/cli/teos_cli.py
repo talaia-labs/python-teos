@@ -15,7 +15,7 @@ from common.exceptions import InvalidKey, InvalidParameter, SignatureError, Towe
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from teos.cli.help import show_usage, help_get_all_appointments
-from teos.protobuf.rpc_api_pb2_grpc import RPC_APIStub
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 
 
 def get_all_appointments(rpc_host, rpc_port):
@@ -33,7 +33,7 @@ def get_all_appointments(rpc_host, rpc_port):
 
     try:
         with grpc.insecure_channel(f"{rpc_host}:{rpc_port}") as channel:
-            stub = RPC_APIStub(channel)
+            stub = TowerServicesStub(channel)
             r = stub.get_all_appointments(Empty())
             response = json_format.MessageToDict(
                 r.appointments, including_default_value_fields=True, preserving_proto_field_name=True

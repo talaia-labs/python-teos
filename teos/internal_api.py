@@ -16,8 +16,7 @@ from teos.protobuf.appointment_pb2 import (
     GetAllAppointmentsResponse,
 )
 from teos.protobuf.user_pb2 import RegisterResponse
-from teos.protobuf.http_api_pb2_grpc import HTTP_APIServicer, add_HTTP_APIServicer_to_server
-from teos.protobuf.rpc_api_pb2_grpc import RPC_APIServicer, add_RPC_APIServicer_to_server
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 
@@ -30,12 +29,10 @@ class InternalAPI:
         self.endpoint = "localhost:50051"
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
-
-        add_HTTP_APIServicer_to_server(InternalAPIHTTP(self.rw_lock, watcher, self.logger), self.rpc_server)
-        add_RPC_APIServicer_to_server(InternalAPIRPC(self.rw_lock, watcher, self.logger), self.rpc_server)
+        add_TowerServicesServicer_to_server(_InternalAPI(self.rw_lock, watcher, self.logger), self.rpc_server)
 
 
-class InternalAPIHTTP(HTTP_APIServicer):
+class _InternalAPI(TowerServicesServicer):
     def __init__(self, rw_lock, watcher, logger):
         self.rw_lock = rw_lock
         self.watcher = watcher
@@ -110,13 +107,6 @@ class InternalAPIHTTP(HTTP_APIServicer):
                 context.set_details("Appointment not found")
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 return GetAppointmentResponse()
-
-
-class InternalAPIRPC(RPC_APIServicer):
-    def __init__(self, rw_lock, watcher, logger):
-        self.rw_lock = rw_lock
-        self.watcher = watcher
-        self.logger = logger
 
     def get_all_appointments(self, request, context):
         with self.rw_lock.gen_rlock():
