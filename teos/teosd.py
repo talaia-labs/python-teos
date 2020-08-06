@@ -235,28 +235,28 @@ if __name__ == "__main__":
     command_line_conf = {}
     data_dir = DATA_DIR
 
+    opts, _ = getopt(
+        argv[1:],
+        "hd",
+        [
+            "apibind=",
+            "apiport=",
+            "rpcbind=",
+            "rpcport=",
+            "btcnetwork=",
+            "btcrpcuser=",
+            "btcrpcpassword=",
+            "btcrpcconnect=",
+            "btcrpcport=",
+            "btcfeedconnect=",
+            "btcfeedport=",
+            "datadir=",
+            "wsgi=" "daemon",
+            "overwritekey",
+            "help",
+        ],
+    )
     try:
-        opts, _ = getopt(
-            argv[1:],
-            "hd",
-            [
-                "apibind=",
-                "apiport=",
-                "rpcbind=",
-                "rpcport=",
-                "btcnetwork=",
-                "btcrpcuser=",
-                "btcrpcpassword=",
-                "btcrpcconnect=",
-                "btcrpcport=",
-                "btcfeedconnect=",
-                "btcfeedport=",
-                "datadir=",
-                "daemon",
-                "overwritekey",
-                "help",
-            ],
-        )
         for opt, arg in opts:
             if opt in ["--apibind"]:
                 command_line_conf["API_BIND"] = arg
@@ -294,6 +294,11 @@ if __name__ == "__main__":
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 data_dir = os.path.expanduser(arg)
+            if opt in ["--wsgi"]:
+                if arg in ["gunicorn", "flask"]:
+                    command_line_conf["WSGI"] = arg
+                else:
+                    exit("wsgi must be either gunicorn or flask")
             if opt in ["-d", "--daemon"]:
                 command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:
