@@ -14,7 +14,7 @@ from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder, TransactionTracker
 
 from test.teos.conftest import config, create_txs
-from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_keypair, compute_locator
+from test.teos.unit.conftest import get_random_value_hex, generate_keypair, compute_locator
 
 import common.receipts as receipts
 from common.cryptographer import Cryptographer, hash_160
@@ -101,7 +101,7 @@ def client(app):
 
 
 @pytest.fixture
-def appointment():
+def appointment(generate_dummy_appointment):
     appointment, dispute_tx = generate_dummy_appointment()
     locator_dispute_tx_map[appointment.locator] = dispute_tx
 
@@ -423,7 +423,7 @@ def test_add_appointment_in_cache_invalid_transaction(internal_api, client, bloc
     )
 
 
-def test_add_too_many_appointment(internal_api, client, block_processor):
+def test_add_too_many_appointment(internal_api, client, block_processor, generate_dummy_appointment):
     # Give slots to the user
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=200, subscription_expiry=0)
 

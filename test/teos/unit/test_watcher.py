@@ -35,7 +35,6 @@ from test.teos.conftest import (
     generate_block_with_transactions,
 )
 from test.teos.unit.conftest import (
-    generate_dummy_appointment,
     get_random_value_hex,
     generate_keypair,
     bitcoind_feed_params,
@@ -98,7 +97,7 @@ def locator_uuid_map(txids):
     return {compute_locator(txid): uuid4().hex for txid in txids}
 
 
-def create_appointments(n):
+def create_appointments(generate_dummy_appointment, n):
     locator_uuid_map = dict()
     appointments = dict()
     dispute_txs = []
@@ -318,7 +317,7 @@ def test_watcher_init(watcher):
     assert isinstance(watcher.locator_cache, LocatorCache)
 
 
-def test_add_appointment_non_registered(watcher):
+def test_add_appointment_non_registered(watcher, generate_dummy_appointment):
     # Appointments from non-registered users should fail
     user_sk, user_pk = generate_keypair()
 
@@ -329,7 +328,7 @@ def test_add_appointment_non_registered(watcher):
         watcher.add_appointment(appointment, appointment_signature)
 
 
-def test_add_appointment_no_slots(watcher):
+def test_add_appointment_no_slots(watcher, generate_dummy_appointment):
     # Appointments from register users with no available slots should aso fail
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
@@ -342,7 +341,7 @@ def test_add_appointment_no_slots(watcher):
         watcher.add_appointment(appointment, appointment_signature)
 
 
-def test_add_appointment(watcher):
+def test_add_appointment(watcher, generate_dummy_appointment):
     # Simulate the user is registered
     user_sk, user_pk = generate_keypair()
     available_slots = 100
@@ -395,7 +394,7 @@ def test_add_appointment(watcher):
     assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
 
-def test_add_appointment_in_cache(watcher):
+def test_add_appointment_in_cache(watcher, generate_dummy_appointment):
     # Generate an appointment and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
@@ -470,7 +469,7 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
     assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
 
 
-def test_add_appointment_in_cache_invalid_transaction(watcher):
+def test_add_appointment_in_cache_invalid_transaction(watcher, generate_dummy_appointment):
     # Generate an appointment that cannot be decrypted and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
@@ -498,7 +497,7 @@ def test_add_appointment_in_cache_invalid_transaction(watcher):
     assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
 
 
-def test_add_too_many_appointments(watcher):
+def test_add_too_many_appointments(watcher, generate_dummy_appointment):
     # Simulate the user is registered
     user_sk, user_pk = generate_keypair()
     available_slots = 100
@@ -526,11 +525,11 @@ def test_add_too_many_appointments(watcher):
         watcher.add_appointment(appointment, appointment_signature)
 
 
-def test_do_watch(watcher, temp_db_manager):
+def test_do_watch(watcher, temp_db_manager, generate_dummy_appointment):
     watcher.db_manager = temp_db_manager
 
     # We will wipe all the previous data and add 5 appointments
-    appointments, locator_uuid_map, dispute_txs = create_appointments(APPOINTMENTS)
+    appointments, locator_uuid_map, dispute_txs = create_appointments(generate_dummy_appointment, APPOINTMENTS)
 
     # Set the data into the Watcher and in the db
     watcher.locator_uuid_map = locator_uuid_map
@@ -623,7 +622,7 @@ def test_get_breaches_random_data(watcher, locator_uuid_map):
     assert len(potential_breaches) == 0
 
 
-def test_check_breach(watcher):
+def test_check_breach(watcher, generate_dummy_appointment):
     # A breach will be flagged as valid only if the encrypted blob can be properly decrypted and the resulting data
     # matches a transaction format.
     uuid = uuid4().hex
@@ -634,7 +633,7 @@ def test_check_breach(watcher):
     assert Cryptographer.encrypt(penalty_rawtx, dispute_txid) == appointment.encrypted_blob
 
 
-def test_check_breach_random_data(watcher):
+def test_check_breach_random_data(watcher, generate_dummy_appointment):
     # If a breach triggers an appointment with random data as encrypted blob, the check should fail.
     uuid = uuid4().hex
     appointment, dispute_tx = generate_dummy_appointment()
@@ -647,7 +646,7 @@ def test_check_breach_random_data(watcher):
         watcher.check_breach(uuid, appointment, dispute_txid)
 
 
-def test_check_breach_invalid_transaction(watcher):
+def test_check_breach_invalid_transaction(watcher, generate_dummy_appointment):
     # If the breach triggers an appointment with data that can be decrypted but does not match a transaction, it should
     # fail
     uuid = uuid4().hex
@@ -661,7 +660,7 @@ def test_check_breach_invalid_transaction(watcher):
         watcher.check_breach(uuid, appointment, dispute_txid)
 
 
-def test_filter_valid_breaches(watcher):
+def test_filter_valid_breaches(watcher, generate_dummy_appointment):
     dispute_txid = "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
     encrypted_blob = (
         "a62aa9bb3c8591e4d5de10f1bd49db92432ce2341af55762cdc9242c08662f97f5f47da0a1aa88373508cd6e67e87eefddeca0cee98c1"
@@ -694,7 +693,7 @@ def test_filter_valid_breaches(watcher):
     assert len(invalid_breaches) == 0 and len(valid_breaches) == 1
 
 
-def test_filter_breaches_random_data(watcher):
+def test_filter_breaches_random_data(watcher, generate_dummy_appointment):
     appointments = {}
     locator_uuid_map = {}
     breaches = {}

@@ -83,36 +83,44 @@ def fork(block_hash, blocks):
     bitcoin_cli.generatetoaddress(blocks, bitcoin_cli.getnewaddress())
 
 
-def generate_dummy_appointment():
-    commitment_tx, commitment_txid, penalty_tx = create_txs()
+@pytest.fixture(scope="session")
+def generate_dummy_appointment(run_bitcoind):
+    def _generate_dummy_appointment():
+        commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
+        dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
 
-    appointment_data = {
-        "locator": compute_locator(commitment_txid),
-        "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-        "encrypted_blob": Cryptographer.encrypt(penalty_tx, commitment_txid),
-        "user_id": get_random_value_hex(16),
-        "user_signature": get_random_value_hex(50),
-        "start_block": 200,
-    }
+        appointment_data = {
+            "locator": compute_locator(commitment_txid),
+            "to_self_delay": dummy_appointment_data.get("to_self_delay"),
+            "encrypted_blob": Cryptographer.encrypt(penalty_tx, commitment_txid),
+            "user_id": get_random_value_hex(16),
+            "user_signature": get_random_value_hex(50),
+            "start_block": 200,
+        }
 
-    return ExtendedAppointment.from_dict(appointment_data), commitment_tx
+        return ExtendedAppointment.from_dict(appointment_data), commitment_tx
+
+    return _generate_dummy_appointment
 
 
-def generate_dummy_tracker(commitment_tx=None):
-    if not commitment_tx:
-        commitment_tx = create_commitment_tx()
-    decoded_commitment_tx = bitcoin_cli.decoderawtransaction(commitment_tx)
-    penalty_tx = create_penalty_tx(decoded_commitment_tx)
-    locator = decoded_commitment_tx.get("txid")[:LOCATOR_LEN_HEX]
+@pytest.fixture(scope="session")
+def generate_dummy_tracker(run_bitcoind):
+    def _generate_dummy_tracker(commitment_tx=None):
+        if not commitment_tx:
+            commitment_tx = create_commitment_tx()
+        decoded_commitment_tx = bitcoin_cli.decoderawtransaction(commitment_tx)
+        penalty_tx = create_penalty_tx(decoded_commitment_tx)
+        locator = decoded_commitment_tx.get("txid")[:LOCATOR_LEN_HEX]
 
-    tracker_data = dict(
-        locator=locator,
-        dispute_txid=bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"),
-        penalty_txid=bitcoin_cli.decoderawtransaction(penalty_tx).get("txid"),
-        penalty_rawtx=penalty_tx,
-        user_id="02" + get_random_value_hex(32),
-    )
+        tracker_data = dict(
+            locator=locator,
+            dispute_txid=bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"),
+            penalty_txid=bitcoin_cli.decoderawtransaction(penalty_tx).get("txid"),
+            penalty_rawtx=penalty_tx,
+            user_id="02" + get_random_value_hex(32),
+        )
 
-    return TransactionTracker.from_dict(tracker_data)
+        return TransactionTracker.from_dict(tracker_data)
+
+    return _generate_dummy_tracker

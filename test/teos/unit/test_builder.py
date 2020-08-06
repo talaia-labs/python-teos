@@ -7,15 +7,10 @@ from teos.watcher import Watcher
 from teos.responder import Responder
 
 from test.teos.conftest import config, generate_blocks
-from test.teos.unit.conftest import (
-    get_random_value_hex,
-    generate_dummy_appointment,
-    generate_dummy_tracker,
-    generate_keypair,
-)
+from test.teos.unit.conftest import get_random_value_hex, generate_keypair
 
 
-def test_build_appointments(run_bitcoind):
+def test_build_appointments(generate_dummy_appointment):
     appointments_data = {}
 
     # Create some appointment data
@@ -45,7 +40,7 @@ def test_build_appointments(run_bitcoind):
         assert uuid in locator_uuid_map[appointment.get("locator")]
 
 
-def test_build_trackers(run_bitcoind):
+def test_build_trackers(generate_dummy_tracker):
     trackers_data = {}
 
     # Create some trackers data

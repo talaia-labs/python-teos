@@ -14,16 +14,16 @@ from teos.appointments_dbm import (
 
 from common.constants import LOCATOR_LEN_BYTES
 
-from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment, generate_dummy_tracker
+from test.teos.unit.conftest import get_random_value_hex
 
 
 @pytest.fixture(scope="module")
-def watcher_appointments(run_bitcoind):
+def watcher_appointments(generate_dummy_appointment):
     return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
 @pytest.fixture(scope="module")
-def responder_trackers(run_bitcoind):
+def responder_trackers(generate_dummy_tracker):
     return {uuid4().hex: generate_dummy_tracker().locator for _ in range(10)}
 
 
@@ -220,7 +220,7 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
         assert appointment.to_dict() == db_watcher_appointments[uuid]
 
 
-def test_store_load_triggered_appointment(run_bitcoind, db_manager):
+def test_store_load_triggered_appointment(generate_dummy_appointment, db_manager):
     db_watcher_appointments = db_manager.load_watcher_appointments()
     db_watcher_appointments_with_triggered = db_manager.load_watcher_appointments(include_triggered=True)
 
