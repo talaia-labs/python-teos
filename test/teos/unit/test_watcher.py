@@ -216,7 +216,7 @@ def test_update_cache_full():
         assert locator in locator_cache.cache
 
 
-def test_locator_cache_is_full(block_processor):
+def test_locator_cache_is_full():
     # Empty cache
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 
@@ -228,7 +228,7 @@ def test_locator_cache_is_full(block_processor):
     assert locator_cache.is_full()
 
 
-def test_locator_remove_oldest_block(block_processor):
+def test_locator_remove_oldest_block():
     # Empty cache
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 

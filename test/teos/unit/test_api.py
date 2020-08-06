@@ -50,6 +50,11 @@ teos_sk, teos_pk = generate_keypair()
 teos_id = hexlify(teos_pk.format(compressed=True)).decode("utf-8")
 
 
+# A function that ignores the arguments and returns user_id; used in some tests to mock the result of authenticate_user
+def mock_authenticate_user(*args, **kwargs):
+    return user_id
+
+
 @pytest.fixture()
 def get_all_db_manager():
     manager = AppointmentsDBM("get_all_tmp_db")
@@ -482,9 +487,6 @@ def test_get_appointment_in_watcher(internal_api, client, appointment, monkeypat
     internal_api.watcher.appointments[uuid] = extended_appointment_summary
     internal_api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
 
-    def mock_authenticate_user(*args, **kwargs):
-        return user_id
-
     # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
     monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
 
@@ -513,9 +515,6 @@ def test_get_appointment_in_responder(internal_api, client, generate_dummy_track
     uuid = hash_160("{}{}".format(appointment.locator, user_id))
     internal_api.watcher.responder.trackers[uuid] = tx_tracker.get_summary()
     internal_api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_dict())
-
-    def mock_authenticate_user(*args, **kwargs):
-        return user_id
 
     # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
     monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
