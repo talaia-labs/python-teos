@@ -130,10 +130,9 @@ def test_add_appointment_not_enough_slots(internal_api, stub):
     assert "Invalid signature or user does not have enough slots available" in e.value.details()
 
 
-def test_add_appointment_limit_reached(internal_api, stub):
+def test_add_appointment_limit_reached(internal_api, stub, monkeypatch):
     # If the tower appointment limit is reached RESOURCE_EXHAUSTED should be returned
-    current_limit = internal_api.watcher.max_appointments
-    internal_api.watcher.max_appointments = 0
+    monkeypatch.setattr(internal_api.watcher, "max_appointments", 0)
 
     stub.register(RegisterRequest(user_id=user_id))
 
@@ -144,9 +143,6 @@ def test_add_appointment_limit_reached(internal_api, stub):
 
     assert e.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
     assert "Appointment limit reached" in e.value.details()
-
-    # Set the limit back just in case the whole suite if being run
-    internal_api.watcher.max_appointments = current_limit
 
 
 def test_add_appointment_already_triggered(internal_api, stub):
