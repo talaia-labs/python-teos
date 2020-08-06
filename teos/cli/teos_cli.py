@@ -14,13 +14,7 @@ from common.tools import setup_data_folder, is_compressed_pk, intify
 from common.exceptions import InvalidParameter
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from teos.cli.help import (
-    show_usage,
-    help_get_all_appointments,
-    help_get_tower_info,
-    help_get_users,
-    help_get_user,
-)
+from teos.cli.help import show_usage, help_get_all_appointments, help_get_tower_info, help_get_users, help_get_user
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.user_pb2 import GetUserRequest
 

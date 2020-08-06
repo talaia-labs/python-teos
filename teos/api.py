@@ -56,26 +56,30 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
-def serve(internal_api_endpoint, min_to_self_delay, log_file):
+def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file=None):
     """
     Starts the API.
 
-    This method is handled by an external WSGI server, such as gunicorn.
-
-    Notice since this is run via terminal (or via subprocess.Popen) all arguments are strings.
+    This method can be handled either form an external WSGI (like gunicorn) in which case log_file is required,
+    or by the Flask development server, in which case it is not.
 
     Args:
-        internal_api_endpoint (:obj:`str`): Endpoint where the internal api is running (host:port).
-        min_to_self_delay (:obj:`str`): The minimum to_self_delay accepted by the Inspector.
-        log_file (:obj:`str`): The file_path where to store logs.
+        internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (host:port).
+        endpoint (:obj:`str`): endpoint where the http api will be running (host:port).
+        min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the Inspector.
+        log_file (:obj:`str`): the file_path where to store logs (only necessary if not running with Flask).
 
     Returns:
         The application object needed by the WSGI server to run.
     """
 
-    setup_logging(log_file)
+    if log_file:
+        setup_logging(log_file)
     inspector = Inspector(int(min_to_self_delay))
     api = API(inspector, internal_api_endpoint)
+
+    api.logger.info(f"Initialized. Serving at {endpoint}")
+
     return api.app
 
 

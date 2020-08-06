@@ -113,15 +113,7 @@ def test_setup_data_folder():
 
 
 def test_intify_unchanged():
-    test_cases = [
-        0,
-        1.1,
-        True,
-        False,
-        "yo",
-        {},
-        [],
-    ]
+    test_cases = [0, 1.1, True, False, "yo", {}, []]
     for x in test_cases:
         assert intify(x) == x
 

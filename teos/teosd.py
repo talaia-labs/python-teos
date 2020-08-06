@@ -11,6 +11,7 @@ from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
+import teos.api as api
 import teos.rpc as rpc
 from teos.help import show_usage
 from teos.watcher import Watcher
@@ -198,16 +199,23 @@ def main(config):
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
 
-            # Start the API (using gunicorn) and the RPC server
-            # FIXME: We may like to add workers depending on a config value
-            subprocess.Popen(
-                [
-                    "gunicorn",
-                    f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
-                    f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
-                    f"min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
-                ]
-            )
+            # Start the API and the RPC server
+            api_endpoint = f"{config.get('API_BIND')}:{config.get('API_PORT')}"
+            if config.get("WSGI") == "gunicorn":
+                # FIXME: We may like to add workers depending on a config value
+                subprocess.Popen(
+                    [
+                        "gunicorn",
+                        f"--bind={api_endpoint}",
+                        f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
+                        f"endpoint='{api_endpoint}', min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', "
+                        f"log_file='{config.get('LOG_FILE')}')",
+                    ]
+                )
+            else:
+                os.environ["WERKZEUG_RUN_MAIN"] = "true"
+                app = api.serve(INTERNAL_API_ENDPOINT, api_endpoint, config.get("MIN_TO_SELF_DELAY"))
+                Process(target=app.run, kwargs={"host": config.get("API_BIND"), "port": config.get("API_PORT")}).start()
 
             Process(
                 target=rpc.serve,
