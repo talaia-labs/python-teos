@@ -1,7 +1,7 @@
 wheel
 zmq
 flask
-Flask-JSONRPC
+grpcio
 cryptography==2.8
 coincurve
 pyzbase32
@@ -10,3 +10,4 @@ plyvel
 readerwriterlock
 structlog
 python-daemon
+gunicorn

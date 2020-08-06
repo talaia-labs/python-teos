@@ -64,7 +64,7 @@ def register(user_id, teos_id, teos_url):
 
     # Check that the server signed the response as it should.
     if not tower_signature:
-        raise TowerResponseError("The response does not contain the signature of the appointment")
+        raise TowerResponseError("The response does not contain the signature of the subscription")
 
     # Check that the signature is correct.
     subscription_receipt = receipts.create_registration_receipt(user_id, available_slots, subscription_expiry)

@@ -2,33 +2,29 @@
 
 import sys
 import json
-import requests
+import grpc
 from sys import argv
 from getopt import getopt, GetoptError
 from requests import ConnectionError
-from uuid import uuid4
+from google.protobuf import json_format
+from google.protobuf.empty_pb2 import Empty
 
-from common import constants
 from common.config_loader import ConfigLoader
 from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from teos.cli.help import show_usage, help_get_all_appointments
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 
 
-def make_rpc_request(rpc_url, method, *args):
-    return requests.post(
-        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5
-    )
-
-
-def get_all_appointments(rpc_url):
+def get_all_appointments(rpc_host, rpc_port):
     """
-    Gets information about all appointments stored in the tower, if the user requesting the data is an administrator.
+    Gets information about all appointments stored in the tower.
 
     Args:
-        rpc_url (:obj:`str`): the url ofr the teos RPC.
+        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
+        rpc_port (:obj:`int`): the port where the rpc server is running.
 
     Returns:
         :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
@@ -36,23 +32,18 @@ def get_all_appointments(rpc_url):
     """
 
     try:
-        response = make_rpc_request(rpc_url, "get_all_appointments")
-        if response.status_code != constants.HTTP_OK:
-            print(
-                f"The server returned an error. Status code: {response.status_code}. Reason: {response.reason}",
-                file=sys.stderr,
+        with grpc.insecure_channel(f"{rpc_host}:{rpc_port}") as channel:
+            stub = TowerServicesStub(channel)
+            r = stub.get_all_appointments(Empty())
+            response = json_format.MessageToDict(
+                r.appointments, including_default_value_fields=True, preserving_proto_field_name=True
             )
-            return None
 
-        response_json = json.dumps(response.json()["result"], indent=4, sort_keys=True)
-        return response_json
+        return response
 
-    except ConnectionError:
+    # FIXME: Handle different errors
+    except grpc.RpcError:
         print("Can't connect to the Eye of Satoshi. RPC server cannot be reached", file=sys.stderr)
-        return None
-
-    except requests.exceptions.Timeout:
-        print("The request timed out", file=sys.stderr)
         return None
 
 
@@ -63,18 +54,11 @@ def main(command, args, command_line_conf):
 
     setup_data_folder(DATA_DIR)
 
-    # Set the teos url
-    teos_rpc_url = "{}:{}/rpc".format(config.get("RPC_BIND"), config.get("RPC_PORT"))
-
-    # If an http or https prefix if found, leaves the server as is. Otherwise defaults to http.
-    if not teos_rpc_url.startswith("http"):
-        teos_rpc_url = "http://" + teos_rpc_url
-
     try:
         if command == "get_all_appointments":
-            appointment_data = get_all_appointments(teos_rpc_url)
+            appointment_data = get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
             if appointment_data:
-                print(appointment_data)
+                print(json.dumps(appointment_data, indent=4, sort_keys=True))
 
         elif command == "help":
             if args:

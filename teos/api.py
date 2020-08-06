@@ -1,13 +1,15 @@
+import grpc
+from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
 import common.errors as errors
-from teos.inspector import InspectionFailed
-from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
-from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
+from teos.inspector import Inspector, InspectionFailed
+from teos.protobuf.user_pb2 import RegisterRequest
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
+from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
-from common.logger import get_logger
-from common.appointment import Appointment
 from common.exceptions import InvalidParameter
+from common.logger import setup_logging, get_logger
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
@@ -54,34 +56,50 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
+def serve(internal_api_endpoint, min_to_self_delay, log_file):
+    """
+    Starts the API.
+
+    This method is handled by an external WSGI server, such as gunicorn.
+
+    Notice since this is run via terminal (or via subprocess.Popen) all arguments are strings.
+
+    Args:
+        internal_api_endpoint (:obj:`str`): Endpoint where the internal api is running (host:port).
+        min_to_self_delay (:obj:`str`): The minimum to_self_delay accepted by the Inspector.
+        log_file (:obj:`str`): The file_path where to store logs.
+
+    Returns:
+        The application object needed by the WSGI server to run.
+    """
+
+    setup_logging(log_file)
+    inspector = Inspector(int(min_to_self_delay))
+    api = API(inspector, internal_api_endpoint)
+    return api.app
+
+
 class API:
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and serves user requests.
+    The API is connected with the :class:`InternalAPI` <teos.internal_api.InternalAPI> via gRPC.
 
     Args:
-        host (:obj:`str`): the hostname to listen on.
-        port (:obj:`int`): the port of the webserver.
-        rw_lock (:obj:`RWLockWrite <readwritelock.rwlock.RWLockWrite>`): lock that must be acquired before reading or
-            writing to the watchtower's state.
         inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
             the received appointment data.
-        watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
+        internal_api_endpoint (:obj:`str`): the endpoint where the internal api is served.
 
     Attributes:
         logger: the logger for this component.
         app: the Flask app of the API server.
     """
 
-    def __init__(self, host, port, rw_lock, inspector, watcher):
-        self.logger = get_logger(component=API.__name__)
-        self.host = host
-        self.port = port
-        self.rw_lock = rw_lock
-        self.inspector = inspector
-        self.watcher = watcher
+    def __init__(self, inspector, internal_api_endpoint):
 
-        # ToDo: #5-add-async-to-api
+        self.logger = get_logger(component=API.__name__)
         self.app = Flask(__name__)
+        self.inspector = inspector
+        self.internal_api_endpoint = internal_api_endpoint
 
         # Adds all the routes to the functions listed above.
         routes = {
@@ -124,20 +142,20 @@ class API:
         user_id = request_data.get("public_key")
 
         if user_id:
-            with self.rw_lock.gen_wlock():
-                try:
-                    rcode = HTTP_OK
-                    available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
-                    response = {
-                        "public_key": user_id,
-                        "available_slots": available_slots,
-                        "subscription_expiry": subscription_expiry,
-                        "subscription_signature": subscription_signature,
-                    }
+            try:
+                with grpc.insecure_channel(self.internal_api_endpoint) as channel:
+                    stub = TowerServicesStub(channel)
+                    r = stub.register(RegisterRequest(user_id=user_id))
 
-                except InvalidParameter as e:
-                    rcode = HTTP_BAD_REQUEST
-                    response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                    rcode = HTTP_OK
+                    response = json_format.MessageToDict(
+                        r, including_default_value_fields=True, preserving_proto_field_name=True
+                    )
+                    response["public_key"] = user_id
+
+            except grpc.RpcError as e:
+                rcode = HTTP_BAD_REQUEST
+                response = {"error": e.details(), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
@@ -175,33 +193,46 @@ class API:
         except InvalidParameter as e:
             return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
 
-        with self.rw_lock.gen_wlock():
-            try:
-                appointment = self.inspector.inspect(request_data.get("appointment"))
-                response = self.watcher.add_appointment(appointment, request_data.get("signature"))
+        try:
+            appointment = self.inspector.inspect(request_data.get("appointment"))
+            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
+                stub = TowerServicesStub(channel)
+                r = stub.add_appointment(
+                    AddAppointmentRequest(
+                        appointment=Appointment(
+                            locator=appointment.locator,
+                            encrypted_blob=appointment.encrypted_blob,
+                            to_self_delay=appointment.to_self_delay,
+                        ),
+                        signature=request_data.get("signature"),
+                    )
+                )
+
                 rcode = HTTP_OK
+                response = json_format.MessageToDict(
+                    r, including_default_value_fields=True, preserving_proto_field_name=True
+                )
+        except InspectionFailed as e:
+            rcode = HTTP_BAD_REQUEST
+            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
 
-            except InspectionFailed as e:
-                rcode = HTTP_BAD_REQUEST
-                response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
-
-            except (AuthenticationFailure, NotEnoughSlots):
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.UNAUTHENTICATED:
                 rcode = HTTP_BAD_REQUEST
                 response = {
-                    "error": "appointment rejected. Invalid signature or user does not have enough slots available",
+                    "error": f"appointment rejected. {e.details()}",
                     "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
                 }
-
-            except AppointmentLimitReached:
-                rcode = HTTP_SERVICE_UNAVAILABLE
-                response = {"error": "appointment rejected"}
-
-            except AppointmentAlreadyTriggered:
+            elif e.code() == grpc.StatusCode.ALREADY_EXISTS:
                 rcode = HTTP_BAD_REQUEST
                 response = {
-                    "error": "appointment rejected. The provided appointment has already been triggered",
+                    "error": f"appointment rejected. {e.details()}",
                     "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
                 }
+            else:
+                # This covers grpc.StatusCode.RESOURCE_EXHAUSTED (and any other return).
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": "appointment rejected"}
 
         self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
@@ -239,31 +270,31 @@ class API:
         locator = request_data.get("locator")
 
         try:
-            with self.rw_lock.gen_rlock():
-                self.inspector.check_locator(locator)
-                self.logger.info(
-                    "Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator
+            self.inspector.check_locator(locator)
+            self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
+
+            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
+                stub = TowerServicesStub(channel)
+                r = stub.get_appointment(
+                    GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
                 )
-                appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
+                data = (
+                    r.appointment_data.appointment
+                    if r.appointment_data.WhichOneof("appointment_data") == "appointment"
+                    else r.appointment_data.tracker
+                )
 
-            if status == "being_watched":
-                # Cast the ExtendedAppointment to Appointment to remove all the tower-specific data
-                appointment_data = Appointment.from_dict(appointment_data).to_dict()
-            else:
-                # Remove user_id field from appointment data since it is an internal field.
-                appointment_data.pop("user_id")
+                rcode = HTTP_OK
+                response = {
+                    "locator": locator,
+                    "status": r.status,
+                    "appointment": json_format.MessageToDict(
+                        data, including_default_value_fields=True, preserving_proto_field_name=True
+                    ),
+                }
 
-            rcode = HTTP_OK
-            response = {"locator": locator, "status": status, "appointment": appointment_data}
-
-        except (InspectionFailed, AuthenticationFailure, AppointmentNotFound):
+        except (InspectionFailed, grpc.RpcError):
             rcode = HTTP_NOT_FOUND
             response = {"locator": locator, "status": "not_found"}
 
         return jsonify(response), rcode
-
-    def start(self):
-        """ This function starts the Flask server used to run the API """
-
-        # ToDo: #185-serve-teosd-production
-        self.app.run(host=self.host, port=self.port)

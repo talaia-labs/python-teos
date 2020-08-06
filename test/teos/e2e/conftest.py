@@ -30,7 +30,7 @@ def run_teosd():
 
     teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
 
-    teosd_process = Process(target=main, kwargs={"config": config}, daemon=True)
+    teosd_process = Process(target=main, kwargs={"config": config})
     teosd_process.start()
 
     # Give it some time to bootstrap

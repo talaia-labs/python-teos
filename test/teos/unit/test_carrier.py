@@ -1,6 +1,6 @@
 from test.teos.conftest import generate_blocks
 from test.teos.unit.conftest import get_random_value_hex
-from teos.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
+from teos.utils.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
 from test.teos.conftest import create_commitment_tx, bitcoin_cli
 

@@ -1,26 +1,25 @@
 import os
+import daemon
+import subprocess
 from sys import argv, exit
+from multiprocessing import Process
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
-import threading
-import daemon
-from readerwriterlock import rwlock
 
 from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
-from teos.api import API
-from teos.rpc import RPC
+import teos.rpc as rpc
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
 from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
-from teos.inspector import Inspector
 from teos.responder import Responder
 from teos.gatekeeper import Gatekeeper
+from teos.internal_api import InternalAPI
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
@@ -28,14 +27,21 @@ from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
 
 logger = get_logger(component="Daemon")
+parent_pid = os.getpid()
+
+INTERNAL_API_HOST = "localhost"
+INTERNAL_API_PORT = "50051"
+INTERNAL_API_ENDPOINT = f"{INTERNAL_API_HOST}:{INTERNAL_API_PORT}"
 
 
 def handle_signals(signal_received, frame):
-    logger.info("Closing connection with appointments db")
-    db_manager.db.close()
-    chain_monitor.terminate = True
+    if os.getpid() == parent_pid:
+        logger.info("Closing connection with appointments db")
+        db_manager.db.close()
+        chain_monitor.terminate = True
 
-    logger.info("Shutting down TEOS")
+        logger.info("Shutting down TEOS")
+
     exit(0)
 
 
@@ -74,7 +80,7 @@ def main(config):
 
         logger.info("Starting TEOS")
 
-        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
+        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
         bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
         if not can_connect_to_bitcoind(bitcoind_connect_params):
@@ -188,21 +194,33 @@ def main(config):
                 elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
                     Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
 
-            # lock to be acquired before interacting with the watchtower's state
-            rw_lock = rwlock.RWLockWrite()
-
-            # Fire the API and the ChainMonitor
+            # Fire ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
-            inspector = Inspector(block_processor, config.get("MIN_TO_SELF_DELAY"))
 
-            # start the RPC server
-            logger.info(f'Starting RPC Server on {config.get("RPC_BIND")}:{config.get("RPC_PORT")}')
-            rpc = RPC(config.get("RPC_BIND"), config.get("RPC_PORT"), rw_lock, inspector, watcher)
-            threading.Thread(target=rpc.start, daemon=True).start()
+            # Start the internal API
+            internal_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
+            internal_api.rpc_server.start()
+            internal_api.logger.info(f"Initialized. Serving at {internal_api.endpoint}")
 
-            # start the API server
-            API(config.get("API_BIND"), config.get("API_PORT"), rw_lock, inspector, watcher).start()
+            # Start the API (using gunicorn) and the RPC server
+            # FIXME: We may like to add workers depending on a config value
+            subprocess.Popen(
+                [
+                    "gunicorn",
+                    f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
+                    f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
+                    f"min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
+                ]
+            )
+            Process(
+                target=rpc.serve,
+                args=(config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT),
+                daemon=True,
+            ).start()
+
+            # Hang there until a stop command is received
+            internal_api.rpc_server.wait_for_termination()
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

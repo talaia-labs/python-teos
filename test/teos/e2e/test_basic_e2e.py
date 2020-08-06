@@ -1,13 +1,10 @@
-import requests
 import pytest
 from time import sleep
 from riemann.tx import Tx
 from binascii import hexlify
 from coincurve import PrivateKey
-from uuid import uuid4
 
 from contrib.client import teos_client
-
 
 import common.receipts as receipts
 from common.exceptions import TowerResponseError
@@ -15,6 +12,7 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
+import teos.cli.teos_cli as teos_cli
 from teos.utils.auth_proxy import JSONRPCException
 
 from test.teos.conftest import (
@@ -32,7 +30,6 @@ teos_base_endpoint = "http://{}:{}".format(config.get("API_BIND"), config.get("A
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
-teos_rpc_endpoint = "http://{}:{}/rpc".format(config.get("RPC_BIND"), config.get("RPC_PORT"))
 
 
 user_sk = Cryptographer.generate_key()
@@ -53,18 +50,6 @@ def get_appointment_info(locator, sk=user_sk):
 
 def add_appointment(appointment_data, sk=user_sk):
     return teos_client.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
-
-
-def make_rpc_request(rpc_url, method, *args):
-    return requests.post(
-        url=rpc_url, json={"method": method, "params": args, "jsonrpc": "2.0", "id": uuid4().int}, timeout=5
-    )
-
-
-def get_all_appointments():
-    response = make_rpc_request(teos_rpc_endpoint, "get_all_appointments")
-    jsonrpc_response = response.json()
-    return jsonrpc_response["result"]
 
 
 def test_commands_non_registered(teosd):
@@ -126,7 +111,7 @@ def test_appointment_life_cycle():
     assert appointment_info.get("appointment") == appointment.to_dict()
 
     # Check also the get_all_appointment endpoint
-    all_appointments = get_all_appointments()
+    all_appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == 0
@@ -139,7 +124,7 @@ def test_appointment_life_cycle():
     appointments_in_watcher -= 1
     appointments_in_responder += 1
 
-    all_appointments = get_all_appointments()
+    all_appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == appointments_in_responder
@@ -210,7 +195,7 @@ def test_multiple_appointments_life_cycle():
         sleep(1)
 
     # Test that they all show up in get_all_appointments at the correct stages.
-    all_appointments = get_all_appointments()
+    all_appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == appointments_in_responder
