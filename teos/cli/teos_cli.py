@@ -14,13 +14,20 @@ from common.tools import setup_data_folder
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from teos.cli.help import show_usage, help_get_all_appointments
+from teos.cli.help import (
+    show_usage,
+    help_get_all_appointments,
+    help_get_appointments,
+    help_get_tower_info,
+    help_get_users,
+    help_get_user,
+)
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 
 
 def get_all_appointments(rpc_host, rpc_port):
     """
-    Gets information about all appointments stored in the tower.
+    Gets information about all the appointments stored in the tower.
 
     Args:
         rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
