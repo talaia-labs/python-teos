@@ -12,7 +12,7 @@ from teos.internal_api import InternalAPI
 from teos.teosd import INTERNAL_API_ENDPOINT
 
 from test.teos.conftest import config
-from test.teos.unit.conftest import generate_keypair, generate_dummy_appointment, generate_dummy_tracker
+from test.teos.unit.conftest import generate_keypair
 
 
 MAX_APPOINTMENTS = 100
@@ -51,7 +51,8 @@ def test_get_all_appointments_empty():
     assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 0
 
 
-def test_get_all_appointments_watcher(internal_api):
+# FIXME: 194 will do with dummy appointment
+def test_get_all_appointments_watcher(internal_api, generate_dummy_appointment):
     # Data is pulled straight from the database, so we need to feed some
     appointment, _ = generate_dummy_appointment()
     uuid = uuid4().hex
@@ -64,7 +65,8 @@ def test_get_all_appointments_watcher(internal_api):
     internal_api.watcher.db_manager.delete_watcher_appointment(uuid)
 
 
-def test_get_all_appointments_tracker(internal_api):
+# FIXME: 194 will do with dummy tracker
+def test_get_all_appointments_responder(internal_api, generate_dummy_tracker):
     # Data is pulled straight from the database, so we need to feed some
     tracker = generate_dummy_tracker()
     uuid = uuid4().hex
@@ -77,7 +79,8 @@ def test_get_all_appointments_tracker(internal_api):
     internal_api.watcher.db_manager.delete_responder_tracker(uuid)
 
 
-def test_get_all_appointments_both(internal_api):
+# FIXME: 194 will do with dummy appointments and trackers
+def test_get_all_appointments_both(internal_api, generate_dummy_appointment, generate_dummy_tracker):
     # Data is pulled straight from the database, so we need to feed some
     appointment, _ = generate_dummy_appointment()
     uuid_appointment = uuid4().hex

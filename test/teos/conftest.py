@@ -35,7 +35,7 @@ def prng_seed():
     random.seed(0)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def run_bitcoind(dirname=".test_bitcoin"):
     # Run bitcoind in a separate folder
     makedirs(dirname, exist_ok=True)

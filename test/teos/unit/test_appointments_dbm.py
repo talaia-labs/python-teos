@@ -14,17 +14,19 @@ from teos.appointments_dbm import (
 
 from common.constants import LOCATOR_LEN_BYTES
 
-from test.teos.unit.conftest import get_random_value_hex, generate_dummy_appointment
+from test.teos.unit.conftest import get_random_value_hex
 
 
+# FIXME: 194 will do with dummy appointments
 @pytest.fixture(scope="module")
-def watcher_appointments():
+def watcher_appointments(generate_dummy_appointment):
     return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
+# FIXME: 194 will do with dummy trackers
 @pytest.fixture(scope="module")
-def responder_trackers():
-    return {get_random_value_hex(16): get_random_value_hex(32) for _ in range(10)}
+def responder_trackers(generate_dummy_tracker):
+    return {uuid4().hex: generate_dummy_tracker().locator for _ in range(10)}
 
 
 def open_create_db(db_path):
@@ -166,6 +168,18 @@ def test_update_locator_map_empty(db_manager):
 
 def test_delete_locator_map(db_manager):
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
+
+    # Make sure there are some locators before starting the test
+    # (needed so that the test can be ran individually from the others)
+    if not locator_maps:
+        for _ in range(5):
+            uuid = uuid4().hex
+            locator = get_random_value_hex(LOCATOR_LEN_BYTES)
+            db_manager.create_append_locator_map(locator, uuid)
+
+        locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
+
+    # Now that there are some locators, we can start the test
     assert len(locator_maps) != 0
 
     for locator, uuids in locator_maps.items():
@@ -208,7 +222,7 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
         assert appointment.to_dict() == db_watcher_appointments[uuid]
 
 
-def test_store_load_triggered_appointment(db_manager):
+def test_store_load_triggered_appointment(generate_dummy_appointment, db_manager):
     db_watcher_appointments = db_manager.load_watcher_appointments()
     db_watcher_appointments_with_triggered = db_manager.load_watcher_appointments(include_triggered=True)
 
@@ -252,6 +266,13 @@ def test_store_load_responder_trackers(db_manager, responder_trackers):
 
 
 def test_delete_watcher_appointment(db_manager, watcher_appointments):
+    # make sure that some appointments were added
+    # (needed in case the test is ran individually rather than as part of the suite)
+    db_watcher_appointments = db_manager.load_watcher_appointments(include_triggered=True)
+    if not db_watcher_appointments:
+        for uuid, appointment in watcher_appointments.items():
+            db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+
     # Let's delete all we added
     db_watcher_appointments = db_manager.load_watcher_appointments(include_triggered=True)
     assert len(db_watcher_appointments) != 0
@@ -290,6 +311,13 @@ def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
 
 
 def test_delete_responder_tracker(db_manager, responder_trackers):
+    # make sure that some trackers were added
+    # (needed in case the test is ran individually rather than as part of the suite)
+    db_responder_trackers = db_manager.load_responder_trackers()
+    if not db_responder_trackers:
+        for key, value in responder_trackers.items():
+            db_manager.store_responder_tracker(key, {"value": value})
+
     # Same for the responder
     db_responder_trackers = db_manager.load_responder_trackers()
     assert len(db_responder_trackers) != 0
