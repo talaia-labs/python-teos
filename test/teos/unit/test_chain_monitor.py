@@ -63,7 +63,7 @@ def test_update_state(block_processor):
     assert chain_monitor.best_tip == another_block_hash and new_block_hash == chain_monitor.last_tips[-1]
 
 
-def test_monitor_chain_polling(db_manager, block_processor):
+def test_monitor_chain_polling(block_processor):
     # Try polling with the Watcher
     watcher_queue = Queue()
     chain_monitor = ChainMonitor(watcher_queue, Queue(), block_processor, bitcoind_feed_params)
@@ -88,7 +88,7 @@ def test_monitor_chain_polling(db_manager, block_processor):
     chain_monitor.terminate = True
 
 
-def test_monitor_chain_zmq(db_manager, block_processor):
+def test_monitor_chain_zmq(block_processor):
     responder_queue = Queue()
     chain_monitor = ChainMonitor(Queue(), responder_queue, block_processor, bitcoind_feed_params)
     chain_monitor.best_tip = block_processor.get_best_block_hash()
@@ -111,7 +111,7 @@ def test_monitor_chain_zmq(db_manager, block_processor):
     generate_blocks(1)
 
 
-def test_monitor_chain(db_manager, block_processor):
+def test_monitor_chain(block_processor):
     # Not much to test here, this should launch two threads (one per monitor approach) and finish on terminate
     chain_monitor = ChainMonitor(Queue(), Queue(), block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
@@ -133,7 +133,7 @@ def test_monitor_chain(db_manager, block_processor):
     generate_blocks(1)
 
 
-def test_monitor_chain_single_update(db_manager, block_processor):
+def test_monitor_chain_single_update(block_processor):
     # This test tests that if both threads try to add the same block to the queue, only the first one will make it
     chain_monitor = ChainMonitor(Queue(), Queue(), block_processor, bitcoind_feed_params)
 

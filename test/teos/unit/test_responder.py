@@ -34,6 +34,7 @@ def responder(db_manager, gatekeeper, carrier, block_processor):
     return responder
 
 
+# FIXME: Check if this can be removed and used the general fixture
 @pytest.fixture(scope="session")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
@@ -63,6 +64,7 @@ def test_tracker_init():
     )
 
 
+# FIXME: 194 will do with dummy tracker
 def test_tracker_to_dict(generate_dummy_tracker):
     tracker = generate_dummy_tracker()
     tracker_dict = tracker.to_dict()
@@ -76,6 +78,7 @@ def test_tracker_to_dict(generate_dummy_tracker):
     )
 
 
+# FIXME: 194 will do with dummy tracker
 def test_tracker_from_dict(generate_dummy_tracker):
     tracker_dict = generate_dummy_tracker().to_dict()
     new_tracker = TransactionTracker.from_dict(tracker_dict)
@@ -83,6 +86,7 @@ def test_tracker_from_dict(generate_dummy_tracker):
     assert tracker_dict == new_tracker.to_dict()
 
 
+# FIXME: 194 will do with dummy tracker
 def test_tracker_from_dict_invalid_data(generate_dummy_tracker):
     tracker_dict = generate_dummy_tracker().to_dict()
 
@@ -94,6 +98,7 @@ def test_tracker_from_dict_invalid_data(generate_dummy_tracker):
             TransactionTracker.from_dict(tracker_dict_copy)
 
 
+# FIXME: 194 will do with dummy tracker
 def test_tracker_get_summary(generate_dummy_tracker):
     tracker = generate_dummy_tracker()
     assert tracker.get_summary() == {
@@ -180,6 +185,7 @@ def test_handle_breach_bad_response(db_manager, gatekeeper, carrier, block_proce
     assert receipt.delivered is False
 
 
+# FIXME: 194 will do with dummy tracker
 def test_add_tracker(responder, generate_dummy_tracker):
     for _ in range(20):
         uuid = uuid4().hex
@@ -214,6 +220,7 @@ def test_add_tracker(responder, generate_dummy_tracker):
         )
 
 
+# FIXME: 194 will do with dummy tracker
 def test_add_tracker_same_penalty_txid(responder, generate_dummy_tracker):
     # Test that multiple trackers with the same penalty can be added
     confirmations = 0
@@ -254,6 +261,7 @@ def test_add_tracker_same_penalty_txid(responder, generate_dummy_tracker):
         )
 
 
+# FIXME: 194 will do with dummy tracker
 def test_add_tracker_already_confirmed(responder, generate_dummy_tracker):
     # Tests that a tracker of an already confirmed penalty can be added
     for i in range(20):

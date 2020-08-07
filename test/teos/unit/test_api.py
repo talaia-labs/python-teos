@@ -66,7 +66,7 @@ def get_all_db_manager():
     rmtree("get_all_tmp_db")
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="module")
 def internal_api(run_bitcoind, db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     watcher = Watcher(
@@ -199,10 +199,7 @@ def test_add_appointment(internal_api, client, appointment, block_processor):
     assert r.json.get("start_block") == block_processor.get_block_count()
 
 
-def test_add_appointment_no_json(internal_api, client, appointment):
-    # Simulate the user registration (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-
+def test_add_appointment_no_json(client):
     # No JSON data
     r = client.post(add_appointment_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
@@ -210,10 +207,7 @@ def test_add_appointment_no_json(internal_api, client, appointment):
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-def test_add_appointment_json_no_inner_dict(internal_api, client, appointment):
-    # Simulate the user registration (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-
+def test_add_appointment_json_no_inner_dict(client):
     # JSON data with no inner dict (invalid data format)
     r = client.post(add_appointment_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
@@ -221,6 +215,7 @@ def test_add_appointment_json_no_inner_dict(internal_api, client, appointment):
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_wrong(internal_api, client, appointment):
     # Simulate the user registration (end time does not matter here)
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
@@ -233,7 +228,8 @@ def test_add_appointment_wrong(internal_api, client, appointment):
     assert errors.APPOINTMENT_FIELD_TOO_SMALL == r.json.get("error_code")
 
 
-def test_add_appointment_not_registered(client, appointment):
+# FIXME: 194 will do with dummy appointment
+def test_add_appointment_not_registered(internal_api, client, appointment):
     # Properly formatted appointment, user is not registered
     tmp_sk, tmp_pk = generate_keypair()
     tmp_compressed_pk = hexlify(tmp_pk.format(compressed=True)).decode("utf-8")
@@ -246,6 +242,7 @@ def test_add_appointment_not_registered(client, appointment):
     assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_registered_no_free_slots(internal_api, client, appointment):
     # Empty the user slots (end time does not matter here)
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=0, subscription_expiry=0)
@@ -257,6 +254,7 @@ def test_add_appointment_registered_no_free_slots(internal_api, client, appointm
     assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_registered_not_enough_free_slots(internal_api, client, appointment):
     # Give some slots to the user (end time does not matter here)
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
@@ -272,6 +270,7 @@ def test_add_appointment_registered_not_enough_free_slots(internal_api, client, 
     assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
 
+# FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_multiple_times_same_user(
     internal_api, client, appointment, block_processor, n=MULTIPLE_APPOINTMENTS
 ):
@@ -290,6 +289,7 @@ def test_add_appointment_multiple_times_same_user(
     assert len(internal_api.watcher.locator_uuid_map[appointment.locator]) == 1
 
 
+# FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_multiple_times_different_users(
     internal_api, client, appointment, block_processor, n=MULTIPLE_APPOINTMENTS
 ):
@@ -317,6 +317,7 @@ def test_add_appointment_multiple_times_different_users(
     assert len(set(internal_api.watcher.locator_uuid_map[appointment.locator])) == n
 
 
+# FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_update_same_size(internal_api, client, appointment, block_processor):
     # Update an appointment by one of the same size and check that no additional slots are filled
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
@@ -341,6 +342,7 @@ def test_add_appointment_update_same_size(internal_api, client, appointment, blo
     )
 
 
+# FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_update_bigger(internal_api, client, appointment, block_processor):
     # Update an appointment by one bigger, and check additional slots are filled
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=2, subscription_expiry=0)
@@ -367,6 +369,7 @@ def test_add_appointment_update_bigger(internal_api, client, appointment, block_
     assert r.status_code == HTTP_BAD_REQUEST
 
 
+# FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_update_smaller(internal_api, client, appointment, block_processor):
     # Update an appointment by one bigger, and check slots are freed
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=2, subscription_expiry=0)
@@ -423,6 +426,7 @@ def test_add_appointment_in_cache_invalid_transaction(internal_api, client, bloc
     )
 
 
+# FIXME: 194 will do with dummy appointment and block processor
 def test_add_too_many_appointment(internal_api, client, block_processor, generate_dummy_appointment):
     # Give slots to the user
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=200, subscription_expiry=0)
@@ -442,14 +446,14 @@ def test_add_too_many_appointment(internal_api, client, block_processor, generat
             assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
 
-def test_get_appointment_no_json(client, appointment):
+def test_get_appointment_no_json(client):
     r = client.post(add_appointment_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Request is not json encoded" in r.json.get("error")
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-def test_get_appointment_json_no_inner_dict(client, appointment):
+def test_get_appointment_json_no_inner_dict(client):
     r = client.post(add_appointment_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Invalid request content" in r.json.get("error")
@@ -512,7 +516,8 @@ def test_get_appointment_in_watcher(internal_api, client, appointment, monkeypat
 def test_get_appointment_in_responder(internal_api, client, generate_dummy_tracker, monkeypatch):
     tx_tracker = generate_dummy_tracker()
 
-    uuid = hash_160("{}{}".format(appointment.locator, user_id))
+    # Mock the appointment in the Responder
+    uuid = hash_160("{}{}".format(tx_tracker.locator, user_id))
     internal_api.watcher.responder.trackers[uuid] = tx_tracker.get_summary()
     internal_api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_dict())
 
@@ -520,9 +525,9 @@ def test_get_appointment_in_responder(internal_api, client, generate_dummy_track
     monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
 
     # Request back the data
-    message = "get appointment {}".format(appointment.locator)
+    message = "get appointment {}".format(tx_tracker.locator)
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
-    data = {"locator": appointment.locator, "signature": signature}
+    data = {"locator": tx_tracker.locator, "signature": signature}
 
     # Next we can request it
     r = client.post(get_appointment_endpoint, json=data)

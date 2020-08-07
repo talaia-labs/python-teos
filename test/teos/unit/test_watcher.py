@@ -97,6 +97,7 @@ def locator_uuid_map(txids):
     return {compute_locator(txid): uuid4().hex for txid in txids}
 
 
+# FIXME: 194 will do with dummy appointment
 def create_appointments(generate_dummy_appointment, n):
     locator_uuid_map = dict()
     appointments = dict()
@@ -317,6 +318,7 @@ def test_watcher_init(watcher):
     assert isinstance(watcher.locator_cache, LocatorCache)
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_non_registered(watcher, generate_dummy_appointment):
     # Appointments from non-registered users should fail
     user_sk, user_pk = generate_keypair()
@@ -328,6 +330,7 @@ def test_add_appointment_non_registered(watcher, generate_dummy_appointment):
         watcher.add_appointment(appointment, appointment_signature)
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_no_slots(watcher, generate_dummy_appointment):
     # Appointments from register users with no available slots should aso fail
     user_sk, user_pk = generate_keypair()
@@ -341,6 +344,7 @@ def test_add_appointment_no_slots(watcher, generate_dummy_appointment):
         watcher.add_appointment(appointment, appointment_signature)
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment(watcher, generate_dummy_appointment):
     # Simulate the user is registered
     user_sk, user_pk = generate_keypair()
@@ -429,6 +433,7 @@ def test_add_appointment_in_cache(watcher, generate_dummy_appointment):
         watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_in_cache_invalid_blob(watcher):
     # Generate an appointment with an invalid transaction and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
@@ -497,6 +502,7 @@ def test_add_appointment_in_cache_invalid_transaction(watcher, generate_dummy_ap
     assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_too_many_appointments(watcher, generate_dummy_appointment):
     # Simulate the user is registered
     user_sk, user_pk = generate_keypair()
@@ -601,6 +607,7 @@ def test_do_watch_cache_update(watcher):
         assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
 
 
+# FIXME: 194 will do with dummy watcher
 def test_get_breaches(watcher, txids, locator_uuid_map):
     watcher.locator_uuid_map = locator_uuid_map
     locators_txid_map = {compute_locator(txid): txid for txid in txids}
@@ -610,6 +617,7 @@ def test_get_breaches(watcher, txids, locator_uuid_map):
     assert locator_uuid_map.keys() == potential_breaches.keys()
 
 
+# FIXME: 194 will do with dummy watcher
 def test_get_breaches_random_data(watcher, locator_uuid_map):
     # The likelihood of finding a potential breach with random data should be negligible
     watcher.locator_uuid_map = locator_uuid_map
@@ -622,6 +630,7 @@ def test_get_breaches_random_data(watcher, locator_uuid_map):
     assert len(potential_breaches) == 0
 
 
+# FIXME: 194 will do with dummy watcher and appointment
 def test_check_breach(watcher, generate_dummy_appointment):
     # A breach will be flagged as valid only if the encrypted blob can be properly decrypted and the resulting data
     # matches a transaction format.
@@ -633,6 +642,7 @@ def test_check_breach(watcher, generate_dummy_appointment):
     assert Cryptographer.encrypt(penalty_rawtx, dispute_txid) == appointment.encrypted_blob
 
 
+# FIXME: 194 will do with dummy watcher and appointment
 def test_check_breach_random_data(watcher, generate_dummy_appointment):
     # If a breach triggers an appointment with random data as encrypted blob, the check should fail.
     uuid = uuid4().hex
@@ -646,6 +656,7 @@ def test_check_breach_random_data(watcher, generate_dummy_appointment):
         watcher.check_breach(uuid, appointment, dispute_txid)
 
 
+# FIXME: 194 will do with dummy watcher and appointment
 def test_check_breach_invalid_transaction(watcher, generate_dummy_appointment):
     # If the breach triggers an appointment with data that can be decrypted but does not match a transaction, it should
     # fail
@@ -660,6 +671,7 @@ def test_check_breach_invalid_transaction(watcher, generate_dummy_appointment):
         watcher.check_breach(uuid, appointment, dispute_txid)
 
 
+# FIXME: 194 will do with dummy watcher
 def test_filter_valid_breaches(watcher, generate_dummy_appointment):
     dispute_txid = "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
     encrypted_blob = (
@@ -693,6 +705,7 @@ def test_filter_valid_breaches(watcher, generate_dummy_appointment):
     assert len(invalid_breaches) == 0 and len(valid_breaches) == 1
 
 
+# FIXME: 194 will do with dummy watcher and appointment
 def test_filter_breaches_random_data(watcher, generate_dummy_appointment):
     appointments = {}
     locator_uuid_map = {}

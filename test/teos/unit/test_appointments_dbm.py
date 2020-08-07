@@ -17,11 +17,13 @@ from common.constants import LOCATOR_LEN_BYTES
 from test.teos.unit.conftest import get_random_value_hex
 
 
+# FIXME: 194 will do with dummy appointments
 @pytest.fixture(scope="module")
 def watcher_appointments(generate_dummy_appointment):
     return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
 
 
+# FIXME: 194 will do with dummy trackers
 @pytest.fixture(scope="module")
 def responder_trackers(generate_dummy_tracker):
     return {uuid4().hex: generate_dummy_tracker().locator for _ in range(10)}

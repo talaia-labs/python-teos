@@ -92,6 +92,7 @@ def test_register_wrong_user_id(internal_api, stub):
     assert "Provided public key does not match expected format" in e.value.details()
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment(internal_api, stub, generate_dummy_appointment):
     # Normal request should work just fine (user needs to be registered)
     stub.register(RegisterRequest(user_id=user_id))
@@ -103,6 +104,7 @@ def test_add_appointment(internal_api, stub, generate_dummy_appointment):
     assert isinstance(response, AddAppointmentResponse)
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_non_registered(internal_api, stub, generate_dummy_appointment):
     # If the user is not registered we should get UNAUTHENTICATED + the proper message
     another_user_sk, another_user_pk = generate_keypair()
@@ -115,6 +117,7 @@ def test_add_appointment_non_registered(internal_api, stub, generate_dummy_appoi
     assert "Invalid signature or user does not have enough slots available" in e.value.details()
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_not_enough_slots(internal_api, stub, generate_dummy_appointment):
     # UNAUTHENTICATED should also be get if the user does not have enough appointment slots
     # Register the user and set the slots to 0
@@ -130,6 +133,7 @@ def test_add_appointment_not_enough_slots(internal_api, stub, generate_dummy_app
     assert "Invalid signature or user does not have enough slots available" in e.value.details()
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_limit_reached(internal_api, stub, generate_dummy_appointment, monkeypatch):
     # If the tower appointment limit is reached RESOURCE_EXHAUSTED should be returned
     monkeypatch.setattr(internal_api.watcher, "max_appointments", 0)
@@ -145,6 +149,7 @@ def test_add_appointment_limit_reached(internal_api, stub, generate_dummy_appoin
     assert "Appointment limit reached" in e.value.details()
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_already_triggered(internal_api, stub, generate_dummy_appointment):
     # If the appointment has already been trigger we should get ALREADY_EXISTS
     stub.register(RegisterRequest(user_id=user_id))
@@ -161,6 +166,7 @@ def test_add_appointment_already_triggered(internal_api, stub, generate_dummy_ap
     assert "The provided appointment has already been triggered" in e.value.details()
 
 
+# FIXME: 194 will do with dummy appointment
 def test_get_appointment(internal_api, stub, generate_dummy_appointment):
     # Requests should work provided the user is registered and the appointment exists for him
     stub.register(RegisterRequest(user_id=user_id))
@@ -178,6 +184,7 @@ def test_get_appointment(internal_api, stub, generate_dummy_appointment):
     assert isinstance(response, GetAppointmentResponse)
 
 
+# FIXME: 194 will do with dummy appointment
 def test_get_appointment_non_registered(internal_api, stub, generate_dummy_appointment):
     # If the user is not registered or the appointment does not belong to him the response should be NOT_FOUND
     stub.register(RegisterRequest(user_id=user_id))

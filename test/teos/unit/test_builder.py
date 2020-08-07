@@ -10,6 +10,7 @@ from test.teos.conftest import config, generate_blocks
 from test.teos.unit.conftest import get_random_value_hex, generate_keypair
 
 
+# FIXME: 194 will do with dummy appointment
 def test_build_appointments(generate_dummy_appointment):
     appointments_data = {}
 
@@ -40,6 +41,7 @@ def test_build_appointments(generate_dummy_appointment):
         assert uuid in locator_uuid_map[appointment.get("locator")]
 
 
+# FIXME: 194 will do with dummy tracker
 def test_build_trackers(generate_dummy_tracker):
     trackers_data = {}
 
@@ -106,6 +108,7 @@ def test_update_states_empty_list(db_manager, gatekeeper, carrier, block_process
         Builder.update_states(w, missed_blocks_responder, missed_blocks_watcher)
 
 
+# FIXME: 194 will do with watcher, since no functionality is being used, this is only populating the data structures
 def test_update_states_responder_misses_more(db_manager, gatekeeper, carrier, block_processor):
     w = Watcher(
         db_manager=db_manager,
@@ -128,6 +131,7 @@ def test_update_states_responder_misses_more(db_manager, gatekeeper, carrier, bl
     assert w.responder.last_known_block == blocks[-1]
 
 
+# FIXME: 194 will do with watcher, since no functionality is being used, this is only populating the data structures
 def test_update_states_watcher_misses_more(db_manager, gatekeeper, carrier, block_processor):
     # Same as before, but data is now in the Responder
     w = Watcher(

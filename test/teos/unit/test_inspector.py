@@ -169,7 +169,7 @@ def test_check_blob():
                 raise e
 
 
-def test_inspect(run_bitcoind):
+def test_inspect():
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     to_self_delay = MIN_TO_SELF_DELAY
@@ -186,7 +186,7 @@ def test_inspect(run_bitcoind):
     )
 
 
-def test_inspect_wrong(run_bitcoind):
+def test_inspect_wrong():
     # Wrong types (taking out empty dict, since that's a different error)
     wrong_types = WRONG_TYPES.pop(WRONG_TYPES.index({}))
     for data in wrong_types:

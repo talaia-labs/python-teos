@@ -12,6 +12,7 @@ from test.teos.conftest import config
 from test.teos.unit.conftest import get_random_value_hex, generate_keypair
 
 
+# FIXME: 194 this whole test file could work with a gatekeeper build using a dummy block_processor
 def test_init(gatekeeper):
     assert isinstance(gatekeeper.subscription_slots, int) and gatekeeper.subscription_slots == config.get(
         "SUBSCRIPTION_SLOTS"
@@ -151,6 +152,7 @@ def test_identify_user_wrong(gatekeeper):
         gatekeeper.authenticate_user(message, signature.encode())
 
 
+# FIXME: 194 will do with dummy appointment
 def test_add_update_appointment(gatekeeper, generate_dummy_appointment):
     # add_update_appointment should decrease the slot count if a new appointment is added
     # let's add a new user
