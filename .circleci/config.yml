@@ -15,9 +15,9 @@ jobs:
           name: Install dependencies
           command: |
             pyenv local 3.7.0
-            python3 -m venv venv
-            . venv/bin/activate
-            sudo pip install --upgrade pip
+            python -m venv .venv
+            source .venv/bin/activate
+            python -m pip install --upgrade pip
             pip install -r requirements.txt
             pip install -r requirements-dev.txt
             pip install -r contrib/client/requirements.txt
@@ -33,7 +33,7 @@ jobs:
 
       - save_cache:
           paths:
-            - ./venv
+            - .venv
             - bitcoin
           key: v1-dependencies-20.0-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}-{{ checksum "contrib/client/requirements.txt" }}}
 
@@ -46,25 +46,25 @@ jobs:
       - run:
           name: Run contrib unit tests
           command: |
-            . venv/bin/activate
+            source .venv/bin/activate
             pytest contrib/**/test
 
       - run:
           name: Run common unit tests
           command: |
-            . venv/bin/activate
+            source .venv/bin/activate
             pytest test/common/unit
 
       - run:
           name: Run teos unit tests
           command: |
-            . venv/bin/activate
+            source .venv/bin/activate
             BITCOIND=/home/circleci/project/bitcoin/bin/bitcoind pytest test/teos/unit/
 
       - run:
           name: Run e2e tests
           command: |
-            . venv/bin/activate
+            source .venv/bin/activate
             BITCOIND=/home/circleci/project/bitcoin/bin/bitcoind pytest test/teos/e2e/
 
   # Update Docker image
