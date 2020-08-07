@@ -46,12 +46,55 @@ def get_all_appointments(rpc_host, rpc_port):
                 r.appointments, including_default_value_fields=True, preserving_proto_field_name=True
             )
 
-        return response
+        print(response)
 
     # FIXME: Handle different errors
     except grpc.RpcError:
         print("Can't connect to the Eye of Satoshi. RPC server cannot be reached", file=sys.stderr)
         return None
+
+
+def get_appointments(rpc_host, rpc_port, locator):
+    """
+    Gets all the appointments for a specific locator.
+
+    Args:
+        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
+        rpc_port (:obj:`int`): the port where the rpc server is running.
+        locator (:obj:`str`): the locator of the requested appointment.
+    """
+    pass
+
+
+def get_tower_info(rpc_host, rpc_port):
+    """
+    Gets general information about the tower.
+    Args:
+        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
+        rpc_port (:obj:`int`): the port where the rpc server is running.
+    """
+    pass
+
+
+def get_users(rpc_host, rpc_port):
+    """
+    Gets the list of registered user ids from the tower.
+    Args:
+        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
+        rpc_port (:obj:`int`): the port where the rpc server is running.
+    """
+    pass
+
+
+def get_user(rpc_host, rpc_port, user_id):
+    """
+    Gets information about a specific user.
+    Args:
+        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
+        rpc_port (:obj:`int`): the port where the rpc server is running.
+        user_id (:obj:`str`): the requested user_id.
+    """
+    pass
 
 
 def main(command, args, command_line_conf):
@@ -61,11 +104,33 @@ def main(command, args, command_line_conf):
 
     setup_data_folder(DATA_DIR)
 
+    teos_rpc_host = config.get("RPC_BIND")
+    teos_rpc_port = config.get("RPC_PORT")
     try:
         if command == "get_all_appointments":
-            appointment_data = get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
-            if appointment_data:
-                print(json.dumps(appointment_data, indent=4, sort_keys=True))
+            get_all_appointments(teos_rpc_host, teos_rpc_port)
+
+        elif command == "get_appointments":
+            if not args:
+                sys.exit("No locator was given")
+            if len(args) > 1:
+                sys.exit(f"Expected only one argument, not {len(args)}")
+
+            get_appointments(teos_rpc_host, teos_rpc_port, args[0])
+
+        elif command == "get_tower_info":
+            get_tower_info(teos_rpc_host, teos_rpc_port)
+
+        elif command == "get_users":
+            get_users(teos_rpc_host, teos_rpc_port)
+
+        elif command == "get_user":
+            if not args:
+                sys.exit("No user_id was given")
+            if len(args) > 1:
+                sys.exit(f"Expected only one argument, not {len(args)}")
+
+            get_user(teos_rpc_host, teos_rpc_port, args[0])
 
         elif command == "help":
             if args:
@@ -73,6 +138,18 @@ def main(command, args, command_line_conf):
 
                 if command == "get_all_appointments":
                     sys.exit(help_get_all_appointments())
+
+                elif command == "get_appointments":
+                    sys.exit(help_get_appointments())
+
+                elif command == "get_tower_info":
+                    sys.exit(help_get_tower_info())
+
+                elif command == "get_users":
+                    sys.exit(help_get_users())
+
+                elif command == "get_user":
+                    sys.exit(help_get_user())
 
                 else:
                     sys.exit("Unknown command. Use help to check the list of available commands")
