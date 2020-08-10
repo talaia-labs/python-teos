@@ -4,6 +4,7 @@ import grpc
 
 import teos.protobuf.appointment_pb2 as appointment__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+import teos.protobuf.tower_services_pb2 as tower__services__pb2
 import teos.protobuf.user_pb2 as user__pb2
 
 
@@ -44,7 +45,7 @@ class TowerServicesStub(object):
         self.get_tower_info = channel.unary_unary(
             "/teos.protobuf.protos.v1.TowerServices/get_tower_info",
             request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            response_deserializer=appointment__pb2.GetTowerInfoResponse.FromString,
+            response_deserializer=tower__services__pb2.GetTowerInfoResponse.FromString,
         )
         self.get_users = channel.unary_unary(
             "/teos.protobuf.protos.v1.TowerServices/get_users",
@@ -140,7 +141,7 @@ def add_TowerServicesServicer_to_server(servicer, server):
         "get_tower_info": grpc.unary_unary_rpc_method_handler(
             servicer.get_tower_info,
             request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-            response_serializer=appointment__pb2.GetTowerInfoResponse.SerializeToString,
+            response_serializer=tower__services__pb2.GetTowerInfoResponse.SerializeToString,
         ),
         "get_users": grpc.unary_unary_rpc_method_handler(
             servicer.get_users,
@@ -313,7 +314,7 @@ class TowerServices(object):
             target,
             "/teos.protobuf.protos.v1.TowerServices/get_tower_info",
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            appointment__pb2.GetTowerInfoResponse.FromString,
+            tower__services__pb2.GetTowerInfoResponse.FromString,
             options,
             channel_credentials,
             call_credentials,

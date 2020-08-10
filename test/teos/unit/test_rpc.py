@@ -7,7 +7,7 @@ from threading import Thread
 import teos.rpc as rpc
 from teos.watcher import Watcher
 from teos.responder import Responder
-import teos.cli.teos_cli as teos_cli
+from teos.cli.teos_cli import RPCClient
 from teos.internal_api import InternalAPI
 from teos.teosd import INTERNAL_API_ENDPOINT
 
@@ -46,18 +46,23 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
     i_api.rpc_server.stop(None)
 
 
-def test_get_all_appointments_empty():
-    appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+@pytest.fixture(scope="module")
+def rpc_client():
+    return RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+
+
+def test_get_all_appointments_empty(rpc_client):
+    appointments = rpc_client.get_all_appointments()
     assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 0
 
 
 # FIXME: 194 will do with dummy appointment
-def test_get_all_appointments_watcher(internal_api, generate_dummy_appointment):
+def test_get_all_appointments_watcher(internal_api, generate_dummy_appointment, rpc_client):
     # Data is pulled straight from the database, so we need to feed some
     appointment, _ = generate_dummy_appointment()
     uuid = uuid4().hex
     internal_api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-    appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    appointments = rpc_client.get_all_appointments()
     assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 0
     assert appointments.get("watcher_appointments")[uuid] == appointment.to_dict()
 
@@ -66,12 +71,12 @@ def test_get_all_appointments_watcher(internal_api, generate_dummy_appointment):
 
 
 # FIXME: 194 will do with dummy tracker
-def test_get_all_appointments_responder(internal_api, generate_dummy_tracker):
+def test_get_all_appointments_responder(internal_api, generate_dummy_tracker, rpc_client):
     # Data is pulled straight from the database, so we need to feed some
     tracker = generate_dummy_tracker()
     uuid = uuid4().hex
     internal_api.watcher.db_manager.store_responder_tracker(uuid, tracker.to_dict())
-    appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    appointments = rpc_client.get_all_appointments()
     assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 1
     assert appointments.get("responder_trackers")[uuid] == tracker.to_dict()
 
@@ -80,7 +85,7 @@ def test_get_all_appointments_responder(internal_api, generate_dummy_tracker):
 
 
 # FIXME: 194 will do with dummy appointments and trackers
-def test_get_all_appointments_both(internal_api, generate_dummy_appointment, generate_dummy_tracker):
+def test_get_all_appointments_both(internal_api, generate_dummy_appointment, generate_dummy_tracker, rpc_client):
     # Data is pulled straight from the database, so we need to feed some
     appointment, _ = generate_dummy_appointment()
     uuid_appointment = uuid4().hex
@@ -90,7 +95,7 @@ def test_get_all_appointments_both(internal_api, generate_dummy_appointment, gen
     uuid_tracker = uuid4().hex
     internal_api.watcher.db_manager.store_responder_tracker(uuid_tracker, tracker.to_dict())
 
-    appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    appointments = rpc_client.get_all_appointments()
     assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 1
     assert appointments.get("watcher_appointments")[uuid_appointment] == appointment.to_dict()
     assert appointments.get("responder_trackers")[uuid_tracker] == tracker.to_dict()

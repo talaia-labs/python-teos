@@ -4,6 +4,7 @@ import sys
 import json
 import grpc
 from sys import argv
+import functools
 from getopt import getopt, GetoptError
 from requests import ConnectionError
 from google.protobuf import json_format
@@ -23,78 +24,46 @@ from teos.cli.help import (
     help_get_user,
 )
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
+from teos.protobuf.appointment_pb2 import GetAppointmentsRequest
+from teos.protobuf.user_pb2 import GetUserRequest
 
 
-def get_all_appointments(rpc_host, rpc_port):
-    """
-    Gets information about all the appointments stored in the tower.
+def formatted(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return json_format.MessageToDict(result, including_default_value_fields=True, preserving_proto_field_name=True)
 
-    Args:
-        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
-        rpc_port (:obj:`int`): the port where the rpc server is running.
-
-    Returns:
-        :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
-        responds.
-    """
-
-    try:
-        with grpc.insecure_channel(f"{rpc_host}:{rpc_port}") as channel:
-            stub = TowerServicesStub(channel)
-            r = stub.get_all_appointments(Empty())
-            response = json_format.MessageToDict(
-                r.appointments, including_default_value_fields=True, preserving_proto_field_name=True
-            )
-
-        print(response)
-
-    # FIXME: Handle different errors
-    except grpc.RpcError:
-        print("Can't connect to the Eye of Satoshi. RPC server cannot be reached", file=sys.stderr)
-        return None
+    return wrapper
 
 
-def get_appointments(rpc_host, rpc_port, locator):
-    """
-    Gets all the appointments for a specific locator.
+class RPCClient:
+    def __init__(self, rpc_host, rpc_port):
+        self.rpc_host = rpc_host
+        self.rpc_port = rpc_port
+        self.channel = grpc.insecure_channel(f"{rpc_host}:{rpc_port}")
+        self.stub = TowerServicesStub(self.channel)
 
-    Args:
-        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
-        rpc_port (:obj:`int`): the port where the rpc server is running.
-        locator (:obj:`str`): the locator of the requested appointment.
-    """
-    pass
+    @formatted
+    def get_all_appointments(self):
+        result = self.stub.get_all_appointments(Empty())
+        return result.appointments
 
+    @formatted
+    def get_appointments(self, locator):
+        return self.stub.get_appointments(GetAppointmentsRequest(locator=locator))
 
-def get_tower_info(rpc_host, rpc_port):
-    """
-    Gets general information about the tower.
-    Args:
-        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
-        rpc_port (:obj:`int`): the port where the rpc server is running.
-    """
-    pass
+    @formatted
+    def get_tower_info(self):
+        return self.stub.get_tower_info(Empty())
 
+    @formatted
+    def get_users(self):
+        return self.stub.get_users(Empty())
 
-def get_users(rpc_host, rpc_port):
-    """
-    Gets the list of registered user ids from the tower.
-    Args:
-        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
-        rpc_port (:obj:`int`): the port where the rpc server is running.
-    """
-    pass
-
-
-def get_user(rpc_host, rpc_port, user_id):
-    """
-    Gets information about a specific user.
-    Args:
-        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
-        rpc_port (:obj:`int`): the port where the rpc server is running.
-        user_id (:obj:`str`): the requested user_id.
-    """
-    pass
+    @formatted
+    def get_user(user_id):
+        return self.stub.get_user(GetUserRequest(user_id=user_id))
 
 
 def main(command, args, command_line_conf):
@@ -106,9 +75,12 @@ def main(command, args, command_line_conf):
 
     teos_rpc_host = config.get("RPC_BIND")
     teos_rpc_port = config.get("RPC_PORT")
+
+    rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
+
     try:
         if command == "get_all_appointments":
-            get_all_appointments(teos_rpc_host, teos_rpc_port)
+            result = rpc_client.get_all_appointments()
 
         elif command == "get_appointments":
             if not args:
@@ -116,13 +88,13 @@ def main(command, args, command_line_conf):
             if len(args) > 1:
                 sys.exit(f"Expected only one argument, not {len(args)}")
 
-            get_appointments(teos_rpc_host, teos_rpc_port, args[0])
+            result = rpc_client.get_appointments(args[0])
 
         elif command == "get_tower_info":
-            get_tower_info(teos_rpc_host, teos_rpc_port)
+            result = rpc_client.get_tower_info()
 
         elif command == "get_users":
-            get_users(teos_rpc_host, teos_rpc_port)
+            result = rpc_client.get_users()
 
         elif command == "get_user":
             if not args:
@@ -130,8 +102,7 @@ def main(command, args, command_line_conf):
             if len(args) > 1:
                 sys.exit(f"Expected only one argument, not {len(args)}")
 
-            get_user(teos_rpc_host, teos_rpc_port, args[0])
-
+            result = rpc_client.get_user(args[0])
         elif command == "help":
             if args:
                 command = args.pop(0)
@@ -163,6 +134,9 @@ def main(command, args, command_line_conf):
         sys.exit(f"{e.msg}. Error arguments: {e.kwargs}")
     except Exception as e:
         sys.exit(f"Unknown error occurred: {str(e)}")
+
+    if result:
+        print(result)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
-import teos.cli.teos_cli as teos_cli
+from teos.cli.teos_cli import RPCClient
 from teos.utils.auth_proxy import JSONRPCException
 
 from test.teos.conftest import (
@@ -110,8 +110,10 @@ def test_appointment_life_cycle(run_bitcoind):
     assert appointment_info.get("locator") == locator
     assert appointment_info.get("appointment") == appointment.to_dict()
 
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+
     # Check also the get_all_appointment endpoint
-    all_appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    all_appointments = rpc_client.get_all_appointments()
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == 0
@@ -124,7 +126,7 @@ def test_appointment_life_cycle(run_bitcoind):
     appointments_in_watcher -= 1
     appointments_in_responder += 1
 
-    all_appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    all_appointments = rpc_client.get_all_appointments()
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == appointments_in_responder
@@ -195,7 +197,8 @@ def test_multiple_appointments_life_cycle(run_bitcoind):
         sleep(1)
 
     # Test that they all show up in get_all_appointments at the correct stages.
-    all_appointments = teos_cli.get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    all_appointments = rpc_client.get_all_appointments()
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == appointments_in_responder

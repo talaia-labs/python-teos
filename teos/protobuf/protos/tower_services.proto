@@ -6,6 +6,15 @@ import "appointment.proto";
 import "user.proto";
 import "google/protobuf/empty.proto";
 
+message GetTowerInfoResponse {
+  // Response with information about the tower.
+
+  uint32 n_watcher_appointments = 1;
+  uint32 n_responder_trackers = 2;
+  uint32 n_registered_users = 3;
+  string tower_id = 4;
+}
+
 service TowerServices {
   rpc register(RegisterRequest) returns (RegisterResponse) {}
   rpc add_appointment(AddAppointmentRequest) returns (AddAppointmentResponse) {}

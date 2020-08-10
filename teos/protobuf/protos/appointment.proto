@@ -91,12 +91,3 @@ message GetAllAppointmentsResponse {
 
   google.protobuf.Struct appointments = 1;
 }
-
-message GetTowerInfoResponse {
-  // Response with information about the tower.
-
-  uint32 n_watcher_appointments = 1;
-  uint32 n_responder_trackers = 2;
-  uint32 n_registered_users = 3;
-  string tower_id = 4;
-}
