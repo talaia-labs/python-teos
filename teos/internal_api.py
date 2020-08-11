@@ -13,12 +13,15 @@ from teos.protobuf.appointment_pb2 import (
     AppointmentData,
     AddAppointmentResponse,
     GetAppointmentResponse,
+    GetAppointmentsResponse,
     GetAllAppointmentsResponse,
 )
-from teos.protobuf.user_pb2 import RegisterResponse
+from teos.protobuf.user_pb2 import RegisterResponse, GetUserResponse, GetUsersResponse
+from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
+from teos.inspector import Inspector
 
 
 class InternalAPI:
@@ -144,3 +147,43 @@ class _InternalAPI(TowerServicesServicer):
         appointments.update({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
 
         return GetAllAppointmentsResponse(appointments=appointments)
+
+    def get_appointments(self, request, context):
+        Inspector.check_locator(locator)
+        with self.rw_lock.gen_rlock():
+            uuids = self.watcher.locator_uuid_map.get(locator)
+            results = []
+
+            for uuid in uuids:
+                if uuid in self.watcher.appointments:
+                    appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
+                    status = "being_watched"
+                elif uuid in self.responder.trackers:
+                    appointment_data = self.responder.db_manager.load_responder_tracker(uuid)
+                    status = "dispute_responded"
+                else:
+                    raise InvalidParamsError("Cannot find {}".format(locator))
+                results.append(GetAppointmentResponse(appointment=appointment_data, status=status))
+
+            return GetAppointmentsResponse(results=results)
+
+    def get_tower_info(self, request, context):
+        with self.rw_lock.gen_rlock():
+            return GetTowerInfoResponse(
+                tower_id=Cryptographer.get_compressed_pk(self.watcher.signing_key.public_key),
+                n_registered_users=len(self.watcher.gatekeeper.registered_users),
+                n_watcher_appointments=len(self.watcher.appointments),
+                n_responder_trackers=len(self.responder.trackers),
+            )
+
+    def get_users(self, request, context):
+        with self.rw_lock.gen_rlock():
+            user_ids = list(self.watcher.gatekeeper.registered_users.keys())
+            return GetUsersResponse(user_ids=user_ids)
+
+    def get_user(self, request, context):
+        with self.rw_lock.gen_rlock():
+            user = self.watcher.gatekeeper.registered_users.get(request.user_id)
+            if not user:
+                raise InvalidParamsError("User not found", data={"user_id": user_id})
+            return GetUserResponse(user=user)
