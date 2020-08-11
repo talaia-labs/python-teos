@@ -21,7 +21,7 @@ from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
-from teos.inspector import Inspector
+from teos.inspector import Inspector, InspectionFailed
 
 
 class InternalAPI:
@@ -149,21 +149,49 @@ class _InternalAPI(TowerServicesServicer):
         return GetAllAppointmentsResponse(appointments=appointments)
 
     def get_appointments(self, request, context):
-        Inspector.check_locator(locator)
-        with self.rw_lock.gen_rlock():
-            uuids = self.watcher.locator_uuid_map.get(locator)
-            results = []
+        try:
+            Inspector.check_locator(request.locator)
+        except InspectionFailed as e:
+            context.set_details(f"Invalid locator: {e.reason}")
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return GetAppointmentsResponse()
 
+        with self.rw_lock.gen_rlock():
+            uuids = self.watcher.locator_uuid_map.get(request.locator)
+
+            if not uuids:
+                context.set_details("No appointment found for this locator")
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                return GetAppointmentsResponse()
+
+            results = []
             for uuid in uuids:
                 if uuid in self.watcher.appointments:
-                    appointment_data = self.watcher.db_manager.load_watcher_appointment(uuid)
+                    data = self.watcher.db_manager.load_watcher_appointment(uuid)
+                    appointment_data = AppointmentData(
+                        appointment=AppointmentProto(
+                            locator=data.get("locator"),
+                            encrypted_blob=data.get("encrypted_blob"),
+                            to_self_delay=data.get("to_self_delay"),
+                        )
+                    )
                     status = "being_watched"
-                elif uuid in self.responder.trackers:
-                    appointment_data = self.responder.db_manager.load_responder_tracker(uuid)
+                elif uuid in self.watcher.responder.trackers:
+                    data = self.watcher.responder.db_manager.load_responder_tracker(uuid)
+                    appointment_data = AppointmentData(
+                        tracker=TrackerProto(
+                            locator=data.get("locator"),
+                            dispute_txid=data.get("dispute_txid"),
+                            penalty_txid=data.get("penalty_txid"),
+                            penalty_rawtx=data.get("penalty_rawtx"),
+                        )
+                    )
                     status = "dispute_responded"
                 else:
-                    raise InvalidParamsError("Cannot find {}".format(locator))
-                results.append(GetAppointmentResponse(appointment=appointment_data, status=status))
+                    # This should never happen, since we already checked locator_uuid_map
+                    raise RuntimeError("Cannot find {}".format(request.locator))
+
+                results.append(GetAppointmentResponse(appointment_data=appointment_data, status=status))
 
             return GetAppointmentsResponse(results=results)
 

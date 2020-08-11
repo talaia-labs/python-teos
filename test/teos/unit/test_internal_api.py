@@ -1,6 +1,8 @@
 import grpc
 import pytest
 from binascii import hexlify
+from uuid import uuid4
+
 from google.protobuf.empty_pb2 import Empty
 
 from common.cryptographer import Cryptographer, hash_160
@@ -17,6 +19,8 @@ from teos.protobuf.appointment_pb2 import (
     AddAppointmentResponse,
     GetAppointmentRequest,
     GetAppointmentResponse,
+    GetAppointmentsRequest,
+    GetAppointmentsResponse,
     GetAllAppointmentsResponse,
 )
 
@@ -43,6 +47,16 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
     yield i_api
 
     i_api.rpc_server.stop(None)
+
+
+@pytest.fixture()
+def clear_state(internal_api, db_manager):
+    """If added to a test, it will clear the db and all the appointments in the watcher and responder before running
+    the test"""
+    internal_api.watcher.appointments = dict()
+    internal_api.watcher.responder.trackers = dict()
+    for key, _ in db_manager.db.iterator():
+        db_manager.db.delete(key)
 
 
 @pytest.fixture()
@@ -232,6 +246,110 @@ def test_get_appointment_non_existent(internal_api, stub):
 # the previous set. Notice the currently there is not even authentication for the CLI (FIXME)
 
 
-def test_get_all_appointments(internal_api, stub):
+def test_get_all_appointments(clear_state, internal_api, stub):
     response = stub.get_all_appointments(Empty())
     assert isinstance(response, GetAllAppointmentsResponse)
+    appointments = dict(response.appointments)
+    assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 0
+
+
+# FIXME: 194 will do with dummy appointment
+def test_get_all_appointments_watcher(clear_state, internal_api, generate_dummy_appointment, stub):
+    # Data is pulled straight from the database, so we need to feed some
+    appointment, _ = generate_dummy_appointment()
+    uuid = uuid4().hex
+    internal_api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+
+    response = stub.get_all_appointments(Empty())
+    appointments = dict(response.appointments)
+
+    assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 0
+    assert dict(appointments.get("watcher_appointments")[uuid]) == appointment.to_dict()
+
+    # Delete the data
+    internal_api.watcher.db_manager.delete_watcher_appointment(uuid)
+
+
+# FIXME: 194 will do with dummy tracker
+def test_get_all_appointments_responder(clear_state, internal_api, generate_dummy_tracker, stub):
+    # Data is pulled straight from the database, so we need to feed some
+    tracker = generate_dummy_tracker()
+    uuid = uuid4().hex
+    internal_api.watcher.db_manager.store_responder_tracker(uuid, tracker.to_dict())
+
+    response = stub.get_all_appointments(Empty())
+    appointments = dict(response.appointments)
+
+    assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 1
+    assert dict(appointments.get("responder_trackers")[uuid]) == tracker.to_dict()
+
+    # Delete the data
+    internal_api.watcher.db_manager.delete_responder_tracker(uuid)
+
+
+# FIXME: 194 will do with dummy appointments and trackers
+def test_get_all_appointments_both(clear_state, internal_api, generate_dummy_appointment, generate_dummy_tracker, stub):
+    # Data is pulled straight from the database, so we need to feed some
+    appointment, _ = generate_dummy_appointment()
+    uuid_appointment = uuid4().hex
+    internal_api.watcher.db_manager.store_watcher_appointment(uuid_appointment, appointment.to_dict())
+
+    tracker = generate_dummy_tracker()
+    uuid_tracker = uuid4().hex
+    internal_api.watcher.db_manager.store_responder_tracker(uuid_tracker, tracker.to_dict())
+
+    response = stub.get_all_appointments(Empty())
+    appointments = dict(response.appointments)
+
+    assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 1
+    assert dict(appointments.get("watcher_appointments")[uuid_appointment]) == appointment.to_dict()
+    assert dict(appointments.get("responder_trackers")[uuid_tracker]) == tracker.to_dict()
+
+
+def test_get_appointments_invalid_locator(internal_api, stub):
+    with pytest.raises(grpc.RpcError) as e:
+        response = stub.get_appointments(GetAppointmentsRequest(locator="wrong locator"))
+
+    assert e.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+    assert "Invalid locator" in e.value.details()
+
+
+# FIXME: 194 will do with dummy appointments
+def test_get_appointments_empty(internal_api, generate_dummy_appointment, stub):
+    appointment, _ = generate_dummy_appointment()
+
+    with pytest.raises(grpc.RpcError) as e:
+        response = stub.get_appointments(GetAppointmentsRequest(locator=appointment.locator))
+
+    assert e.value.code() == grpc.StatusCode.NOT_FOUND
+    assert "No appointment found for this locator" in e.value.details()
+
+
+def test_get_appointments(clear_state, internal_api, db_manager, generate_dummy_appointment, stub, monkeypatch):
+    appointment, _ = generate_dummy_appointment()
+
+    # We store the same appointment with two different ids
+    uuid_appointment1 = uuid4().hex
+    uuid_appointment2 = uuid4().hex
+
+    # we mock the watcher's state to believe there are appointments with the above uuid, and we add them to the db
+    monkeypatch.setattr(
+        internal_api.watcher, "locator_uuid_map", {appointment.locator: [uuid_appointment1, uuid_appointment2]}
+    )
+    monkeypatch.setattr(
+        internal_api.watcher,
+        "appointments",
+        {
+            uuid_appointment1: {"locator": appointment.locator, "user_id": uuid4().hex},
+            uuid_appointment2: {"locator": appointment.locator, "user_id": uuid4().hex},
+        },
+    )
+    db_manager.store_watcher_appointment(uuid_appointment1, appointment.to_dict())
+    db_manager.store_watcher_appointment(uuid_appointment2, appointment.to_dict())
+
+    response = stub.get_appointments(GetAppointmentsRequest(locator=appointment.locator))
+    assert isinstance(response, GetAppointmentsResponse)
+    assert len(response.results) == 2
+    assert response.results[0].appointment_data.appointment.locator == appointment.locator
+    assert response.results[1].appointment_data.appointment.locator == appointment.locator
+
