@@ -13,7 +13,7 @@ from teos.internal_api import InternalAPI
 from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
-from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse
+from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse, GetUsersResponse, GetUserRequest, GetUserResponse
 from teos.protobuf.appointment_pb2 import (
     Appointment,
     AddAppointmentRequest,
@@ -367,7 +367,7 @@ def test_get_tower_info_empty(clear_state, internal_api, stub):
     assert response.n_responder_trackers == 0
 
 
-def test_get_tower_info(clear_state, internal_api, stub, monkeypatch):
+def test_get_tower_info(internal_api, stub, monkeypatch):
     monkeypatch.setattr(internal_api.watcher.gatekeeper, "registered_users", {"uid1": {}})
     monkeypatch.setattr(
         internal_api.watcher,
@@ -393,3 +393,36 @@ def test_get_tower_info(clear_state, internal_api, stub, monkeypatch):
     assert response.n_registered_users == 1
     assert response.n_watcher_appointments == 2
     assert response.n_responder_trackers == 3
+
+
+def test_get_users(internal_api, stub, monkeypatch):
+    # it doesn't matter they are not valid user ids for the test
+    mock_users = ["user1", "user2", "user3"]
+    monkeypatch.setattr(
+        internal_api.watcher.gatekeeper, "registered_users", {"user1": dict(), "user2": dict(), "user3": dict()}
+    )
+
+    response = stub.get_users(Empty())
+    assert isinstance(response, GetUsersResponse)
+    assert response.user_ids == mock_users
+
+
+def test_get_user(internal_api, stub, monkeypatch):
+    # it doesn't matter they are not valid user ids and user data object for this test
+    mock_user_id = "some_user_id"
+    mock_user = {"fake": "data"}
+    monkeypatch.setitem(internal_api.watcher.gatekeeper.registered_users, mock_user_id, mock_user)
+
+    response = stub.get_user(GetUserRequest(user_id=mock_user_id))
+    assert isinstance(response, GetUserResponse)
+    assert dict(response.user) == mock_user
+
+
+def test_get_user_not_found(internal_api, stub):
+    mock_user_id = "some_non_existing_user_id"
+
+    with pytest.raises(grpc.RpcError) as e:
+        response = stub.get_user(GetUserRequest(user_id=mock_user_id))
+
+    assert e.value.code() == grpc.StatusCode.NOT_FOUND
+    assert "User not found" in e.value.details()

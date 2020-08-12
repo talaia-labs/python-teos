@@ -213,6 +213,12 @@ class _InternalAPI(TowerServicesServicer):
     def get_user(self, request, context):
         with self.rw_lock.gen_rlock():
             user = self.watcher.gatekeeper.registered_users.get(request.user_id)
+
             if not user:
-                raise InvalidParamsError("User not found", data={"user_id": user_id})
-            return GetUserResponse(user=user)
+                context.set_details("User not found")
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                return GetUserResponse()
+
+            user_struct = Struct()
+            user_struct.update(user)
+            return GetUserResponse(user=user_struct)
