@@ -62,7 +62,7 @@ class RPCClient:
         return self.stub.get_users(Empty())
 
     @formatted
-    def get_user(user_id):
+    def get_user(self, user_id):
         return self.stub.get_user(GetUserRequest(user_id=user_id))
 
 
@@ -141,7 +141,7 @@ def main(command, args, command_line_conf):
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["get_all_appointments", "help"]
+    commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "help"])
