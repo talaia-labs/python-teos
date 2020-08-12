@@ -12,6 +12,7 @@ from teos.responder import Responder
 from teos.internal_api import InternalAPI
 from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
+from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse
 from teos.protobuf.appointment_pb2 import (
     Appointment,
@@ -353,3 +354,42 @@ def test_get_appointments(clear_state, internal_api, db_manager, generate_dummy_
     assert response.results[0].appointment_data.appointment.locator == appointment.locator
     assert response.results[1].appointment_data.appointment.locator == appointment.locator
 
+
+# TODO should have a test get_appointments for trackers in responder
+
+
+def test_get_tower_info_empty(clear_state, internal_api, stub):
+    response = stub.get_tower_info(Empty())
+    assert isinstance(response, GetTowerInfoResponse)
+    assert response.tower_id == Cryptographer.get_compressed_pk(internal_api.watcher.signing_key.public_key)
+    assert response.n_registered_users == 0
+    assert response.n_watcher_appointments == 0
+    assert response.n_responder_trackers == 0
+
+
+def test_get_tower_info(clear_state, internal_api, stub, monkeypatch):
+    monkeypatch.setattr(internal_api.watcher.gatekeeper, "registered_users", {"uid1": {}})
+    monkeypatch.setattr(
+        internal_api.watcher,
+        "appointments",
+        {
+            "uid1": {"locator": "locator1", "user_id": "user_id1"},
+            "uid2": {"locator": "locator2", "user_id": "user_id2"},
+        },
+    )
+    monkeypatch.setattr(
+        internal_api.watcher.responder,
+        "trackers",
+        {
+            "uid1": {"penalty_txid": "txid1", "locator": "locator1", "user_id": "user_id1"},
+            "uid2": {"penalty_txid": "txid2", "locator": "locator2", "user_id": "user_id2"},
+            "uid3": {"penalty_txid": "txid3", "locator": "locator2", "user_id": "user_id3"},
+        },
+    )
+
+    response = stub.get_tower_info(Empty())
+    assert isinstance(response, GetTowerInfoResponse)
+    assert response.tower_id == Cryptographer.get_compressed_pk(internal_api.watcher.signing_key.public_key)
+    assert response.n_registered_users == 1
+    assert response.n_watcher_appointments == 2
+    assert response.n_responder_trackers == 3

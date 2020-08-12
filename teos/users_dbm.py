@@ -57,14 +57,16 @@ class UsersDBM(DBManager):
                 return True
 
             except json.JSONDecodeError:
-                self.logger.info("Could't add user to db. Wrong user data format", user_id=user_id, user_data=user_data)
+                self.logger.info(
+                    "Couldn't add user to db. Wrong user data format", user_id=user_id, user_data=user_data
+                )
                 return False
 
             except TypeError:
-                self.logger.info("Could't add user to db", user_id=user_id, user_data=user_data)
+                self.logger.info("Couldn't add user to db", user_id=user_id, user_data=user_data)
                 return False
         else:
-            self.logger.info("Could't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
+            self.logger.info("Couldn't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
             return False
 
     def load_user(self, user_id):

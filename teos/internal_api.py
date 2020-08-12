@@ -5,6 +5,7 @@ from google.protobuf.struct_pb2 import Struct
 
 from common.logger import get_logger
 from common.appointment import Appointment
+from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter
 
 from teos.protobuf.appointment_pb2 import (
@@ -201,7 +202,7 @@ class _InternalAPI(TowerServicesServicer):
                 tower_id=Cryptographer.get_compressed_pk(self.watcher.signing_key.public_key),
                 n_registered_users=len(self.watcher.gatekeeper.registered_users),
                 n_watcher_appointments=len(self.watcher.appointments),
-                n_responder_trackers=len(self.responder.trackers),
+                n_responder_trackers=len(self.watcher.responder.trackers),
             )
 
     def get_users(self, request, context):

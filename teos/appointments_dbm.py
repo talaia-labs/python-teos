@@ -191,12 +191,12 @@ class AppointmentsDBM(DBManager):
 
         except json.JSONDecodeError:
             self.logger.info(
-                "Could't add appointment to db. Wrong appointment format.", uuid=uuid, appoinent=appointment
+                "Couldn't add appointment to db. Wrong appointment format.", uuid=uuid, appointment=appointment
             )
             return False
 
         except TypeError:
-            self.logger.info("Could't add appointment to db.", uuid=uuid, appoinent=appointment)
+            self.logger.info("Couldn't add appointment to db.", uuid=uuid, appointment=appointment)
             return False
 
     def store_responder_tracker(self, uuid, tracker):
@@ -217,11 +217,11 @@ class AppointmentsDBM(DBManager):
             return True
 
         except json.JSONDecodeError:
-            self.logger.info("Could't add tracker to db. Wrong tracker format.", uuid=uuid, tracker=tracker)
+            self.logger.info("Couldn't add tracker to db. Wrong tracker format.", uuid=uuid, tracker=tracker)
             return False
 
         except TypeError:
-            self.logger.info("Could't add tracker to db.", uuid=uuid, tracker=tracker)
+            self.logger.info("Couldn't add tracker to db.", uuid=uuid, tracker=tracker)
             return False
 
     def load_locator_map(self, locator):
