@@ -4,6 +4,10 @@ def show_usage():
         "\n\tpython teos_cli.py [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
         "\n\tget_all_appointments \tGets information about all appointments stored in the tower."
+        "\n\tget_appointments \tGets information about appointments with a certain locator."
+        "\n\tget_tower_info \tGets generic information about the tower."
+        "\n\tget_users \tGets the list of registered user ids."
+        "\n\tget_user \tGets information about a specific user."
         "\n\thelp \t\t\tShows a list of commands or help for a specific command."
         "\n\nGLOBAL OPTIONS:"
         "\n\t--rpcconnect \tRPC server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
@@ -50,7 +54,7 @@ def help_get_tower_info():
 def help_get_users():
     return (
         "NAME:"
-        "\tpython teos_cli get_users - Gets the list of users."
+        "\tpython teos_cli get_users - Gets the list of registered user ids."
         "\n\nUSAGE:"
         "\tpython teos_cli.py get_users"
         "\n\nDESCRIPTION:"
