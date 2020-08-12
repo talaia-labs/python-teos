@@ -54,6 +54,7 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
 def clear_state(internal_api, db_manager):
     """If added to a test, it will clear the db and all the appointments in the watcher and responder before running
     the test"""
+    internal_api.watcher.gatekeeper.registered_users = dict()
     internal_api.watcher.appointments = dict()
     internal_api.watcher.responder.trackers = dict()
     for key, _ in db_manager.db.iterator():
