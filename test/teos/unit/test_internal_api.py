@@ -327,7 +327,7 @@ def test_get_appointments_empty(internal_api, generate_dummy_appointment, stub):
     assert "No appointment found for this locator" in e.value.details()
 
 
-def test_get_appointments(clear_state, internal_api, db_manager, generate_dummy_appointment, stub, monkeypatch):
+def test_get_appointments_watcher(clear_state, internal_api, db_manager, generate_dummy_appointment, stub, monkeypatch):
     appointment, _ = generate_dummy_appointment()
 
     # We store the same appointment with two different ids
@@ -353,10 +353,34 @@ def test_get_appointments(clear_state, internal_api, db_manager, generate_dummy_
     assert isinstance(response, GetAppointmentsResponse)
     assert len(response.results) == 2
     assert response.results[0].appointment_data.appointment.locator == appointment.locator
+    assert response.results[0].status == "being_watched"
     assert response.results[1].appointment_data.appointment.locator == appointment.locator
+    assert response.results[1].status == "being_watched"
 
 
-# TODO should have a test get_appointments for trackers in responder
+def test_get_appointments_responder(
+    clear_state, internal_api, db_manager, generate_dummy_appointment, stub, monkeypatch
+):
+    appointment, _ = generate_dummy_appointment()
+
+    uuid_appointment = uuid4().hex
+
+    # we mock the watcher's state to believe there are appointments with the above uuid, and we add them to the db
+    monkeypatch.setattr(internal_api.watcher, "locator_uuid_map", {appointment.locator: [uuid_appointment]})
+    monkeypatch.setattr(
+        internal_api.watcher.responder,
+        "trackers",
+        {uuid_appointment: {"penalty_txid": uuid4().hex, "locator": appointment.locator, "user_id": uuid4().hex}},
+    )
+    db_manager.store_responder_tracker(uuid_appointment, appointment.to_dict())
+
+    response = stub.get_appointments(GetAppointmentsRequest(locator=appointment.locator))
+    assert isinstance(response, GetAppointmentsResponse)
+    assert len(response.results) == 1
+    res = response.results[0]
+    app = response.results[0].appointment_data
+    assert response.results[0].appointment_data.tracker.locator == appointment.locator
+    assert response.results[0].status == "dispute_responded"
 
 
 def test_get_tower_info_empty(clear_state, internal_api, stub):
