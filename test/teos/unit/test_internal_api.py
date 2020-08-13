@@ -3,12 +3,14 @@ import pytest
 from binascii import hexlify
 from uuid import uuid4
 
+from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
 from common.cryptographer import Cryptographer, hash_160
 
 from teos.watcher import Watcher
 from teos.responder import Responder
+from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
 from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
@@ -435,12 +437,13 @@ def test_get_users(internal_api, stub, monkeypatch):
 def test_get_user(internal_api, stub, monkeypatch):
     # it doesn't matter they are not valid user ids and user data object for this test
     mock_user_id = "some_user_id"
-    mock_user = {"fake": "data"}
-    monkeypatch.setitem(internal_api.watcher.gatekeeper.registered_users, mock_user_id, mock_user)
+    mock_user_info = UserInfo(100, 1234)
+    monkeypatch.setitem(internal_api.watcher.gatekeeper.registered_users, mock_user_id, mock_user_info)
 
     response = stub.get_user(GetUserRequest(user_id=mock_user_id))
     assert isinstance(response, GetUserResponse)
-    assert dict(response.user) == mock_user
+
+    assert json_format.MessageToDict(response.user) == mock_user_info.to_dict()
 
 
 def test_get_user_not_found(internal_api, stub):
