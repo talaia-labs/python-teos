@@ -35,7 +35,6 @@ class RPC:
         add_TowerServicesServicer_to_server(_RPC(internal_api_endpoint, self.logger), self.rpc_server)
 
 
-# TODO: all the methods are basically the same, this should be refactored
 class _RPC(TowerServicesServicer):
     """
     This represents the RPC server provider and implements all the methods that can be accessed using the CLI.
@@ -48,31 +47,23 @@ class _RPC(TowerServicesServicer):
     def __init__(self, internal_api_endpoint, logger):
         self.logger = logger
         self.internal_api_endpoint = internal_api_endpoint
+        self.channel = grpc.insecure_channel(self.internal_api_endpoint)
+        self.stub = TowerServicesStub(self.channel)
 
     def get_all_appointments(self, request, context):
-        with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-            stub = TowerServicesStub(channel)
-            return stub.get_all_appointments(request)
+        return self.stub.get_all_appointments(request)
 
     def get_appointments(self, request, context):
-        with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-            stub = TowerServicesStub(channel)
-            return stub.get_all_appointments(request)
+        return self.stub.get_appointments(request)
 
     def get_tower_info(self, request, context):
-        with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-            stub = TowerServicesStub(channel)
-            return stub.get_all_appointments(request)
+        return self.stub.get_tower_info(request)
 
     def get_users(self, request, context):
-        with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-            stub = TowerServicesStub(channel)
-            return stub.get_all_appointments(request)
+        return self.stub.get_users(request)
 
     def get_user(self, request, context):
-        with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-            stub = TowerServicesStub(channel)
-            return stub.get_all_appointments(request)
+        return self.stub.get_user(request)
 
 
 def serve(rpc_bind, rpc_port, internal_api_endpoint):
