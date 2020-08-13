@@ -29,10 +29,17 @@ from teos.protobuf.user_pb2 import GetUserRequest
 
 
 def formatted(func):
+    """Transforms the given function by wrapping the return value with json_format.MessageToDict followed by
+    json.dumps, in order to print the result in a prettyfied json format.
+    """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        return json_format.MessageToDict(result, including_default_value_fields=True, preserving_proto_field_name=True)
+        result_dict = json_format.MessageToDict(
+            result, including_default_value_fields=True, preserving_proto_field_name=True
+        )
+        return json.dumps(result_dict, indent=4)
 
     return wrapper
 
@@ -128,6 +135,8 @@ def main(command, args, command_line_conf):
             else:
                 sys.exit(show_usage())
 
+    except grpc.RpcError as e:
+        sys.exit(e.details())
     except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
         sys.exit(str(e))
     except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
