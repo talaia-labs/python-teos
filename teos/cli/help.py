@@ -47,7 +47,7 @@ def help_get_tower_info():
         "\n\nUSAGE:"
         "\tpython teos_cli.py get_tower_info"
         "\n\nDESCRIPTION:"
-        "\n\n\tGets generic information about the tower, like the tower_id and aggregate data on users and appointments.\n"
+        "\n\n\tGets generic information about the tower, like tower_id and aggregate data on users and appointments.\n"
     )
 
 

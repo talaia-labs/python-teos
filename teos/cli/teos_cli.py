@@ -45,6 +45,11 @@ def formatted(func):
 
 
 class RPCClient:
+    """Creates and keeps a connection to the an RPC serving TowerServices. It has methods to call each of the
+    available grpc services, and it returns a pretty-printed json response.
+    Errors from the grpc calls are not handled.
+    """
+
     def __init__(self, rpc_host, rpc_port):
         self.rpc_host = rpc_host
         self.rpc_port = rpc_port
@@ -53,8 +58,7 @@ class RPCClient:
 
     @formatted
     def get_all_appointments(self):
-        result = self.stub.get_all_appointments(Empty())
-        return result.appointments
+        return self.stub.get_all_appointments(Empty())
 
     @formatted
     def get_appointments(self, locator):
