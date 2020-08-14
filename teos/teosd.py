@@ -19,7 +19,7 @@ from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
 from teos.responder import Responder
 from teos.gatekeeper import Gatekeeper
-from teos.internal_api import InternalAPI
+import teos.internal_api as internal_api
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
@@ -198,11 +198,6 @@ def main(config):
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
 
-            # Start the internal API
-            internal_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
-            internal_api.rpc_server.start()
-            internal_api.logger.info(f"Initialized. Serving at {internal_api.endpoint}")
-
             # Start the API (using gunicorn) and the RPC server
             # FIXME: We may like to add workers depending on a config value
             subprocess.Popen(
@@ -213,14 +208,15 @@ def main(config):
                     f"min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
                 ]
             )
+
             Process(
                 target=rpc.serve,
                 args=(config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT),
                 daemon=True,
             ).start()
 
-            # Hang there until a stop command is received
-            internal_api.rpc_server.wait_for_termination()
+            # Start the internal API
+            internal_api.serve(watcher, INTERNAL_API_ENDPOINT)
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

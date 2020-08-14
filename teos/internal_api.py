@@ -46,6 +46,26 @@ class InternalAPI:
         add_TowerServicesServicer_to_server(_InternalAPI(watcher, self.logger), self.rpc_server)
 
 
+def serve(watcher, internal_api_endpoint):
+    """
+    Serves the internal API at a given endpoint.
+
+    This method will serve and hold until the main process is stop or a stop signal is received. Notice the latter is
+    not possible possible currently since the stop signal has to be passed to `rpc_server` and it is not returned. This
+    may change once the stop command for the CLI is implemented.
+
+    Args:
+        watcher (:obj:`Watcher <teos.watcher.Watcher`): The ``Watcher`` instance (backend).
+        internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
+    """
+
+    internal_api = InternalAPI(watcher, internal_api_endpoint)
+    internal_api.rpc_server.start()
+
+    internal_api.logger.info(f"Initialized. Serving at {internal_api.endpoint}")
+    internal_api.rpc_server.wait_for_termination()
+
+
 class _InternalAPI(TowerServicesServicer):
     """
     This represents the internal api service provider and implements all the gRPC methods offered by the API.
