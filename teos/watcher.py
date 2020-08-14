@@ -641,3 +641,28 @@ class Watcher:
                         invalid_breaches.append(uuid)
 
         return valid_breaches, invalid_breaches
+
+    def get_registered_user_ids(self):
+        """Returns the list of user ids of all the registered users."""
+        return list(self.gatekeeper.registered_users.keys())
+
+    def get_user_info(self, user_id):
+        """
+        Returns the `UserInfo` of the user with the given id.
+
+        Args:
+            user_id (:obj:`str`): the id of the requested user.
+
+        Returns:
+            :obj:`teos.gatekeeper.UserInfo` or :obj:`None`: The `UserInfo` object if found. `None` if not found, or
+            the `user_id` is invalid.
+        """
+        return self.gatekeeper.registered_users.get(user_id)
+
+    def get_all_watcher_appointments(self):
+        """Returns a dictionary with all the appointment stored in the db for the watcher."""
+        return self.db_manager.load_watcher_appointments()
+
+    def get_all_responder_trackers(self):
+        """Returns a dictionary with all the trackers stored in the db for the responder."""
+        return self.db_manager.load_responder_trackers()

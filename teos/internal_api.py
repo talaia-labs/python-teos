@@ -5,7 +5,6 @@ from google.protobuf.struct_pb2 import Struct
 
 from common.logger import get_logger
 from common.appointment import Appointment
-from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter
 
 from teos.protobuf.appointment_pb2 import (
@@ -141,8 +140,8 @@ class _InternalAPI(TowerServicesServicer):
 
     def get_all_appointments(self, request, context):
         with self.rw_lock.gen_rlock():
-            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
-            responder_trackers = self.watcher.db_manager.load_responder_trackers()
+            watcher_appointments = self.watcher.get_all_watcher_appointments()
+            responder_trackers = self.watcher.get_all_responder_trackers()
 
         appointments = Struct()
         appointments.update({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
@@ -207,12 +206,11 @@ class _InternalAPI(TowerServicesServicer):
 
     def get_users(self, request, context):
         with self.rw_lock.gen_rlock():
-            user_ids = list(self.watcher.gatekeeper.registered_users.keys())
-            return GetUsersResponse(user_ids=user_ids)
+            return GetUsersResponse(user_ids=self.watcher.get_registered_user_ids())
 
     def get_user(self, request, context):
         with self.rw_lock.gen_rlock():
-            user_info = self.watcher.gatekeeper.registered_users.get(request.user_id)
+            user_info = self.watcher.get_user_info(request.user_id)
 
             if not user_info:
                 context.set_details("User not found")

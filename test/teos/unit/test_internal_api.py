@@ -438,7 +438,14 @@ def test_get_user(internal_api, stub, monkeypatch):
     # it doesn't matter they are not valid user ids and user data object for this test
     mock_user_id = "some_user_id"
     mock_user_info = UserInfo(100, 1234)
-    monkeypatch.setitem(internal_api.watcher.gatekeeper.registered_users, mock_user_id, mock_user_info)
+
+    def mock_get_user_info(user_id):
+        if user_id == mock_user_id:
+            return mock_user_info
+        else:
+            raise f"called with an unexpected user_id: {user_id}"
+
+    monkeypatch.setattr(internal_api.watcher, "get_user_info", mock_get_user_info)
 
     response = stub.get_user(GetUserRequest(user_id=mock_user_id))
     assert isinstance(response, GetUserResponse)
