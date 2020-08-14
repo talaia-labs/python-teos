@@ -26,6 +26,10 @@ from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.user_pb2 import GetUserRequest
 
 
+def to_json(obj):
+    return json.dumps(obj, indent=4)
+
+
 def formatted(func):
     """Transforms the given function by wrapping the return value with json_format.MessageToDict followed by
     json.dumps, in order to print the result in a prettyfied json format.
@@ -37,7 +41,7 @@ def formatted(func):
         result_dict = json_format.MessageToDict(
             result, including_default_value_fields=True, preserving_proto_field_name=True
         )
-        return json.dumps(result_dict, indent=4)
+        return to_json(result_dict)
 
     return wrapper
 
@@ -56,19 +60,20 @@ class RPCClient:
 
     @formatted
     def get_all_appointments(self):
-        return self.stub.get_all_appointments(Empty())
+        result = self.stub.get_all_appointments(Empty())
+        return result.appointments
 
     @formatted
     def get_tower_info(self):
         return self.stub.get_tower_info(Empty())
 
-    @formatted
     def get_users(self):
-        return self.stub.get_users(Empty())
+        result = self.stub.get_users(Empty())
+        return to_json(list(result.user_ids))
 
     @formatted
     def get_user(self, user_id):
-        return self.stub.get_user(GetUserRequest(user_id=user_id))
+        return self.stub.get_user(GetUserRequest(user_id=user_id), indent=4)
 
 
 def main(command, args, command_line_conf):
