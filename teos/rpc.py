@@ -71,10 +71,6 @@ class _RPC(TowerServicesServicer):
         return self.stub.get_all_appointments(request)
 
     @forward_errors
-    def get_appointments(self, request, context):
-        return self.stub.get_appointments(request)
-
-    @forward_errors
     def get_tower_info(self, request, context):
         return self.stub.get_tower_info(request)
 

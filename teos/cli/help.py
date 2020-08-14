@@ -4,7 +4,6 @@ def show_usage():
         "\n\tpython teos_cli.py [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
         "\n\tget_all_appointments \tGets information about all appointments stored in the tower."
-        "\n\tget_appointments \tGets information about appointments with a certain locator."
         "\n\tget_tower_info \tGets generic information about the tower."
         "\n\tget_users \tGets the list of registered user ids."
         "\n\tget_user \tGets information about a specific user."
@@ -25,18 +24,6 @@ def help_get_all_appointments():
         "\tpython teos_cli.py get_all_appointments"
         "\n\nDESCRIPTION:"
         "\n\n\tGets information about all appointments stored in the tower.\n"
-    )
-
-
-def help_get_appointments():
-    return (
-        "NAME:"
-        "\tpython teos_cli get_appointments - Gets information about appointments with a certain locator."
-        "\n\nUSAGE:"
-        '\tpython teos_cli.py get_appointments "locator"'
-        "\n\nDESCRIPTION:"
-        "\n\n\tGets information about all the appointments with the given locator. For each appointment, the data\n"
-        "\n\n\tthat is returned include the full appointment receipt, and the current status within the tower.\n"
     )
 
 

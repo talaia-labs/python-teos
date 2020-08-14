@@ -72,18 +72,6 @@ message GetAppointmentResponse {
   string status = 2;
 }
 
-message GetAppointmentsRequest {
-  // Request to get information about all the appointment for a specific locator. Contains the appointment locator
-
-  string locator = 1;
-}
-
-message GetAppointmentsResponse {
-  // Response to a GetAppointmentsRequest. Contains a list of GetAppointmentResponse.
-
-  repeated GetAppointmentResponse results = 1;
-}
-
 message GetAllAppointmentsResponse {
   /* Response with data about all the appointments in the tower. Return is a Struct build from a Python dictionary,
   containing the watcher appointments and the responder trackers.

@@ -13,7 +13,6 @@ from teos.protobuf.appointment_pb2 import (
     AppointmentData,
     AddAppointmentResponse,
     GetAppointmentResponse,
-    GetAppointmentsResponse,
     GetAllAppointmentsResponse,
 )
 from teos.protobuf.user_pb2 import RegisterResponse, GetUserResponse, GetUsersResponse
@@ -147,53 +146,6 @@ class _InternalAPI(TowerServicesServicer):
         appointments.update({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
 
         return GetAllAppointmentsResponse(appointments=appointments)
-
-    def get_appointments(self, request, context):
-        try:
-            Inspector.check_locator(request.locator)
-        except InspectionFailed as e:
-            context.set_details(f"Invalid locator: {e.reason}")
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return GetAppointmentsResponse()
-
-        with self.rw_lock.gen_rlock():
-            uuids = self.watcher.locator_uuid_map.get(request.locator)
-
-            if not uuids:
-                context.set_details("No appointment found for this locator")
-                context.set_code(grpc.StatusCode.NOT_FOUND)
-                return GetAppointmentsResponse()
-
-            results = []
-            for uuid in uuids:
-                if uuid in self.watcher.appointments:
-                    data = self.watcher.db_manager.load_watcher_appointment(uuid)
-                    appointment_data = AppointmentData(
-                        appointment=AppointmentProto(
-                            locator=data.get("locator"),
-                            encrypted_blob=data.get("encrypted_blob"),
-                            to_self_delay=data.get("to_self_delay"),
-                        )
-                    )
-                    status = "being_watched"
-                elif uuid in self.watcher.responder.trackers:
-                    data = self.watcher.responder.db_manager.load_responder_tracker(uuid)
-                    appointment_data = AppointmentData(
-                        tracker=TrackerProto(
-                            locator=data.get("locator"),
-                            dispute_txid=data.get("dispute_txid"),
-                            penalty_txid=data.get("penalty_txid"),
-                            penalty_rawtx=data.get("penalty_rawtx"),
-                        )
-                    )
-                    status = "dispute_responded"
-                else:
-                    # This should never happen, since we already checked locator_uuid_map
-                    raise RuntimeError("Cannot find {}".format(request.locator))
-
-                results.append(GetAppointmentResponse(appointment_data=appointment_data, status=status))
-
-            return GetAppointmentsResponse(results=results)
 
     def get_tower_info(self, request, context):
         with self.rw_lock.gen_rlock():

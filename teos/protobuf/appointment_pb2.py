@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x11\x61ppointment.proto\x12\x17teos.protobuf.protos.v1\x1a\x1cgoogle/protobuf/struct.proto\"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r\"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t\"\x97\x01\n\x0f\x41ppointmentData\x12;\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.AppointmentH\x00\x12\x33\n\x07tracker\x18\x02 \x01(\x0b\x32 .teos.protobuf.protos.v1.TrackerH\x00\x42\x12\n\x10\x61ppointment_data\"e\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x39\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t\"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r\";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t\"l\n\x16GetAppointmentResponse\x12\x42\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32(.teos.protobuf.protos.v1.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t\")\n\x16GetAppointmentsRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\"[\n\x17GetAppointmentsResponse\x12@\n\x07results\x18\x01 \x03(\x0b\x32/.teos.protobuf.protos.v1.GetAppointmentResponse\"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3'
+  serialized_pb=b'\n\x11\x61ppointment.proto\x12\x17teos.protobuf.protos.v1\x1a\x1cgoogle/protobuf/struct.proto\"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r\"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t\"\x97\x01\n\x0f\x41ppointmentData\x12;\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.AppointmentH\x00\x12\x33\n\x07tracker\x18\x02 \x01(\x0b\x32 .teos.protobuf.protos.v1.TrackerH\x00\x42\x12\n\x10\x61ppointment_data\"e\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x39\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t\"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r\";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t\"l\n\x16GetAppointmentResponse\x12\x42\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32(.teos.protobuf.protos.v1.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t\"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,])
 
@@ -347,70 +347,6 @@ _GETAPPOINTMENTRESPONSE = _descriptor.Descriptor(
 )
 
 
-_GETAPPOINTMENTSREQUEST = _descriptor.Descriptor(
-  name='GetAppointmentsRequest',
-  full_name='teos.protobuf.protos.v1.GetAppointmentsRequest',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='locator', full_name='teos.protobuf.protos.v1.GetAppointmentsRequest.locator', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=816,
-  serialized_end=857,
-)
-
-
-_GETAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
-  name='GetAppointmentsResponse',
-  full_name='teos.protobuf.protos.v1.GetAppointmentsResponse',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='results', full_name='teos.protobuf.protos.v1.GetAppointmentsResponse.results', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=859,
-  serialized_end=950,
-)
-
-
 _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
   name='GetAllAppointmentsResponse',
   full_name='teos.protobuf.protos.v1.GetAllAppointmentsResponse',
@@ -438,8 +374,8 @@ _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=952,
-  serialized_end=1027,
+  serialized_start=816,
+  serialized_end=891,
 )
 
 _APPOINTMENTDATA.fields_by_name['appointment'].message_type = _APPOINTMENT
@@ -452,7 +388,6 @@ _APPOINTMENTDATA.oneofs_by_name['appointment_data'].fields.append(
 _APPOINTMENTDATA.fields_by_name['tracker'].containing_oneof = _APPOINTMENTDATA.oneofs_by_name['appointment_data']
 _ADDAPPOINTMENTREQUEST.fields_by_name['appointment'].message_type = _APPOINTMENT
 _GETAPPOINTMENTRESPONSE.fields_by_name['appointment_data'].message_type = _APPOINTMENTDATA
-_GETAPPOINTMENTSRESPONSE.fields_by_name['results'].message_type = _GETAPPOINTMENTRESPONSE
 _GETALLAPPOINTMENTSRESPONSE.fields_by_name['appointments'].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT
 DESCRIPTOR.message_types_by_name['Appointment'] = _APPOINTMENT
 DESCRIPTOR.message_types_by_name['Tracker'] = _TRACKER
@@ -461,8 +396,6 @@ DESCRIPTOR.message_types_by_name['AddAppointmentRequest'] = _ADDAPPOINTMENTREQUE
 DESCRIPTOR.message_types_by_name['AddAppointmentResponse'] = _ADDAPPOINTMENTRESPONSE
 DESCRIPTOR.message_types_by_name['GetAppointmentRequest'] = _GETAPPOINTMENTREQUEST
 DESCRIPTOR.message_types_by_name['GetAppointmentResponse'] = _GETAPPOINTMENTRESPONSE
-DESCRIPTOR.message_types_by_name['GetAppointmentsRequest'] = _GETAPPOINTMENTSREQUEST
-DESCRIPTOR.message_types_by_name['GetAppointmentsResponse'] = _GETAPPOINTMENTSRESPONSE
 DESCRIPTOR.message_types_by_name['GetAllAppointmentsResponse'] = _GETALLAPPOINTMENTSRESPONSE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -514,20 +447,6 @@ GetAppointmentResponse = _reflection.GeneratedProtocolMessageType('GetAppointmen
   # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.GetAppointmentResponse)
   })
 _sym_db.RegisterMessage(GetAppointmentResponse)
-
-GetAppointmentsRequest = _reflection.GeneratedProtocolMessageType('GetAppointmentsRequest', (_message.Message,), {
-  'DESCRIPTOR' : _GETAPPOINTMENTSREQUEST,
-  '__module__' : 'appointment_pb2'
-  # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.GetAppointmentsRequest)
-  })
-_sym_db.RegisterMessage(GetAppointmentsRequest)
-
-GetAppointmentsResponse = _reflection.GeneratedProtocolMessageType('GetAppointmentsResponse', (_message.Message,), {
-  'DESCRIPTOR' : _GETAPPOINTMENTSRESPONSE,
-  '__module__' : 'appointment_pb2'
-  # @@protoc_insertion_point(class_scope:teos.protobuf.protos.v1.GetAppointmentsResponse)
-  })
-_sym_db.RegisterMessage(GetAppointmentsResponse)
 
 GetAllAppointmentsResponse = _reflection.GeneratedProtocolMessageType('GetAllAppointmentsResponse', (_message.Message,), {
   'DESCRIPTOR' : _GETALLAPPOINTMENTSRESPONSE,

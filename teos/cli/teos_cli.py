@@ -18,13 +18,11 @@ from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from teos.cli.help import (
     show_usage,
     help_get_all_appointments,
-    help_get_appointments,
     help_get_tower_info,
     help_get_users,
     help_get_user,
 )
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
-from teos.protobuf.appointment_pb2 import GetAppointmentsRequest
 from teos.protobuf.user_pb2 import GetUserRequest
 
 
@@ -61,10 +59,6 @@ class RPCClient:
         return self.stub.get_all_appointments(Empty())
 
     @formatted
-    def get_appointments(self, locator):
-        return self.stub.get_appointments(GetAppointmentsRequest(locator=locator))
-
-    @formatted
     def get_tower_info(self):
         return self.stub.get_tower_info(Empty())
 
@@ -93,14 +87,6 @@ def main(command, args, command_line_conf):
         if command == "get_all_appointments":
             result = rpc_client.get_all_appointments()
 
-        elif command == "get_appointments":
-            if not args:
-                sys.exit("No locator was given")
-            if len(args) > 1:
-                sys.exit(f"Expected only one argument, not {len(args)}")
-
-            result = rpc_client.get_appointments(args[0])
-
         elif command == "get_tower_info":
             result = rpc_client.get_tower_info()
 
@@ -120,9 +106,6 @@ def main(command, args, command_line_conf):
 
                 if command == "get_all_appointments":
                     sys.exit(help_get_all_appointments())
-
-                elif command == "get_appointments":
-                    sys.exit(help_get_appointments())
 
                 elif command == "get_tower_info":
                     sys.exit(help_get_tower_info())

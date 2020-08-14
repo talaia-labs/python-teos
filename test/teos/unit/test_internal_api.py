@@ -22,8 +22,6 @@ from teos.protobuf.appointment_pb2 import (
     AddAppointmentResponse,
     GetAppointmentRequest,
     GetAppointmentResponse,
-    GetAppointmentsRequest,
-    GetAppointmentsResponse,
     GetAllAppointmentsResponse,
 )
 
@@ -308,81 +306,6 @@ def test_get_all_appointments_both(clear_state, internal_api, generate_dummy_app
     assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 1
     assert dict(appointments.get("watcher_appointments")[uuid_appointment]) == appointment.to_dict()
     assert dict(appointments.get("responder_trackers")[uuid_tracker]) == tracker.to_dict()
-
-
-def test_get_appointments_invalid_locator(internal_api, stub):
-    with pytest.raises(grpc.RpcError) as e:
-        response = stub.get_appointments(GetAppointmentsRequest(locator="wrong locator"))
-
-    assert e.value.code() == grpc.StatusCode.INVALID_ARGUMENT
-    assert "Invalid locator" in e.value.details()
-
-
-# FIXME: 194 will do with dummy appointments
-def test_get_appointments_empty(internal_api, generate_dummy_appointment, stub):
-    appointment, _ = generate_dummy_appointment()
-
-    with pytest.raises(grpc.RpcError) as e:
-        response = stub.get_appointments(GetAppointmentsRequest(locator=appointment.locator))
-
-    assert e.value.code() == grpc.StatusCode.NOT_FOUND
-    assert "No appointment found for this locator" in e.value.details()
-
-
-def test_get_appointments_watcher(clear_state, internal_api, db_manager, generate_dummy_appointment, stub, monkeypatch):
-    appointment, _ = generate_dummy_appointment()
-
-    # We store the same appointment with two different ids
-    uuid_appointment1 = uuid4().hex
-    uuid_appointment2 = uuid4().hex
-
-    # we mock the watcher's state to believe there are appointments with the above uuid, and we add them to the db
-    monkeypatch.setattr(
-        internal_api.watcher, "locator_uuid_map", {appointment.locator: [uuid_appointment1, uuid_appointment2]}
-    )
-    monkeypatch.setattr(
-        internal_api.watcher,
-        "appointments",
-        {
-            uuid_appointment1: {"locator": appointment.locator, "user_id": uuid4().hex},
-            uuid_appointment2: {"locator": appointment.locator, "user_id": uuid4().hex},
-        },
-    )
-    db_manager.store_watcher_appointment(uuid_appointment1, appointment.to_dict())
-    db_manager.store_watcher_appointment(uuid_appointment2, appointment.to_dict())
-
-    response = stub.get_appointments(GetAppointmentsRequest(locator=appointment.locator))
-    assert isinstance(response, GetAppointmentsResponse)
-    assert len(response.results) == 2
-    assert response.results[0].appointment_data.appointment.locator == appointment.locator
-    assert response.results[0].status == "being_watched"
-    assert response.results[1].appointment_data.appointment.locator == appointment.locator
-    assert response.results[1].status == "being_watched"
-
-
-def test_get_appointments_responder(
-    clear_state, internal_api, db_manager, generate_dummy_appointment, stub, monkeypatch
-):
-    appointment, _ = generate_dummy_appointment()
-
-    uuid_appointment = uuid4().hex
-
-    # we mock the watcher's state to believe there are appointments with the above uuid, and we add them to the db
-    monkeypatch.setattr(internal_api.watcher, "locator_uuid_map", {appointment.locator: [uuid_appointment]})
-    monkeypatch.setattr(
-        internal_api.watcher.responder,
-        "trackers",
-        {uuid_appointment: {"penalty_txid": uuid4().hex, "locator": appointment.locator, "user_id": uuid4().hex}},
-    )
-    db_manager.store_responder_tracker(uuid_appointment, appointment.to_dict())
-
-    response = stub.get_appointments(GetAppointmentsRequest(locator=appointment.locator))
-    assert isinstance(response, GetAppointmentsResponse)
-    assert len(response.results) == 1
-    res = response.results[0]
-    app = response.results[0].appointment_data
-    assert response.results[0].appointment_data.tracker.locator == appointment.locator
-    assert response.results[0].status == "dispute_responded"
 
 
 def test_get_tower_info_empty(clear_state, internal_api, stub):

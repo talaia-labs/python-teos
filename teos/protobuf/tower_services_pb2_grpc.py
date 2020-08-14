@@ -32,11 +32,6 @@ class TowerServicesStub(object):
             request_serializer=appointment__pb2.GetAppointmentRequest.SerializeToString,
             response_deserializer=appointment__pb2.GetAppointmentResponse.FromString,
         )
-        self.get_appointments = channel.unary_unary(
-            "/teos.protobuf.protos.v1.TowerServices/get_appointments",
-            request_serializer=appointment__pb2.GetAppointmentsRequest.SerializeToString,
-            response_deserializer=appointment__pb2.GetAppointmentsResponse.FromString,
-        )
         self.get_all_appointments = channel.unary_unary(
             "/teos.protobuf.protos.v1.TowerServices/get_all_appointments",
             request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -75,12 +70,6 @@ class TowerServicesServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def get_appointment(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("Method not implemented!")
-        raise NotImplementedError("Method not implemented!")
-
-    def get_appointments(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -127,11 +116,6 @@ def add_TowerServicesServicer_to_server(servicer, server):
             servicer.get_appointment,
             request_deserializer=appointment__pb2.GetAppointmentRequest.FromString,
             response_serializer=appointment__pb2.GetAppointmentResponse.SerializeToString,
-        ),
-        "get_appointments": grpc.unary_unary_rpc_method_handler(
-            servicer.get_appointments,
-            request_deserializer=appointment__pb2.GetAppointmentsRequest.FromString,
-            response_serializer=appointment__pb2.GetAppointmentsResponse.SerializeToString,
         ),
         "get_all_appointments": grpc.unary_unary_rpc_method_handler(
             servicer.get_all_appointments,
@@ -234,33 +218,6 @@ class TowerServices(object):
             "/teos.protobuf.protos.v1.TowerServices/get_appointment",
             appointment__pb2.GetAppointmentRequest.SerializeToString,
             appointment__pb2.GetAppointmentResponse.FromString,
-            options,
-            channel_credentials,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-        )
-
-    @staticmethod
-    def get_appointments(
-        request,
-        target,
-        options=(),
-        channel_credentials=None,
-        call_credentials=None,
-        compression=None,
-        wait_for_ready=None,
-        timeout=None,
-        metadata=None,
-    ):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            "/teos.protobuf.protos.v1.TowerServices/get_appointments",
-            appointment__pb2.GetAppointmentsRequest.SerializeToString,
-            appointment__pb2.GetAppointmentsResponse.FromString,
             options,
             channel_credentials,
             call_credentials,
