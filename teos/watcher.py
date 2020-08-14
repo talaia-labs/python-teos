@@ -225,6 +225,26 @@ class Watcher:
         self.last_known_block = db_manager.load_last_block_hash_watcher()
         self.locator_cache = LocatorCache(blocks_in_cache)
 
+    @property
+    def tower_id(self):
+        """Get the id of this tower, as a hex string."""
+        return Cryptographer.get_compressed_pk(self.signing_key.public_key)
+
+    @property
+    def n_registered_users(self):
+        """Get the number of users currently registered to the tower."""
+        return len(self.gatekeeper.registered_users)
+
+    @property
+    def n_watcher_appointments(self):
+        """Get the total number of appointments stored in the watcher."""
+        return len(self.appointments)
+
+    @property
+    def n_responder_trackers(self):
+        """Get the total number of trackers in the responder."""
+        return len(self.responder.trackers)
+
     def awake(self):
         """Starts a new thread to monitor the blockchain for channel breaches"""
 

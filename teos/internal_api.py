@@ -199,10 +199,10 @@ class _InternalAPI(TowerServicesServicer):
     def get_tower_info(self, request, context):
         with self.rw_lock.gen_rlock():
             return GetTowerInfoResponse(
-                tower_id=Cryptographer.get_compressed_pk(self.watcher.signing_key.public_key),
-                n_registered_users=len(self.watcher.gatekeeper.registered_users),
-                n_watcher_appointments=len(self.watcher.appointments),
-                n_responder_trackers=len(self.watcher.responder.trackers),
+                tower_id=self.watcher.tower_id,
+                n_registered_users=self.watcher.n_registered_users,
+                n_watcher_appointments=self.watcher.n_watcher_appointments,
+                n_responder_trackers=self.watcher.n_responder_trackers,
             )
 
     def get_users(self, request, context):
