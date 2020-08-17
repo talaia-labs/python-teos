@@ -1,4 +1,5 @@
 import pytest
+import json
 from time import sleep
 from riemann.tx import Tx
 from binascii import hexlify
@@ -113,7 +114,7 @@ def test_appointment_life_cycle(run_bitcoind):
     rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
 
     # Check also the get_all_appointment endpoint
-    all_appointments = rpc_client.get_all_appointments()
+    all_appointments = json.loads(rpc_client.get_all_appointments())
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == 0
@@ -126,7 +127,7 @@ def test_appointment_life_cycle(run_bitcoind):
     appointments_in_watcher -= 1
     appointments_in_responder += 1
 
-    all_appointments = rpc_client.get_all_appointments()
+    all_appointments = json.loads(rpc_client.get_all_appointments())
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == appointments_in_responder
@@ -198,7 +199,7 @@ def test_multiple_appointments_life_cycle(run_bitcoind):
 
     # Test that they all show up in get_all_appointments at the correct stages.
     rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
-    all_appointments = rpc_client.get_all_appointments()
+    all_appointments = json.loads(rpc_client.get_all_appointments())
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == appointments_in_watcher and len(responding) == appointments_in_responder
