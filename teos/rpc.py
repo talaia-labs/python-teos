@@ -87,7 +87,7 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
-    This method will serve and hold until the main process is started or a stop signal is received. Notice the later is
+    This method will serve and hold until the main process is stop or a stop signal is received. Notice the latter is
     not possible possible currently since the stop signal has to be passed to `rpc_server` and it is not returned. This
     may change once the stop command for the CLI is implemented.
 
