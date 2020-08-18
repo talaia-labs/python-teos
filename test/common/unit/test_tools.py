@@ -151,7 +151,7 @@ def test_intify_changed():
 
     x = [1.0, 1.5, -2.0, True]
     res = intify(x)
-    assert res == [1.0, 1.5, -2, True]
+    assert res == [1, 1.5, -2, True]
     assert type(res[0]) == int
     assert type(res[1]) == float
     assert type(res[2]) == int

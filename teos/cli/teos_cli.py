@@ -31,7 +31,8 @@ def to_json(obj):
 
 
 def formatted(func):
-    """Transforms the given function by wrapping the return value with json_format.MessageToDict followed by
+    """
+    Transforms the given function by wrapping the return value with json_format.MessageToDict followed by
     json.dumps, in order to print the result in a prettyfied json format.
     """
 
@@ -47,7 +48,8 @@ def formatted(func):
 
 
 class RPCClient:
-    """Creates and keeps a connection to the an RPC serving TowerServices. It has methods to call each of the
+    """
+    Creates and keeps a connection to the an RPC serving TowerServices. It has methods to call each of the
     available grpc services, and it returns a pretty-printed json response.
     Errors from the grpc calls are not handled.
 
@@ -84,7 +86,8 @@ class RPCClient:
 
     @formatted
     def get_user(self, user_id):
-        """Gets information about a specific user.
+        """
+        Gets information about a specific user.
 
         Args:
             user_id (:obj:`str`): the id of the requested user.
@@ -92,6 +95,7 @@ class RPCClient:
         Raises:
             :obj:`InvalidParameter`: if `user_id` is not in the valid format.
         """
+
         if not is_compressed_pk(user_id):
             raise InvalidParameter("Invalid user id")
 

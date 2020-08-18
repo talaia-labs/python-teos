@@ -37,8 +37,10 @@ class RPC:
 
 
 def forward_errors(func):
-    """Transforms in order to forward any grpc.RPCError returned by the upstream grpc as the result of the current grpc
-    call."""
+    """
+    Transforms in order to forward any grpc.RPCError returned by the upstream grpc as the result of the current grpc
+    call.
+    """
 
     @functools.wraps(func)
     def wrapper(self, request, context, *args, **kwargs):

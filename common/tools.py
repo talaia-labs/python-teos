@@ -80,7 +80,8 @@ def setup_data_folder(data_folder):
 
 
 def intify(obj):
-    """Takes an object that is a recursive composition of primitive types, lists and dictionaries, and returns an
+    """
+    Takes an object that is a recursive composition of primitive types, lists and dictionaries, and returns an
     equivalent object where every `float` number that is actually an integer is replaced with the corresponding `int`.
 
     Args:
@@ -89,6 +90,7 @@ def intify(obj):
     Returns:
         The modified version of `obj`
     """
+
     if isinstance(obj, list):
         return [intify(x) for x in obj]
     elif isinstance(obj, dict):
