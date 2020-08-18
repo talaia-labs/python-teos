@@ -268,9 +268,6 @@ def test_get_all_appointments_watcher(clear_state, internal_api, generate_dummy_
     assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 0
     assert dict(appointments.get("watcher_appointments")[uuid]) == appointment.to_dict()
 
-    # Delete the data
-    internal_api.watcher.db_manager.delete_watcher_appointment(uuid)
-
 
 # FIXME: 194 will do with dummy tracker
 def test_get_all_appointments_responder(clear_state, internal_api, generate_dummy_tracker, stub):
@@ -284,9 +281,6 @@ def test_get_all_appointments_responder(clear_state, internal_api, generate_dumm
 
     assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 1
     assert dict(appointments.get("responder_trackers")[uuid]) == tracker.to_dict()
-
-    # Delete the data
-    internal_api.watcher.db_manager.delete_responder_tracker(uuid)
 
 
 # FIXME: 194 will do with dummy appointments and trackers
@@ -311,7 +305,7 @@ def test_get_all_appointments_both(clear_state, internal_api, generate_dummy_app
 def test_get_tower_info_empty(clear_state, internal_api, stub):
     response = stub.get_tower_info(Empty())
     assert isinstance(response, GetTowerInfoResponse)
-    assert response.tower_id == Cryptographer.get_compressed_pk(internal_api.watcher.signing_key.public_key)
+    assert response.tower_id == Cryptographer.get_compressed_pk(teos_pk)
     assert response.n_registered_users == 0
     assert response.n_watcher_appointments == 0
     assert response.n_responder_trackers == 0
@@ -387,7 +381,7 @@ def test_get_user_not_found(internal_api, stub):
     mock_user_id = "some_non_existing_user_id"
 
     with pytest.raises(grpc.RpcError) as e:
-        response = stub.get_user(GetUserRequest(user_id=mock_user_id))
+        stub.get_user(GetUserRequest(user_id=mock_user_id))
 
     assert e.value.code() == grpc.StatusCode.NOT_FOUND
     assert "User not found" in e.value.details()
