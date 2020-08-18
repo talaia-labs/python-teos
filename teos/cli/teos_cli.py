@@ -73,7 +73,7 @@ class RPCClient:
 
     @formatted
     def get_user(self, user_id):
-        return self.stub.get_user(GetUserRequest(user_id=user_id), indent=4)
+        return self.stub.get_user(GetUserRequest(user_id=user_id))
 
 
 def main(command, args, command_line_conf):
@@ -128,11 +128,11 @@ def main(command, args, command_line_conf):
                 sys.exit(show_usage())
 
     except grpc.RpcError as e:
-        sys.exit(e.details())
-    except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
-        sys.exit(str(e))
-    except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
-        sys.exit(f"{e.msg}. Error arguments: {e.kwargs}")
+        if e.code() == grpc.StatusCode.UNAVAILABLE:
+            sys.exit(f"It was not possible to reach the Eye of Satoshi. Check your network settings.")
+        else:
+            sys.exit(e.details())
+
     except Exception as e:
         sys.exit(f"Unknown error occurred: {str(e)}")
 
