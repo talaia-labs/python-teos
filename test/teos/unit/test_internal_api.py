@@ -359,21 +359,28 @@ def test_get_users(internal_api, stub, monkeypatch):
 
 def test_get_user(internal_api, stub, monkeypatch):
     # it doesn't matter they are not valid user ids and user data object for this test
-    mock_user_id = "some_user_id"
-    mock_user_info = UserInfo(100, 1234)
+    mock_user_id = "02c73bad28b78dd7e3bcad609d330e0d60b97fa0e08ca1cf486cb6cab8dd6140ac"
+    mock_available_slots = 100
+    mock_subscription_expiry = 1234
+    mock_user_info = UserInfo(mock_available_slots, mock_subscription_expiry)
 
     def mock_get_user_info(user_id):
         if user_id == mock_user_id:
             return mock_user_info
         else:
-            raise f"called with an unexpected user_id: {user_id}"
+            raise RuntimeError(f"called with an unexpected user_id: {user_id}")
 
     monkeypatch.setattr(internal_api.watcher, "get_user_info", mock_get_user_info)
 
     response = stub.get_user(GetUserRequest(user_id=mock_user_id))
     assert isinstance(response, GetUserResponse)
 
-    assert json_format.MessageToDict(response.user) == mock_user_info.to_dict()
+    # FIXME: numbers are currently returned as floats, even if they are integers
+    assert json_format.MessageToDict(response.user) == {
+        "appointments": [],
+        "available_slots": float(mock_available_slots),
+        "subscription_expiry": float(mock_subscription_expiry),
+    }
 
 
 def test_get_user_not_found(internal_api, stub):

@@ -190,5 +190,11 @@ class _InternalAPI(TowerServicesServicer):
                 return GetUserResponse()
 
             user_struct = Struct()
-            user_struct.update(user_info.to_dict())
+            user_struct.update(
+                {
+                    "subscription_expiry": user_info.subscription_expiry,
+                    "available_slots": user_info.available_slots,
+                    "appointments": list(user_info.appointments.keys()),
+                }
+            )
             return GetUserResponse(user=user_struct)

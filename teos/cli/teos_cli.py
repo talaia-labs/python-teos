@@ -11,7 +11,7 @@ from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
 from common.config_loader import ConfigLoader
-from common.tools import setup_data_folder
+from common.tools import setup_data_folder, is_compressed_pk
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
@@ -73,7 +73,11 @@ class RPCClient:
 
     @formatted
     def get_user(self, user_id):
-        return self.stub.get_user(GetUserRequest(user_id=user_id))
+        if not is_compressed_pk(user_id):
+            raise InvalidParameter("Invalid user id")
+
+        result = self.stub.get_user(GetUserRequest(user_id=user_id))
+        return result.user
 
 
 def main(command, args, command_line_conf):
@@ -127,17 +131,18 @@ def main(command, args, command_line_conf):
             else:
                 sys.exit(show_usage())
 
+        if result:
+            print(result)
+
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNAVAILABLE:
             sys.exit(f"It was not possible to reach the Eye of Satoshi. Check your network settings.")
         else:
             sys.exit(e.details())
-
+    except InvalidParameter as e:
+        sys.exit(e.msg if not e.kwargs else f"{e.msg}. Error arguments: {e.kwargs}")
     except Exception as e:
         sys.exit(f"Unknown error occurred: {str(e)}")
-
-    if result:
-        print(result)
 
 
 if __name__ == "__main__":
