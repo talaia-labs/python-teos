@@ -10,7 +10,7 @@ from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
 from common.config_loader import ConfigLoader
-from common.tools import setup_data_folder, is_compressed_pk
+from common.tools import setup_data_folder, is_compressed_pk, intify
 from common.exceptions import InvalidParameter
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
@@ -25,6 +25,7 @@ from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.user_pb2 import GetUserRequest
 
 
+# All conversions to json in this module should be consistent, therefore we restrict the options using this function.
 def to_json(obj):
     return json.dumps(obj, indent=4)
 
@@ -40,7 +41,7 @@ def formatted(func):
         result_dict = json_format.MessageToDict(
             result, including_default_value_fields=True, preserving_proto_field_name=True
         )
-        return to_json(result_dict)
+        return to_json(intify(result_dict))
 
     return wrapper
 

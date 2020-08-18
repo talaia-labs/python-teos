@@ -1,7 +1,15 @@
 import os
 
 from common.constants import LOCATOR_LEN_BYTES
-from common.tools import is_compressed_pk, is_256b_hex_str, is_locator, compute_locator, setup_data_folder, is_u4int
+from common.tools import (
+    is_compressed_pk,
+    is_256b_hex_str,
+    is_locator,
+    compute_locator,
+    setup_data_folder,
+    is_u4int,
+    intify,
+)
 from test.common.unit.conftest import get_random_value_hex
 
 
@@ -102,3 +110,68 @@ def test_setup_data_folder():
     assert os.path.isdir(test_folder)
 
     os.rmdir(test_folder)
+
+
+def test_intify_unchanged():
+    test_cases = [
+        0,
+        1.1,
+        True,
+        False,
+        "yo",
+        {},
+        [],
+    ]
+    for x in test_cases:
+        assert intify(x) == x
+
+    res = intify([3, 2.5, "yo"])
+    assert res == [3, 2.5, "yo"]
+    assert type(res[0]) == int
+    assert type(res[1]) == float
+
+    x = [3, 2.5, "yo", [4]]
+    res = intify(x)
+    assert res == x
+    assert type(res[0]) == int
+    assert type(res[1]) == float
+    assert type(res[3][0]) == int
+
+    x = {"a": 1, "b": 2.5, "c": {"d": [8]}}
+    res = intify(x)
+    assert res == x
+    assert type(res["a"] == int)
+    assert type(res["b"] == float)
+    assert type(res["c"]["d"][0] == int)
+
+
+def test_intify_changed():
+    assert intify(1.0) == 1
+    assert intify(-1.0) == -1
+
+    x = [1.0, 1.5, -2.0, True]
+    res = intify(x)
+    assert res == [1.0, 1.5, -2, True]
+    assert type(res[0]) == int
+    assert type(res[1]) == float
+    assert type(res[2]) == int
+    assert type(res[3]) == bool
+
+    x = {"a": 1.0, "b": 1.5, "c": -2.0, "d": False}
+    res = intify(x)
+    assert res == {"a": 1, "b": 1.5, "c": -2, "d": False}
+    assert type(res["a"]) == int
+    assert type(res["b"]) == float
+    assert type(res["c"]) == int
+    assert type(res["d"]) == bool
+
+    x = {"a": 1.0, "b": [4, {"c": 5.0, "cc": 5.5}], "d": {"e": ["foo", 6, 6.5, 7.0]}}
+    res = intify(x)
+    assert res == {"a": 1, "b": [4, {"c": 5, "cc": 5.5}], "d": {"e": ["foo", 6, 6.5, 7]}}
+    assert type(res["a"]) == int
+    assert type(res["b"][0]) == int
+    assert type(res["b"][1]["c"]) == int
+    assert type(res["b"][1]["cc"]) == float
+    assert type(res["d"]["e"][1]) == int
+    assert type(res["d"]["e"][2]) == float
+    assert type(res["d"]["e"][3]) == int
