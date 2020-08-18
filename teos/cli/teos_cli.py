@@ -159,7 +159,7 @@ def main(command, args, command_line_conf):
 
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNAVAILABLE:
-            sys.exit("It was not possible to reach the Eye of Satoshi. Check your network settings.")
+            sys.exit("It was not possible to reach the Eye of Satoshi. Are you sure the tower is running?")
         else:
             sys.exit(e.details())
     except InvalidParameter as e:
