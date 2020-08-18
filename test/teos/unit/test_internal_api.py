@@ -1,16 +1,21 @@
 import grpc
 import pytest
 from binascii import hexlify
+from uuid import uuid4
+
+from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
 from common.cryptographer import Cryptographer, hash_160
 
 from teos.watcher import Watcher
 from teos.responder import Responder
+from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
 from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
-from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse
+from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
+from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse, GetUsersResponse, GetUserRequest, GetUserResponse
 from teos.protobuf.appointment_pb2 import (
     Appointment,
     AddAppointmentRequest,
@@ -43,6 +48,17 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
     yield i_api
 
     i_api.rpc_server.stop(None)
+
+
+@pytest.fixture()
+def clear_state(internal_api, db_manager):
+    """If added to a test, it will clear the db and all the appointments in the watcher and responder before running
+    the test"""
+    internal_api.watcher.gatekeeper.registered_users = dict()
+    internal_api.watcher.appointments = dict()
+    internal_api.watcher.responder.trackers = dict()
+    for key, _ in db_manager.db.iterator():
+        db_manager.db.delete(key)
 
 
 @pytest.fixture()
@@ -232,6 +248,140 @@ def test_get_appointment_non_existent(internal_api, stub):
 # the previous set. Notice the currently there is not even authentication for the CLI (FIXME)
 
 
-def test_get_all_appointments(internal_api, stub):
+def test_get_all_appointments(clear_state, internal_api, stub):
     response = stub.get_all_appointments(Empty())
     assert isinstance(response, GetAllAppointmentsResponse)
+    appointments = dict(response.appointments)
+    assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 0
+
+
+# FIXME: 194 will do with dummy appointment
+def test_get_all_appointments_watcher(clear_state, internal_api, generate_dummy_appointment, stub):
+    # Data is pulled straight from the database, so we need to feed some
+    appointment, _ = generate_dummy_appointment()
+    uuid = uuid4().hex
+    internal_api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+
+    response = stub.get_all_appointments(Empty())
+    appointments = dict(response.appointments)
+
+    assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 0
+    assert dict(appointments.get("watcher_appointments")[uuid]) == appointment.to_dict()
+
+
+# FIXME: 194 will do with dummy tracker
+def test_get_all_appointments_responder(clear_state, internal_api, generate_dummy_tracker, stub):
+    # Data is pulled straight from the database, so we need to feed some
+    tracker = generate_dummy_tracker()
+    uuid = uuid4().hex
+    internal_api.watcher.db_manager.store_responder_tracker(uuid, tracker.to_dict())
+
+    response = stub.get_all_appointments(Empty())
+    appointments = dict(response.appointments)
+
+    assert len(appointments.get("watcher_appointments")) == 0 and len(appointments.get("responder_trackers")) == 1
+    assert dict(appointments.get("responder_trackers")[uuid]) == tracker.to_dict()
+
+
+# FIXME: 194 will do with dummy appointments and trackers
+def test_get_all_appointments_both(clear_state, internal_api, generate_dummy_appointment, generate_dummy_tracker, stub):
+    # Data is pulled straight from the database, so we need to feed some
+    appointment, _ = generate_dummy_appointment()
+    uuid_appointment = uuid4().hex
+    internal_api.watcher.db_manager.store_watcher_appointment(uuid_appointment, appointment.to_dict())
+
+    tracker = generate_dummy_tracker()
+    uuid_tracker = uuid4().hex
+    internal_api.watcher.db_manager.store_responder_tracker(uuid_tracker, tracker.to_dict())
+
+    response = stub.get_all_appointments(Empty())
+    appointments = dict(response.appointments)
+
+    assert len(appointments.get("watcher_appointments")) == 1 and len(appointments.get("responder_trackers")) == 1
+    assert dict(appointments.get("watcher_appointments")[uuid_appointment]) == appointment.to_dict()
+    assert dict(appointments.get("responder_trackers")[uuid_tracker]) == tracker.to_dict()
+
+
+def test_get_tower_info_empty(clear_state, internal_api, stub):
+    response = stub.get_tower_info(Empty())
+    assert isinstance(response, GetTowerInfoResponse)
+    assert response.tower_id == Cryptographer.get_compressed_pk(teos_pk)
+    assert response.n_registered_users == 0
+    assert response.n_watcher_appointments == 0
+    assert response.n_responder_trackers == 0
+
+
+def test_get_tower_info(internal_api, stub, monkeypatch):
+    monkeypatch.setattr(internal_api.watcher.gatekeeper, "registered_users", {"uid1": {}})
+    monkeypatch.setattr(
+        internal_api.watcher,
+        "appointments",
+        {
+            "uid1": {"locator": "locator1", "user_id": "user_id1"},
+            "uid2": {"locator": "locator2", "user_id": "user_id2"},
+        },
+    )
+    monkeypatch.setattr(
+        internal_api.watcher.responder,
+        "trackers",
+        {
+            "uid1": {"penalty_txid": "txid1", "locator": "locator1", "user_id": "user_id1"},
+            "uid2": {"penalty_txid": "txid2", "locator": "locator2", "user_id": "user_id2"},
+            "uid3": {"penalty_txid": "txid3", "locator": "locator2", "user_id": "user_id3"},
+        },
+    )
+
+    response = stub.get_tower_info(Empty())
+    assert isinstance(response, GetTowerInfoResponse)
+    assert response.tower_id == Cryptographer.get_compressed_pk(internal_api.watcher.signing_key.public_key)
+    assert response.n_registered_users == 1
+    assert response.n_watcher_appointments == 2
+    assert response.n_responder_trackers == 3
+
+
+def test_get_users(internal_api, stub, monkeypatch):
+    # it doesn't matter they are not valid user ids for the test
+    mock_users = ["user1", "user2", "user3"]
+    monkeypatch.setattr(
+        internal_api.watcher.gatekeeper, "registered_users", {"user1": dict(), "user2": dict(), "user3": dict()}
+    )
+
+    response = stub.get_users(Empty())
+    assert isinstance(response, GetUsersResponse)
+    assert response.user_ids == mock_users
+
+
+def test_get_user(internal_api, stub, monkeypatch):
+    # it doesn't matter they are not valid user ids and user data object for this test
+    mock_user_id = "02c73bad28b78dd7e3bcad609d330e0d60b97fa0e08ca1cf486cb6cab8dd6140ac"
+    mock_available_slots = 100
+    mock_subscription_expiry = 1234
+    mock_user_info = UserInfo(mock_available_slots, mock_subscription_expiry)
+
+    def mock_get_user_info(user_id):
+        if user_id == mock_user_id:
+            return mock_user_info
+        else:
+            raise RuntimeError(f"called with an unexpected user_id: {user_id}")
+
+    monkeypatch.setattr(internal_api.watcher, "get_user_info", mock_get_user_info)
+
+    response = stub.get_user(GetUserRequest(user_id=mock_user_id))
+    assert isinstance(response, GetUserResponse)
+
+    # FIXME: numbers are currently returned as floats, even if they are integers
+    assert json_format.MessageToDict(response.user) == {
+        "appointments": [],
+        "available_slots": float(mock_available_slots),
+        "subscription_expiry": float(mock_subscription_expiry),
+    }
+
+
+def test_get_user_not_found(internal_api, stub):
+    mock_user_id = "some_non_existing_user_id"
+
+    with pytest.raises(grpc.RpcError) as e:
+        stub.get_user(GetUserRequest(user_id=mock_user_id))
+
+    assert e.value.code() == grpc.StatusCode.NOT_FOUND
+    assert "User not found" in e.value.details()

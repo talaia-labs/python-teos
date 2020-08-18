@@ -225,6 +225,26 @@ class Watcher:
         self.last_known_block = db_manager.load_last_block_hash_watcher()
         self.locator_cache = LocatorCache(blocks_in_cache)
 
+    @property
+    def tower_id(self):
+        """Get the id of this tower, as a hex string."""
+        return Cryptographer.get_compressed_pk(self.signing_key.public_key)
+
+    @property
+    def n_registered_users(self):
+        """Get the number of users currently registered to the tower."""
+        return len(self.gatekeeper.registered_users)
+
+    @property
+    def n_watcher_appointments(self):
+        """Get the total number of appointments stored in the watcher."""
+        return len(self.appointments)
+
+    @property
+    def n_responder_trackers(self):
+        """Get the total number of trackers in the responder."""
+        return len(self.responder.trackers)
+
     def awake(self):
         """Starts a new thread to monitor the blockchain for channel breaches"""
 
@@ -621,3 +641,28 @@ class Watcher:
                         invalid_breaches.append(uuid)
 
         return valid_breaches, invalid_breaches
+
+    def get_registered_user_ids(self):
+        """Returns the list of user ids of all the registered users."""
+        return list(self.gatekeeper.registered_users.keys())
+
+    def get_user_info(self, user_id):
+        """
+        Returns the `UserInfo` of the user with the given id.
+
+        Args:
+            user_id (:obj:`str`): the id of the requested user.
+
+        Returns:
+            :obj:`teos.gatekeeper.UserInfo` or :obj:`None`: The `UserInfo` object if found. `None` if not found, or
+            the `user_id` is invalid.
+        """
+        return self.gatekeeper.registered_users.get(user_id)
+
+    def get_all_watcher_appointments(self):
+        """Returns a dictionary with all the appointment stored in the db for the watcher."""
+        return self.db_manager.load_watcher_appointments()
+
+    def get_all_responder_trackers(self):
+        """Returns a dictionary with all the trackers stored in the db for the responder."""
+        return self.db_manager.load_responder_trackers()

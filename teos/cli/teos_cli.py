@@ -4,47 +4,103 @@ import sys
 import json
 import grpc
 from sys import argv
+import functools
 from getopt import getopt, GetoptError
-from requests import ConnectionError
 from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
 from common.config_loader import ConfigLoader
-from common.tools import setup_data_folder
-from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
+from common.tools import setup_data_folder, is_compressed_pk, intify
+from common.exceptions import InvalidParameter
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from teos.cli.help import show_usage, help_get_all_appointments
+from teos.cli.help import (
+    show_usage,
+    help_get_all_appointments,
+    help_get_tower_info,
+    help_get_users,
+    help_get_user,
+)
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
+from teos.protobuf.user_pb2 import GetUserRequest
 
 
-def get_all_appointments(rpc_host, rpc_port):
+# All conversions to json in this module should be consistent, therefore we restrict the options using this function.
+def to_json(obj):
+    return json.dumps(obj, indent=4)
+
+
+def formatted(func):
     """
-    Gets information about all appointments stored in the tower.
+    Transforms the given function by wrapping the return value with json_format.MessageToDict followed by
+    json.dumps, in order to print the result in a prettyfied json format.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        result_dict = json_format.MessageToDict(
+            result, including_default_value_fields=True, preserving_proto_field_name=True
+        )
+        return to_json(intify(result_dict))
+
+    return wrapper
+
+
+class RPCClient:
+    """
+    Creates and keeps a connection to the an RPC serving TowerServices. It has methods to call each of the
+    available grpc services, and it returns a pretty-printed json response.
+    Errors from the grpc calls are not handled.
 
     Args:
-        rpc_host (:obj:`str`): the hostname (or IP) where the rpc server is running.
-        rpc_port (:obj:`int`): the port where the rpc server is running.
+        rpc_host (:obj:`str`): the IP or host where the RPC server will be hosted.
+        rpc_port (:obj:`int`): the port where the RPC server will be hosted.
 
-    Returns:
-        :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
-        responds.
+    Attributes:
+        channel (:obj:`grpc.Channel`): the Channel object
+        stub: the rpc client stub
     """
 
-    try:
-        with grpc.insecure_channel(f"{rpc_host}:{rpc_port}") as channel:
-            stub = TowerServicesStub(channel)
-            r = stub.get_all_appointments(Empty())
-            response = json_format.MessageToDict(
-                r.appointments, including_default_value_fields=True, preserving_proto_field_name=True
-            )
+    def __init__(self, rpc_host, rpc_port):
+        self.rpc_host = rpc_host
+        self.rpc_port = rpc_port
+        self.channel = grpc.insecure_channel(f"{rpc_host}:{rpc_port}")
+        self.stub = TowerServicesStub(self.channel)
 
-        return response
+    @formatted
+    def get_all_appointments(self):
+        """Gets a list of all the appointments in the watcher, and trackers in the responder."""
+        result = self.stub.get_all_appointments(Empty())
+        return result.appointments
 
-    # FIXME: Handle different errors
-    except grpc.RpcError:
-        print("Can't connect to the Eye of Satoshi. RPC server cannot be reached", file=sys.stderr)
-        return None
+    @formatted
+    def get_tower_info(self):
+        """Gets generic information about the tower."""
+        return self.stub.get_tower_info(Empty())
+
+    def get_users(self):
+        """Gets the list of registered user ids."""
+        result = self.stub.get_users(Empty())
+        return to_json(list(result.user_ids))
+
+    @formatted
+    def get_user(self, user_id):
+        """
+        Gets information about a specific user.
+
+        Args:
+            user_id (:obj:`str`): the id of the requested user.
+
+        Raises:
+            :obj:`InvalidParameter`: if `user_id` is not in the valid format.
+        """
+
+        if not is_compressed_pk(user_id):
+            raise InvalidParameter("Invalid user id")
+
+        result = self.stub.get_user(GetUserRequest(user_id=user_id))
+        return result.user
 
 
 def main(command, args, command_line_conf):
@@ -54,12 +110,28 @@ def main(command, args, command_line_conf):
 
     setup_data_folder(DATA_DIR)
 
+    teos_rpc_host = config.get("RPC_BIND")
+    teos_rpc_port = config.get("RPC_PORT")
+
+    rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
+
     try:
         if command == "get_all_appointments":
-            appointment_data = get_all_appointments(config.get("RPC_BIND"), config.get("RPC_PORT"))
-            if appointment_data:
-                print(json.dumps(appointment_data, indent=4, sort_keys=True))
+            result = rpc_client.get_all_appointments()
 
+        elif command == "get_tower_info":
+            result = rpc_client.get_tower_info()
+
+        elif command == "get_users":
+            result = rpc_client.get_users()
+
+        elif command == "get_user":
+            if not args:
+                sys.exit("No user_id was given")
+            if len(args) > 1:
+                sys.exit(f"Expected only one argument, not {len(args)}")
+
+            result = rpc_client.get_user(args[0])
         elif command == "help":
             if args:
                 command = args.pop(0)
@@ -67,23 +139,38 @@ def main(command, args, command_line_conf):
                 if command == "get_all_appointments":
                     sys.exit(help_get_all_appointments())
 
+                elif command == "get_tower_info":
+                    sys.exit(help_get_tower_info())
+
+                elif command == "get_users":
+                    sys.exit(help_get_users())
+
+                elif command == "get_user":
+                    sys.exit(help_get_user())
+
                 else:
                     sys.exit("Unknown command. Use help to check the list of available commands")
 
             else:
                 sys.exit(show_usage())
 
-    except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
-        sys.exit(str(e))
-    except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
-        sys.exit(f"{e.msg}. Error arguments: {e.kwargs}")
+        if result:
+            print(result)
+
+    except grpc.RpcError as e:
+        if e.code() == grpc.StatusCode.UNAVAILABLE:
+            sys.exit("It was not possible to reach the Eye of Satoshi. Are you sure the tower is running?")
+        else:
+            sys.exit(e.details())
+    except InvalidParameter as e:
+        sys.exit(e.msg if not e.kwargs else f"{e.msg}. Error arguments: {e.kwargs}")
     except Exception as e:
         sys.exit(f"Unknown error occurred: {str(e)}")
 
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["get_all_appointments", "help"]
+    commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "help"])

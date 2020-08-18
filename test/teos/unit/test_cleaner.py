@@ -15,6 +15,7 @@ ITEMS = 10
 MAX_ITEMS = 100
 ITERATIONS = 10
 
+
 # FIXME: 194 this is using the dummiest appointment, can be updated with the fixture once it's implemented
 def set_up_appointments(db_manager, total_appointments):
     appointments = dict()

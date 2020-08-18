@@ -4,6 +4,7 @@ import grpc
 
 import teos.protobuf.appointment_pb2 as appointment__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+import teos.protobuf.tower_services_pb2 as tower__services__pb2
 import teos.protobuf.user_pb2 as user__pb2
 
 
@@ -36,6 +37,21 @@ class TowerServicesStub(object):
             request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             response_deserializer=appointment__pb2.GetAllAppointmentsResponse.FromString,
         )
+        self.get_tower_info = channel.unary_unary(
+            "/teos.protobuf.protos.v1.TowerServices/get_tower_info",
+            request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            response_deserializer=tower__services__pb2.GetTowerInfoResponse.FromString,
+        )
+        self.get_users = channel.unary_unary(
+            "/teos.protobuf.protos.v1.TowerServices/get_users",
+            request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            response_deserializer=user__pb2.GetUsersResponse.FromString,
+        )
+        self.get_user = channel.unary_unary(
+            "/teos.protobuf.protos.v1.TowerServices/get_user",
+            request_serializer=user__pb2.GetUserRequest.SerializeToString,
+            response_deserializer=user__pb2.GetUserResponse.FromString,
+        )
 
 
 class TowerServicesServicer(object):
@@ -65,6 +81,24 @@ class TowerServicesServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def get_tower_info(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def get_users(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def get_user(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_TowerServicesServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -87,6 +121,21 @@ def add_TowerServicesServicer_to_server(servicer, server):
             servicer.get_all_appointments,
             request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             response_serializer=appointment__pb2.GetAllAppointmentsResponse.SerializeToString,
+        ),
+        "get_tower_info": grpc.unary_unary_rpc_method_handler(
+            servicer.get_tower_info,
+            request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            response_serializer=tower__services__pb2.GetTowerInfoResponse.SerializeToString,
+        ),
+        "get_users": grpc.unary_unary_rpc_method_handler(
+            servicer.get_users,
+            request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            response_serializer=user__pb2.GetUsersResponse.SerializeToString,
+        ),
+        "get_user": grpc.unary_unary_rpc_method_handler(
+            servicer.get_user,
+            request_deserializer=user__pb2.GetUserRequest.FromString,
+            response_serializer=user__pb2.GetUserResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.v1.TowerServices", rpc_method_handlers)
@@ -196,6 +245,87 @@ class TowerServices(object):
             "/teos.protobuf.protos.v1.TowerServices/get_all_appointments",
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             appointment__pb2.GetAllAppointmentsResponse.FromString,
+            options,
+            channel_credentials,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def get_tower_info(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/teos.protobuf.protos.v1.TowerServices/get_tower_info",
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            tower__services__pb2.GetTowerInfoResponse.FromString,
+            options,
+            channel_credentials,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def get_users(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/teos.protobuf.protos.v1.TowerServices/get_users",
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            user__pb2.GetUsersResponse.FromString,
+            options,
+            channel_credentials,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def get_user(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/teos.protobuf.protos.v1.TowerServices/get_user",
+            user__pb2.GetUserRequest.SerializeToString,
+            user__pb2.GetUserResponse.FromString,
             options,
             channel_credentials,
             call_credentials,

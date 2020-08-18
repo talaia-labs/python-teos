@@ -25,7 +25,7 @@ message Tracker {
   string penalty_rawtx = 4;
 }
 
-message AppointmentData{
+message AppointmentData {
   /*
   Encapsulates the data for a GetAppointmentResponse, given it can be an appointment (data is on the Watcher) or a
   tracker (data is on the Responder).
@@ -73,9 +73,9 @@ message GetAppointmentResponse {
 }
 
 message GetAllAppointmentsResponse {
-  /* Request data about all the appointments in the tower. Return is a Struct build from a Python dictionary, containing
-  the watcher appointments and the responder trackers.
-   */
+  /* Response with data about all the appointments in the tower. Return is a Struct build from a Python dictionary,
+  containing the watcher appointments and the responder trackers.
+  */
 
   google.protobuf.Struct appointments = 1;
 }

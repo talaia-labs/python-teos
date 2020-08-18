@@ -11,7 +11,7 @@ from teos.internal_api import InternalAPI
 from common.appointment import Appointment
 from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.appointments_dbm import AppointmentsDBM
-from teos.responder import Responder, TransactionTracker
+from teos.responder import Responder
 
 from test.teos.conftest import config, create_txs
 from test.teos.unit.conftest import get_random_value_hex, generate_keypair, compute_locator
