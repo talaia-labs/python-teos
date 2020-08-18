@@ -6,13 +6,12 @@ import grpc
 from sys import argv
 import functools
 from getopt import getopt, GetoptError
-from requests import ConnectionError
 from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
 from common.config_loader import ConfigLoader
 from common.tools import setup_data_folder, is_compressed_pk
-from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
+from common.exceptions import InvalidParameter
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from teos.cli.help import (
@@ -50,6 +49,14 @@ class RPCClient:
     """Creates and keeps a connection to the an RPC serving TowerServices. It has methods to call each of the
     available grpc services, and it returns a pretty-printed json response.
     Errors from the grpc calls are not handled.
+
+    Args:
+        rpc_host (:obj:`str`): the IP or host where the RPC server will be hosted.
+        rpc_port (:obj:`int`): the port where the RPC server will be hosted.
+
+    Attributes:
+        channel (:obj:`grpc.Channel`): the Channel object
+        stub: the rpc client stub
     """
 
     def __init__(self, rpc_host, rpc_port):
@@ -60,19 +67,30 @@ class RPCClient:
 
     @formatted
     def get_all_appointments(self):
+        """Gets a list of all the appointments in the watcher, and trackers in the responder."""
         result = self.stub.get_all_appointments(Empty())
         return result.appointments
 
     @formatted
     def get_tower_info(self):
+        """Gets generic information about the tower."""
         return self.stub.get_tower_info(Empty())
 
     def get_users(self):
+        """Gets the list of registered user ids."""
         result = self.stub.get_users(Empty())
         return to_json(list(result.user_ids))
 
     @formatted
     def get_user(self, user_id):
+        """Gets information about a specific user.
+
+        Args:
+            user_id (:obj:`str`): the id of the requested user.
+
+        Raises:
+            :obj:`InvalidParameter`: if `user_id` is not in the valid format.
+        """
         if not is_compressed_pk(user_id):
             raise InvalidParameter("Invalid user id")
 
@@ -136,7 +154,7 @@ def main(command, args, command_line_conf):
 
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNAVAILABLE:
-            sys.exit(f"It was not possible to reach the Eye of Satoshi. Check your network settings.")
+            sys.exit("It was not possible to reach the Eye of Satoshi. Check your network settings.")
         else:
             sys.exit(e.details())
     except InvalidParameter as e:

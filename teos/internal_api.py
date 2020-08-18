@@ -20,7 +20,6 @@ from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
-from teos.inspector import Inspector, InspectionFailed
 
 
 class InternalAPI:
@@ -88,6 +87,7 @@ class _InternalAPI(TowerServicesServicer):
         self.watcher = watcher
 
     def register(self, request, context):
+        """Registers a user to the tower."""
         with self.rw_lock.gen_wlock():
             try:
                 available_slots, subscription_expiry, subscription_signature = self.watcher.register(request.user_id)
@@ -105,6 +105,7 @@ class _InternalAPI(TowerServicesServicer):
                 return RegisterResponse()
 
     def add_appointment(self, request, context):
+        """Processes the request to add an appointment from a user."""
         with self.rw_lock.gen_wlock():
             try:
                 appointment = Appointment(
@@ -130,6 +131,7 @@ class _InternalAPI(TowerServicesServicer):
             return AddAppointmentResponse()
 
     def get_appointment(self, request, context):
+        """Returns an appointment stored in the tower, if it exists."""
         with self.rw_lock.gen_rlock():
             try:
                 data, status = self.watcher.get_appointment(request.locator, request.signature)
@@ -158,6 +160,7 @@ class _InternalAPI(TowerServicesServicer):
                 return GetAppointmentResponse()
 
     def get_all_appointments(self, request, context):
+        """Returns all the appointments in the tower."""
         with self.rw_lock.gen_rlock():
             watcher_appointments = self.watcher.get_all_watcher_appointments()
             responder_trackers = self.watcher.get_all_responder_trackers()
@@ -168,6 +171,7 @@ class _InternalAPI(TowerServicesServicer):
         return GetAllAppointmentsResponse(appointments=appointments)
 
     def get_tower_info(self, request, context):
+        """Returns generic information about the tower."""
         with self.rw_lock.gen_rlock():
             return GetTowerInfoResponse(
                 tower_id=self.watcher.tower_id,
@@ -177,10 +181,12 @@ class _InternalAPI(TowerServicesServicer):
             )
 
     def get_users(self, request, context):
+        """Returns the list of all registered user ids."""
         with self.rw_lock.gen_rlock():
             return GetUsersResponse(user_ids=self.watcher.get_registered_user_ids())
 
     def get_user(self, request, context):
+        """Returns information about a user, given its user id."""
         with self.rw_lock.gen_rlock():
             user_info = self.watcher.get_user_info(request.user_id)
 
