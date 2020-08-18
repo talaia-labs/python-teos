@@ -334,4 +334,3 @@ class TowerServices(object):
             timeout,
             metadata,
         )
-
