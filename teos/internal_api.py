@@ -20,6 +20,7 @@ from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
 from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
+from google.protobuf.empty_pb2 import Empty
 
 
 class InternalAPI:
@@ -31,6 +32,7 @@ class InternalAPI:
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to. The Watcher is
             the main backend class of the tower and can interact with the rest.
         internal_api_endpoint (:obj:`str`): the endpoint where the internal api will be served (gRPC server).
+        stop_command_event (:obj:`multiprocessing.Event`): an Event to be set when a `stop` command is issued.
 
     Attributes:
         logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
@@ -38,33 +40,13 @@ class InternalAPI:
         rpc_server (:obj:`Server <grpc.Server>`): the non-started gRPC server instance.
     """
 
-    def __init__(self, watcher, internal_api_endpoint):
+    def __init__(self, watcher, internal_api_endpoint, stop_command_event):
         self.logger = get_logger(component=InternalAPI.__name__)
         self.watcher = watcher
         self.endpoint = internal_api_endpoint
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
-        add_TowerServicesServicer_to_server(_InternalAPI(watcher, self.logger), self.rpc_server)
-
-
-def serve(watcher, internal_api_endpoint):
-    """
-    Serves the internal API at a given endpoint.
-
-    This method will serve and hold until the main process is stop or a stop signal is received. Notice the latter is
-    not possible possible currently since the stop signal has to be passed to `rpc_server` and it is not returned. This
-    may change once the stop command for the CLI is implemented.
-
-    Args:
-        watcher (:obj:`Watcher <teos.watcher.Watcher`): The ``Watcher`` instance (backend).
-        internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
-    """
-
-    internal_api = InternalAPI(watcher, internal_api_endpoint)
-    internal_api.rpc_server.start()
-
-    internal_api.logger.info(f"Initialized. Serving at {internal_api.endpoint}")
-    internal_api.rpc_server.wait_for_termination()
+        add_TowerServicesServicer_to_server(_InternalAPI(watcher, stop_command_event, self.logger), self.rpc_server)
 
 
 class _InternalAPI(TowerServicesServicer):
@@ -74,6 +56,7 @@ class _InternalAPI(TowerServicesServicer):
     Args:
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to. The Watcher is
             the main backend class of the tower and can interact with the rest.
+        stop_command_event (:obj:`multiprocessing.Event`): an Event to be set when a `stop` command is issued.
         logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
 
     Attributes:
@@ -81,10 +64,11 @@ class _InternalAPI(TowerServicesServicer):
             backend.
     """
 
-    def __init__(self, watcher, logger):
+    def __init__(self, watcher, stop_command_event, logger):
+        self.watcher = watcher
+        self.stop_command_event = stop_command_event
         self.logger = logger
         self.rw_lock = rwlock.RWLockWrite()  # lock to be acquired before interacting with the watchtower's state
-        self.watcher = watcher
 
     def register(self, request, context):
         """Registers a user to the tower."""
@@ -204,3 +188,7 @@ class _InternalAPI(TowerServicesServicer):
                 }
             )
             return GetUserResponse(user=user_struct)
+
+    def stop(self, request, context):
+        self.stop_command_event.set()
+        return Empty()

@@ -58,3 +58,14 @@ def help_get_user():
         "\n\nDESCRIPTION:"
         "\n\n\tGets information about a specific user.\n"
     )
+
+
+def help_stop():
+    return (
+        "NAME:"
+        "\tpython teos_cli stop - Requests a graceful shutdown of the tower."
+        "\n\nUSAGE:"
+        "\tpython teos_cli.py stop"
+        "\n\nDESCRIPTION:"
+        "\n\n\Requests a graceful shutdown of the tower.\n"
+    )

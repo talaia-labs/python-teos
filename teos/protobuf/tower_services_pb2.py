@@ -23,8 +23,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     syntax="proto3",
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
-    serialized_pb=b'\n\x14tower_services.proto\x12\x17teos.protobuf.protos.v1\x1a\x11\x61ppointment.proto\x1a\nuser.proto\x1a\x1bgoogle/protobuf/empty.proto"\x82\x01\n\x14GetTowerInfoResponse\x12\x1e\n\x16n_watcher_appointments\x18\x01 \x01(\r\x12\x1c\n\x14n_responder_trackers\x18\x02 \x01(\r\x12\x1a\n\x12n_registered_users\x18\x03 \x01(\r\x12\x10\n\x08tower_id\x18\x04 \x01(\t2\xd3\x05\n\rTowerServices\x12\x61\n\x08register\x12(.teos.protobuf.protos.v1.RegisterRequest\x1a).teos.protobuf.protos.v1.RegisterResponse"\x00\x12t\n\x0f\x61\x64\x64_appointment\x12..teos.protobuf.protos.v1.AddAppointmentRequest\x1a/.teos.protobuf.protos.v1.AddAppointmentResponse"\x00\x12t\n\x0fget_appointment\x12..teos.protobuf.protos.v1.GetAppointmentRequest\x1a/.teos.protobuf.protos.v1.GetAppointmentResponse"\x00\x12\x65\n\x14get_all_appointments\x12\x16.google.protobuf.Empty\x1a\x33.teos.protobuf.protos.v1.GetAllAppointmentsResponse"\x00\x12Y\n\x0eget_tower_info\x12\x16.google.protobuf.Empty\x1a-.teos.protobuf.protos.v1.GetTowerInfoResponse"\x00\x12P\n\tget_users\x12\x16.google.protobuf.Empty\x1a).teos.protobuf.protos.v1.GetUsersResponse"\x00\x12_\n\x08get_user\x12\'.teos.protobuf.protos.v1.GetUserRequest\x1a(.teos.protobuf.protos.v1.GetUserResponse"\x00\x62\x06proto3',
-    dependencies=[appointment__pb2.DESCRIPTOR, user__pb2.DESCRIPTOR, google_dot_protobuf_dot_empty__pb2.DESCRIPTOR],
+    serialized_pb=b'\n\x14tower_services.proto\x12\x17teos.protobuf.protos.v1\x1a\x11\x61ppointment.proto\x1a\nuser.proto\x1a\x1bgoogle/protobuf/empty.proto"\x82\x01\n\x14GetTowerInfoResponse\x12\x1e\n\x16n_watcher_appointments\x18\x01 \x01(\r\x12\x1c\n\x14n_responder_trackers\x18\x02 \x01(\r\x12\x1a\n\x12n_registered_users\x18\x03 \x01(\r\x12\x10\n\x08tower_id\x18\x04 \x01(\t2\x8d\x06\n\rTowerServices\x12\x61\n\x08register\x12(.teos.protobuf.protos.v1.RegisterRequest\x1a).teos.protobuf.protos.v1.RegisterResponse"\x00\x12t\n\x0f\x61\x64\x64_appointment\x12..teos.protobuf.protos.v1.AddAppointmentRequest\x1a/.teos.protobuf.protos.v1.AddAppointmentResponse"\x00\x12t\n\x0fget_appointment\x12..teos.protobuf.protos.v1.GetAppointmentRequest\x1a/.teos.protobuf.protos.v1.GetAppointmentResponse"\x00\x12\x65\n\x14get_all_appointments\x12\x16.google.protobuf.Empty\x1a\x33.teos.protobuf.protos.v1.GetAllAppointmentsResponse"\x00\x12Y\n\x0eget_tower_info\x12\x16.google.protobuf.Empty\x1a-.teos.protobuf.protos.v1.GetTowerInfoResponse"\x00\x12P\n\tget_users\x12\x16.google.protobuf.Empty\x1a).teos.protobuf.protos.v1.GetUsersResponse"\x00\x12_\n\x08get_user\x12\'.teos.protobuf.protos.v1.GetUserRequest\x1a(.teos.protobuf.protos.v1.GetUserResponse"\x00\x12\x38\n\x04stop\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty"\x00\x62\x06proto3',
+    dependencies=[appointment__pb2.DESCRIPTOR, user__pb2.DESCRIPTOR, google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,],
 )
 
 
@@ -148,7 +148,7 @@ _TOWERSERVICES = _descriptor.ServiceDescriptor(
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
     serialized_start=243,
-    serialized_end=966,
+    serialized_end=1024,
     methods=[
         _descriptor.MethodDescriptor(
             name="register",
@@ -217,6 +217,16 @@ _TOWERSERVICES = _descriptor.ServiceDescriptor(
             containing_service=None,
             input_type=user__pb2._GETUSERREQUEST,
             output_type=user__pb2._GETUSERRESPONSE,
+            serialized_options=None,
+            create_key=_descriptor._internal_create_key,
+        ),
+        _descriptor.MethodDescriptor(
+            name="stop",
+            full_name="teos.protobuf.protos.v1.TowerServices.stop",
+            index=7,
+            containing_service=None,
+            input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+            output_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
             serialized_options=None,
             create_key=_descriptor._internal_create_key,
         ),

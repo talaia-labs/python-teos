@@ -14,7 +14,14 @@ from common.tools import setup_data_folder, is_compressed_pk, intify
 from common.exceptions import InvalidParameter
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from teos.cli.help import show_usage, help_get_all_appointments, help_get_tower_info, help_get_users, help_get_user
+from teos.cli.help import (
+    show_usage,
+    help_get_all_appointments,
+    help_get_tower_info,
+    help_get_users,
+    help_get_user,
+    help_stop,
+)
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.user_pb2 import GetUserRequest
 
@@ -96,6 +103,10 @@ class RPCClient:
         result = self.stub.get_user(GetUserRequest(user_id=user_id))
         return result.user
 
+    def stop(self):
+        self.stub.stop(Empty())
+        return "Closing the Eye of Satoshi"
+
 
 def main(command, args, command_line_conf):
     # Loads config and sets up the data folder and log file
@@ -126,6 +137,10 @@ def main(command, args, command_line_conf):
                 sys.exit(f"Expected only one argument, not {len(args)}")
 
             result = rpc_client.get_user(args[0])
+
+        elif command == "stop":
+            result = rpc_client.stop()
+
         elif command == "help":
             if args:
                 command = args.pop(0)
@@ -141,6 +156,9 @@ def main(command, args, command_line_conf):
 
                 elif command == "get_user":
                     sys.exit(help_get_user())
+
+                elif command == "stop":
+                    sys.exit(help_stop())
 
                 else:
                     sys.exit("Unknown command. Use help to check the list of available commands")
@@ -164,7 +182,7 @@ def main(command, args, command_line_conf):
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "help"]
+    commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "stop", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "help"])

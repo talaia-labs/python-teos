@@ -2,7 +2,9 @@ import os
 import daemon
 import subprocess
 from sys import argv, exit
-from multiprocessing import Process
+from multiprocessing import Process, Event
+from threading import Thread
+from functools import partial
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
@@ -20,7 +22,7 @@ from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
 from teos.responder import Responder
 from teos.gatekeeper import Gatekeeper
-import teos.internal_api as internal_api
+from teos.internal_api import InternalAPI
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
@@ -33,17 +35,16 @@ parent_pid = os.getpid()
 INTERNAL_API_HOST = "localhost"
 INTERNAL_API_PORT = "50051"
 INTERNAL_API_ENDPOINT = f"{INTERNAL_API_HOST}:{INTERNAL_API_PORT}"
+# the grace time in seconds to complete any pending internal api call when stopping teosd
+INTERNAL_API_SHUTDOWN_GRACE_TIME = 10
 
 
-def handle_signals(signal_received, frame):
-    if os.getpid() == parent_pid:
-        logger.info("Closing connection with appointments db")
-        db_manager.db.close()
-        chain_monitor.terminate = True
+def handle_signals(stop_command_event, signum, frame):
+    logger.info(f"Signal {signum} received. Stopping")
 
-        logger.info("Shutting down TEOS")
-
-    exit(0)
+    # setting the event during the signal seems to cause a deadlock, as the same thread is waiting for the event
+    # see https://stackoverflow.com/questions/24422154/multiprocessing-event-wait-hangs-when-interrupted-by-a-signal/30831867  # noqa: E501
+    Thread(target=stop_command_event.set).start()
 
 
 def get_config(command_line_conf, data_dir):
@@ -72,10 +73,6 @@ def main(config):
     global db_manager, chain_monitor
 
     try:
-        signal(SIGINT, handle_signals)
-        signal(SIGTERM, handle_signals)
-        signal(SIGQUIT, handle_signals)
-
         setup_data_folder(config.get("DATA_DIR"))
         setup_logging(config.get("LOG_FILE"))
 
@@ -199,11 +196,20 @@ def main(config):
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
 
-            # Start the API and the RPC server
+            stop_command_event = Event()  # event triggered when a `stop` command is issued
+            stop_event = Event()  # event triggered when the public API is halted, hence teosd is ready to stop
+
+            signal(SIGINT, partial(handle_signals, stop_command_event))
+            signal(SIGTERM, partial(handle_signals, stop_command_event))
+            signal(SIGQUIT, partial(handle_signals, stop_command_event))
+
+            # Start the public API server
             api_endpoint = f"{config.get('API_BIND')}:{config.get('API_PORT')}"
+            api_popen = None
+            api_process = None
             if config.get("WSGI") == "gunicorn":
                 # FIXME: We may like to add workers depending on a config value
-                subprocess.Popen(
+                api_popen = subprocess.Popen(
                     [
                         "gunicorn",
                         f"--bind={api_endpoint}",
@@ -213,7 +219,7 @@ def main(config):
                     ]
                 )
             else:
-                Process(
+                api_process = Process(
                     target=api.serve,
                     kwargs={
                         "internal_api_endpoint": INTERNAL_API_ENDPOINT,
@@ -222,16 +228,53 @@ def main(config):
                         "log_file": config.get("LOG_FILE"),
                         "auto_run": True,
                     },
-                ).start()
+                )
+                api_process.start()
 
-            Process(
+            # Start the rpc
+            rpc_process = Process(
                 target=rpc.serve,
-                args=(config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT),
+                args=(config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, stop_event),
                 daemon=True,
-            ).start()
+            )
+            rpc_process.start()
 
             # Start the internal API
-            internal_api.serve(watcher, INTERNAL_API_ENDPOINT)
+            internal_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT, stop_command_event)
+            internal_api.rpc_server.start()
+            logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
+
+            stop_command_event.wait()
+
+            # stop command received
+
+            logger.info("Terminating public API")
+
+            if api_popen:
+                api_popen.terminate()
+                api_popen.wait()
+            else:
+                api_process.kill()
+                api_process.join()
+
+            logger.info("Terminated public API")
+
+            stop_event.set()
+
+            # wait for rpc process to shutdown
+            rpc_process.join()
+            # TODO: should we have a timeout on rpc_process.join()? Should we kill the process on timeout?
+
+            logger.info("Internal API stopping")
+            internal_api.rpc_server.stop(INTERNAL_API_SHUTDOWN_GRACE_TIME).wait()
+            logger.info("Internal API stopped")
+
+            logger.info("Closing connection with appointments db")
+            db_manager.db.close()
+            chain_monitor.terminate = True
+
+            logger.info("Shutting down TEOS")
+            exit(0)
 
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))

@@ -10,6 +10,9 @@ from teos.protobuf.tower_services_pb2_grpc import (
     add_TowerServicesServicer_to_server,
 )
 
+# the grace time in seconds to complete any pending rpc call when a `stop` command is received
+SHUTDOWN_GRACE_TIME = 10
+
 
 class RPC:
     """
@@ -38,8 +41,8 @@ class RPC:
 
 def forward_errors(func):
     """
-    Transforms in order to forward any grpc.RPCError returned by the upstream grpc as the result of the current grpc
-    call.
+    Transforms `func` in order to forward any grpc.RPCError returned by the upstream grpc as the result of the current
+    grpc call.
     """
 
     @functools.wraps(func)
@@ -84,8 +87,12 @@ class _RPC(TowerServicesServicer):
     def get_user(self, request, context):
         return self.stub.get_user(request)
 
+    @forward_errors
+    def stop(self, request, context):
+        return self.stub.stop(request)
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint):
+
+def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
@@ -97,10 +104,17 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint):
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
+        stop_event TODO
     """
 
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
     rpc.rpc_server.start()
 
     rpc.logger.info(f"Initialized. Serving at {rpc.endpoint}")
-    rpc.rpc_server.wait_for_termination()
+
+    stop_event.wait()
+
+    rpc.logger.info("Stopping")
+    stopped_event = rpc.rpc_server.stop(SHUTDOWN_GRACE_TIME)
+    stopped_event.wait()
+    rpc.logger.info("Stopped")

@@ -52,6 +52,11 @@ class TowerServicesStub(object):
             request_serializer=user__pb2.GetUserRequest.SerializeToString,
             response_deserializer=user__pb2.GetUserResponse.FromString,
         )
+        self.stop = channel.unary_unary(
+            "/teos.protobuf.protos.v1.TowerServices/stop",
+            request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+        )
 
 
 class TowerServicesServicer(object):
@@ -99,6 +104,12 @@ class TowerServicesServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def stop(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_TowerServicesServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -136,6 +147,11 @@ def add_TowerServicesServicer_to_server(servicer, server):
             servicer.get_user,
             request_deserializer=user__pb2.GetUserRequest.FromString,
             response_serializer=user__pb2.GetUserResponse.SerializeToString,
+        ),
+        "stop": grpc.unary_unary_rpc_method_handler(
+            servicer.stop,
+            request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler("teos.protobuf.protos.v1.TowerServices", rpc_method_handlers)
@@ -334,3 +350,31 @@ class TowerServices(object):
             timeout,
             metadata,
         )
+
+    @staticmethod
+    def stop(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/teos.protobuf.protos.v1.TowerServices/stop",
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
