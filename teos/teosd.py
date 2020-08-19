@@ -213,7 +213,6 @@ def main(config):
                     ]
                 )
             else:
-                os.environ["WERKZEUG_RUN_MAIN"] = "true"
                 Process(
                     target=api.serve,
                     kwargs={
@@ -259,7 +258,8 @@ if __name__ == "__main__":
             "btcfeedconnect=",
             "btcfeedport=",
             "datadir=",
-            "wsgi=" "daemon",
+            "wsgi=",
+            "daemon",
             "overwritekey",
             "help",
         ],
