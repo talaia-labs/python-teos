@@ -214,8 +214,16 @@ def main(config):
                 )
             else:
                 os.environ["WERKZEUG_RUN_MAIN"] = "true"
-                app = api.serve(INTERNAL_API_ENDPOINT, api_endpoint, config.get("MIN_TO_SELF_DELAY"))
-                Process(target=app.run, kwargs={"host": config.get("API_BIND"), "port": config.get("API_PORT")}).start()
+                Process(
+                    target=api.serve,
+                    kwargs={
+                        "internal_api_endpoint": INTERNAL_API_ENDPOINT,
+                        "endpoint": api_endpoint,
+                        "min_to_self_delay": config.get("MIN_TO_SELF_DELAY"),
+                        "log_file": config.get("LOG_FILE"),
+                        "auto_run": True,
+                    },
+                ).start()
 
             Process(
                 target=rpc.serve,
