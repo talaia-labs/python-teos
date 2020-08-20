@@ -4,7 +4,6 @@ import subprocess
 from sys import argv, exit
 from multiprocessing import Process, Event
 from threading import Thread
-from functools import partial
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
@@ -39,14 +38,6 @@ INTERNAL_API_ENDPOINT = f"{INTERNAL_API_HOST}:{INTERNAL_API_PORT}"
 INTERNAL_API_SHUTDOWN_GRACE_TIME = 10
 
 
-def handle_signals(stop_command_event, signum, frame):
-    logger.info(f"Signal {signum} received. Stopping")
-
-    # setting the event during the signal seems to cause a deadlock, as the same thread is waiting for the event
-    # see https://stackoverflow.com/questions/24422154/multiprocessing-event-wait-hangs-when-interrupted-by-a-signal/30831867  # noqa: E501
-    Thread(target=stop_command_event.set).start()
-
-
 def get_config(command_line_conf, data_dir):
     """
     Combines the command line config with the config loaded from the file and the default config in order to construct
@@ -69,33 +60,48 @@ def get_config(command_line_conf, data_dir):
     return config
 
 
-def main(config):
-    global db_manager, chain_monitor
+class TeosDaemon:
+    def __init__(self, config):
+        self.config = config
+        self.stop_command_event = Event()  # event triggered when a `stop` command is issued
+        self.stop_event = Event()  # event triggered when the public API is halted, hence teosd is ready to stop
 
-    try:
-        setup_data_folder(config.get("DATA_DIR"))
-        setup_logging(config.get("LOG_FILE"))
+    def start(self):
+        try:
+            logger.info("Starting TEOS")
+            self.setup_components()
+            self.start_services()
 
-        logger.info("Starting TEOS")
+            self.stop_command_event.wait()
 
-        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
-        bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
+            self.teardown()
+
+        except Exception as e:
+            logger.error("An error occurred: {}. Shutting down".format(e))
+            exit(1)
+
+    def setup_components(self):
+        setup_data_folder(self.config.get("DATA_DIR"))
+        setup_logging(self.config.get("LOG_FILE"))
+
+        bitcoind_connect_params = {k: v for k, v in self.config.items() if k.startswith("BTC_RPC")}
+        bitcoind_feed_params = {k: v for k, v in self.config.items() if k.startswith("BTC_FEED")}
 
         if not can_connect_to_bitcoind(bitcoind_connect_params):
             logger.error("Cannot connect to bitcoind. Shutting down")
 
-        elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
+        elif not in_correct_network(bitcoind_connect_params, self.config.get("BTC_NETWORK")):
             logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
 
         else:
-            if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
+            if not os.path.exists(self.config.get("TEOS_SECRET_KEY")) or self.config.get("OVERWRITE_KEY"):
                 logger.info("Generating a new key pair")
                 sk = Cryptographer.generate_key()
-                Cryptographer.save_key_file(sk.to_der(), "teos_sk", config.get("DATA_DIR"))
+                Cryptographer.save_key_file(sk.to_der(), "teos_sk", self.config.get("DATA_DIR"))
 
             else:
                 logger.info("Tower identity found. Loading keys")
-                secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
+                secret_key_der = Cryptographer.load_key_file(self.config.get("TEOS_SECRET_KEY"))
 
                 if not secret_key_der:
                     raise IOError("TEOS private key cannot be loaded")
@@ -106,59 +112,59 @@ def main(config):
             carrier = Carrier(bitcoind_connect_params)
 
             gatekeeper = Gatekeeper(
-                UsersDBM(config.get("USERS_DB_PATH")),
+                UsersDBM(self.config.get("USERS_DB_PATH")),
                 block_processor,
-                config.get("SUBSCRIPTION_SLOTS"),
-                config.get("SUBSCRIPTION_DURATION"),
-                config.get("EXPIRY_DELTA"),
+                self.config.get("SUBSCRIPTION_SLOTS"),
+                self.config.get("SUBSCRIPTION_DURATION"),
+                self.config.get("EXPIRY_DELTA"),
             )
-            db_manager = AppointmentsDBM(config.get("APPOINTMENTS_DB_PATH"))
-            responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-            watcher = Watcher(
-                db_manager,
+            self.db_manager = AppointmentsDBM(self.config.get("APPOINTMENTS_DB_PATH"))
+            responder = Responder(self.db_manager, gatekeeper, carrier, block_processor)
+            self.watcher = Watcher(
+                self.db_manager,
                 gatekeeper,
                 block_processor,
                 responder,
                 sk,
-                config.get("MAX_APPOINTMENTS"),
-                config.get("LOCATOR_CACHE_SIZE"),
+                self.config.get("MAX_APPOINTMENTS"),
+                self.config.get("LOCATOR_CACHE_SIZE"),
             )
 
             # Create the chain monitor and start monitoring the chain
-            chain_monitor = ChainMonitor(
-                watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
+            self.chain_monitor = ChainMonitor(
+                self.watcher.block_queue, self.watcher.responder.block_queue, block_processor, bitcoind_feed_params
             )
 
-            watcher_appointments_data = db_manager.load_watcher_appointments()
-            responder_trackers_data = db_manager.load_responder_trackers()
+            watcher_appointments_data = self.db_manager.load_watcher_appointments()
+            responder_trackers_data = self.db_manager.load_responder_trackers()
 
             if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
                 logger.info("Fresh bootstrap")
 
-                watcher.awake()
-                watcher.responder.awake()
+                self.watcher.awake()
+                self.watcher.responder.awake()
 
             else:
                 logger.info("Bootstrapping from backed up data")
 
                 # Update the Watcher backed up data if found.
                 if len(watcher_appointments_data) != 0:
-                    watcher.appointments, watcher.locator_uuid_map = Builder.build_appointments(
+                    self.watcher.appointments, self.watcher.locator_uuid_map = Builder.build_appointments(
                         watcher_appointments_data
                     )
 
                 # Update the Responder with backed up data if found.
                 if len(responder_trackers_data) != 0:
-                    watcher.responder.trackers, watcher.responder.tx_tracker_map = Builder.build_trackers(
+                    self.watcher.responder.trackers, self.watcher.responder.tx_tracker_map = Builder.build_trackers(
                         responder_trackers_data
                     )
 
                 # Awaking components so the states can be updated.
-                watcher.awake()
-                watcher.responder.awake()
+                self.watcher.awake()
+                self.watcher.responder.awake()
 
-                last_block_watcher = db_manager.load_last_block_hash_watcher()
-                last_block_responder = db_manager.load_last_block_hash_responder()
+                last_block_watcher = self.db_manager.load_last_block_hash_watcher()
+                last_block_responder = self.db_manager.load_last_block_hash_responder()
 
                 # Populate the block queues with data if they've missed some while offline. If the blocks of both match
                 # we don't perform the search twice.
@@ -181,104 +187,106 @@ def main(config):
 
                 # If only one of the instances needs to be updated, it can be done separately.
                 if len(missed_blocks_watcher) == 0 and len(missed_blocks_responder) != 0:
-                    Builder.populate_block_queue(watcher.responder.block_queue, missed_blocks_responder)
-                    watcher.responder.block_queue.join()
+                    Builder.populate_block_queue(self.watcher.responder.block_queue, missed_blocks_responder)
+                    self.watcher.responder.block_queue.join()
 
                 elif len(missed_blocks_responder) == 0 and len(missed_blocks_watcher) != 0:
-                    Builder.populate_block_queue(watcher.block_queue, missed_blocks_watcher)
-                    watcher.block_queue.join()
+                    Builder.populate_block_queue(self.watcher.block_queue, missed_blocks_watcher)
+                    self.watcher.block_queue.join()
 
                 # Otherwise they need to be updated at the same time, block by block
                 elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
-                    Builder.update_states(watcher, missed_blocks_watcher, missed_blocks_responder)
+                    Builder.update_states(self.watcher, missed_blocks_watcher, missed_blocks_responder)
 
             # Fire ChainMonitor
             # FIXME: 92-block-data-during-bootstrap-db
-            chain_monitor.monitor_chain()
+            self.chain_monitor.monitor_chain()
 
-            stop_command_event = Event()  # event triggered when a `stop` command is issued
-            stop_event = Event()  # event triggered when the public API is halted, hence teosd is ready to stop
+    def start_services(self):
+        signal(SIGINT, self.handle_signals)
+        signal(SIGTERM, self.handle_signals)
+        signal(SIGQUIT, self.handle_signals)
 
-            signal(SIGINT, partial(handle_signals, stop_command_event))
-            signal(SIGTERM, partial(handle_signals, stop_command_event))
-            signal(SIGQUIT, partial(handle_signals, stop_command_event))
-
-            # Start the public API server
-            api_endpoint = f"{config.get('API_BIND')}:{config.get('API_PORT')}"
-            api_popen = None
-            api_process = None
-            if config.get("WSGI") == "gunicorn":
-                # FIXME: We may like to add workers depending on a config value
-                api_popen = subprocess.Popen(
-                    [
-                        "gunicorn",
-                        f"--bind={api_endpoint}",
-                        f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
-                        f"endpoint='{api_endpoint}', min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', "
-                        f"log_file='{config.get('LOG_FILE')}')",
-                    ]
-                )
-            else:
-                api_process = Process(
-                    target=api.serve,
-                    kwargs={
-                        "internal_api_endpoint": INTERNAL_API_ENDPOINT,
-                        "endpoint": api_endpoint,
-                        "min_to_self_delay": config.get("MIN_TO_SELF_DELAY"),
-                        "log_file": config.get("LOG_FILE"),
-                        "auto_run": True,
-                    },
-                )
-                api_process.start()
-
-            # Start the rpc
-            rpc_process = Process(
-                target=rpc.serve,
-                args=(config.get("RPC_BIND"), config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, stop_event),
-                daemon=True,
+        # Start the public API server
+        api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
+        self.api_popen = None
+        self.api_process = None
+        if self.config.get("WSGI") == "gunicorn":
+            # FIXME: We may like to add workers depending on a config value
+            self.api_popen = subprocess.Popen(
+                [
+                    "gunicorn",
+                    f"--bind={api_endpoint}",
+                    f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
+                    f"endpoint='{api_endpoint}', min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}', "
+                    f"log_file='{self.config.get('LOG_FILE')}')",
+                ]
             )
-            rpc_process.start()
+        else:
+            self.api_process = Process(
+                target=api.serve,
+                kwargs={
+                    "internal_api_endpoint": INTERNAL_API_ENDPOINT,
+                    "endpoint": api_endpoint,
+                    "min_to_self_delay": self.config.get("MIN_TO_SELF_DELAY"),
+                    "log_file": self.config.get("LOG_FILE"),
+                    "auto_run": True,
+                },
+            )
+            self.api_process.start()
 
-            # Start the internal API
-            internal_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT, stop_command_event)
-            internal_api.rpc_server.start()
-            logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
+        # Start the rpc
+        self.rpc_process = Process(
+            target=rpc.serve,
+            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
+            daemon=True,
+        )
+        self.rpc_process.start()
 
-            stop_command_event.wait()
+        # Start the internal API
+        self.internal_api = InternalAPI(self.watcher, INTERNAL_API_ENDPOINT, self.stop_command_event)
+        self.internal_api.rpc_server.start()
+        logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
 
-            # stop command received
+    def handle_signals(self, signum, frame):
+        logger.info(f"Signal {signum} received. Stopping")
 
-            logger.info("Terminating public API")
+        # setting the event during the signal seems to cause a deadlock, as the same thread is waiting for the event
+        # see https://stackoverflow.com/questions/24422154/multiprocessing-event-wait-hangs-when-interrupted-by-a-signal/30831867  # noqa: E501
+        Thread(target=self.stop_command_event.set).start()
 
-            if api_popen:
-                api_popen.terminate()
-                api_popen.wait()
-            else:
-                api_process.kill()
-                api_process.join()
+    def teardown(self):
+        logger.info("Terminating public API")
 
-            logger.info("Terminated public API")
+        if self.api_popen:
+            self.api_popen.terminate()
+            self.api_popen.wait()
+        else:
+            self.api_process.kill()
+            self.api_process.join()
 
-            stop_event.set()
+        logger.info("Terminated public API")
 
-            # wait for rpc process to shutdown
-            rpc_process.join()
-            # TODO: should we have a timeout on rpc_process.join()? Should we kill the process on timeout?
+        self.stop_event.set()
 
-            logger.info("Internal API stopping")
-            internal_api.rpc_server.stop(INTERNAL_API_SHUTDOWN_GRACE_TIME).wait()
-            logger.info("Internal API stopped")
+        # wait for rpc process to shutdown
+        self.rpc_process.join()
+        # TODO: should we have a timeout on rpc_process.join()? Should we kill the process on timeout?
 
-            logger.info("Closing connection with appointments db")
-            db_manager.db.close()
-            chain_monitor.terminate = True
+        logger.info("Internal API stopping")
+        self.internal_api.rpc_server.stop(INTERNAL_API_SHUTDOWN_GRACE_TIME).wait()
+        logger.info("Internal API stopped")
 
-            logger.info("Shutting down TEOS")
-            exit(0)
+        logger.info("Closing connection with appointments db")
+        self.db_manager.db.close()
+        self.chain_monitor.terminate = True
 
-    except Exception as e:
-        logger.error("An error occurred: {}. Shutting down".format(e))
-        exit(1)
+        logger.info("Shutting down TEOS")
+        exit(0)
+
+
+def main(config):
+    TeosDaemon(config).start()
 
 
 if __name__ == "__main__":
@@ -365,6 +373,6 @@ if __name__ == "__main__":
     if config.get("DAEMON"):
         print("Starting TEOS")
         with daemon.DaemonContext():
-            main(config)
+            TeosDaemon(config).start()
     else:
-        main(config)
+        TeosDaemon(config).start()
