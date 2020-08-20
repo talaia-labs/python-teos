@@ -44,6 +44,7 @@ class InternalAPI:
         self.logger = get_logger(component=InternalAPI.__name__)
         self.watcher = watcher
         self.endpoint = internal_api_endpoint
+        self.stop_command_event = stop_command_event
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
         add_TowerServicesServicer_to_server(_InternalAPI(watcher, stop_command_event, self.logger), self.rpc_server)

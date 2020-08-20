@@ -1,4 +1,5 @@
 import pytest
+from multiprocessing import Event
 from shutil import rmtree
 from binascii import hexlify
 
@@ -73,7 +74,7 @@ def internal_api(run_bitcoind, db_manager, gatekeeper, carrier, block_processor)
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
+    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT, Event())
     i_api.rpc_server.start()
 
     yield i_api
