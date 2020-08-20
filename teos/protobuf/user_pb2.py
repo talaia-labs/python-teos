@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
     serialized_pb=b'\n\nuser.proto\x12\x17teos.protobuf.protos.v1\x1a\x1cgoogle/protobuf/struct.proto""\n\x0fRegisterRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"y\n\x10RegisterResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x02 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x03 \x01(\r\x12\x1e\n\x16subscription_signature\x18\x04 \x01(\t"!\n\x0eGetUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"8\n\x0fGetUserResponse\x12%\n\x04user\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct"$\n\x10GetUsersResponse\x12\x10\n\x08user_ids\x18\x01 \x03(\tb\x06proto3',
-    dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,],
+    dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR],
 )
 
 
@@ -52,7 +52,7 @@ _REGISTERREQUEST = _descriptor.Descriptor(
             serialized_options=None,
             file=DESCRIPTOR,
             create_key=_descriptor._internal_create_key,
-        ),
+        )
     ],
     extensions=[],
     nested_types=[],
@@ -191,7 +191,7 @@ _GETUSERREQUEST = _descriptor.Descriptor(
             serialized_options=None,
             file=DESCRIPTOR,
             create_key=_descriptor._internal_create_key,
-        ),
+        )
     ],
     extensions=[],
     nested_types=[],
@@ -232,7 +232,7 @@ _GETUSERRESPONSE = _descriptor.Descriptor(
             serialized_options=None,
             file=DESCRIPTOR,
             create_key=_descriptor._internal_create_key,
-        ),
+        )
     ],
     extensions=[],
     nested_types=[],
@@ -273,7 +273,7 @@ _GETUSERSRESPONSE = _descriptor.Descriptor(
             serialized_options=None,
             file=DESCRIPTOR,
             create_key=_descriptor._internal_create_key,
-        ),
+        )
     ],
     extensions=[],
     nested_types=[],

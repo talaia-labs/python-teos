@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
     serialized_pb=b'\n\x11\x61ppointment.proto\x12\x17teos.protobuf.protos.v1\x1a\x1cgoogle/protobuf/struct.proto"M\n\x0b\x41ppointment\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x16\n\x0e\x65ncrypted_blob\x18\x02 \x01(\t\x12\x15\n\rto_self_delay\x18\x03 \x01(\r"]\n\x07Tracker\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x14\n\x0c\x64ispute_txid\x18\x02 \x01(\t\x12\x14\n\x0cpenalty_txid\x18\x03 \x01(\t\x12\x15\n\rpenalty_rawtx\x18\x04 \x01(\t"\x97\x01\n\x0f\x41ppointmentData\x12;\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.AppointmentH\x00\x12\x33\n\x07tracker\x18\x02 \x01(\x0b\x32 .teos.protobuf.protos.v1.TrackerH\x00\x42\x12\n\x10\x61ppointment_data"e\n\x15\x41\x64\x64\x41ppointmentRequest\x12\x39\n\x0b\x61ppointment\x18\x01 \x01(\x0b\x32$.teos.protobuf.protos.v1.Appointment\x12\x11\n\tsignature\x18\x02 \x01(\t"\x87\x01\n\x16\x41\x64\x64\x41ppointmentResponse\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x13\n\x0bstart_block\x18\x02 \x01(\r\x12\x11\n\tsignature\x18\x03 \x01(\t\x12\x17\n\x0f\x61vailable_slots\x18\x04 \x01(\r\x12\x1b\n\x13subscription_expiry\x18\x05 \x01(\r";\n\x15GetAppointmentRequest\x12\x0f\n\x07locator\x18\x01 \x01(\t\x12\x11\n\tsignature\x18\x02 \x01(\t"l\n\x16GetAppointmentResponse\x12\x42\n\x10\x61ppointment_data\x18\x01 \x01(\x0b\x32(.teos.protobuf.protos.v1.AppointmentData\x12\x0e\n\x06status\x18\x02 \x01(\t"K\n\x1aGetAllAppointmentsResponse\x12-\n\x0c\x61ppointments\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Structb\x06proto3',
-    dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,],
+    dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR],
 )
 
 
@@ -265,7 +265,7 @@ _APPOINTMENTDATA = _descriptor.Descriptor(
             containing_type=None,
             create_key=_descriptor._internal_create_key,
             fields=[],
-        ),
+        )
     ],
     serialized_start=251,
     serialized_end=402,
@@ -595,7 +595,7 @@ _GETALLAPPOINTMENTSRESPONSE = _descriptor.Descriptor(
             serialized_options=None,
             file=DESCRIPTOR,
             create_key=_descriptor._internal_create_key,
-        ),
+        )
     ],
     extensions=[],
     nested_types=[],

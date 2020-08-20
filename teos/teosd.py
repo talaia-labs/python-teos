@@ -11,6 +11,7 @@ from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
+import teos.api as api
 import teos.rpc as rpc
 from teos.help import show_usage
 from teos.watcher import Watcher
@@ -198,16 +199,30 @@ def main(config):
             # FIXME: 92-block-data-during-bootstrap-db
             chain_monitor.monitor_chain()
 
-            # Start the API (using gunicorn) and the RPC server
-            # FIXME: We may like to add workers depending on a config value
-            subprocess.Popen(
-                [
-                    "gunicorn",
-                    f"--bind={config.get('API_BIND')}:{config.get('API_PORT')}",
-                    f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
-                    f"min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', log_file='{config.get('LOG_FILE')}')",
-                ]
-            )
+            # Start the API and the RPC server
+            api_endpoint = f"{config.get('API_BIND')}:{config.get('API_PORT')}"
+            if config.get("WSGI") == "gunicorn":
+                # FIXME: We may like to add workers depending on a config value
+                subprocess.Popen(
+                    [
+                        "gunicorn",
+                        f"--bind={api_endpoint}",
+                        f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
+                        f"endpoint='{api_endpoint}', min_to_self_delay='{config.get('MIN_TO_SELF_DELAY')}', "
+                        f"log_file='{config.get('LOG_FILE')}')",
+                    ]
+                )
+            else:
+                Process(
+                    target=api.serve,
+                    kwargs={
+                        "internal_api_endpoint": INTERNAL_API_ENDPOINT,
+                        "endpoint": api_endpoint,
+                        "min_to_self_delay": config.get("MIN_TO_SELF_DELAY"),
+                        "log_file": config.get("LOG_FILE"),
+                        "auto_run": True,
+                    },
+                ).start()
 
             Process(
                 target=rpc.serve,
@@ -227,28 +242,29 @@ if __name__ == "__main__":
     command_line_conf = {}
     data_dir = DATA_DIR
 
+    opts, _ = getopt(
+        argv[1:],
+        "hd",
+        [
+            "apibind=",
+            "apiport=",
+            "rpcbind=",
+            "rpcport=",
+            "btcnetwork=",
+            "btcrpcuser=",
+            "btcrpcpassword=",
+            "btcrpcconnect=",
+            "btcrpcport=",
+            "btcfeedconnect=",
+            "btcfeedport=",
+            "datadir=",
+            "wsgi=",
+            "daemon",
+            "overwritekey",
+            "help",
+        ],
+    )
     try:
-        opts, _ = getopt(
-            argv[1:],
-            "hd",
-            [
-                "apibind=",
-                "apiport=",
-                "rpcbind=",
-                "rpcport=",
-                "btcnetwork=",
-                "btcrpcuser=",
-                "btcrpcpassword=",
-                "btcrpcconnect=",
-                "btcrpcport=",
-                "btcfeedconnect=",
-                "btcfeedport=",
-                "datadir=",
-                "daemon",
-                "overwritekey",
-                "help",
-            ],
-        )
         for opt, arg in opts:
             if opt in ["--apibind"]:
                 command_line_conf["API_BIND"] = arg
@@ -286,6 +302,11 @@ if __name__ == "__main__":
                     exit("btcfeedport must be an integer")
             if opt in ["--datadir"]:
                 data_dir = os.path.expanduser(arg)
+            if opt in ["--wsgi"]:
+                if arg in ["gunicorn", "flask"]:
+                    command_line_conf["WSGI"] = arg
+                else:
+                    exit("wsgi must be either gunicorn or flask")
             if opt in ["-d", "--daemon"]:
                 command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:

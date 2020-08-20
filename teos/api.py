@@ -1,4 +1,5 @@
 import grpc
+import multiprocessing as mpp
 from google.protobuf import json_format
 from flask import Flask, request, jsonify
 
@@ -56,27 +57,38 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
-def serve(internal_api_endpoint, min_to_self_delay, log_file):
+def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run=False):
     """
     Starts the API.
 
-    This method is handled by an external WSGI server, such as gunicorn.
-
-    Notice since this is run via terminal (or via subprocess.Popen) all arguments are strings.
+    This method can be handled either form an external WSGI (like gunicorn) or by the Flask development server.
 
     Args:
-        internal_api_endpoint (:obj:`str`): Endpoint where the internal api is running (host:port).
-        min_to_self_delay (:obj:`str`): The minimum to_self_delay accepted by the Inspector.
-        log_file (:obj:`str`): The file_path where to store logs.
+        internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (host:port).
+        endpoint (:obj:`str`): endpoint where the http api will be running (host:port).
+        min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the Inspector.
+        log_file (:obj:`str`): the file_path where to store logs.
+        auto_run (:obj:`bool`): whether the server should be started by this process. False if run with an external
+            WSGI. True is run by Flask.
 
     Returns:
-        The application object needed by the WSGI server to run.
+        The application object needed by the WSGI server to run if ``auto_run`` if ``False``, ``None`` otherwise.
     """
 
-    setup_logging(log_file)
+    # For Python 3.7- and 3.8+ compatibility. Processes for MacOS are created as fork up to 3.8 by default, then it got
+    # changed to spawn.
+    if mpp.get_start_method() == "spawn":
+        setup_logging(log_file)
     inspector = Inspector(int(min_to_self_delay))
     api = API(inspector, internal_api_endpoint)
-    return api.app
+
+    api.logger.info(f"Initialized. Serving at {endpoint}")
+
+    if auto_run:
+        host, port = endpoint.split(":")
+        api.app.run(host=host, port=port)
+    else:
+        return api.app
 
 
 class API:
