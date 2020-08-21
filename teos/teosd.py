@@ -293,6 +293,9 @@ class TeosDaemon:
             self.api_popen.terminate()
             self.api_popen.wait()
         else:
+            # FIXME: when the public API process is ran with flask, there is no SIGTERM handler attempting
+            # a graceful shutdown (rejecting new requests, trying to complete ongoing ones); therefore, we send
+            # a SIGKILL instead.
             self.api_process.kill()
             self.api_process.join()
 
@@ -303,7 +306,6 @@ class TeosDaemon:
 
         # wait for RPC process to shutdown
         self.rpc_process.join()
-        # TODO: should we have a timeout on rpc_process.join()? Should we kill the process on timeout?
 
         # Stops the internal API, after waiting for some grace time
         logger.info("Internal API stopping")
