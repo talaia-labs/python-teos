@@ -237,6 +237,19 @@ class TeosDaemon:
         signal(SIGTERM, self.handle_signals)
         signal(SIGQUIT, self.handle_signals)
 
+        # Start the internal API
+        self.internal_api = InternalAPI(self.watcher, INTERNAL_API_ENDPOINT, self.stop_command_event)
+        self.internal_api.rpc_server.start()
+        logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
+
+        # Start the rpc
+        self.rpc_process = multiprocessing.Process(
+            target=rpc.serve,
+            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
+            daemon=True,
+        )
+        self.rpc_process.start()
+
         # Start the public API server
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
         self.api_popen = None
@@ -265,19 +278,6 @@ class TeosDaemon:
             )
             self.api_process.start()
 
-        # Start the rpc
-        self.rpc_process = multiprocessing.Process(
-            target=rpc.serve,
-            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
-            daemon=True,
-        )
-        self.rpc_process.start()
-
-        # Start the internal API
-        self.internal_api = InternalAPI(self.watcher, INTERNAL_API_ENDPOINT, self.stop_command_event)
-        self.internal_api.rpc_server.start()
-        logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
-
     def handle_signals(self, signum, frame):
         """Handles signals by initiating a graceful shutdown."""
         logger.info(f"Signal {signum} received. Stopping")
@@ -288,6 +288,7 @@ class TeosDaemon:
         """Shuts down all services and closes the DB, then exits. This method does not return."""
         logger.info("Terminating public API")
 
+        # Stop the public API first
         if self.api_popen:
             self.api_popen.terminate()
             self.api_popen.wait()
@@ -297,19 +298,23 @@ class TeosDaemon:
 
         logger.info("Terminated public API")
 
+        # Signals readines to shutdown to the other processes
         self.stop_event.set()
 
-        # wait for rpc process to shutdown
+        # wait for RPC process to shutdown
         self.rpc_process.join()
         # TODO: should we have a timeout on rpc_process.join()? Should we kill the process on timeout?
 
+        # Stops the internal API, after waiting for some grace time
         logger.info("Internal API stopping")
         self.internal_api.rpc_server.stop(INTERNAL_API_SHUTDOWN_GRACE_TIME).wait()
         logger.info("Internal API stopped")
 
+        # terminate the ChainMonitor
+        self.chain_monitor.terminate = True
+
         logger.info("Closing connection with appointments db")
         self.db_manager.db.close()
-        self.chain_monitor.terminate = True
 
         logger.info("Shutting down TEOS")
         exit(0)
