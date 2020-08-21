@@ -91,7 +91,7 @@ class TeosDaemon:
             logger.error("Cannot connect to bitcoind. Shutting down")
 
         elif not in_correct_network(bitcoind_connect_params, self.config.get("BTC_NETWORK")):
-            logger.error("bitcoind is running on a different network, check conf.py and bitcoin.conf. Shutting down")
+            logger.error("bitcoind is running on a different network, check teos.conf and bitcoin.conf. Shutting down")
 
         else:
             if not os.path.exists(self.config.get("TEOS_SECRET_KEY")) or self.config.get("OVERWRITE_KEY"):
