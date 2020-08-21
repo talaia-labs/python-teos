@@ -2,8 +2,9 @@ import os
 import daemon
 import subprocess
 from sys import argv, exit
-from multiprocessing import Process, Event
-from threading import Thread
+import multiprocessing
+import threading
+
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
@@ -63,8 +64,15 @@ def get_config(command_line_conf, data_dir):
 class TeosDaemon:
     def __init__(self, config):
         self.config = config
-        self.stop_command_event = Event()  # event triggered when a `stop` command is issued
-        self.stop_event = Event()  # event triggered when the public API is halted, hence teosd is ready to stop
+
+        # event triggered when a `stop` command is issued
+        # Using multiprocessing.Event seems to cause a deadlock if event.set() is called in a signal handler that
+        # interrupted event.wait(). This does not happen with threading.Event.
+        # See https://bugs.python.org/issue41606
+        self.stop_command_event = threading.Event()
+
+        # event triggered when the public API is halted, hence teosd is ready to stop
+        self.stop_event = multiprocessing.Event()
 
     def start(self):
         try:
@@ -223,7 +231,7 @@ class TeosDaemon:
                 ]
             )
         else:
-            self.api_process = Process(
+            self.api_process = multiprocessing.Process(
                 target=api.serve,
                 kwargs={
                     "internal_api_endpoint": INTERNAL_API_ENDPOINT,
@@ -236,7 +244,7 @@ class TeosDaemon:
             self.api_process.start()
 
         # Start the rpc
-        self.rpc_process = Process(
+        self.rpc_process = multiprocessing.Process(
             target=rpc.serve,
             args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
             daemon=True,
@@ -251,9 +259,7 @@ class TeosDaemon:
     def handle_signals(self, signum, frame):
         logger.info(f"Signal {signum} received. Stopping")
 
-        # setting the event during the signal seems to cause a deadlock, as the same thread is waiting for the event
-        # see https://stackoverflow.com/questions/24422154/multiprocessing-event-wait-hangs-when-interrupted-by-a-signal/30831867  # noqa: E501
-        Thread(target=self.stop_command_event.set).start()
+        self.stop_command_event.set()
 
     def teardown(self):
         logger.info("Terminating public API")
