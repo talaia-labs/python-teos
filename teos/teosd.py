@@ -62,6 +62,25 @@ def get_config(command_line_conf, data_dir):
 
 
 class TeosDaemon:
+    """
+    The :class:`TeosDaemon` organizes the code to initialize all the components of teos, start the service, stop and teardown.
+
+    Args:
+        config (:obj:`dict`): the configuration object.
+
+    Attributes:
+        stop_command_event (:obj"`threading.Event`) the Event that will be set to initiate a graceful shutdown.
+        stop_event (:obj"`multiprocessing.Event`) the Event that services running on different processes will monitor
+            in order to be informed that they should shutdown.
+        db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`) the db manager for appointments.
+        watcher (:obj:`teos.watcher.Watcher`) the `Watcher` instance.
+        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`) the `ChainMonitor` instance.
+        self.api_popen (:obj:`subprocess.Popen` or "obj"`None`) if set, the `Popen` instance running the public API.
+        self.api_process (:obj:`multiprocessing.Process` or "obj"`None`) if set, the `Process` instance running the public API.
+        self.rpc_process (:obj:`multiprocessing.Process`) the instance of the internal RPC server; only set if running.
+        self.internal_api (:obj:`teos.internal_api.InternalAPI`) the InternalAPI instance.
+    """
+
     def __init__(self, config):
         self.config = config
 
@@ -75,6 +94,7 @@ class TeosDaemon:
         self.stop_event = multiprocessing.Event()
 
     def start(self):
+        """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
         try:
             logger.info("Starting TEOS")
             self.setup_components()
@@ -89,6 +109,7 @@ class TeosDaemon:
             exit(1)
 
     def setup_components(self):
+        """Performs the initial setup and creates all the components."""
         setup_data_folder(self.config.get("DATA_DIR"))
         setup_logging(self.config.get("LOG_FILE"))
 
@@ -211,6 +232,7 @@ class TeosDaemon:
             self.chain_monitor.monitor_chain()
 
     def start_services(self):
+        """Readies the tower by setting up signal handling, and starting all the services."""
         signal(SIGINT, self.handle_signals)
         signal(SIGTERM, self.handle_signals)
         signal(SIGQUIT, self.handle_signals)
@@ -257,11 +279,13 @@ class TeosDaemon:
         logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
 
     def handle_signals(self, signum, frame):
+        """Handles signals by initiating a graceful shutdown."""
         logger.info(f"Signal {signum} received. Stopping")
 
         self.stop_command_event.set()
 
     def teardown(self):
+        """Shuts down all services and closes the DB, then exits. This method does not return."""
         logger.info("Terminating public API")
 
         if self.api_popen:
