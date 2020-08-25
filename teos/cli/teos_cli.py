@@ -104,8 +104,9 @@ class RPCClient:
         return result.user
 
     def stop(self):
+        """Stops TEOS gracefully."""
         self.stub.stop(Empty())
-        return "Closing the Eye of Satoshi"
+        print("Closing the Eye of Satoshi")
 
 
 def main(command, args, command_line_conf):

@@ -67,5 +67,5 @@ def help_stop():
         "\n\nUSAGE:"
         "\tpython teos_cli.py stop"
         "\n\nDESCRIPTION:"
-        "\n\n\Requests a graceful shutdown of the tower.\n"
+        "\n\n\tRequests a graceful shutdown of the tower.\n"
     )

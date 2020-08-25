@@ -28,15 +28,10 @@ from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
 from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
+from teos.constants import INTERNAL_API_ENDPOINT, SHUTDOWN_GRACE_TIME
 
 logger = get_logger(component="Daemon")
 parent_pid = os.getpid()
-
-INTERNAL_API_HOST = "localhost"
-INTERNAL_API_PORT = "50051"
-INTERNAL_API_ENDPOINT = f"{INTERNAL_API_HOST}:{INTERNAL_API_PORT}"
-# the grace time in seconds to complete any pending internal api call when stopping teosd
-INTERNAL_API_SHUTDOWN_GRACE_TIME = 10
 
 
 def get_config(command_line_conf, data_dir):
@@ -63,20 +58,23 @@ def get_config(command_line_conf, data_dir):
 
 class TeosDaemon:
     """
-    The :class:`TeosDaemon` organizes the code to initialize all the components of teos, start the service, stop and teardown.
+    The :class:`TeosDaemon` organizes the code to initialize all the components of teos, start the service, stop and
+    teardown.
 
     Args:
         config (:obj:`dict`): the configuration object.
 
     Attributes:
-        stop_command_event (:obj"`threading.Event`) the Event that will be set to initiate a graceful shutdown.
-        stop_event (:obj"`multiprocessing.Event`) the Event that services running on different processes will monitor
+        stop_command_event (:obj:`threading.Event`) the Event that will be set to initiate a graceful shutdown.
+        stop_event (:obj:`multiprocessing.Event`) the Event that services running on different processes will monitor
             in order to be informed that they should shutdown.
+        block_processor (:obj:`teos.block_processor.BlockProcessor`) the BlockProcessor instance.
         db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`) the db manager for appointments.
         watcher (:obj:`teos.watcher.Watcher`) the `Watcher` instance.
-        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`) the `ChainMonitor` instance.
-        self.api_popen (:obj:`subprocess.Popen` or "obj"`None`) if set, the `Popen` instance running the public API.
-        self.api_process (:obj:`multiprocessing.Process` or "obj"`None`) if set, the `Process` instance running the public API.
+        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`) the ``ChainMonitor`` instance.
+        self.api_popen (:obj:`subprocess.Popen` or :obj:`None`) if set, the ``Popen`` instance running the public API.
+        self.api_process (:obj:`multiprocessing.Process` or :obj:`None`) if set, the ``Process`` instance running the
+            public API.
         self.rpc_process (:obj:`multiprocessing.Process`) the instance of the internal RPC server; only set if running.
         self.internal_api (:obj:`teos.internal_api.InternalAPI`) the InternalAPI instance.
     """
@@ -84,7 +82,7 @@ class TeosDaemon:
     def __init__(self, config):
         self.config = config
 
-        # event triggered when a `stop` command is issued
+        # event triggered when a ``stop`` command is issued
         # Using multiprocessing.Event seems to cause a deadlock if event.set() is called in a signal handler that
         # interrupted event.wait(). This does not happen with threading.Event.
         # See https://bugs.python.org/issue41606
@@ -93,23 +91,6 @@ class TeosDaemon:
         # event triggered when the public API is halted, hence teosd is ready to stop
         self.stop_event = multiprocessing.Event()
 
-    def start(self):
-        """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
-        try:
-            logger.info("Starting TEOS")
-            self.setup_components()
-            self.start_services()
-
-            self.stop_command_event.wait()
-
-            self.teardown()
-
-        except Exception as e:
-            logger.error("An error occurred: {}. Shutting down".format(e))
-            exit(1)
-
-    def setup_components(self):
-        """Performs the initial setup and creates all the components."""
         setup_data_folder(self.config.get("DATA_DIR"))
         setup_logging(self.config.get("LOG_FILE"))
 
@@ -117,119 +98,144 @@ class TeosDaemon:
         bitcoind_feed_params = {k: v for k, v in self.config.items() if k.startswith("BTC_FEED")}
 
         if not can_connect_to_bitcoind(bitcoind_connect_params):
-            logger.error("Cannot connect to bitcoind. Shutting down")
+            raise RuntimeError("Cannot connect to bitcoind")
 
         elif not in_correct_network(bitcoind_connect_params, self.config.get("BTC_NETWORK")):
-            logger.error("bitcoind is running on a different network, check teos.conf and bitcoin.conf. Shutting down")
+            raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
+
+        if not os.path.exists(self.config.get("TEOS_SECRET_KEY")) or self.config.get("OVERWRITE_KEY"):
+            logger.info("Generating a new key pair")
+            sk = Cryptographer.generate_key()
+            Cryptographer.save_key_file(sk.to_der(), "teos_sk", self.config.get("DATA_DIR"))
 
         else:
-            if not os.path.exists(self.config.get("TEOS_SECRET_KEY")) or self.config.get("OVERWRITE_KEY"):
-                logger.info("Generating a new key pair")
-                sk = Cryptographer.generate_key()
-                Cryptographer.save_key_file(sk.to_der(), "teos_sk", self.config.get("DATA_DIR"))
+            logger.info("Tower identity found. Loading keys")
+            secret_key_der = Cryptographer.load_key_file(self.config.get("TEOS_SECRET_KEY"))
 
-            else:
-                logger.info("Tower identity found. Loading keys")
-                secret_key_der = Cryptographer.load_key_file(self.config.get("TEOS_SECRET_KEY"))
+            if not secret_key_der:
+                raise IOError("TEOS private key cannot be loaded")
+            sk = Cryptographer.load_private_key_der(secret_key_der)
 
-                if not secret_key_der:
-                    raise IOError("TEOS private key cannot be loaded")
-                sk = Cryptographer.load_private_key_der(secret_key_der)
+        logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
+        self.block_processor = BlockProcessor(bitcoind_connect_params)
+        carrier = Carrier(bitcoind_connect_params)
 
-            logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
-            block_processor = BlockProcessor(bitcoind_connect_params)
-            carrier = Carrier(bitcoind_connect_params)
+        gatekeeper = Gatekeeper(
+            UsersDBM(self.config.get("USERS_DB_PATH")),
+            self.block_processor,
+            self.config.get("SUBSCRIPTION_SLOTS"),
+            self.config.get("SUBSCRIPTION_DURATION"),
+            self.config.get("EXPIRY_DELTA"),
+        )
+        self.db_manager = AppointmentsDBM(self.config.get("APPOINTMENTS_DB_PATH"))
+        responder = Responder(self.db_manager, gatekeeper, carrier, self.block_processor)
+        self.watcher = Watcher(
+            self.db_manager,
+            gatekeeper,
+            self.block_processor,
+            responder,
+            sk,
+            self.config.get("MAX_APPOINTMENTS"),
+            self.config.get("LOCATOR_CACHE_SIZE"),
+        )
 
-            gatekeeper = Gatekeeper(
-                UsersDBM(self.config.get("USERS_DB_PATH")),
-                block_processor,
-                self.config.get("SUBSCRIPTION_SLOTS"),
-                self.config.get("SUBSCRIPTION_DURATION"),
-                self.config.get("EXPIRY_DELTA"),
-            )
-            self.db_manager = AppointmentsDBM(self.config.get("APPOINTMENTS_DB_PATH"))
-            responder = Responder(self.db_manager, gatekeeper, carrier, block_processor)
-            self.watcher = Watcher(
-                self.db_manager,
-                gatekeeper,
-                block_processor,
-                responder,
-                sk,
-                self.config.get("MAX_APPOINTMENTS"),
-                self.config.get("LOCATOR_CACHE_SIZE"),
-            )
+        # Create the chain monitor and start monitoring the chain
+        self.chain_monitor = ChainMonitor(
+            self.watcher.block_queue, self.watcher.responder.block_queue, self.block_processor, bitcoind_feed_params
+        )
 
-            # Create the chain monitor and start monitoring the chain
-            self.chain_monitor = ChainMonitor(
-                self.watcher.block_queue, self.watcher.responder.block_queue, block_processor, bitcoind_feed_params
-            )
+        # Set up the internal API
+        self.internal_api = InternalAPI(self.watcher, INTERNAL_API_ENDPOINT, self.stop_command_event)
 
-            watcher_appointments_data = self.db_manager.load_watcher_appointments()
-            responder_trackers_data = self.db_manager.load_responder_trackers()
+        # Create the rpc, without starting it
+        self.rpc_process = multiprocessing.Process(
+            target=rpc.serve,
+            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
+            daemon=True,
+        )
 
-            if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
-                logger.info("Fresh bootstrap")
+        # One of this variables will contain the handle of the process running the API, when the service is started
+        self.api_popen = None
+        self.api_process = None
 
-                self.watcher.awake()
-                self.watcher.responder.awake()
+    def start(self):
+        """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
+        logger.info("Starting TEOS")
+        self.setup_components()
+        self.start_services()
 
-            else:
-                logger.info("Bootstrapping from backed up data")
+        self.stop_command_event.wait()
 
-                # Update the Watcher backed up data if found.
-                if len(watcher_appointments_data) != 0:
-                    self.watcher.appointments, self.watcher.locator_uuid_map = Builder.build_appointments(
-                        watcher_appointments_data
-                    )
+        self.teardown()
 
-                # Update the Responder with backed up data if found.
-                if len(responder_trackers_data) != 0:
-                    self.watcher.responder.trackers, self.watcher.responder.tx_tracker_map = Builder.build_trackers(
-                        responder_trackers_data
-                    )
+    def setup_components(self):
+        """Performs the initial setup and creates all the components."""
+        watcher_appointments_data = self.db_manager.load_watcher_appointments()
+        responder_trackers_data = self.db_manager.load_responder_trackers()
 
-                # Awaking components so the states can be updated.
-                self.watcher.awake()
-                self.watcher.responder.awake()
+        if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
+            logger.info("Fresh bootstrap")
 
-                last_block_watcher = self.db_manager.load_last_block_hash_watcher()
-                last_block_responder = self.db_manager.load_last_block_hash_responder()
+            self.watcher.awake()
+            self.watcher.responder.awake()
 
-                # Populate the block queues with data if they've missed some while offline. If the blocks of both match
-                # we don't perform the search twice.
+        else:
+            logger.info("Bootstrapping from backed up data")
 
-                # FIXME: 32-reorgs-offline dropped txs are not used at this point.
-                last_common_ancestor_watcher, dropped_txs_watcher = block_processor.find_last_common_ancestor(
-                    last_block_watcher
+            # Update the Watcher backed up data if found.
+            if len(watcher_appointments_data) != 0:
+                self.watcher.appointments, self.watcher.locator_uuid_map = Builder.build_appointments(
+                    watcher_appointments_data
                 )
-                missed_blocks_watcher = block_processor.get_missed_blocks(last_common_ancestor_watcher)
 
-                if last_block_watcher == last_block_responder:
-                    dropped_txs_responder = dropped_txs_watcher
-                    missed_blocks_responder = missed_blocks_watcher
+            # Update the Responder with backed up data if found.
+            if len(responder_trackers_data) != 0:
+                self.watcher.responder.trackers, self.watcher.responder.tx_tracker_map = Builder.build_trackers(
+                    responder_trackers_data
+                )
 
-                else:
-                    last_common_ancestor_responder, dropped_txs_responder = block_processor.find_last_common_ancestor(
-                        last_block_responder
-                    )
-                    missed_blocks_responder = block_processor.get_missed_blocks(last_common_ancestor_responder)
+            # Awaking components so the states can be updated.
+            self.watcher.awake()
+            self.watcher.responder.awake()
 
-                # If only one of the instances needs to be updated, it can be done separately.
-                if len(missed_blocks_watcher) == 0 and len(missed_blocks_responder) != 0:
-                    Builder.populate_block_queue(self.watcher.responder.block_queue, missed_blocks_responder)
-                    self.watcher.responder.block_queue.join()
+            last_block_watcher = self.db_manager.load_last_block_hash_watcher()
+            last_block_responder = self.db_manager.load_last_block_hash_responder()
 
-                elif len(missed_blocks_responder) == 0 and len(missed_blocks_watcher) != 0:
-                    Builder.populate_block_queue(self.watcher.block_queue, missed_blocks_watcher)
-                    self.watcher.block_queue.join()
+            # Populate the block queues with data if they've missed some while offline. If the blocks of both match
+            # we don't perform the search twice.
 
-                # Otherwise they need to be updated at the same time, block by block
-                elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
-                    Builder.update_states(self.watcher, missed_blocks_watcher, missed_blocks_responder)
+            # FIXME: 32-reorgs-offline dropped txs are not used at this point.
+            last_common_ancestor_watcher, dropped_txs_watcher = self.block_processor.find_last_common_ancestor(
+                last_block_watcher
+            )
+            missed_blocks_watcher = self.block_processor.get_missed_blocks(last_common_ancestor_watcher)
 
-            # Fire ChainMonitor
-            # FIXME: 92-block-data-during-bootstrap-db
-            self.chain_monitor.monitor_chain()
+            if last_block_watcher == last_block_responder:
+                dropped_txs_responder = dropped_txs_watcher
+                missed_blocks_responder = missed_blocks_watcher
+
+            else:
+                last_common_ancestor_responder, dropped_txs_responder = self.block_processor.find_last_common_ancestor(
+                    last_block_responder
+                )
+                missed_blocks_responder = self.block_processor.get_missed_blocks(last_common_ancestor_responder)
+
+            # If only one of the instances needs to be updated, it can be done separately.
+            if len(missed_blocks_watcher) == 0 and len(missed_blocks_responder) != 0:
+                Builder.populate_block_queue(self.watcher.responder.block_queue, missed_blocks_responder)
+                self.watcher.responder.block_queue.join()
+
+            elif len(missed_blocks_responder) == 0 and len(missed_blocks_watcher) != 0:
+                Builder.populate_block_queue(self.watcher.block_queue, missed_blocks_watcher)
+                self.watcher.block_queue.join()
+
+            # Otherwise they need to be updated at the same time, block by block
+            elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
+                Builder.update_states(self.watcher, missed_blocks_watcher, missed_blocks_responder)
+
+        # Fire ChainMonitor
+        # FIXME: 92-block-data-during-bootstrap-db
+        self.chain_monitor.monitor_chain()
 
     def start_services(self):
         """Readies the tower by setting up signal handling, and starting all the services."""
@@ -238,22 +244,14 @@ class TeosDaemon:
         signal(SIGQUIT, self.handle_signals)
 
         # Start the internal API
-        self.internal_api = InternalAPI(self.watcher, INTERNAL_API_ENDPOINT, self.stop_command_event)
         self.internal_api.rpc_server.start()
         logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
 
-        # Start the rpc
-        self.rpc_process = multiprocessing.Process(
-            target=rpc.serve,
-            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
-            daemon=True,
-        )
+        # Start the rpc process
         self.rpc_process.start()
 
         # Start the public API server
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
-        self.api_popen = None
-        self.api_process = None
         if self.config.get("WSGI") == "gunicorn":
             # FIXME: We may like to add workers depending on a config value
             self.api_popen = subprocess.Popen(
@@ -301,7 +299,7 @@ class TeosDaemon:
 
         logger.info("Terminated public API")
 
-        # Signals readines to shutdown to the other processes
+        # Signals readiness to shutdown to the other processes
         self.stop_event.set()
 
         # wait for RPC process to shutdown
@@ -309,7 +307,7 @@ class TeosDaemon:
 
         # Stops the internal API, after waiting for some grace time
         logger.info("Internal API stopping")
-        self.internal_api.rpc_server.stop(INTERNAL_API_SHUTDOWN_GRACE_TIME).wait()
+        self.internal_api.rpc_server.stop(SHUTDOWN_GRACE_TIME).wait()
         logger.info("Internal API stopped")
 
         # terminate the ChainMonitor
@@ -323,7 +321,11 @@ class TeosDaemon:
 
 
 def main(config):
-    TeosDaemon(config).start()
+    try:
+        TeosDaemon(config).start()
+    except Exception as e:
+        logger.error("An error occurred: {}. Shutting down".format(e))
+        exit(1)
 
 
 if __name__ == "__main__":
@@ -410,6 +412,6 @@ if __name__ == "__main__":
     if config.get("DAEMON"):
         print("Starting TEOS")
         with daemon.DaemonContext():
-            TeosDaemon(config).start()
+            main(config)
     else:
-        TeosDaemon(config).start()
+        main(config)

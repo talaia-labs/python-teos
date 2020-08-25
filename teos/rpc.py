@@ -4,14 +4,12 @@ from concurrent import futures
 
 from common.logger import get_logger
 
+from teos.constants import SHUTDOWN_GRACE_TIME
 from teos.protobuf.tower_services_pb2_grpc import (
     TowerServicesStub,
     TowerServicesServicer,
     add_TowerServicesServicer_to_server,
 )
-
-# the grace time in seconds to complete any pending rpc call when a `stop` command is received
-SHUTDOWN_GRACE_TIME = 10
 
 
 class RPC:
@@ -41,8 +39,8 @@ class RPC:
 
 def forward_errors(func):
     """
-    Transforms `func` in order to forward any grpc.RPCError returned by the upstream grpc as the result of the current
-    grpc call.
+    Transforms ``func`` in order to forward any ``grpc.RPCError`` returned by the upstream grpc as the result of the
+    current grpc call.
     """
 
     @functools.wraps(func)
@@ -104,7 +102,8 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
-        stop_event TODO
+        stop_event (:obj:`multiprocessing.Event`) the Event that this service will monitor. The rpc server will
+            initiate a graceful shutdown once this event is set.
     """
 
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
