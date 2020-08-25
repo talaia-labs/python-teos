@@ -72,9 +72,8 @@ class TeosDaemon:
         db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`) the db manager for appointments.
         watcher (:obj:`teos.watcher.Watcher`) the `Watcher` instance.
         chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`) the ``ChainMonitor`` instance.
-        self.api_popen (:obj:`subprocess.Popen` or :obj:`None`) if set, the ``Popen`` instance running the public API.
-        self.api_process (:obj:`multiprocessing.Process` or :obj:`None`) if set, the ``Process`` instance running the
-            public API.
+        self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process` or :obj:`None`) once the rpc process
+            is created, the instance of either ``Popen`` or ``Process`` that is serving the public API.
         self.rpc_process (:obj:`multiprocessing.Process`) the instance of the internal RPC server; only set if running.
         self.internal_api (:obj:`teos.internal_api.InternalAPI`) the InternalAPI instance.
     """
@@ -160,9 +159,9 @@ class TeosDaemon:
             daemon=True,
         )
 
-        # One of this variables will contain the handle of the process running the API, when the service is started
-        self.api_popen = None
-        self.api_process = None
+        # This variables will contain the handle of the process running the API, when the service is started.
+        # It will be an instance of either Popen or Process, depending on the WSGI config setting.
+        self.api_proc = None
 
     def start(self):
         """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
@@ -260,7 +259,7 @@ class TeosDaemon:
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
         if self.config.get("WSGI") == "gunicorn":
             # FIXME: We may like to add workers depending on a config value
-            self.api_popen = subprocess.Popen(
+            self.api_proc = subprocess.Popen(
                 [
                     "gunicorn",
                     f"--bind={api_endpoint}",
@@ -270,7 +269,7 @@ class TeosDaemon:
                 ]
             )
         else:
-            self.api_process = multiprocessing.Process(
+            self.api_proc = multiprocessing.Process(
                 target=api.serve,
                 kwargs={
                     "internal_api_endpoint": INTERNAL_API_ENDPOINT,
@@ -280,7 +279,7 @@ class TeosDaemon:
                     "auto_run": True,
                 },
             )
-            self.api_process.start()
+            self.api_proc.start()
 
     def handle_signals(self, signum, frame):
         """Handles signals by initiating a graceful shutdown."""
@@ -293,15 +292,18 @@ class TeosDaemon:
         logger.info("Terminating public API")
 
         # Stop the public API first
-        if self.api_popen:
-            self.api_popen.terminate()
-            self.api_popen.wait()
+        if self.config.get("WSGI") == "gunicorn":
+            # ``api_proc`` is a Popen instance
+            self.api_proc.terminate()
+            self.api_proc.wait()
         else:
+            # ``api_proc`` is a Process instance
+
             # FIXME: when the public API process is ran with flask, there is no SIGTERM handler attempting
             # a graceful shutdown (rejecting new requests, trying to complete ongoing ones); therefore, we send
             # a SIGKILL instead.
-            self.api_process.kill()
-            self.api_process.join()
+            self.api_proc.kill()
+            self.api_proc.join()
 
         logger.info("Terminated public API")
 
