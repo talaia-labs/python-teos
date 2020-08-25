@@ -248,12 +248,14 @@ class TeosDaemon:
         signal(SIGTERM, self.handle_signals)
         signal(SIGQUIT, self.handle_signals)
 
-        # Start the internal API
-        self.internal_api.rpc_server.start()
-        logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
-
         # Start the rpc process
         self.rpc_process.start()
+
+        # Start the internal API
+        # This MUST be done after rpc_process.start to avoid the issue that was solved in
+        # https://github.com/talaia-labs/python-teos/pull/198
+        self.internal_api.rpc_server.start()
+        logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
 
         # Start the public API server
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
