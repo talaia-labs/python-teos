@@ -1,8 +1,9 @@
 import functools
 import grpc
+import multiprocessing as mpp
 from concurrent import futures
 
-from common.logger import get_logger
+from common.logger import setup_logging, get_logger
 
 from teos.constants import SHUTDOWN_GRACE_TIME
 from teos.protobuf.tower_services_pb2_grpc import (
@@ -90,7 +91,7 @@ class _RPC(TowerServicesServicer):
         return self.stub.stop(request)
 
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
+def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
@@ -102,10 +103,15 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
+        log_file (:obj:`str`): the file_path where to store logs.
         stop_event (:obj:`multiprocessing.Event`) the Event that this service will monitor. The rpc server will
             initiate a graceful shutdown once this event is set.
     """
 
+    # For Python 3.7- and 3.8+ compatibility. Processes for MacOS are created as fork up to 3.8 by default, then it got
+    # changed to spawn.
+    if mpp.get_start_method() == "spawn":
+        setup_logging(log_file)
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
     rpc.rpc_server.start()
 

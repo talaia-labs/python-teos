@@ -150,7 +150,13 @@ class TeosDaemon:
         # Create the rpc, without starting it
         self.rpc_process = multiprocessing.Process(
             target=rpc.serve,
-            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
+            args=(
+                self.config.get("RPC_BIND"),
+                self.config.get("RPC_PORT"),
+                INTERNAL_API_ENDPOINT,
+                self.stop_event,
+                self.config.get("LOG_FILE"),
+            ),
             daemon=True,
         )
 
