@@ -142,16 +142,6 @@ class TeosDaemon:
         # It will be an instance of either Popen or Process, depending on the WSGI config setting.
         self.api_proc = None
 
-    def start(self):
-        """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
-        logger.info("Starting TEOS")
-        self.bootstrap_components()
-        self.start_services()
-
-        self.stop_command_event.wait()
-
-        self.teardown()
-
     def bootstrap_components(self):
         """
         Performs the initial setup of the components. It loads the appointments and tracker for the watcher and the
@@ -269,7 +259,7 @@ class TeosDaemon:
 
     def handle_signals(self, signum, frame):
         """Handles signals by initiating a graceful shutdown."""
-        logger.info(f"Signal {signum} received. Stopping")
+        logger.debug(f"Signal {signum} received. Stopping")
 
         self.stop_command_event.set()
 
@@ -312,6 +302,16 @@ class TeosDaemon:
 
         logger.info("Shutting down TEOS")
         exit(0)
+
+    def start(self):
+        """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
+        logger.info("Starting TEOS")
+        self.bootstrap_components()
+        self.start_services()
+
+        self.stop_command_event.wait()
+
+        self.teardown()
 
 
 def main(config):
