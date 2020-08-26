@@ -138,7 +138,7 @@ class TeosDaemon:
             self.config.get("LOCATOR_CACHE_SIZE"),
         )
 
-        # Create the chain monitor and start monitoring the chain
+        # Create the chain monitor
         self.chain_monitor = ChainMonitor(
             self.watcher.block_queue, self.watcher.responder.block_queue, self.block_processor, bitcoind_feed_params
         )
@@ -166,15 +166,20 @@ class TeosDaemon:
     def start(self):
         """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
         logger.info("Starting TEOS")
-        self.setup_components()
+        self.bootstrap_components()
         self.start_services()
 
         self.stop_command_event.wait()
 
         self.teardown()
 
-    def setup_components(self):
-        """Performs the initial setup and creates all the components."""
+    def bootstrap_components(self):
+        """
+        Performs the initial setup of the components. It loads the appointments and tracker for the watcher and the
+        responder (if any), and awakes the components. It also populates the block queues with any missing data, in
+        case the tower has been offline for some time. Finally, it starts the chain monitor.
+        """
+
         watcher_appointments_data = self.db_manager.load_watcher_appointments()
         responder_trackers_data = self.db_manager.load_responder_trackers()
 
