@@ -473,7 +473,10 @@ def test_appointment_shutdown_teos_trigger_back_online(run_bitcoind):
     add_appointment(appointment)
 
     # Restart teos
-    teosd_process.terminate()
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client.stop()
+    teosd_process.join()
+
     teosd_process, _ = run_teosd()
 
     assert teos_pid != teosd_process.pid
@@ -511,7 +514,10 @@ def test_appointment_shutdown_teos_trigger_while_offline(run_bitcoind):
     assert appointment_info.get("appointment") == appointment.to_dict()
 
     # Shutdown and trigger
-    teosd_process.terminate()
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client.stop()
+    teosd_process.join()
+
     generate_block_with_transactions(commitment_tx)
 
     # Restart
