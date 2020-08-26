@@ -63,6 +63,7 @@ class TeosDaemon:
 
     Args:
         config (:obj:`dict`): the configuration object.
+        sk (:obj:`PrivateKey`:): the ``PrivateKey`` of the tower.
 
     Attributes:
         stop_command_event (:obj:`threading.Event`) the Event that will be set to initiate a graceful shutdown.
@@ -78,7 +79,7 @@ class TeosDaemon:
         self.internal_api (:obj:`teos.internal_api.InternalAPI`) the InternalAPI instance.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, sk):
         self.config = config
 
         # event triggered when a ``stop`` command is issued
@@ -90,30 +91,8 @@ class TeosDaemon:
         # event triggered when the public API is halted, hence teosd is ready to stop
         self.stop_event = multiprocessing.Event()
 
-        setup_data_folder(self.config.get("DATA_DIR"))
-        setup_logging(self.config.get("LOG_FILE"))
-
-        bitcoind_connect_params = {k: v for k, v in self.config.items() if k.startswith("BTC_RPC")}
-        bitcoind_feed_params = {k: v for k, v in self.config.items() if k.startswith("BTC_FEED")}
-
-        if not can_connect_to_bitcoind(bitcoind_connect_params):
-            raise RuntimeError("Cannot connect to bitcoind")
-
-        elif not in_correct_network(bitcoind_connect_params, self.config.get("BTC_NETWORK")):
-            raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
-
-        if not os.path.exists(self.config.get("TEOS_SECRET_KEY")) or self.config.get("OVERWRITE_KEY"):
-            logger.info("Generating a new key pair")
-            sk = Cryptographer.generate_key()
-            Cryptographer.save_key_file(sk.to_der(), "teos_sk", self.config.get("DATA_DIR"))
-
-        else:
-            logger.info("Tower identity found. Loading keys")
-            secret_key_der = Cryptographer.load_key_file(self.config.get("TEOS_SECRET_KEY"))
-
-            if not secret_key_der:
-                raise IOError("TEOS private key cannot be loaded")
-            sk = Cryptographer.load_private_key_der(secret_key_der)
+        bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
+        bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
         logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
         self.block_processor = BlockProcessor(bitcoind_connect_params)
@@ -336,8 +315,32 @@ class TeosDaemon:
 
 
 def main(config):
+    setup_data_folder(config.get("DATA_DIR"))
+    setup_logging(config.get("LOG_FILE"))
+
+    bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
+
+    if not can_connect_to_bitcoind(bitcoind_connect_params):
+        raise RuntimeError("Cannot connect to bitcoind")
+
+    elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
+        raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
+
+    if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
+        logger.info("Generating a new key pair")
+        sk = Cryptographer.generate_key()
+        Cryptographer.save_key_file(sk.to_der(), "teos_sk", config.get("DATA_DIR"))
+
+    else:
+        logger.info("Tower identity found. Loading keys")
+        secret_key_der = Cryptographer.load_key_file(config.get("TEOS_SECRET_KEY"))
+
+        if not secret_key_der:
+            raise IOError("TEOS private key cannot be loaded")
+        sk = Cryptographer.load_private_key_der(secret_key_der)
+
     try:
-        TeosDaemon(config).start()
+        TeosDaemon(config, sk).start()
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         exit(1)
