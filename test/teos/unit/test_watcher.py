@@ -80,7 +80,7 @@ def watcher(run_bitcoind, db_manager, gatekeeper):
     watcher.last_known_block = block_processor.get_best_block_hash()
 
     chain_monitor = ChainMonitor(
-        watcher.block_queue, watcher.responder.block_queue, block_processor, bitcoind_feed_params
+        [watcher.block_queue, watcher.responder.block_queue], block_processor, bitcoind_feed_params
     )
     chain_monitor.monitor_chain()
 

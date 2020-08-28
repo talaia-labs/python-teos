@@ -1,3 +1,4 @@
+from enum import Enum
 import zmq
 import binascii
 from threading import Thread, Event, Condition
@@ -8,15 +9,14 @@ from common.logger import get_logger
 class ChainMonitor:
     """
     The :class:`ChainMonitor` is in charge of monitoring the blockchain (via ``bitcoind``) to detect new blocks on top
-    of the best chain. If a new best block is spotted, the chain monitor will notify the
-    :obj:`Watcher <teos.watcher.Watcher>` and the :obj:`Responder <teos.responder.Responder>` using ``Queues``.
+    of the best chain. If a new best block is spotted, the chain monitor will notify the given ``Queues``.
 
     The :class:`ChainMonitor` monitors the chain using two methods: ``zmq`` and ``polling``. Blocks are only notified
     once per queue and the notification is triggered by the method that detects the block faster.
 
     Args:
-        watcher_queue (:obj:`Queue`): the queue to be used to send blocks hashes to the ``Watcher``.
-        responder_queue (:obj:`Queue`): the queue to be used to send blocks hashes to the ``Responder``.
+        receiving_queues (:obj:`list`): a list of ``Queue`` objects that will be notified when the chain_monitor is
+            active and it received new blocks hashes.
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance.
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
@@ -29,15 +29,11 @@ class ChainMonitor:
         lock (:obj:`Condition`): a lock used to protect concurrent access to the queues and ``best_tip`` by the zmq and
             polling threads.
         zmqSubSocket (:obj:`socket`): a socket to connect to ``bitcoind`` via ``zmq``.
-        watcher_queue (:obj:`Queue`): a queue to send new best tips to the :obj:`Watcher <teos.watcher.Watcher>`.
-        responder_queue (:obj:`Queue`): a queue to send new best tips to the
-            :obj:`Responder <teos.responder.Responder>`.
         polling_delta (:obj:`int`): time between polls (in seconds).
         max_block_window_size (:obj:`int`): max size of last_tips.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a blockProcessor instance.
     """
 
-    def __init__(self, watcher_queue, responder_queue, block_processor, bitcoind_feed_params):
+    def __init__(self, receiving_queues, block_processor, bitcoind_feed_params):
         self.logger = get_logger(component=ChainMonitor.__name__)
         self.best_tip = None
         self.last_tips = []
@@ -59,8 +55,7 @@ class ChainMonitor:
             )
         )
 
-        self.watcher_queue = watcher_queue
-        self.responder_queue = responder_queue
+        self.receiving_queues = receiving_queues
 
         self.polling_delta = 60
         self.max_block_window_size = 10
@@ -75,8 +70,8 @@ class ChainMonitor:
             block_hash (:obj:`str`): the new block hash to be sent to the subscribers.
         """
 
-        self.watcher_queue.put(block_hash)
-        self.responder_queue.put(block_hash)
+        for queue in self.receiving_queues:
+            queue.put(block_hash)
 
     def update_state(self, block_hash):
         """

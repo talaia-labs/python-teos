@@ -28,7 +28,7 @@ from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
 @pytest.fixture(scope="module")
 def responder(db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     return responder
@@ -297,7 +297,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
 
     # Create a fresh responder to simplify the test
     responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     # Let's set up the trackers first
@@ -360,7 +360,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
 
 def test_check_confirmations(db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
@@ -416,7 +416,7 @@ def test_get_txs_to_rebroadcast(responder):
 
 def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     commitment_txs = [create_commitment_tx() for _ in range(30)]
@@ -537,7 +537,7 @@ def test_get_expired_trackers(responder, generate_dummy_tracker):
 
 def test_rebroadcast(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
 
     # Include the commitment txs in a block
