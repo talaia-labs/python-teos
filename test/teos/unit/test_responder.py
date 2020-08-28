@@ -299,6 +299,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
     responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
+    chain_monitor.activate()
 
     # Let's set up the trackers first
     for tracker in trackers:

@@ -155,6 +155,9 @@ class TeosDaemon:
         case the tower has been offline for some time. Finally, it starts the chain monitor.
         """
 
+        # Make sure that the ChainMonitor starts listening to new blocks while we bootstrap
+        self.chain_monitor.monitor_chain()
+
         watcher_appointments_data = self.db_manager.load_watcher_appointments()
         responder_trackers_data = self.db_manager.load_responder_trackers()
 
@@ -218,9 +221,8 @@ class TeosDaemon:
             elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
                 Builder.update_states(self.watcher, missed_blocks_watcher, missed_blocks_responder)
 
-        # Fire ChainMonitor
-        # FIXME: 92-block-data-during-bootstrap-db
-        self.chain_monitor.monitor_chain()
+        # Activate ChainMonitor
+        self.chain_monitor.activate()
 
     def start_services(self):
         """Readies the tower by setting up signal handling, and starting all the services."""
@@ -298,7 +300,7 @@ class TeosDaemon:
         logger.info("Internal API stopped")
 
         # terminate the ChainMonitor
-        self.chain_monitor.terminate = True
+        self.chain_monitor.terminate()
 
         logger.info("Closing connection with appointments db")
         self.db_manager.db.close()
