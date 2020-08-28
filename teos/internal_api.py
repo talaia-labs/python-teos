@@ -191,5 +191,6 @@ class _InternalAPI(TowerServicesServicer):
             return GetUserResponse(user=user_struct)
 
     def stop(self, request, context):
+        """Initiates a graceful shutdown of the tower."""
         self.stop_command_event.set()
         return Empty()

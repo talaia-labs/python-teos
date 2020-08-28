@@ -121,6 +121,7 @@ def main(command, args, command_line_conf):
 
     rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
 
+    result = None
     try:
         if command == "get_all_appointments":
             result = rpc_client.get_all_appointments()
@@ -137,7 +138,7 @@ def main(command, args, command_line_conf):
             if len(args) > 1:
                 sys.exit(f"Expected only one argument, not {len(args)}")
 
-            result = rpc_client.get_user(args[0])
+            rpc_client.get_user(args[0])
 
         elif command == "stop":
             result = rpc_client.stop()

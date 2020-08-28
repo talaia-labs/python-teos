@@ -5,6 +5,7 @@ from time import sleep
 from multiprocessing import Process
 
 from teos.teosd import main
+from teos.cli.teos_cli import RPCClient
 from common.cryptographer import Cryptographer
 from test.teos.conftest import config
 
@@ -16,8 +17,10 @@ def teosd():
 
     yield teosd_process, teos_id
 
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client.stop()
+    teosd_process.join()
     shutil.rmtree(".teos")
-    teosd_process.terminate()
 
 
 def run_teosd():

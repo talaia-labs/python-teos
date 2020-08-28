@@ -63,20 +63,20 @@ class TeosDaemon:
 
     Args:
         config (:obj:`dict`): the configuration object.
-        sk (:obj:`PrivateKey`:): the ``PrivateKey`` of the tower.
+        sk (:obj:`PrivateKey`): the ``PrivateKey`` of the tower.
 
     Attributes:
-        stop_command_event (:obj:`threading.Event`) the Event that will be set to initiate a graceful shutdown.
-        stop_event (:obj:`multiprocessing.Event`) the Event that services running on different processes will monitor
+        stop_command_event (:obj:`threading.Event`): the Event that will be set to initiate a graceful shutdown.
+        stop_event (:obj:`multiprocessing.Event`): the Event that services running on different processes will monitor
             in order to be informed that they should shutdown.
-        block_processor (:obj:`teos.block_processor.BlockProcessor`) the BlockProcessor instance.
-        db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`) the db manager for appointments.
-        watcher (:obj:`teos.watcher.Watcher`) the `Watcher` instance.
-        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`) the ``ChainMonitor`` instance.
-        self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process` or :obj:`None`) once the rpc process
+        block_processor (:obj:`teos.block_processor.BlockProcessor`): the BlockProcessor instance.
+        db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`): the db manager for appointments.
+        watcher (:obj:`teos.watcher.Watcher`): the `Watcher` instance.
+        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`): the ``ChainMonitor`` instance.
+        self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process` or :obj:`None`): once the rpc process
             is created, the instance of either ``Popen`` or ``Process`` that is serving the public API.
-        self.rpc_process (:obj:`multiprocessing.Process`) the instance of the internal RPC server; only set if running.
-        self.internal_api (:obj:`teos.internal_api.InternalAPI`) the InternalAPI instance.
+        self.rpc_process (:obj:`multiprocessing.Process`): the instance of the internal RPC server; only set if running.
+        self.internal_api (:obj:`teos.internal_api.InternalAPI`): the InternalAPI instance.
     """
 
     def __init__(self, config, sk):
@@ -93,6 +93,12 @@ class TeosDaemon:
 
         bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
         bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
+
+        if not can_connect_to_bitcoind(bitcoind_connect_params):
+            raise RuntimeError("Cannot connect to bitcoind")
+
+        elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
+            raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
 
         logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
         self.block_processor = BlockProcessor(bitcoind_connect_params)
@@ -268,13 +274,10 @@ class TeosDaemon:
         logger.info("Terminating public API")
 
         # Stop the public API first
-        if self.config.get("WSGI") == "gunicorn":
-            # ``api_proc`` is a Popen instance
+        if isinstance(self.api_proc, subprocess.Popen):
             self.api_proc.terminate()
             self.api_proc.wait()
-        else:
-            # ``api_proc`` is a Process instance
-
+        elif isinstance(self.api_proc, multiprocessing.Process):
             # FIXME: when the public API process is ran with flask, there is no SIGTERM handler attempting
             # a graceful shutdown (rejecting new requests, trying to complete ongoing ones); therefore, we send
             # a SIGKILL instead.
@@ -317,14 +320,6 @@ class TeosDaemon:
 def main(config):
     setup_data_folder(config.get("DATA_DIR"))
     setup_logging(config.get("LOG_FILE"))
-
-    bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
-
-    if not can_connect_to_bitcoind(bitcoind_connect_params):
-        raise RuntimeError("Cannot connect to bitcoind")
-
-    elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
-        raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
 
     if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
         logger.info("Generating a new key pair")
