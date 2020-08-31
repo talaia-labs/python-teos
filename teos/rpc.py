@@ -1,9 +1,11 @@
-import functools
 import grpc
+import functools
 from concurrent import futures
+from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-from common.logger import get_logger
+from common.logger import setup_logging, get_logger
 
+from teos.constants import SHUTDOWN_GRACE_TIME
 from teos.protobuf.tower_services_pb2_grpc import (
     TowerServicesStub,
     TowerServicesServicer,
@@ -14,14 +16,11 @@ from teos.protobuf.tower_services_pb2_grpc import (
 class RPC:
     """
     The RPC is an external RPC server offered by tower to receive requests from the CLI.
-
     This acts as a proxy between the internal api and the CLI.
-
     Args:
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
-
     Attributes:
         logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
         endpoint (:obj:`str`): the endpoint where the RPC api will be served (external gRPC server).
@@ -35,11 +34,20 @@ class RPC:
         self.rpc_server.add_insecure_port(self.endpoint)
         add_TowerServicesServicer_to_server(_RPC(internal_api_endpoint, self.logger), self.rpc_server)
 
+    def handle_signals(self, signum, frame):
+        self.teardown()
+
+    def teardown(self):
+        self.logger.info("Stopping")
+        stopped_event = self.rpc_server.stop(SHUTDOWN_GRACE_TIME)
+        stopped_event.wait()
+        self.logger.info("Stopped")
+
 
 def forward_errors(func):
     """
-    Transforms in order to forward any grpc.RPCError returned by the upstream grpc as the result of the current grpc
-    call.
+    Transforms ``func`` in order to forward any ``grpc.RPCError`` returned by the upstream grpc as the result of the
+    current grpc call.
     """
 
     @functools.wraps(func)
@@ -84,8 +92,12 @@ class _RPC(TowerServicesServicer):
     def get_user(self, request, context):
         return self.stub.get_user(request)
 
+    @forward_errors
+    def stop(self, request, context):
+        return self.stub.stop(request)
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint):
+
+def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
@@ -97,10 +109,23 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint):
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
+        log_file (:obj:`str`): the file_path where to store logs.
+        stop_event (:obj:`multiprocessing.Event`) the Event that this service will monitor. The rpc server will
+            initiate a graceful shutdown once this event is set.
     """
 
+    setup_logging(log_file)
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
+    signal(SIGINT, rpc.handle_signals)
+    signal(SIGTERM, rpc.handle_signals)
+    signal(SIGQUIT, rpc.handle_signals)
     rpc.rpc_server.start()
 
     rpc.logger.info(f"Initialized. Serving at {rpc.endpoint}")
-    rpc.rpc_server.wait_for_termination()
+
+    stop_event.wait()
+
+    rpc.logger.info("Stopping")
+    stopped_event = rpc.rpc_server.stop(SHUTDOWN_GRACE_TIME)
+    stopped_event.wait()
+    rpc.logger.info("Stopped")

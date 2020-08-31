@@ -2,11 +2,16 @@ import os
 import shutil
 import pytest
 from time import sleep
+import multiprocessing
+from grpc import RpcError
 from multiprocessing import Process
 
 from teos.teosd import main
+from teos.cli.teos_cli import RPCClient
 from common.cryptographer import Cryptographer
 from test.teos.conftest import config
+
+multiprocessing.set_start_method("spawn")
 
 
 # This fixture needs to be manually run on the first E2E.
@@ -16,8 +21,19 @@ def teosd():
 
     yield teosd_process, teos_id
 
+    # FIXME: This is not ideal, but for some reason stop raises socket being closed on the first try here.
+    stopped = False
+    while not stopped:
+        try:
+            rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+            rpc_client.stop()
+            stopped = True
+        except RpcError:
+            print("failed")
+            pass
+
+    teosd_process.join()
     shutil.rmtree(".teos")
-    teosd_process.terminate()
 
 
 def run_teosd():

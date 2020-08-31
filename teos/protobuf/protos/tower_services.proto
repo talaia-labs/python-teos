@@ -23,4 +23,5 @@ service TowerServices {
   rpc get_tower_info(google.protobuf.Empty) returns (GetTowerInfoResponse) {}
   rpc get_users(google.protobuf.Empty) returns (GetUsersResponse) {}
   rpc get_user(GetUserRequest) returns (GetUserResponse) {}
+  rpc stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }

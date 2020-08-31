@@ -1,3 +1,4 @@
+from multiprocessing import Event
 import grpc
 import pytest
 from binascii import hexlify
@@ -42,7 +43,7 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT)
+    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT, Event())
     i_api.rpc_server.start()
 
     yield i_api
@@ -385,3 +386,9 @@ def test_get_user_not_found(internal_api, stub):
 
     assert e.value.code() == grpc.StatusCode.NOT_FOUND
     assert "User not found" in e.value.details()
+
+
+def test_stop(internal_api, stub):
+    stub.stop(Empty())
+
+    assert internal_api.stop_command_event.is_set()
