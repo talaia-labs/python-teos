@@ -75,10 +75,7 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run
         The application object needed by the WSGI server to run if ``auto_run`` if ``False``, ``None`` otherwise.
     """
 
-    # For Python 3.7- and 3.8+ compatibility. Processes for MacOS are created as fork up to 3.8 by default, then it got
-    # changed to spawn.
-    if mpp.get_start_method() == "spawn":
-        setup_logging(log_file)
+    setup_logging(log_file)
     inspector = Inspector(int(min_to_self_delay))
     api = API(inspector, internal_api_endpoint)
 

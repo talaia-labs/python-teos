@@ -342,6 +342,10 @@ def main(config):
 
 
 if __name__ == "__main__":
+    # Subprocess need to be run using "spawn" for consistent execution between different OS. No state is really shared
+    # between process.
+    multiprocessing.set_start_method("spawn")
+
     command_line_conf = {}
     data_dir = DATA_DIR
 

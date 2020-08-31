@@ -108,10 +108,7 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
             initiate a graceful shutdown once this event is set.
     """
 
-    # For Python 3.7- and 3.8+ compatibility. Processes for MacOS are created as fork up to 3.8 by default, then it got
-    # changed to spawn.
-    if mpp.get_start_method() == "spawn":
-        setup_logging(log_file)
+    setup_logging(log_file)
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
     rpc.rpc_server.start()
 
