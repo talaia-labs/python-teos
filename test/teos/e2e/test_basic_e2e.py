@@ -527,5 +527,3 @@ def test_appointment_shutdown_teos_trigger_while_offline(run_bitcoind):
     # The appointment should have been moved to the Responder
     appointment_info = get_appointment_info(locator)
     assert appointment_info.get("status") == "dispute_responded"
-
-    teosd_process.terminate()
