@@ -1,7 +1,7 @@
-import functools
 import grpc
-import multiprocessing as mpp
+import functools
 from concurrent import futures
+from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
 from common.logger import setup_logging, get_logger
 
@@ -16,14 +16,11 @@ from teos.protobuf.tower_services_pb2_grpc import (
 class RPC:
     """
     The RPC is an external RPC server offered by tower to receive requests from the CLI.
-
     This acts as a proxy between the internal api and the CLI.
-
     Args:
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
-
     Attributes:
         logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
         endpoint (:obj:`str`): the endpoint where the RPC api will be served (external gRPC server).
@@ -36,6 +33,15 @@ class RPC:
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
         add_TowerServicesServicer_to_server(_RPC(internal_api_endpoint, self.logger), self.rpc_server)
+
+    def handle_signals(self, signum, frame):
+        self.teardown()
+
+    def teardown(self):
+        self.logger.info("Stopping")
+        stopped_event = self.rpc_server.stop(SHUTDOWN_GRACE_TIME)
+        stopped_event.wait()
+        self.logger.info("Stopped")
 
 
 def forward_errors(func):
@@ -110,6 +116,9 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
 
     setup_logging(log_file)
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
+    signal(SIGINT, rpc.handle_signals)
+    signal(SIGTERM, rpc.handle_signals)
+    signal(SIGQUIT, rpc.handle_signals)
     rpc.rpc_server.start()
 
     rpc.logger.info(f"Initialized. Serving at {rpc.endpoint}")
