@@ -86,18 +86,6 @@ class ChainMonitor:
         self.queue = Queue()
         self.status = ChainMonitorStatus.IDLE
 
-    def notify_subscribers(self, block_hash):
-        """
-        Notifies the subscribers (``Watcher`` and ``Responder``) about a new block. It does so by putting the hash in
-        the corresponding queue(s).
-
-        Args:
-            block_hash (:obj:`str`): the new block hash to be sent to the subscribers.
-        """
-
-        for rec_queue in self.receiving_queues:
-            rec_queue.put(block_hash)
-
     def enqueue(self, block_hash):
         """
         Adds a new block hash to the internal queue of the  ``ChainMonitor`` and the internal state. The state contains
@@ -174,7 +162,8 @@ class ChainMonitor:
                 # We add a `timeout` to give the thread a chance to terminate even if the queue is empty
                 block_hash = self.queue.get(block=True, timeout=0.1)
                 with self.lock:
-                    self.notify_subscribers(block_hash)
+                    for rec_queue in self.receiving_queues:
+                        rec_queue.put(block_hash)
             except Empty:
                 pass
 

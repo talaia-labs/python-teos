@@ -2,6 +2,7 @@ import zmq
 import time
 from queue import Queue
 from threading import Thread, Event, Condition
+import pytest
 
 from teos.chain_monitor import ChainMonitor, ChainMonitorStatus
 
@@ -15,6 +16,7 @@ def test_init(block_processor):
     # Not much to test here, just sanity checks to make sure nothing goes south in the future
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
 
+    assert chain_monitor.status == ChainMonitorStatus.IDLE
     assert chain_monitor.best_tip is None
     assert isinstance(chain_monitor.last_tips, list) and len(chain_monitor.last_tips) == 0
     assert chain_monitor.status == ChainMonitorStatus.IDLE
@@ -27,19 +29,38 @@ def test_init(block_processor):
     assert isinstance(chain_monitor.receiving_queues[1], Queue)
 
 
-def test_notify_subscribers(block_processor):
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
-    # Subscribers are only notified as long as they are awake
-    new_block = get_random_value_hex(32)
+def test_notify_listeners(block_processor):
+    queue1 = Queue()
+    queue2 = Queue()
+    chain_monitor = ChainMonitor([queue1, queue2], block_processor, bitcoind_feed_params)
 
     # Queues should be empty to start with
-    assert chain_monitor.receiving_queues[0].empty()
-    assert chain_monitor.receiving_queues[1].empty()
+    assert queue1.qsize() == 0
+    assert queue2.qsize() == 0
 
-    chain_monitor.notify_subscribers(new_block)
+    block1 = get_random_value_hex(32)
+    block2 = get_random_value_hex(32)
+    block3 = get_random_value_hex(32)
 
-    assert chain_monitor.receiving_queues[0].get() == new_block
-    assert chain_monitor.receiving_queues[1].get() == new_block
+    # we add two elements to the internal queue before the thread is started
+    chain_monitor.queue.put(block1)
+    chain_monitor.queue.put(block2)
+
+    notifying_thread = Thread(target=chain_monitor.notify_listeners, daemon=True)
+    notifying_thread.start()
+
+    # the existing elements should be processed soon and in order for all queues
+    for q in [queue1, queue2]:
+        assert q.get(timeout=0.1) == block1
+        assert q.get(timeout=0.1) == block2
+
+    # Subscribers are only notified as long as they are awake
+    chain_monitor.queue.put(block3)
+
+    assert queue1.get(timeout=0.1) == block3
+    assert queue2.get(timeout=0.1) == block3
+
+    chain_monitor.terminate()
 
 
 def test_enqueue(block_processor):
@@ -115,11 +136,12 @@ def test_monitor_chain(block_processor):
     chain_monitor.polling_delta = 0.1
 
     chain_monitor.monitor_chain()
+    assert chain_monitor.status == ChainMonitorStatus.LISTENING
 
     # The tip is updated before starting the threads, so it should have changed.
     assert chain_monitor.best_tip is not None
 
-    # Blocks should be received
+    # Blocks should be received and added to the queue
     count = 0
     for _ in range(5):
         generate_blocks(1)
@@ -135,11 +157,23 @@ def test_monitor_chain(block_processor):
     generate_blocks(1)
 
 
+def test_monitor_chain_wrong_status_raises(block_processor):
+    # calling monitor_chain when not idle should raise
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+
+    for status in ChainMonitorStatus:
+        if status != ChainMonitorStatus.IDLE:
+            chain_monitor.status = status  # mock the status
+            with pytest.raises(RuntimeError, match="can only be called in IDLE status"):
+                chain_monitor.monitor_chain()
+
+
 def test_activate(block_processor):
     # Not much to test here, this should launch two threads (one per monitor approach) and finish on terminate
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
     chain_monitor.activate()
+    assert chain_monitor.status == ChainMonitorStatus.ACTIVE
 
     # The tip is updated before starting the threads, so it should have changed.
     assert chain_monitor.best_tip is not None
@@ -156,6 +190,17 @@ def test_activate(block_processor):
     chain_monitor.terminate()
     # The zmq thread needs a block generation to release from the recv method.
     generate_blocks(1)
+
+
+def test_activate_wrong_status_raises(block_processor):
+    # calling activate when not listening should raise
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+
+    for status in ChainMonitorStatus:
+        if status != ChainMonitorStatus.LISTENING:
+            chain_monitor.status = status  # mock the status
+            with pytest.raises(RuntimeError, match="can only be called in LISTENING status"):
+                chain_monitor.activate()
 
 
 def test_monitor_chain_single_update(block_processor):
@@ -190,3 +235,11 @@ def test_monitor_chain_single_update(block_processor):
     chain_monitor.terminate()
     # The zmq thread needs a block generation to release from the recv method.
     generate_blocks(1)
+
+
+def test_terminate(block_processor):
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+
+    chain_monitor.terminate()
+
+    assert chain_monitor.status == ChainMonitorStatus.TERMINATED
