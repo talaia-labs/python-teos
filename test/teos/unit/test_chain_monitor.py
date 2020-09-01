@@ -3,6 +3,7 @@ import time
 from queue import Queue
 from threading import Thread, Event, Condition
 import pytest
+import signal
 
 from teos.chain_monitor import ChainMonitor, ChainMonitorStatus
 
@@ -243,3 +244,16 @@ def test_terminate(block_processor):
     chain_monitor.terminate()
 
     assert chain_monitor.status == ChainMonitorStatus.TERMINATED
+
+
+@pytest.mark.timeout(5)
+def test_threads_stop_when_terminated(block_processor):
+    # When status is "terminated", the methods running the threads should stop immediately
+
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+    chain_monitor.terminate()
+
+    # If any of the function does not exit immrdiately, the test will timeout
+    chain_monitor.monitor_chain_polling()
+    chain_monitor.monitor_chain_zmq()
+    chain_monitor.notify_listeners()

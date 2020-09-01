@@ -157,6 +157,7 @@ class ChainMonitor:
         Once the method is fired, it keeps getting the elements added to the internal queue and notifies the receiving
         queues about them. It terminates whenever the internal state is set to ``ChainMonitorStatus.TERMINATED``.
         """
+
         while self.status != ChainMonitorStatus.TERMINATED:
             try:
                 # We add a `timeout` to give the thread a chance to terminate even if the queue is empty
