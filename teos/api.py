@@ -57,7 +57,7 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
-def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run=False):
+def serve(internal_api_endpoint, endpoint, min_to_self_delay, auto_run=False):
     """
     Starts the API.
 
@@ -67,7 +67,6 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run
         internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (host:port).
         endpoint (:obj:`str`): endpoint where the http api will be running (host:port).
         min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the Inspector.
-        log_file (:obj:`str`): the file_path where to store logs.
         auto_run (:obj:`bool`): whether the server should be started by this process. False if run with an external
             WSGI. True is run by Flask.
 
@@ -75,7 +74,7 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run
         The application object needed by the WSGI server to run if ``auto_run`` if ``False``, ``None`` otherwise.
     """
 
-    setup_logging(log_file)
+    setup_logging()
     inspector = Inspector(int(min_to_self_delay))
     api = API(inspector, internal_api_endpoint)
 

@@ -443,7 +443,8 @@ def main(command, args, command_line_conf):
     config = config_loader.build_config()
 
     setup_data_folder(config.get("DATA_DIR"))
-    setup_logging(config.get("LOG_FILE"))
+    # TODO: use own logger for client
+    setup_logging()
 
     # Set the teos url
     teos_url = "{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))

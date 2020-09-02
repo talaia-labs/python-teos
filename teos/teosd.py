@@ -15,6 +15,7 @@ from common.tools import setup_data_folder
 
 import teos.api as api
 import teos.rpc as rpc
+from teos.logging_server import serve as serve_logging
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -30,7 +31,6 @@ from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
 from teos.constants import INTERNAL_API_ENDPOINT, SHUTDOWN_GRACE_TIME
 
-logger = get_logger(component="Daemon")
 parent_pid = os.getpid()
 
 
@@ -64,6 +64,7 @@ class TeosDaemon:
     Args:
         config (:obj:`dict`): the configuration object.
         sk (:obj:`PrivateKey`): the ``PrivateKey`` of the tower.
+        logger: the logger instance
 
     Attributes:
         stop_command_event (:obj:`threading.Event`): the Event that will be set to initiate a graceful shutdown.
@@ -83,8 +84,9 @@ class TeosDaemon:
         self.internal_api (:obj:`teos.internal_api.InternalAPI`): the InternalAPI instance.
     """
 
-    def __init__(self, config, sk):
+    def __init__(self, config, sk, logger):
         self.config = config
+        self.logger = logger
 
         # event triggered when a ``stop`` command is issued
         # Using multiprocessing.Event seems to cause a deadlock if event.set() is called in a signal handler that
@@ -104,7 +106,7 @@ class TeosDaemon:
         elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
             raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
 
-        logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
+        self.logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
         self.block_processor = BlockProcessor(bitcoind_connect_params)
         carrier = Carrier(bitcoind_connect_params)
 
@@ -169,13 +171,13 @@ class TeosDaemon:
         responder_trackers_data = self.db_manager.load_responder_trackers()
 
         if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
-            logger.info("Fresh bootstrap")
+            self.logger.info("Fresh bootstrap")
 
             self.watcher_thread = self.watcher.awake()
             self.responder_thread = self.watcher.responder.awake()
 
         else:
-            logger.info("Bootstrapping from backed up data")
+            self.logger.info("Bootstrapping from backed up data")
 
             # Update the Watcher backed up data if found.
             if len(watcher_appointments_data) != 0:
@@ -244,7 +246,7 @@ class TeosDaemon:
         # This MUST be done after rpc_process.start to avoid the issue that was solved in
         # https://github.com/talaia-labs/python-teos/pull/198
         self.internal_api.rpc_server.start()
-        logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
+        self.logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
 
         # Start the public API server
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
@@ -255,8 +257,7 @@ class TeosDaemon:
                     "gunicorn",
                     f"--bind={api_endpoint}",
                     f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
-                    f"endpoint='{api_endpoint}', min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}', "
-                    f"log_file='{self.config.get('LOG_FILE')}')",
+                    f"endpoint='{api_endpoint}', min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}')",
                 ]
             )
         else:
@@ -266,7 +267,6 @@ class TeosDaemon:
                     "internal_api_endpoint": INTERNAL_API_ENDPOINT,
                     "endpoint": api_endpoint,
                     "min_to_self_delay": self.config.get("MIN_TO_SELF_DELAY"),
-                    "log_file": self.config.get("LOG_FILE"),
                     "auto_run": True,
                 },
             )
@@ -274,13 +274,13 @@ class TeosDaemon:
 
     def handle_signals(self, signum, frame):
         """Handles signals by initiating a graceful shutdown."""
-        logger.debug(f"Signal {signum} received. Stopping")
+        self.logger.debug(f"Signal {signum} received. Stopping")
 
         self.stop_command_event.set()
 
     def teardown(self):
         """Shuts down all services and closes the DB, then exits. This method does not return."""
-        logger.info("Terminating public API")
+        self.logger.info("Terminating public API")
 
         # Stop the public API first
         if isinstance(self.api_proc, subprocess.Popen):
@@ -293,7 +293,7 @@ class TeosDaemon:
             self.api_proc.kill()
             self.api_proc.join()
 
-        logger.info("Terminated public API")
+        self.logger.info("Terminated public API")
 
         # Signals readiness to shutdown to the other processes
         self.stop_event.set()
@@ -302,9 +302,9 @@ class TeosDaemon:
         self.rpc_process.join()
 
         # Stops the internal API, after waiting for some grace time
-        logger.info("Internal API stopping")
+        self.logger.info("Internal API stopping")
         self.internal_api.rpc_server.stop(SHUTDOWN_GRACE_TIME).wait()
-        logger.info("Internal API stopped")
+        self.logger.info("Internal API stopped")
 
         # terminate the ChainMonitor
         self.chain_monitor.terminate()
@@ -313,15 +313,15 @@ class TeosDaemon:
         self.watcher_thread.join()
         self.responder_thread.join()
 
-        logger.info("Closing connection with appointments db")
+        self.logger.info("Closing connection with appointments db")
         self.db_manager.db.close()
 
-        logger.info("Shutting down TEOS")
+        self.logger.info("Shutting down TEOS")
         exit(0)
 
     def start(self):
         """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
-        logger.info("Starting TEOS")
+        self.logger.info("Starting TEOS")
         self.bootstrap_components()
         self.start_services()
 
@@ -332,7 +332,17 @@ class TeosDaemon:
 
 def main(config):
     setup_data_folder(config.get("DATA_DIR"))
-    setup_logging(config.get("LOG_FILE"))
+
+    logging_process = multiprocessing.Process(target=serve_logging, daemon=True, args=(config.get("LOG_FILE"),))
+    logging_process.start()
+
+    # TODO: how to wait for logging process to be ready?
+    import time
+
+    time.sleep(1)
+
+    setup_logging()
+    logger = get_logger(component="Daemon")
 
     if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
         logger.info("Generating a new key pair")
@@ -348,7 +358,7 @@ def main(config):
         sk = Cryptographer.load_private_key_der(secret_key_der)
 
     try:
-        TeosDaemon(config, sk).start()
+        TeosDaemon(config, sk, logger).start()
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         exit(1)

@@ -1,59 +1,19 @@
 import logging
 import logging.config
-from io import StringIO
+import logging.handlers
 import structlog
+
+from common.constants import TCP_LOGGING_PORT
 
 configured = False  # set to True once setup_logging is called
 
-timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
-pre_chain = [timestamper]
 
-
-# Stripped down version of structlog.dev.ConsoleRenderer, adding the "component" instead of the level.
-class CustomLogRenderer:
-    """
-    Render ``event_dict``. It renders the timestamp, followed by the component within "[]" (unless it's None),
-    followed by the event, then any remaining item in ``event_dict`` in the key=value format.
-    """
-
-    def _repr(self, val):
-        """Returns the representation of *val* if it's not a ``str``."""
-        return val if isinstance(val, str) else repr(val)
-
-    def __call__(self, _, __, event_dict):
-        """Returns ``event_dict`` rendered as a string."""
-        sio = StringIO()
-
-        ts = event_dict.pop("timestamp", None)
-        if ts:
-            sio.write(str(ts) + " ")
-
-        component = event_dict.pop("component", None)
-        if component:
-            sio.write("[" + component + "] ")
-
-        event = self._repr(event_dict.pop("event"))
-
-        sio.write(event)
-
-        # Represent all the key=value elements still in event_dict
-        key_value_part = ", ".join(key + "=" + self._repr(event_dict[key]) for key in sorted(event_dict.keys()))
-        if len(key_value_part) > 0:
-            sio.write("  (" + key_value_part + ")")
-
-        return sio.getvalue()
-
-
-def setup_logging(log_file_path, silent=False):
+def setup_logging():
     """
     Configures the logging options. It must be called only once, before using get_logger.
 
-    Args:
-        log_file_path (:obj:`str`): the path and name of the log file.
-        silent (:obj:`str`): if True, only critical errors will be shown to console.
-
     Raises:
-        :obj:`RuntimeError` setup_logger had already been called.
+        :obj:`RuntimeError` setup_logging had already been called.
     """
 
     global configured
@@ -65,39 +25,26 @@ def setup_logging(log_file_path, silent=False):
         {
             "version": 1,
             "disable_existing_loggers": False,
-            "formatters": {
-                "plain": {
-                    "()": structlog.stdlib.ProcessorFormatter,
-                    "processor": CustomLogRenderer(),
-                    "foreign_pre_chain": pre_chain,
-                }
-            },
             "filters": {  # filter out logs that do not come from teos
                 "onlyteos": {"()": logging.Filter, "name": "teos"}
             },
             "handlers": {
-                "console": {
-                    "level": "INFO" if not silent else "CRITICAL",
-                    "class": "logging.StreamHandler",
-                    "formatter": "plain",
-                    "filters": ["onlyteos"],
-                },
-                "file": {
+                "socket": {
                     "level": "DEBUG",
-                    "class": "logging.handlers.WatchedFileHandler",
-                    "filename": log_file_path,
-                    "formatter": "plain",
+                    "class": "logging.handlers.SocketHandler",
+                    "host": "localhost",
+                    "port": TCP_LOGGING_PORT,
                     "filters": ["onlyteos"],
                 },
             },
-            "loggers": {"": {"handlers": ["console", "file"], "level": "DEBUG", "propagate": True}},
+            "loggers": {"": {"handlers": ["socket"], "level": "DEBUG", "propagate": True}},
         }
     )
 
     structlog.configure(
         processors=[
             structlog.stdlib.PositionalArgumentsFormatter(),
-            timestamper,
+            structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S"),
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         context_class=dict,

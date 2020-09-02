@@ -114,7 +114,7 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
             initiate a graceful shutdown once this event is set.
     """
 
-    setup_logging(log_file)
+    setup_logging()
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
     signal(SIGINT, rpc.handle_signals)
     signal(SIGTERM, rpc.handle_signals)
