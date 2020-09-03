@@ -333,7 +333,8 @@ class TeosDaemon:
 def main(config):
     setup_data_folder(config.get("DATA_DIR"))
 
-    logging_process = multiprocessing.Process(target=serve_logging, daemon=True, args=(config.get("LOG_FILE"),))
+    silent = config.get("DAEMON")
+    logging_process = multiprocessing.Process(target=serve_logging, daemon=True, args=(config.get("LOG_FILE"), silent))
     logging_process.start()
 
     # TODO: how to wait for logging process to be ready?

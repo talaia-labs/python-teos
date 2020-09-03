@@ -120,9 +120,7 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
             abort = self.abort
 
 
-def serve(log_file_path):
-    silent = False  # TODO, need to pass this
-
+def serve(log_file_path, silent):
     logging.config.dictConfig(
         {
             "version": 1,
