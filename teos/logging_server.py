@@ -19,7 +19,14 @@ def _repr(val):
 
 
 def encode_event_dict(event_dict):
-    # TODO: docs
+    """
+    Encodes an event dictionary in a nicely formatted string, following the general format:
+
+        timestamp [component] event (attr1=value1, attr2=value2, ...)
+
+    where values that are not present are omitted. See unit tests for a more precise specification.
+    """
+
     sio = StringIO()
 
     ts = event_dict.pop("timestamp", None)
@@ -43,12 +50,11 @@ def encode_event_dict(event_dict):
 
 
 class LogRecordStreamHandler(socketserver.StreamRequestHandler):
-    """Handler for a streaming logging request.
-
-    This basically logs the record using whatever logging policy is
-    configured locally.
+    """
+    Handler for a streaming logging request. Sends to the logger any received log message, after some preprocessing.
     """
 
+    # Taken almost Verbatim from Python's logging cookbook.
     def handle(self):
         """
         Handle multiple requests - each expected to be a 4-byte length,
@@ -64,7 +70,7 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
             chunk = self.connection.recv(slen)
             while len(chunk) < slen:
                 chunk = chunk + self.connection.recv(slen - len(chunk))
-            obj = self.unPickle(chunk)
+            obj = pickle.loads(chunk)
             record = logging.makeLogRecord(obj)
             self.handle_log_record(record)
 
@@ -76,12 +82,17 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
         Processes log records received via the socket. The record's ``msg`` field is expected to be an encoded ``dict``
         produced by structlog. The ``dict`` is encoded to a string using ``encode_event_dict`` and sent to the logger
         with the name specified in the record.
+
+        Args:
+            record (:obj:`logging.LogRecord`): a log record.
         """
 
+        # TODO: this is broken, would fail for strings containing a '
         event_dict = json.loads(record.msg.replace("'", '"'))
         message = encode_event_dict(event_dict)
 
         logger = logging.getLogger(record.name)
+        # TODO: this might be losing some additional info that is set in the LogRecord; check.
         logger.log(record.levelno, message)
 
 
