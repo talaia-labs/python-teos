@@ -89,11 +89,11 @@ class ChainMonitor:
     def enqueue(self, block_hash):
         """
         Adds a new block hash to the internal queue of the  ``ChainMonitor`` and the internal state. The state contains
-        the ``best_tip`` field and the list of ``last_tips`` to prevent notfying about old blocks. ``last_tips`` is
+        the ``best_tip`` field and the list of ``last_tips`` to prevent notifying about old blocks. ``last_tips`` is
         bounded to ``max_block_window_size``.
 
         Args:
-            block_hash (:obj:`block_hash`): the new best tip.
+            block_hash (:obj:`str`): the new best tip.
 
         Returns:
             :obj:`bool`: True if the state was successfully updated, False otherwise.
@@ -127,7 +127,7 @@ class ChainMonitor:
                 current_tip = self.block_processor.get_best_block_hash()
 
                 # get_best_block_hash may return None if the RPC times out.
-                if current_tip and current_tip not in self.last_tips:
+                if current_tip and current_tip != self.best_tip and current_tip not in self.last_tips:
                     self.logger.info("New block received via polling", block_hash=current_tip)
                     self.enqueue(current_tip)
 
@@ -148,7 +148,7 @@ class ChainMonitor:
 
                 if topic == b"hashblock":
                     block_hash = binascii.hexlify(body).decode("utf-8")
-                    if block_hash not in self.last_tips:
+                    if block_hash != self.best_tip and block_hash not in self.last_tips:
                         self.logger.info("New block received via zmq", block_hash=block_hash)
                         self.enqueue(block_hash)
 
