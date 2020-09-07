@@ -45,7 +45,6 @@ class ChainMonitor:
         logger: the logger for this component.
         best_tip (:obj:`str`): a block hash representing the current best tip.
         last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
-        terminate (:obj:`bool`): a flag to signal the termination of the ``ChainMonitor`` (shutdown the tower).
         check_tip (:obj:`Event`): an event that is triggered at fixed time intervals and controls the polling thread.
         lock (:obj:`Condition`): a lock used to protect concurrent access to the queues and ``best_tip`` by the zmq and
             polling threads.
@@ -155,14 +154,12 @@ class ChainMonitor:
         """
 
         while self.status != ChainMonitorStatus.TERMINATED:
-            try:
-                # We add a `timeout` to give the thread a chance to terminate even if the queue is empty
-                block_hash = self.queue.get(block=True, timeout=0.1)
+            block_hash = self.queue.get(block=True)
+            # A special "END" item is added to the queue after the status is set to TERMINATED
+            if block_hash != "END":
                 with self.lock:
                     for rec_queue in self.receiving_queues:
                         rec_queue.put(block_hash)
-            except Empty:
-                pass
 
     def monitor_chain(self):
         """
@@ -202,8 +199,9 @@ class ChainMonitor:
 
     def terminate(self):
         """
-        Changes the ``status`` of the ``ChainMonitor`` to terminated. All the threads will stop as soon as
-        possible.
+        Changes the ``status`` of the ``ChainMonitor`` to terminated and sends the "END" message to the internal queue.
+        All the threads will stop as soon as possible.
         """
 
         self.status = ChainMonitorStatus.TERMINATED
+        self.queue.put("END")
