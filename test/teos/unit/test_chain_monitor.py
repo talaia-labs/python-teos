@@ -3,7 +3,6 @@ import time
 from queue import Queue
 from threading import Thread, Event, Condition
 import pytest
-import signal
 
 from teos.chain_monitor import ChainMonitor, ChainMonitorStatus
 
@@ -25,12 +24,11 @@ def test_init(block_processor):
     assert isinstance(chain_monitor.lock, Condition)
     assert isinstance(chain_monitor.zmqSubSocket, zmq.Socket)
 
-    # The Queues and asleep flags are initialized when attaching the corresponding subscriber
     assert isinstance(chain_monitor.receiving_queues[0], Queue)
     assert isinstance(chain_monitor.receiving_queues[1], Queue)
 
 
-def test_notify_listeners(block_processor):
+def test_notify_subscribers(block_processor):
     queue1 = Queue()
     queue2 = Queue()
     chain_monitor = ChainMonitor([queue1, queue2], block_processor, bitcoind_feed_params)
@@ -47,7 +45,10 @@ def test_notify_listeners(block_processor):
     chain_monitor.queue.put(block1)
     chain_monitor.queue.put(block2)
 
-    notifying_thread = Thread(target=chain_monitor.notify_listeners, daemon=True)
+    assert queue1.qsize() == 0
+    assert queue2.qsize() == 0
+
+    notifying_thread = Thread(target=chain_monitor.notify_subscribers, daemon=True)
     notifying_thread.start()
 
     # the existing elements should be processed soon and in order for all queues
@@ -253,7 +254,7 @@ def test_threads_stop_when_terminated(block_processor):
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
     chain_monitor.terminate()
 
-    # If any of the function does not exit immrdiately, the test will timeout
+    # If any of the function does not exit immediately, the test will timeout
     chain_monitor.monitor_chain_polling()
     chain_monitor.monitor_chain_zmq()
-    chain_monitor.notify_listeners()
+    chain_monitor.notify_subscribers()
