@@ -33,7 +33,7 @@ def encode(value):
 
 def decode(value):
     """
-    Decodes a value fro BigSize.
+    Decodes a value from BigSize.
 
     Args:
         value (:obj:`bytes`): the value to be decoded.
@@ -79,7 +79,7 @@ def parse(value):
         value (:obj:`bytes`): the bytearray from where the BigSize value will be parsed.
 
     Returns:
-        :obj:`tuple`: A 2 items tuple containing the parsed BigSize and its encoded length (offset of the bytearray).
+        :obj:`tuple`: A 2 items tuple containing the parsed BigSize and its encoded length.
 
     Raises:
         :obj:`TypeError`: If the provided value is not in bytes.

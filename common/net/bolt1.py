@@ -10,7 +10,7 @@ message_types = {"init": b"\x00\x10", "error": b"\x00\x11", "ping": b"\x00\x12",
 
 class Message:
     """
-    Message class. Used as a based class for all other messages.
+    Message class. Used as a base class for all other messages.
 
     Args:
         mtype (:obj:`bytes`): the message type.
@@ -76,7 +76,7 @@ class Message:
             raise ValueError("Cannot decode unknown message type")
 
     def serialize(self):
-        """Serialises the message."""
+        """Serializes the message."""
         if not self.extension:
             return self.type + self.payload
         else:
@@ -91,7 +91,7 @@ class InitMessage(Message):
     Args:
         global_features (:obj:`FeatureVector <teos.net.bolt9.FeatureVector>`): the global features vector.
         local_features (:obj:`FeatureVector <teos.net.bolt9.FeatureVector>`): the local features vector.
-        local_features (:obj:`list`): a list of genesis block hashes (optional).
+        networks (:obj:`NetworksTLV <common.net.tlv.NetworksTLV>`): a networks tlv (optional).
     """
 
     def __init__(self, global_features, local_features, networks=None):
@@ -190,7 +190,7 @@ class ErrorMessage(Message):
             if len(data) < data_len:
                 raise ValueError("Wrong message format. Unexpected EOF")
             if len(message) > 36 + data_len:
-                raise ValueError("Wrong data format. message has additional tailing data")
+                raise ValueError("Wrong data format. message has additional trailing data")
             return cls(channel_id, data.decode("utf-8"))
 
         return cls(channel_id)
@@ -235,7 +235,7 @@ class PingMessage(Message):
             if len(ignored) < byteslen:
                 raise ValueError("Wrong message format. Unexpected EOF")
             if len(message) > 6 + byteslen:
-                raise ValueError("Wrong data format. message has additional tailing data")
+                raise ValueError("Wrong data format. message has additional trailing data")
             return cls(num_pong_bytes, ignored)
 
         return cls(num_pong_bytes)
@@ -255,7 +255,7 @@ class PongMessage(Message):
             if not isinstance(ignored_bytes, bytes):
                 raise TypeError("ignored_bytes must be bytes if set")
             if len(ignored_bytes) > pow(2, 16) - 4:
-                raise ValueError(f"ignored_bytes cannot be higher than {pow(2, 16) -4}")
+                raise ValueError(f"ignored_bytes cannot be higher than {pow(2, 16) - 4}")
 
             payload = len(ignored_bytes).to_bytes(2, "big") + ignored_bytes
 
@@ -277,7 +277,7 @@ class PongMessage(Message):
             if len(ignored_bytes) < byteslen:
                 raise ValueError("Wrong message format. Unexpected EOF")
             if len(message) != 4 + byteslen:
-                raise ValueError("Wrong data format. message has additional tailing data")
+                raise ValueError("Wrong data format. message has additional trailing data")
             return cls(ignored_bytes)
 
         return cls()

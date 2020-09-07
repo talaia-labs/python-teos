@@ -247,7 +247,7 @@ def test_error_from_bytes_wrong():
         ErrorMessage.from_bytes(b"\x00\x11" + bytes.fromhex(get_random_value_hex(32)) + b"\x00\x02\x00")
 
     # Encoded lengths are wrong leaving additional data at the end
-    with pytest.raises(ValueError, match="Wrong data format. message has additional tailing data"):
+    with pytest.raises(ValueError, match="Wrong data format. message has additional trailing data"):
         ErrorMessage.from_bytes(b"\x00\x11" + bytes.fromhex(get_random_value_hex(32)) + b"\x00\x01\x00\x00")
 
 
@@ -320,7 +320,7 @@ def test_ping_message_from_bytes_wrong():
         PingMessage.from_bytes(b"\x00\x12\x00\x00\x00\x01")
 
     # Encoded lengths are wrong leaving additional data at the end
-    with pytest.raises(ValueError, match="Wrong data format. message has additional tailing data"):
+    with pytest.raises(ValueError, match="Wrong data format. message has additional trailing data"):
         PingMessage.from_bytes(b"\x00\x12\x00\x00\x00\x01\x00\x00")
 
 
@@ -381,5 +381,5 @@ def test_pong_message_from_bytes_wrong():
         PongMessage.from_bytes(b"\x00\x13\x00\x01")
 
     # Encoded lengths are wrong leaving additional data at the end
-    with pytest.raises(ValueError, match="Wrong data format. message has additional tailing data"):
+    with pytest.raises(ValueError, match="Wrong data format. message has additional trailing data"):
         PongMessage.from_bytes(b"\x00\x13\x00\x01\x00\x01")

@@ -21,19 +21,21 @@ known_odd_bits = {v: k for k, v in known_features.items()}
 
 def check_feature_name_bit_pair(name, bit):
     """
-    Checks whether a given name and bit par match for known features.
+    Checks whether a given name and bit pair match for known features.
+
+    For unknown features, it returns True as long as they are not using a known name nor bit.
 
     Args:
         name (:obj:`str`): the feature name.
         bit (:obj:`int`): the bit position.
 
     Returns:
-        :obj:`bool`: For known features, returns True if the pair match. For unknown features, returns True if the bit
+        :obj:`bool`: For known features, returns True if the pair matches. For unknown features, returns True if the bit
         is unknown.
     """
 
     if name in known_features:
-        # The pair match
+        # The pair matches
         return bit in [known_features[name], known_features[name] + 1]
     else:
         # The name and bit are unknown
@@ -45,7 +47,7 @@ class Feature:
     Feature represents a feature bit.
 
     Args:
-        bit (:obj:`int`): the bit this feature holds in the feature vector.
+        bit (:obj:`int`): the index that the feature bit holds in the feature vector.
         is_set (:obj:`bool`): whether the feature is set or not.
 
     Attributes:
@@ -64,7 +66,7 @@ class Feature:
 
 
 class FeatureVector:
-    """The FeatureVector encapsulated all the features."""
+    """The FeatureVector encapsulates all the features."""
 
     def __init__(self, **kwargs):
         self._features = {}
@@ -142,7 +144,7 @@ class FeatureVector:
 
         Args:
             name (:obj:`str`): the name of the feature.
-            bit (:obj:`int`): the bit this feature holds in the feature vector.
+            bit (:obj:`int`): the index that the feature bit holds in the feature vector.
 
         Raises:
             :obj:`TypeError`: If name is not str or bit is not integer.

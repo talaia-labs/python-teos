@@ -35,7 +35,7 @@ class TLVRecord:
         self.value = v
 
     def __len__(self):
-        """Returns the length of the serialised TLV record"""
+        """Returns the length of the serialized TLV record"""
         return len(self.serialize())
 
     def __eq__(self, other):
@@ -61,26 +61,26 @@ class TLVRecord:
             raise TypeError("message must be bytes")
 
         try:
-            t, t_offset = bigsize.parse(message)
-            if t.to_bytes(t_offset, "big") == tlv_types["networks"]:
+            t, t_length = bigsize.parse(message)
+            if t.to_bytes(t_length, "big") == tlv_types["networks"]:
                 return NetworksTLV.from_bytes(message)
             else:
-                l, l_offset = bigsize.parse(message[t_offset:])
-                v = message[t_offset + l_offset :]
+                l, l_length = bigsize.parse(message[t_length:])
+                v = message[t_length + l_length :]
                 if l > len(v):
                     # Value is not long enough
-                    raise ValueError()  # This message get overwritten so it does not matter
+                    raise ValueError()  # This message gets overwritten so it does not matter
 
-                if len(message) != t_offset + l_offset + len(v):
-                    # The is additional tailing data
-                    raise ValueError()  # This message get overwritten so it does not matter
+                if len(message) != t_length + l_length + len(v):
+                    # There is additional trailing data
+                    raise ValueError()  # This message gets overwritten so it does not matter
 
-                return cls(t.to_bytes(t_offset, "big"), l.to_bytes(l_offset, "big"), v)
+                return cls(t.to_bytes(t_length, "big"), l.to_bytes(l_length, "big"), v)
         except ValueError as e:
             raise ValueError("Wrong tlv message format. Unexpected EOF")
 
     def serialize(self):
-        """Returns the serialised representation of the TLV record."""
+        """Returns the serialized representation of the TLV record."""
         return self.type + self.length + self.value
 
 
@@ -90,7 +90,11 @@ class NetworksTLV(TLVRecord):
     in.
 
     Args:
-        networks (:obj:`list`): a list of genesis block hashes (hex str).
+        networks (:obj:`list`): a list of genesis block hashes (hex str). This parameter is optional.
+
+    Raises:
+        :obj:`TypeError`: If networks is set and it is not a list.
+        :obj:`ValueError`: If networks is set and all its elements are not 32-byte hex strings.
     """
 
     def __init__(self, networks=None):

@@ -3,7 +3,7 @@ import common.net.bigsize as bigsize
 
 def message_sanity_checks(message, expected_type, min_len, tlv=False):
     """
-    Runs sanity checks to a received byte-encoded message, such as checking it's minimum length or message type.
+    Runs sanity checks to a received byte-encoded message, such as checking its minimum length or message type.
 
     Args:
         message (:obj:`bytes`): the bytes-encoded message.
@@ -28,8 +28,8 @@ def message_sanity_checks(message, expected_type, min_len, tlv=False):
         raise ValueError(f"message be must at least {min_len}-byte long")
 
     if tlv:
-        tlv_type, type_offset = bigsize.parse(message)
-        tlv_type_byte = tlv_type.to_bytes(type_offset, "big")
+        tlv_type, type_length = bigsize.parse(message)
+        tlv_type_byte = tlv_type.to_bytes(type_length, "big")
         if tlv_type_byte != expected_type:
             raise ValueError(
                 f"Wrong message format. types do not match (expected: {expected_type}, received: {tlv_type_byte}"
