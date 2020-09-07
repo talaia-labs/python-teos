@@ -109,13 +109,16 @@ class FeatureVector:
 
         int_features = int.from_bytes(features, "big")
         padding = max(2 * len(known_features), int_features.bit_length())
-        padding = padding + 1 if padding % 2 else padding
+        padding += padding % 2  # round up to the nearest even number
 
         bit_features = f"{int_features:b}".zfill(padding)
         bit_pairs = [bit_features[i : i + 2] for i in range(0, len(bit_features), 2)]
         features_dict = {}
 
         for i, pair in enumerate(reversed(bit_pairs)):
+            if pair == "11":
+                raise ValueError("Both odd and even bits cannot be set in a pair")
+
             # Known features are stored no matter if they are set or not
             odd_bit = 2 * i
             feature_name = known_odd_bits.get(odd_bit)
@@ -126,8 +129,7 @@ class FeatureVector:
                     features_dict[feature_name] = Feature(odd_bit, is_set=True)
                 elif pair == "10":
                     features_dict[feature_name] = Feature(odd_bit + 1, is_set=True)
-                else:
-                    raise ValueError("Both odd and even bits cannot be set in a pair")
+
             # For unknown features, we only store the ones that are set
             else:
                 feature_name = f"unknown_{odd_bit}"

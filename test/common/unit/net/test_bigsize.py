@@ -60,11 +60,11 @@ def test_decode_wrong():
 
     # Wrong encoding
     for v in non_canonical:
-        with pytest.raises(ValueError, match="value is not properly encoded"):
+        with pytest.raises(ValueError, match="Encoded BigSize is non-canonical"):
             bigsize.decode(v)
 
     for v in unexpected_eof:
-        with pytest.raises(ValueError, match="value is not properly encoded"):
+        with pytest.raises(ValueError, match="Unexpected EOF while decoding BigSize"):
             bigsize.decode(v)
 
 
@@ -76,7 +76,7 @@ def test_parse():
 
     # Wrong encoding (behaves exactly like decode_wrong)
     for v in non_canonical:
-        with pytest.raises(ValueError, match="value is not properly encoded"):
+        with pytest.raises(ValueError, match="Encoded BigSize is non-canonical"):
             bigsize.parse(v)
 
 

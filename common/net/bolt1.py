@@ -164,9 +164,9 @@ class ErrorMessage(Message):
                 raise ValueError("data must be string if set")
 
             encoded_message = data.encode("utf-8")
-            if len(encoded_message) > pow(2, 16):
+            if len(encoded_message) >= pow(2, 16):
                 raise ValueError(
-                    f"Encoded data length cannot be bigger than {pow(2, 16)}, {len(encoded_message)} received"
+                    f"Encoded data length cannot be bigger than {pow(2, 16) - 1}, {len(encoded_message)} received"
                 )
 
             payload += len(encoded_message).to_bytes(2, "big") + encoded_message
@@ -207,7 +207,7 @@ class PingMessage(Message):
 
     def __init__(self, num_pong_bytes, ignored_bytes=None):
         if not 0 <= num_pong_bytes < pow(2, 16):
-            raise ValueError(f"num_pong_bytes must be between 0 and {pow(2, 16)}")
+            raise ValueError(f"num_pong_bytes must be between 0 and {pow(2, 16) - 1}")
 
         payload = num_pong_bytes.to_bytes(2, "big")
 

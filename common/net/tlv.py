@@ -39,7 +39,7 @@ class TLVRecord:
         return len(self.serialize())
 
     def __eq__(self, other):
-        return isinstance(other, TLVRecord) and self.value == other.value
+        return isinstance(other, TLVRecord) and self.serialize() == other.serialize()
 
     @classmethod
     def from_bytes(cls, message):

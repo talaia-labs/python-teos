@@ -10,7 +10,7 @@ def encode(value):
 
     Raises:
         :obj:`TypeError`: If the provided value is not an integer.
-        :obj:`ValueError`: If the provided value is negative or bigger than ``pow(2, 64)``.
+        :obj:`ValueError`: If the provided value is negative or bigger than ``pow(2, 64) - 1``.
     """
 
     if not isinstance(value, int):
@@ -19,13 +19,13 @@ def encode(value):
     if value < 0:
         raise ValueError(f"value must be a positive integer, {value} received")
 
-    if value < pow(2, 8) - 3:
+    if value < 253:
         return value.to_bytes(1, "big")
     elif value < pow(2, 16):
         return b"\xfd" + value.to_bytes(2, "big")
     elif value < pow(2, 32):
         return b"\xfe" + value.to_bytes(4, "big")
-    elif value <= pow(2, 64):
+    elif value < pow(2, 64):
         return b"\xff" + value.to_bytes(8, "big")
     else:
         raise ValueError("BigSize can only encode up to 8-byte values")
@@ -49,26 +49,37 @@ def decode(value):
     if not isinstance(value, bytes):
         raise TypeError(f"value must be bytes, {type(value)} received")
 
+    if len(value) == 0:
+        raise ValueError("Unexpected EOF while decoding BigSize")
+
     if len(value) > 9:
         raise ValueError(f"value must be, at most, 9-bytes long, {len(value)} received")
 
-    if len(value) > 1:
-        prefix = value[0]
-        decoded_value = int.from_bytes(value[1:], "big")
-    else:
-        prefix = None
-        decoded_value = int.from_bytes(value, "big")
+    if len(value) == 1 and value[0] < 253:
+        return value[0]
 
-    if not prefix and len(value) == 1 and decoded_value < pow(2, 8) - 3:
-        return decoded_value
-    elif prefix == 253 and len(value) == 3 and pow(2, 8) - 3 <= decoded_value < pow(2, 16):
-        return decoded_value
-    elif prefix == 254 and len(value) == 5 and pow(2, 16) <= decoded_value < pow(2, 32):
-        return decoded_value
-    elif prefix == 255 and len(value) == 9 and pow(2, 32) <= decoded_value:
-        return decoded_value
+    prefix = value[0]
+    decoded_value = int.from_bytes(value[1:], "big")
+
+    if prefix == 253:
+        length = 3
+        min_v = 253
+        max_v = pow(2, 16)
+    elif prefix == 254:
+        length = 5
+        min_v = pow(2, 16)
+        max_v = pow(2, 32)
     else:
-        raise ValueError("value is not properly encoded")
+        length = 9
+        min_v = pow(2, 32)
+        max_v = pow(2, 64)
+
+    if not len(value) == length:
+        raise ValueError("Unexpected EOF while decoding BigSize")
+    elif not min_v <= decoded_value < max_v:
+        raise ValueError("Encoded BigSize is non-canonical")
+    else:
+        return decoded_value
 
 
 def parse(value):
@@ -93,6 +104,7 @@ def parse(value):
 
     prefix = value[0]
 
+    # message length is not explicitly checked here, but wrong length will fail at decode.
     if prefix < 253:
         # prefix is actually the value to be parsed
         return decode(value[0:1]), 1

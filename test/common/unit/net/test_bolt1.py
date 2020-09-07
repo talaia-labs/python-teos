@@ -268,9 +268,9 @@ def test_ping_message():
 
 def test_ping_message_wrong():
     # num_pong_bytes must be an integer between 0 and pow(2, 16)
-    with pytest.raises(ValueError, match=f"num_pong_bytes must be between 0 and {pow(2, 16)}"):
+    with pytest.raises(ValueError, match=f"num_pong_bytes must be between 0 and {pow(2, 16) -1}"):
         PingMessage(-1)
-    with pytest.raises(ValueError, match=f"num_pong_bytes must be between 0 and {pow(2, 16)}"):
+    with pytest.raises(ValueError, match=f"num_pong_bytes must be between 0 and {pow(2, 16) - 1}"):
         PingMessage(pow(2, 16))
 
     # ignore_bytes must be bytes if set
