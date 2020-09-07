@@ -1,5 +1,5 @@
 from enum import Enum
-from queue import Queue, Empty
+from queue import Queue
 import zmq
 import binascii
 from threading import Thread, Event, Condition
@@ -17,16 +17,16 @@ class ChainMonitorStatus(Enum):
 class ChainMonitor:
     """
     The ``ChainMonitor`` is in charge of monitoring the blockchain (via ``bitcoind``) to detect new blocks on top
-    of the best chain. If a new best block is spotted, the chain monitor will notify the given ``Queues``.
+    of the best chain. If a new best block is spotted, the chain monitor will notify the given queues.
 
     The ``ChainMonitor`` monitors the chain using two methods: ``zmq`` and ``polling``. Blocks are only notified
     once per queue and the notification is triggered by the method that detects the block faster.
 
     The ``ChainMonitor`` lifecycle goes through 4 states: idle, listening, active and terminated.
     When a ``ChainMonitor`` instance is created, it is not yet monitoring the chain and the ``status`` attribute
-    is set to `ChainMonitorStatus.IDLE`.
+    is set to ``ChainMonitorStatus.IDLE``.
     Once the ``monitor_chain`` method is called, the chain monitor changes ``status`` to
-    `ChainMonitorStatus.LISTENING`, and starts monitoring the chain for new blocks; it does not yet notify the
+    ``ChainMonitorStatus.LISTENING``, and starts monitoring the chain for new blocks; it does not yet notify the
     receiving queues, but keeps the block hashes in the order they where spotted in an internal queue.
     Once the ``activate`` method is called, the ``status`` changes to ``ChainMonitorStatus.ACTIVE``, and the receiving
     queues are notified in order for all the block hashes that are in the internal queue or any new one that is
@@ -50,8 +50,8 @@ class ChainMonitor:
         polling_delta (:obj:`int`): time between polls (in seconds).
         max_block_window_size (:obj:`int`): max size of last_tips.
         queue (:obj:`Queue`): a ``Queue`` where blocks are stored before they are processed.
-        status (:obj:`ChainMonitorStatus`): the current status of the monitor, either `IDLE`, `LISTENING`, `ACTIVE` or
-            `TERMINATED`.
+        status (:obj:`ChainMonitorStatus`): the current status of the monitor, either ``ChainMonitorStatus.IDLE``,
+            ``ChainMonitorStatus.LISTENING``, ``ChainMonitorStatus.ACTIVE`` or ``ChainMonitorStatus.TERMINATED``.
     """
 
     def __init__(self, receiving_queues, block_processor, bitcoind_feed_params):
@@ -96,11 +96,12 @@ class ChainMonitor:
         """
 
         if block_hash not in self.last_tips:
-            self.queue.put(block_hash)
-            self.last_tips.append(block_hash)
+            with self.lock:
+                self.queue.put(block_hash)
+                self.last_tips.append(block_hash)
 
-            if len(self.last_tips) > self.max_block_window_size:
-                self.last_tips.pop(0)
+                if len(self.last_tips) > self.max_block_window_size:
+                    self.last_tips.pop(0)
 
             return True
 
@@ -150,7 +151,7 @@ class ChainMonitor:
         """
 
         while self.status != ChainMonitorStatus.TERMINATED:
-            message = self.queue.get(block=True)
+            message = self.queue.get()
             # A special "END" message is added to the queue after the status is set to TERMINATED
             # In all the other cases, message is a block_hash
             with self.lock:
@@ -179,8 +180,8 @@ class ChainMonitor:
     def activate(self):
         """
         Changes the ``status`` of the ``ChainMonitor`` from listening to active. It creates a new thread that runs
-        the ``notify_subscribers`` method, which is in charge of notifying the receiving queue for each block hash that is
-        added to the internal queue.
+        the ``notify_subscribers`` method, which is in charge of notifying the receiving queue for each block hash that
+        is added to the internal queue.
 
         Raises:
             :obj:RuntimeError: if the ``status`` was not ``ChainMonitor.LISTENING`` when the method was called.

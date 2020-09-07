@@ -30,13 +30,13 @@ def responder(db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
-    responder.awake()
+    responder_thread = responder.awake()
     chain_monitor.activate()
 
     yield responder
 
     chain_monitor.terminate()
-    responder.join()
+    responder_thread.join()
 
 
 # FIXME: Check if this can be removed and used the general fixture

@@ -72,6 +72,10 @@ class TeosDaemon:
         block_processor (:obj:`teos.block_processor.BlockProcessor`): the BlockProcessor instance.
         db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`): the db manager for appointments.
         watcher (:obj:`teos.watcher.Watcher`): the `Watcher` instance.
+        watcher_thread (:obj:`multithreading.Thread` or :obj:`None`): after ``bootstrap_components``, the thread that
+            runs the Watcher monitoring.
+        responder_thread (:obj:`multithreading.Thread` or :obj:`None`): after ``bootstrap_components``, the thread that
+            runs the Responder monitoring.
         chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`): the ``ChainMonitor`` instance.
         self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process` or :obj:`None`): once the rpc process
             is created, the instance of either ``Popen`` or ``Process`` that is serving the public API.
@@ -123,6 +127,9 @@ class TeosDaemon:
             self.config.get("LOCATOR_CACHE_SIZE"),
         )
 
+        self.watcher_thread = None
+        self.responder_thread = None
+
         # Create the chain monitor
         self.chain_monitor = ChainMonitor(
             [self.watcher.block_queue, self.watcher.responder.block_queue], self.block_processor, bitcoind_feed_params
@@ -164,8 +171,8 @@ class TeosDaemon:
         if len(watcher_appointments_data) == 0 and len(responder_trackers_data) == 0:
             logger.info("Fresh bootstrap")
 
-            self.watcher.awake()
-            self.watcher.responder.awake()
+            self.watcher_thread = self.watcher.awake()
+            self.responder_thread = self.watcher.responder.awake()
 
         else:
             logger.info("Bootstrapping from backed up data")
@@ -183,8 +190,8 @@ class TeosDaemon:
                 )
 
             # Awaking components so the states can be updated.
-            self.watcher.awake()
-            self.watcher.responder.awake()
+            self.watcher_thread = self.watcher.awake()
+            self.responder_thread = self.watcher.responder.awake()
 
             last_block_watcher = self.db_manager.load_last_block_hash_watcher()
             last_block_responder = self.db_manager.load_last_block_hash_responder()
@@ -303,8 +310,8 @@ class TeosDaemon:
         self.chain_monitor.terminate()
 
         # wait for watcher and responder to finish processing their queues
-        self.watcher.join()
-        self.watcher.responder.join()
+        self.watcher_thread.join()
+        self.responder_thread.join()
 
         logger.info("Closing connection with appointments db")
         self.db_manager.db.close()
