@@ -130,6 +130,8 @@ class Responder:
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
             get data from bitcoind.
         last_known_block (:obj:`str`): the last block known by the ``Responder``.
+        responder_thread (:obj:`threading.Thread` or `None`): after ``awake``, the thread that processes incoming
+            blocks from the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`. Initially set to ``None``.
     """
 
     def __init__(self, db_manager, gatekeeper, carrier, block_processor):
@@ -144,13 +146,12 @@ class Responder:
         self.carrier = carrier
         self.block_processor = block_processor
         self.last_known_block = db_manager.load_last_block_hash_responder()
+        self.responder_thread = None
 
     def awake(self):
         """Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth"""
-        responder_thread = Thread(target=self.do_watch, daemon=True)
-        responder_thread.start()
-
-        return responder_thread
+        self.responder_thread = Thread(target=self.do_watch, daemon=True)
+        self.responder_thread.start()
 
     def on_sync(self, block_hash):
         """
@@ -266,6 +267,11 @@ class Responder:
 
         while True:
             block_hash = self.block_queue.get()
+
+            # When the ChainMonitor is stopped, a final "END" message is sent
+            if block_hash == "END":
+                break
+
             block = self.block_processor.get_block(block_hash)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
@@ -516,3 +522,7 @@ class Responder:
                 #        reorg manager
                 self.logger.warning("Dispute and penalty transaction missing. Calling the reorg manager")
                 self.logger.error("Reorg manager not yet implemented")
+
+    def join(self):
+        """Waits until the responder thread is done processing its queue, once the ChainMonitor has been stopped."""
+        self.responder_thread.join()

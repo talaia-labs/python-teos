@@ -302,6 +302,10 @@ class TeosDaemon:
         # terminate the ChainMonitor
         self.chain_monitor.terminate()
 
+        # wait for watcher and responder to finish processing their queues
+        self.watcher.join()
+        self.watcher.responder.join()
+
         logger.info("Closing connection with appointments db")
         self.db_manager.db.close()
 

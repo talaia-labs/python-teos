@@ -33,7 +33,7 @@ class ChainMonitor:
     detected.
     Finally, once the ``terminate`` method is called, the ``status`` is changed to ``ChainMonitorStatus.TERMINATED``,
     the chain monitor stops monitoring the chain and no receiving queue will be notified about new blocks (including
-    any block that is currently in the internal queue).
+    any block that is currently in the internal queue). A final "END" message is sent to all the subscribers.
 
     Args:
         receiving_queues (:obj:`list`): a list of ``Queue`` objects that will be notified when the chain_monitor is
@@ -150,12 +150,12 @@ class ChainMonitor:
         """
 
         while self.status != ChainMonitorStatus.TERMINATED:
-            block_hash = self.queue.get(block=True)
-            # A special "END" item is added to the queue after the status is set to TERMINATED
-            if block_hash != "END":
-                with self.lock:
-                    for rec_queue in self.receiving_queues:
-                        rec_queue.put(block_hash)
+            message = self.queue.get(block=True)
+            # A special "END" message is added to the queue after the status is set to TERMINATED
+            # In all the other cases, message is a block_hash
+            with self.lock:
+                for rec_queue in self.receiving_queues:
+                    rec_queue.put(message)
 
     def monitor_chain(self):
         """

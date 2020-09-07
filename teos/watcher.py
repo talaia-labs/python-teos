@@ -204,6 +204,8 @@ class Watcher:
         max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
         last_known_block (:obj:`str`): the last block known by the ``Watcher``.
         locator_cache (:obj:`LocatorCache`): a cache of locators for the last ``blocks_in_cache`` blocks.
+        watcher_thread (:obj:`threading.Thread` or `None`): after ``awake``, the thread that processes incoming blocks
+            from the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`. Initially set to ``None``.
 
     Raises:
         :obj:`InvalidKey <common.exceptions.InvalidKey>`: if teos sk cannot be loaded.
@@ -224,6 +226,7 @@ class Watcher:
         self.signing_key = sk
         self.last_known_block = db_manager.load_last_block_hash_watcher()
         self.locator_cache = LocatorCache(blocks_in_cache)
+        self.watcher_thread = None
 
     @property
     def tower_id(self):
@@ -248,10 +251,8 @@ class Watcher:
     def awake(self):
         """Starts a new thread to monitor the blockchain for channel breaches"""
 
-        watcher_thread = Thread(target=self.do_watch, daemon=True)
-        watcher_thread.start()
-
-        return watcher_thread
+        self.watcher_thread = Thread(target=self.do_watch, daemon=True)
+        self.watcher_thread.start()
 
     def register(self, user_id):
         """
@@ -444,6 +445,11 @@ class Watcher:
 
         while True:
             block_hash = self.block_queue.get()
+
+            # When the ChainMonitor is stopped, a final "END" message is sent
+            if block_hash == "END":
+                break
+
             block = self.block_processor.get_block(block_hash)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
@@ -666,3 +672,7 @@ class Watcher:
     def get_all_responder_trackers(self):
         """Returns a dictionary with all the trackers stored in the db for the responder."""
         return self.db_manager.load_responder_trackers()
+
+    def join(self):
+        """Waits until the watcher thread is done processing its queue, once the ChainMonitor has been stopped."""
+        self.watcher_thread.join()
