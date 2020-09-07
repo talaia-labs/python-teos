@@ -43,11 +43,9 @@ class ChainMonitor:
 
     Attributes:
         logger: the logger for this component.
-        best_tip (:obj:`str`): a block hash representing the current best tip.
         last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         check_tip (:obj:`Event`): an event that is triggered at fixed time intervals and controls the polling thread.
-        lock (:obj:`Condition`): a lock used to protect concurrent access to the queues and ``best_tip`` by the zmq and
-            polling threads.
+        lock (:obj:`Condition`): a lock used to protect concurrent access to the queues by the zmq and polling threads.
         zmqSubSocket (:obj:`socket`): a socket to connect to ``bitcoind`` via ``zmq``.
         polling_delta (:obj:`int`): time between polls (in seconds).
         max_block_window_size (:obj:`int`): max size of last_tips.
@@ -58,7 +56,6 @@ class ChainMonitor:
 
     def __init__(self, receiving_queues, block_processor, bitcoind_feed_params):
         self.logger = get_logger(component=ChainMonitor.__name__)
-        self.best_tip = None
         self.last_tips = []
 
         self.check_tip = Event()
@@ -88,8 +85,8 @@ class ChainMonitor:
     def enqueue(self, block_hash):
         """
         Adds a new block hash to the internal queue of the  ``ChainMonitor`` and the internal state. The state contains
-        the ``best_tip`` field and the list of ``last_tips`` to prevent notifying about old blocks. ``last_tips`` is
-        bounded to ``max_block_window_size``.
+        the list of ``last_tips`` to prevent notifying about old blocks. ``last_tips`` is bounded to
+        ``max_block_window_size``.
 
         Args:
             block_hash (:obj:`str`): the new best tip.
@@ -98,10 +95,9 @@ class ChainMonitor:
             :obj:`bool`: True if the state was successfully updated, False otherwise.
         """
 
-        if block_hash != self.best_tip and block_hash not in self.last_tips:
+        if block_hash not in self.last_tips:
             self.queue.put(block_hash)
-            self.last_tips.append(self.best_tip)
-            self.best_tip = block_hash
+            self.last_tips.append(block_hash)
 
             if len(self.last_tips) > self.max_block_window_size:
                 self.last_tips.pop(0)
@@ -124,7 +120,7 @@ class ChainMonitor:
             current_tip = self.block_processor.get_best_block_hash()
 
             # get_best_block_hash may return None if the RPC times out.
-            if current_tip and current_tip != self.best_tip and current_tip not in self.last_tips:
+            if current_tip and current_tip not in self.last_tips:
                 self.logger.info("New block received via polling", block_hash=current_tip)
                 self.enqueue(current_tip)
 
@@ -143,7 +139,7 @@ class ChainMonitor:
 
             if topic == b"hashblock":
                 block_hash = binascii.hexlify(body).decode("utf-8")
-                if block_hash != self.best_tip and block_hash not in self.last_tips:
+                if block_hash not in self.last_tips:
                     self.logger.info("New block received via zmq", block_hash=block_hash)
                     self.enqueue(block_hash)
 
@@ -163,9 +159,9 @@ class ChainMonitor:
 
     def monitor_chain(self):
         """
-        Changes the ``status`` of the ``ChainMonitor`` from idle to listening. It initializes the ``best_tip`` to
-        the current one (by querying the :obj:`BlockProcessor <teos.block_processor.BlockProcessor>`) and creates two
-        threads, one per each monitoring approach (``zmq`` and ``polling``).
+        Changes the ``status`` of the ``ChainMonitor`` from idle to listening. It initializes the ``last_tips`` list to
+        the current best tip (by querying the :obj:`BlockProcessor <teos.block_processor.BlockProcessor>`) and creates
+        two threads, one per each monitoring approach (``zmq`` and ``polling``).
 
         Raises:
             :obj:RuntimeError: if the ``status`` was not ``ChainMonitor.IDLE`` when the method was called.
@@ -176,7 +172,7 @@ class ChainMonitor:
 
         self.status = ChainMonitorStatus.LISTENING
 
-        self.best_tip = self.block_processor.get_best_block_hash()
+        self.last_tips.append(self.block_processor.get_best_block_hash())
         Thread(target=self.monitor_chain_polling, daemon=True).start()
         Thread(target=self.monitor_chain_zmq, daemon=True).start()
 

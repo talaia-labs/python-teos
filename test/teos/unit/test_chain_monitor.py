@@ -17,7 +17,6 @@ def test_init(block_processor):
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
 
     assert chain_monitor.status == ChainMonitorStatus.IDLE
-    assert chain_monitor.best_tip is None
     assert isinstance(chain_monitor.last_tips, list) and len(chain_monitor.last_tips) == 0
     assert chain_monitor.status == ChainMonitorStatus.IDLE
     assert isinstance(chain_monitor.check_tip, Event)
@@ -67,28 +66,22 @@ def test_notify_subscribers(block_processor):
 
 def test_enqueue(block_processor):
     # The state is updated after receiving a new block (and only if the block is not already known).
-    # Let's start by setting a best_tip and a couple of old tips
-    new_block_hash = get_random_value_hex(32)
+    # Let's start by adding some hashes to last_tips
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
-    chain_monitor.best_tip = new_block_hash
     chain_monitor.last_tips = [get_random_value_hex(32) for _ in range(5)]
 
-    # Now we can try to update the state with an old best_tip and see how it doesn't work
+    # Now we can try to update the state with an hash already seen and see how it doesn't work
     assert chain_monitor.enqueue(chain_monitor.last_tips[0]) is False
 
-    # Same should happen with the current tip
-    assert chain_monitor.enqueue(chain_monitor.best_tip) is False
-
-    # The state should be correctly updated with a new block hash, the chain tip should change and the old tip should
-    # have been added to the last_tips
+    # The state should be correctly updated with a new block hash, which should be added as last element of last_tips
     another_block_hash = get_random_value_hex(32)
     assert chain_monitor.enqueue(another_block_hash) is True
-    assert chain_monitor.best_tip == another_block_hash and new_block_hash == chain_monitor.last_tips[-1]
+    assert chain_monitor.last_tips[-1] == another_block_hash
 
 
 def test_monitor_chain_polling(block_processor):
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
-    chain_monitor.best_tip = block_processor.get_best_block_hash()
+    chain_monitor.last_tips = [block_processor.get_best_block_hash()]
     chain_monitor.polling_delta = 0.1
 
     # monitor_chain_polling runs until not terminated
@@ -112,7 +105,7 @@ def test_monitor_chain_polling(block_processor):
 def test_monitor_chain_zmq(block_processor):
     responder_queue = Queue()
     chain_monitor = ChainMonitor([Queue(), responder_queue], block_processor, bitcoind_feed_params)
-    chain_monitor.best_tip = block_processor.get_best_block_hash()
+    chain_monitor.last_tips = [block_processor.get_best_block_hash()]
 
     zmq_thread = Thread(target=chain_monitor.monitor_chain_zmq, daemon=True)
     zmq_thread.start()
@@ -140,8 +133,8 @@ def test_monitor_chain(block_processor):
     chain_monitor.monitor_chain()
     assert chain_monitor.status == ChainMonitorStatus.LISTENING
 
-    # The tip is updated before starting the threads, so it should have changed.
-    assert chain_monitor.best_tip is not None
+    # The tip is updated before starting the threads, so it should have been added to last_tips.
+    assert len(chain_monitor.last_tips) > 0
 
     # Blocks should be received and added to the queue
     count = 0
@@ -177,8 +170,8 @@ def test_activate(block_processor):
     chain_monitor.activate()
     assert chain_monitor.status == ChainMonitorStatus.ACTIVE
 
-    # The tip is updated before starting the threads, so it should have changed.
-    assert chain_monitor.best_tip is not None
+    # last_tips is updated before starting the threads, so it not be empty now.
+    assert len(chain_monitor.last_tips) > 0
 
     # Blocks should be received
     for _ in range(5):
@@ -209,7 +202,6 @@ def test_monitor_chain_single_update(block_processor):
     # This test tests that if both threads try to add the same block to the queue, only the first one will make it
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
 
-    chain_monitor.best_tip = None
     chain_monitor.polling_delta = 2
 
     # We will create a block and wait for the polling thread. Then check the queues to see that the block hash has only
