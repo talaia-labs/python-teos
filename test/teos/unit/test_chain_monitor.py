@@ -141,8 +141,7 @@ def test_monitor_chain(block_processor):
     for _ in range(5):
         generate_blocks(1)
         count += 1
-        time.sleep(0.5)  # higher than the polling interval
-        print(f"Best block: {block_processor.get_best_block_hash()}")
+        time.sleep(0.11)  # higher than the polling interval
         assert chain_monitor.receiving_queues[0].empty()
         assert chain_monitor.receiving_queues[1].empty()
         assert chain_monitor.queue.qsize() == count
@@ -225,6 +224,50 @@ def test_monitor_chain_single_update(block_processor):
 
     # We can also force an update and see that it won't go through
     assert chain_monitor.enqueue(queue0_block) is False
+
+    chain_monitor.terminate()
+    # The zmq thread needs a block generation to release from the recv method.
+    generate_blocks(1)
+
+
+def test_monitor_chain_and_activate(block_processor):
+    # In this test, we generate some blocks after `monitor_chain`, then `activate` and generate few more blocks.
+    # We verify that all the generated blocks are indeed sent to the queues in the right order.
+
+    queue1 = Queue()
+    queue2 = Queue()
+
+    # We add some initial blocks to the receiving queues, to simulate a bootstrap with previous information
+    pre_blocks = [get_random_value_hex(32) for _ in range(5)]
+    for block in pre_blocks:
+        queue1.put(block)
+        queue2.put(block)
+
+    # We don't activate the ChainMonitor but we start listening; therefore received blocks should accumulate in the
+    # internal queue
+    chain_monitor = ChainMonitor([queue1, queue2], block_processor, bitcoind_feed_params)
+    chain_monitor.polling_delta = 0.1
+
+    chain_monitor.monitor_chain()
+    assert chain_monitor.status == ChainMonitorStatus.LISTENING
+
+    # we generate some blocks while the monitor is listening but not active
+    init_blocks = generate_blocks(5)
+
+    time.sleep(0.11)  # higher than the polling interval
+
+    chain_monitor.activate()
+
+    # generate some more blocks after activating
+    after_blocks = generate_blocks(5)
+
+    time.sleep(0.11)
+
+    # we now check that all the blocks are in the receiving queues in the correct order
+    all_blocks = pre_blocks + init_blocks + after_blocks
+    for block in all_blocks:
+        assert queue1.get(timeout=0.1) == block
+        assert queue2.get(timeout=0.1) == block
 
     chain_monitor.terminate()
     # The zmq thread needs a block generation to release from the recv method.
