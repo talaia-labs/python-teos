@@ -90,6 +90,29 @@ def test_message_serialize():
     assert Message(mtype, payload, extension).serialize() == mtype + payload + b"\x00" + b"\x01" + b"\x02"
 
 
+def test_message_to_dict():
+    mtype = b"\x00"
+    payload = b"\x00\x01\x02"
+    extension = []
+    m = Message(mtype, payload, extension)
+    m_dict = m.to_dict()
+
+    assert isinstance(m_dict, dict)
+    assert m_dict.get("type") == mtype.hex()
+    assert m_dict.get("payload") == payload.hex()
+    assert m_dict.get("extension") == extension
+
+    # Add extension
+    extension1 = TLVRecord()
+    random_hash = get_random_value_hex(32)
+    extension2 = NetworksTLV([random_hash])
+    m2 = Message(mtype, payload, [extension1, extension2])
+    m2_dict = m2.to_dict()
+    assert m2_dict.get("type") == mtype.hex()
+    assert m2_dict.get("payload") == payload.hex()
+    assert m2_dict.get("extension") == ["", "0120" + random_hash]
+
+
 def test_init_message():
     # Init message requires global_features(FeatureVector), local_features (FeatureVector) and optionally a NetworksTLV
     gf = FeatureVector.from_bytes(b"\x02")
