@@ -232,11 +232,24 @@ def test_monitor_chain_single_update(block_processor):
 
 
 def test_terminate(block_processor):
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+    queue = Queue()
+    chain_monitor = ChainMonitor([queue, Queue()], block_processor, bitcoind_feed_params)
+    chain_monitor.polling_delta = 0.1
+
+    chain_monitor.monitor_chain()
+    chain_monitor.activate()
 
     chain_monitor.terminate()
 
     assert chain_monitor.status == ChainMonitorStatus.TERMINATED
+
+    # generate a new block
+    generate_blocks(1)
+    time.sleep(0.11)  # wait longer than the polling_delta
+
+    # there should be only the "END" message in the receiving queue, as the new block was generated after terminating
+    assert queue.qsize() == 1
+    assert queue.get() == "END"
 
 
 @pytest.mark.timeout(5)
