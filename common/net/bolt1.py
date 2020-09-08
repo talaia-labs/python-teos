@@ -24,18 +24,17 @@ class Message:
     """
 
     def __init__(self, mtype, payload, extension=None):
+        # Normalize the default extension type to empty list
+        if extension is None:
+            extension = []
         if not isinstance(mtype, bytes):
             raise TypeError("mtype must be bytes")
-        if not isinstance(payload, bytes):
+        elif not isinstance(payload, bytes):
             raise TypeError("payload must be bytes")
-        if extension is not None and not isinstance(extension, list):
+        elif not isinstance(extension, list):
             raise TypeError("extension must be a list if set")
-        else:
-            # Normalize the default extension type (for empty lists)
-            if not extension:
-                extension = None
-            elif not all(isinstance(tlv, TLVRecord) for tlv in extension):
-                raise TypeError("All items in extension must be TLVRecords")
+        elif not all(isinstance(tlv, TLVRecord) for tlv in extension):
+            raise TypeError("All items in extension must be TLVRecords")
 
         self.type = mtype
         self.payload = payload
@@ -153,23 +152,22 @@ class ErrorMessage(Message):
         data (:obj:`str`): the error message.
     """
 
-    def __init__(self, channel_id, data=None):
+    def __init__(self, channel_id, data=""):
         if not is_256b_hex_str(channel_id):
             raise ValueError("channel_id must be a 256-bit hex string")
 
+        if not isinstance(data, str):
+            raise ValueError("data must be string if set")
+
         payload = bytes.fromhex(channel_id)
+        encoded_message = data.encode("utf-8")
 
-        if data:
-            if not isinstance(data, str):
-                raise ValueError("data must be string if set")
+        if len(encoded_message) >= pow(2, 16):
+            raise ValueError(
+                f"Encoded data length cannot be bigger than {pow(2, 16) - 1}, {len(encoded_message)} received"
+            )
 
-            encoded_message = data.encode("utf-8")
-            if len(encoded_message) >= pow(2, 16):
-                raise ValueError(
-                    f"Encoded data length cannot be bigger than {pow(2, 16) - 1}, {len(encoded_message)} received"
-                )
-
-            payload += len(encoded_message).to_bytes(2, "big") + encoded_message
+        payload += len(encoded_message).to_bytes(2, "big") + encoded_message
 
         super().__init__(message_types["error"], payload)
         self.channel_id = channel_id
@@ -205,7 +203,7 @@ class PingMessage(Message):
         ignored_bytes (:obj:`bytes`): filling bytes added to the message by the sender.
     """
 
-    def __init__(self, num_pong_bytes, ignored_bytes=None):
+    def __init__(self, num_pong_bytes, ignored_bytes=b""):
         if not 0 <= num_pong_bytes < pow(2, 16):
             raise ValueError(f"num_pong_bytes must be between 0 and {pow(2, 16) - 1}")
 
@@ -250,7 +248,7 @@ class PongMessage(Message):
             by the sender of the ``PingMessage``.
     """
 
-    def __init__(self, ignored_bytes=None):
+    def __init__(self, ignored_bytes=b""):
         if ignored_bytes:
             if not isinstance(ignored_bytes, bytes):
                 raise TypeError("ignored_bytes must be bytes if set")
