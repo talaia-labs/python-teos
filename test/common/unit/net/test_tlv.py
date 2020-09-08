@@ -21,7 +21,7 @@ def test_tlv_record():
 
 
 def test_tlv_record_len():
-    # The TLV length is defined as the length of it's serialized fields
+    # The TLV length is defined as the length of its serialized fields
     t = b"\x01"
     l = b"\x02"
     v = b"\x03"
@@ -30,7 +30,7 @@ def test_tlv_record_len():
 
 
 def test_tlv_record_from_bytes():
-    # from_bytes builds a children class depending on the data type. Currently it only supports Networks
+    # from_bytes builds an instance of a child class depending on the data type. Currently it only supports Networks.
 
     # NetworksTLV
     t = bigsize.encode(1)

@@ -3,7 +3,7 @@ from common.net.bolt9 import Feature, FeatureVector, known_features
 
 
 def test_feature():
-    # Features expect two params, a integer representing the bit of the feature and a boolean with whether that bit
+    # Features expect two params, an integer representing the bit of the feature and a boolean with whether that bit
     # is set or not.
     odd_feature_set = Feature(1, True)
     assert odd_feature_set.bit == 1
@@ -97,7 +97,7 @@ def test_feature_vector_from_bytes():
     assert fv_all_odd.option_anchor_outputs.is_set and fv_all_odd.option_anchor_outputs.is_odd
     assert fv_all_odd.serialize() == f_all_odd
 
-    # All eve features (but initial_routing_sync)
+    # All even features (but initial_routing_sync)
     f_all_even = b"\x15\x55\x59"
     fv_all_even = FeatureVector.from_bytes(f_all_even)
     assert fv_all_even.option_data_loss_protect.is_set and not fv_all_even.option_data_loss_protect.is_odd

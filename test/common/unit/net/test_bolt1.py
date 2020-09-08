@@ -8,13 +8,13 @@ from test.common.unit.conftest import get_random_value_hex
 
 
 def test_message():
-    # Messages are built from a message_type (bytes) a payload (bytes) an a optional list of TLVRecords
+    # Messages are built from a message_type (bytes) a payload (bytes),  and an optional list of TLVRecords
     mtype = b"\x00"
     payload = b"\x00\x01\x02"
     extension = []
     m = Message(mtype, payload, extension)
     assert isinstance(m, Message)
-    assert m.type == mtype and m.payload == payload and m.extension is None
+    assert m.type == mtype and m.payload == payload and m.extension == []
 
     # Same with some tlvs
     extension = [TLVRecord(), NetworksTLV()]
@@ -43,7 +43,7 @@ def test_message_wrong_types():
 
 def test_message_from_bytes():
     # From bytes builds an instance of a children class as long as the type is known, raises ValueError otherwise
-    # Not testing particular cases for the children since they will be covered in their own tests
+    # Not testing particular cases for the child classes since they will be covered in their own tests
 
     # Init
     m = b"\x00\x10\x00\x00\x00\x00"
@@ -77,7 +77,7 @@ def test_message_from_bytes_wrong():
 
 
 def test_message_serialize():
-    # Serialize returns the concatenation opf the byte representation of each field:
+    # Serialize returns the concatenation of the byte representation of each field:
     # type + payload + [extension]
 
     # No extension
@@ -162,7 +162,7 @@ def test_init_message_from_bytes_wrong():
 
     # Message is not long enough < 6
     with pytest.raises(ValueError, match="message be must at least 6-byte long"):
-        InitMessage.from_bytes(b"\x00\x10\x00")
+        InitMessage.from_bytes(b"\x00\x10\x00\x01\x02")
 
     # Type is not init
     with pytest.raises(ValueError, match="Wrong message format. types do not match"):
@@ -179,7 +179,7 @@ def test_error_message():
     em = ErrorMessage(cid)
     assert isinstance(em, ErrorMessage)
     assert em.channel_id == cid
-    assert em.data is None
+    assert not em.data
 
     # Same with associated data
     data = "error message data"
@@ -191,7 +191,7 @@ def test_error_message():
 
 def test_error_message_wrong():
     # Channel id must be a 32-byte hex str
-    # Data must be string if set and no longer than the message cap size when encoded pow(2, 16)
+    # Data must be string if set and no longer than the message cap size when encoded pow(2, 16) - 1
 
     # Wrong channel id
     with pytest.raises(ValueError, match="channel_id must be a 256-bit hex string"):
@@ -205,8 +205,8 @@ def test_error_message_wrong():
         ErrorMessage(get_random_value_hex(32), b"message")
 
     # Data too long
-    with pytest.raises(ValueError, match=f"Encoded data length cannot be bigger than {pow(2, 16)}"):
-        ErrorMessage(get_random_value_hex(32), "A" * (pow(2, 16) + 1))
+    with pytest.raises(ValueError, match=f"Encoded data length cannot be bigger than {pow(2, 16) - 1}"):
+        ErrorMessage(get_random_value_hex(32), "A" * (pow(2, 16)))
 
 
 def test_error_from_bytes():
@@ -218,7 +218,7 @@ def test_error_from_bytes():
     em = ErrorMessage.from_bytes(mtype + cid + data_len)
     assert isinstance(em, ErrorMessage)
     assert em.channel_id == cid.hex()
-    assert em.data is None
+    assert not em.data
 
     # Same with associated data
     data = "message"
@@ -236,7 +236,7 @@ def test_error_from_bytes_wrong():
 
     # Message is not long enough < 36
     with pytest.raises(ValueError, match="message be must at least 36-byte long"):
-        ErrorMessage.from_bytes(b"\x00\x11\x00\x01")
+        ErrorMessage.from_bytes(b"\x00\x11" + bytes(33))
 
     # Type is not error
     with pytest.raises(ValueError, match="Wrong message format. types do not match"):
@@ -252,7 +252,7 @@ def test_error_from_bytes_wrong():
 
 
 def test_ping_message():
-    # Ping expects a number of pong bytes and optionally a some ignored data (bytes)
+    # Ping expects a number of pong bytes and optionally some ignored data (bytes)
     num_pong_bytes = 10
     pm = PingMessage(num_pong_bytes)
     assert isinstance(pm, PingMessage)
@@ -291,7 +291,7 @@ def test_ping_message_from_bytes():
     pm = PingMessage.from_bytes(mtype + num_pong_bytes + bytes_len)
     assert isinstance(pm, PingMessage)
     assert pm.num_pong_bytes == int.from_bytes(num_pong_bytes, "big")
-    assert pm.ignored_bytes is None
+    assert not pm.ignored_bytes
 
     # Same with some ignored data
     ignored_data = b"\x00\x01\x02\x03"
@@ -309,7 +309,7 @@ def test_ping_message_from_bytes_wrong():
 
     # Message is not long enough < 6
     with pytest.raises(ValueError, match="message be must at least 6-byte long"):
-        PingMessage.from_bytes(b"\x00\x12\x00\x01")
+        PingMessage.from_bytes(b"\x00\x12\x00\x01\x02")
 
     # Type is not ping
     with pytest.raises(ValueError, match="Wrong message format. types do not match"):
@@ -325,10 +325,10 @@ def test_ping_message_from_bytes_wrong():
 
 
 def test_pong_message():
-    # Pong can be empty, and optionally can receive so ignored bytes
+    # Pong can be empty, and optionally can receive some ignored bytes
     pm = PongMessage()
     assert isinstance(pm, PongMessage)
-    assert pm.ignored_bytes is None
+    assert not pm.ignored_bytes
 
     # With some ignored_bytes
     ignored_bytes = b"\x00\x02\x06"
@@ -353,7 +353,7 @@ def test_pong_message_from_bytes():
     bytes_len = b"\x00\x00"
     pm = PongMessage.from_bytes(mtype + bytes_len)
     assert isinstance(pm, PongMessage)
-    assert pm.ignored_bytes is None
+    assert not pm.ignored_bytes
 
     # Add some ignored data
     ignored_data = b"\x03\xfd\xef"
