@@ -82,6 +82,13 @@ class Message:
             tlvs = b"".join([tlv.serialize() for tlv in self.extension])
             return self.type + self.payload + tlvs
 
+    def to_dict(self):
+        return {
+            "type": self.type.hex(),
+            "payload": self.payload.hex(),
+            "extension": [extension.serialize().hex() for extension in self.extension],
+        }
+
 
 class InitMessage(Message):
     """
