@@ -87,13 +87,11 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
             record (:obj:`logging.LogRecord`): a log record.
         """
 
-        # TODO: this is broken, would fail for strings containing a '
-        event_dict = json.loads(record.msg.replace("'", '"'))
+        event_dict = json.loads(record.msg)
         message = encode_event_dict(event_dict)
 
         logger = logging.getLogger(record.name)
-        # TODO: this might be losing some additional info that is set in the LogRecord; check.
-        logger.log(record.levelno, message)
+        logger.log(record.levelno, message, exc_info=record.exc_info, stack_info=record.stack_info)
 
 
 class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):

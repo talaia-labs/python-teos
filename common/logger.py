@@ -1,3 +1,4 @@
+import json
 import logging
 import logging.config
 import logging.handlers
@@ -6,6 +7,20 @@ import structlog
 from common.constants import TCP_LOGGING_PORT
 
 configured = False  # set to True once setup_logging is called
+
+
+class JsonMsgLogger(logging.Logger):
+    """
+    Works exactly like logging.Logger but represents dict messages as json. Useful to prevent dicts being cast
+    to strings via str().
+    """
+
+    def makeRecord(self, *args, **kwargs):
+        rv = super().makeRecord(*args, **kwargs)
+        if isinstance(rv.msg, dict):
+            rv.msg = json.dumps(rv.msg)
+
+        return rv
 
 
 def setup_logging():
@@ -53,6 +68,7 @@ def setup_logging():
         cache_logger_on_first_use=True,
     )
 
+    logging.setLoggerClass(JsonMsgLogger)
     configured = True
 
 
