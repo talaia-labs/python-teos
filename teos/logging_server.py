@@ -5,11 +5,11 @@ import logging.handlers
 import socketserver
 from signal import signal, SIGINT
 import struct
+import select
 import json
+from io import StringIO
 
 from common.constants import TCP_LOGGING_PORT
-
-from io import StringIO
 
 
 def _repr(val):
@@ -98,7 +98,7 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
 
 class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
     """
-    Simple TCP socket-based logging receiver suitable for testing.
+    Simple TCP socket-based logging receiver.
     """
 
     allow_reuse_address = True
@@ -110,8 +110,6 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
         self.logname = None
 
     def serve_until_stopped(self):
-        import select
-
         abort = 0
         while not abort:
             rd, wr, ex = select.select([self.socket.fileno()], [], [], self.timeout)
@@ -120,7 +118,16 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
             abort = self.abort
 
 
-def serve(log_file_path, silent):
+def serve(log_file_path, silent, ready):
+    """
+    Sets up logging on console and file, and serve the tcp logging server on `localhost:TCP_LOGGING_PORT`.
+
+    Args:
+        log_file_path (:obj:`str`): the full path and log file name.
+        silent (:obj:`bool`) if True, only CRITICAL errors are shown to console; otherwise INFO and above.
+        ready (:obs):`multiprocessing.Event`) an ``Event`` that is set once the logging server is ready.
+    """
+
     logging.config.dictConfig(
         {
             "version": 1,
@@ -141,4 +148,5 @@ def serve(log_file_path, silent):
 
     signal(SIGINT, ignore_signal)
 
+    ready.set()
     tcpserver.serve_until_stopped()

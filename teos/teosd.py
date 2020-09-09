@@ -334,13 +334,13 @@ def main(config):
     setup_data_folder(config.get("DATA_DIR"))
 
     silent = config.get("DAEMON")
-    logging_process = multiprocessing.Process(target=serve_logging, daemon=True, args=(config.get("LOG_FILE"), silent))
+    logging_server_ready = multiprocessing.Event()
+    logging_process = multiprocessing.Process(
+        target=serve_logging, daemon=True, args=(config.get("LOG_FILE"), silent, logging_server_ready)
+    )
     logging_process.start()
 
-    # TODO: how to wait for logging process to be ready?
-    import time
-
-    time.sleep(1)
+    logging_server_ready.wait()
 
     setup_logging()
     logger = get_logger(component="Daemon")

@@ -14,7 +14,7 @@ from common.logger import setup_logging, get_logger
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
-# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+# NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_remote_addr():
     """
     Gets the remote client ip address. The HTTP_X_REAL_IP field is tried first in case the server is behind a reverse
@@ -32,7 +32,7 @@ def get_remote_addr():
     return remote_addr
 
 
-# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+# NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_request_data_json(request):
     """
     Gets the content of a json POST request and makes sure it decodes to a dictionary.
