@@ -25,13 +25,18 @@ from test.teos.conftest import (
 from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def responder(db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
+    responder_thread = responder.awake()
+    chain_monitor.activate()
 
-    return responder
+    yield responder
+
+    chain_monitor.terminate()
+    responder_thread.join()
 
 
 # FIXME: Check if this can be removed and used the general fixture
@@ -108,8 +113,7 @@ def test_tracker_get_summary(generate_dummy_tracker):
     }
 
 
-def test_init_responder(temp_db_manager, gatekeeper, carrier, block_processor):
-    responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
+def test_init_responder(temp_db_manager, gatekeeper, carrier, block_processor, responder):
     assert isinstance(responder.trackers, dict) and len(responder.trackers) == 0
     assert isinstance(responder.tx_tracker_map, dict) and len(responder.tx_tracker_map) == 0
     assert isinstance(responder.unconfirmed_txs, list) and len(responder.unconfirmed_txs) == 0
@@ -139,9 +143,7 @@ def test_on_sync_fail(responder, block_processor):
     assert responder.on_sync(chain_tip) is False
 
 
-def test_handle_breach(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-
+def test_handle_breach(db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker):
     uuid = uuid4().hex
     commitment_tx = create_commitment_tx()
     tracker = generate_dummy_tracker(commitment_tx)
@@ -161,10 +163,11 @@ def test_handle_breach(db_manager, gatekeeper, carrier, block_processor, generat
     assert receipt.delivered is True
 
 
-def test_handle_breach_bad_response(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
+def test_handle_breach_bad_response(
+    db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker
+):
     # We need a new carrier here, otherwise the transaction will be flagged as previously sent and receipt.delivered
     # will be True
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
 
     uuid = uuid4().hex
     commitment_tx = create_commitment_tx()
@@ -297,8 +300,9 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
 
     # Create a fresh responder to simplify the test
     responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
+    chain_monitor.activate()
 
     # Let's set up the trackers first
     for tracker in trackers:
@@ -358,11 +362,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
         assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
 
 
-def test_check_confirmations(db_manager, gatekeeper, carrier, block_processor):
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
-    chain_monitor.monitor_chain()
-
+def test_check_confirmations(db_manager, gatekeeper, carrier, responder, block_processor):
     # check_confirmations checks, given a list of transaction for a block, what of the known penalty transaction have
     # been confirmed. To test this we need to create a list of transactions and the state of the Responder
     txs = [get_random_value_hex(32) for _ in range(20)]
@@ -414,11 +414,7 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
-    chain_monitor.monitor_chain()
-
+def test_get_completed_trackers(db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker):
     commitment_txs = [create_commitment_tx() for _ in range(30)]
     generate_block_with_transactions(commitment_txs)
     # A complete tracker is a tracker whose penalty transaction has been irrevocably resolved (i.e. has reached 100
@@ -535,11 +531,7 @@ def test_get_expired_trackers(responder, generate_dummy_tracker):
     )
 
 
-def test_rebroadcast(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(Queue(), responder.block_queue, block_processor, bitcoind_feed_params)
-    chain_monitor.monitor_chain()
-
+def test_rebroadcast(db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker):
     # Include the commitment txs in a block
     commitment_txs = [create_commitment_tx() for _ in range(20)]
     generate_block_with_transactions(commitment_txs)

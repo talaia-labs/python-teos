@@ -146,10 +146,16 @@ class Responder:
         self.last_known_block = db_manager.load_last_block_hash_responder()
 
     def awake(self):
-        """Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth"""
+        """
+            Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth.
+            The thread will run until the ``ChainMonitor`` adds the "END" message to the queue.
+
+            Returns:
+                :obj:`Thread <multithreading.Thread>`: the Thread object that was just created and is already running.
+        """
+
         responder_thread = Thread(target=self.do_watch, daemon=True)
         responder_thread.start()
-
         return responder_thread
 
     def on_sync(self, block_hash):
@@ -266,6 +272,11 @@ class Responder:
 
         while True:
             block_hash = self.block_queue.get()
+
+            # When the ChainMonitor is stopped, a final "END" message is sent
+            if block_hash == "END":
+                break
+
             block = self.block_processor.get_block(block_hash)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")

@@ -246,11 +246,16 @@ class Watcher:
         return len(self.responder.trackers)
 
     def awake(self):
-        """Starts a new thread to monitor the blockchain for channel breaches"""
+        """
+            Starts a new thread to monitor the blockchain for channel breaches. The thread will run until the
+            ``ChainMonitor`` adds the "END" message to the queue.
+
+            Returns:
+                :obj:`Thread <multithreading.Thread>`: the Thread object that was just created and is already running.
+        """
 
         watcher_thread = Thread(target=self.do_watch, daemon=True)
         watcher_thread.start()
-
         return watcher_thread
 
     def register(self, user_id):
@@ -444,6 +449,11 @@ class Watcher:
 
         while True:
             block_hash = self.block_queue.get()
+
+            # When the ChainMonitor is stopped, a final "END" message is sent
+            if block_hash == "END":
+                break
+
             block = self.block_processor.get_block(block_hash)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
