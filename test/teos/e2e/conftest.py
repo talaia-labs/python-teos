@@ -53,7 +53,8 @@ def run_teosd():
     teosd_process.start()
 
     # Give it some time to bootstrap
-    sleep(1)
+    # TODO: we should do better synchronization using an Event
+    sleep(3)
 
     return teosd_process, teos_id
 

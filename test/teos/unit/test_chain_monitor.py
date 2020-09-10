@@ -6,7 +6,7 @@ import pytest
 
 from teos.chain_monitor import ChainMonitor, ChainMonitorStatus
 
-from test.teos.conftest import generate_blocks
+from test.teos.conftest import generate_blocks, generate_blocks_with_delay
 from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
 
 
@@ -252,16 +252,14 @@ def test_monitor_chain_and_activate(block_processor):
     assert chain_monitor.status == ChainMonitorStatus.LISTENING
 
     # we generate some blocks while the monitor is listening but not active
-    init_blocks = generate_blocks(5)
+    init_blocks = generate_blocks_with_delay(3, 0.15)
 
     time.sleep(0.11)  # higher than the polling interval
 
     chain_monitor.activate()
 
     # generate some more blocks after activating
-    after_blocks = generate_blocks(5)
-
-    time.sleep(0.11)
+    after_blocks = generate_blocks_with_delay(3, 0.15)
 
     # we now check that all the blocks are in the receiving queues in the correct order
     all_blocks = pre_blocks + init_blocks + after_blocks

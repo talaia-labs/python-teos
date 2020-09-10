@@ -126,11 +126,11 @@ def generate_blocks(n):
     return bitcoin_cli.generatetoaddress(n, btc_addr)
 
 
-def generate_blocks_with_delay(n):
+def generate_blocks_with_delay(n, delay=0.2):
     block_ids = []
     for _ in range(n):
-        block_ids.append(generate_blocks(1))
-        sleep(0.2)
+        block_ids.extend(generate_blocks(1))
+        sleep(delay)
 
     return block_ids
 
