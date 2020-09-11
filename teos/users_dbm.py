@@ -20,7 +20,7 @@ class UsersDBM(DBManager):
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
 
     Attributes:
-        logger: the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
     """
 
     def __init__(self, db_path):
@@ -80,7 +80,7 @@ class UsersDBM(DBManager):
         Returns:
             :obj:`dict`: A dictionary containing the user data if the ``key`` is found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         try:

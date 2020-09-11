@@ -39,13 +39,13 @@ def register(user_id, teos_id, teos_url):
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`tuple`: A tuple containing the available slots count and the subscription expiry
+        :obj:`tuple`: A tuple containing the available slots count and the subscription expiry.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `user_id` is invalid.
+        :obj:`InvalidParameter`: if `user_id` is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the
+            response was invalid.
     """
 
     if not is_compressed_pk(user_id):
@@ -79,6 +79,7 @@ def create_appointment(appointment_data):
     """
     Creates an appointment object from an appointment data dictionary provided by the user. Performs all the required
     sanity checks on the input data:
+
         - Check that the given commitment_txid is correct (proper format and not missing)
         - Check that the transaction is correct (not missing)
 
@@ -109,16 +110,14 @@ def create_appointment(appointment_data):
 
 def add_appointment(appointment, user_sk, teos_id, teos_url):
     """
-    Manages the add_appointment command.
-
-    The life cycle of the function is as follows:
+    Manages the add_appointment command. The life cycle of the function is as follows:
         - Sign the appointment
         - Send the appointment to the tower
         - Wait for the response
         - Check the tower's response and signature
 
     Args:
-        appointment (:obj:`Appointment <common.appointment.Appointment>`): An appointment object.
+        appointment (:obj:`Appointment <common.appointment.Appointment>`): an appointment object.
         user_sk (:obj:`PrivateKey`): the user's private key.
         teos_id (:obj:`str`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
@@ -129,8 +128,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
     Raises:
         :obj:`ValueError`: if the appointment cannot be signed.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -170,14 +168,12 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`dict`: a dictionary containing the appointment data.
+        :obj:`dict`: A dictionary containing the appointment data.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `appointment_data` or any of its fields is
-        invalid.
+        :obj:`InvalidParameter`: if `appointment_data` or any of its fields is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     # FIXME: All responses from the tower should be signed. Not using teos_id atm.
@@ -205,11 +201,11 @@ def load_keys(user_sk_path):
         user_sk_path (:obj:`str`): path to the user's private key file.
 
     Returns:
-        :obj:`tuple`: a tuple containing a ``PrivateKey`` and a ``str`` representing the user sk and user id
+        :obj:`tuple`: A tuple containing a :obj:`PrivateKey` and a :obj:`str` representing the user sk and user id
         (compressed pk) respectively.
 
     Raises:
-        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if any of the keys is invalid or cannot be loaded.
+        :obj:`InvalidKey`: if any of the keys is invalid or cannot be loaded.
     """
 
     if not user_sk_path:
@@ -242,7 +238,7 @@ def load_teos_id(teos_pk_path):
         :obj:`str`: The tower id.
 
     Raises:
-        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if the public key is invalid or cannot be loaded.
+        :obj:`InvalidKey`: if the public key is invalid or cannot be loaded.
     """
 
     if not teos_pk_path:
@@ -266,7 +262,7 @@ def post_request(data, endpoint):
         endpoint (:obj:`str`): the endpoint to send the post request.
 
     Returns:
-        :obj:`dict`: a json-encoded dictionary with the server response if the data can be posted.
+        :obj:`dict`: A json-encoded dictionary with the server response if the data can be posted.
 
     Raises:
         :obj:`ConnectionError`: if the client cannot connect to the tower.
@@ -292,15 +288,14 @@ def process_post_response(response):
     Processes the server response to a post request.
 
     Args:
-        response (:obj:`requests.models.Response`): a ``Response`` object obtained from the request.
+        response (:obj:`Response`): a :obj:`Response` object obtained from the request.
 
     Returns:
-        :obj:`dict`: a dictionary containing the tower's response data if the response type is
+        :obj:`dict`: A dictionary containing the tower's response data if the response type is
         ``HTTP_OK``.
 
     Raises:
-        :obj:`TowerResponseError <common.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     try:
@@ -325,15 +320,15 @@ def parse_add_appointment_args(args):
 
     Args:
         args (:obj:`list`): a list of command line arguments that must contain a json encoded appointment, or the file
-        option and the path to a file containing a json encoded appointment.
+            option and the path to a file containing a json encoded appointment.
 
     Returns:
         :obj:`dict`: A dictionary containing the appointment data.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if the appointment data is not JSON encoded.
-        :obj:`FileNotFoundError`: if -f is passed and the appointment file is not found.
-        :obj:`IOError`: if -f was passed and the file cannot be read.
+        :obj:`InvalidParameter`: if the appointment data is not JSON encoded.
+        :obj:`FileNotFoundError`: if ``-f`` is passed and the appointment file is not found.
+        :obj:`IOError`: if ``-f`` was passed and the file cannot be read.
     """
 
     use_help = "Use 'help add_appointment' for help of how to use the command"

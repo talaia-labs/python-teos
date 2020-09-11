@@ -26,14 +26,17 @@ from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.user_pb2 import GetUserRequest
 
 
-# All conversions to json in this module should be consistent, therefore we restrict the options using this function.
 def to_json(obj):
+    """
+    All conversions to json in this module should be consistent, therefore we restrict the options using
+    this function.
+    """
     return json.dumps(obj, indent=4)
 
 
 def formatted(func):
     """
-    Transforms the given function by wrapping the return value with json_format.MessageToDict followed by
+    Transforms the given function by wrapping the return value with ``json_format.MessageToDict`` followed by
     json.dumps, in order to print the result in a prettyfied json format.
     """
 
@@ -59,8 +62,8 @@ class RPCClient:
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
 
     Attributes:
-        channel (:obj:`grpc.Channel`): the Channel object
-        stub: the rpc client stub
+        channel (:obj:`grpc.Channel`): The :obj:`Channel` object.
+        stub: The rpc client stub.
     """
 
     def __init__(self, rpc_host, rpc_port):

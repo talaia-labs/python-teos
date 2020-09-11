@@ -25,19 +25,20 @@ from google.protobuf.empty_pb2 import Empty
 
 class InternalAPI:
     """
-    The internal API is the interface to interact with the tower backend. It offers methods than can be accessed by the
-    CLI or the client via the :class:`API <teos.api.API>` (HTTP proxy) or the :class:`RPC <teos.rpc.RPC>` (gRPC proxy).
+    The :obj:`InternalAPI` is the interface to interact with the tower backend. It offers methods than can be accessed
+    by the CLI or the client via the :class:`API <teos.api.API>` (HTTP proxy) or the :class:`RPC <teos.rpc.RPC>`
+    (gRPC proxy).
 
     Args:
-        watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to. The Watcher is
-            the main backend class of the tower and can interact with the rest.
+        watcher (:obj:`Watcher <teos.watcher.Watcher>`): a :obj:`Watcher` instance to pass the requests to. The Watcher
+            is the main backend class of the tower and can interact with the rest.
         internal_api_endpoint (:obj:`str`): the endpoint where the internal api will be served (gRPC server).
-        stop_command_event (:obj:`multiprocessing.Event`): an Event to be set when a `stop` command is issued.
+        stop_command_event (:obj:`multiprocessing.Event`): an event to be set when a ``stop`` command is issued.
 
     Attributes:
-        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
-        endpoint (:obj:`str`): the endpoint where the internal api will be served (gRPC server).
-        rpc_server (:obj:`Server <grpc.Server>`): the non-started gRPC server instance.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        endpoint (:obj:`str`): The endpoint where the internal api will be served (gRPC server).
+        rpc_server (:obj:`grpc.Server <grpc.Server>`): The non-started gRPC server instance.
     """
 
     def __init__(self, watcher, internal_api_endpoint, stop_command_event):

@@ -6,7 +6,7 @@ from teos.utils.auth_proxy import JSONRPCException
 
 
 class InvalidTransactionFormat(BasicException):
-    """Raised when a transaction is not properly formatted"""
+    """Raised when a transaction is not properly formatted."""
 
 
 class BlockProcessor:
@@ -16,10 +16,10 @@ class BlockProcessor:
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc password, host and port)
+            (``rpc user, rpc password, host and port``).
 
     Attributes:
-        logger: the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
     """
 
     def __init__(self, btc_connect_params):
@@ -36,7 +36,7 @@ class BlockProcessor:
         Returns:
             :obj:`dict` or :obj:`None`: A dictionary containing the requested block data if the block is found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         try:
@@ -55,7 +55,7 @@ class BlockProcessor:
         Returns:
             :obj:`str` or :obj:`None`: The hash of the block if it can be found.
 
-            Returns ``None`` otherwise (not even sure this can actually happen).
+            Returns :obj:`None` otherwise (not even sure this can actually happen).
         """
 
         try:
@@ -74,7 +74,7 @@ class BlockProcessor:
         Returns:
             :obj:`int` or :obj:`None`: The count of the best chain if it can be computed.
 
-            Returns ``None`` otherwise (not even sure this can actually happen).
+            Returns :obj:`None` otherwise (not even sure this can actually happen).
         """
 
         try:
@@ -98,7 +98,7 @@ class BlockProcessor:
             :obj:`dict`: The decoding of the given ``raw_tx`` if the transaction is well formatted.
 
         Raises:
-            :obj:`InvalidTransactionFormat`: If the provided ``raw_tx`` has invalid format.
+            :obj:`InvalidTransactionFormat`: If the `provided ``raw_tx`` has invalid format.
         """
 
         try:
@@ -122,7 +122,7 @@ class BlockProcessor:
             :obj:`int` or :obj:`None`: The distance between the target and the best chain tip is the target block can be
             found on the blockchain.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         distance = None
@@ -175,7 +175,7 @@ class BlockProcessor:
             block_hash(:obj:`str`): the hash of the block to be checked.
 
         Returns:
-            :obj:`bool`: ``True`` if the block is on the best chain, ``False`` otherwise.
+            :obj:`bool`: True if the block is on the best chain, False otherwise.
 
         Raises:
             KeyError: If the block cannot be found in the blockchain.
@@ -203,9 +203,9 @@ class BlockProcessor:
             last_known_block_hash(:obj:`str`): the hash of the last know block.
 
         Returns:
-            :obj:`tuple`: A tuple (:obj:`str`:, :obj:`list`:) where the first item contains the hash of the last common
-                ancestor and the second item contains the list of transactions from ``last_known_block_hash`` to
-                ``last_common_ancestor``.
+            :obj:`tuple`: A tuple (:obj:`str`, :obj:`list`) where the first item contains the hash of the last common
+            ancestor and the second item contains the list of transactions from ``last_known_block_hash`` to
+            ``last_common_ancestor``.
         """
 
         target_block_hash = last_known_block_hash
