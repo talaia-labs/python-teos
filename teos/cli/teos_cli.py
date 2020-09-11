@@ -62,15 +62,14 @@ class RPCClient:
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
 
     Attributes:
-        channel (:obj:`grpc.Channel`): The :obj:`Channel` object.
         stub: The rpc client stub.
     """
 
     def __init__(self, rpc_host, rpc_port):
         self.rpc_host = rpc_host
         self.rpc_port = rpc_port
-        self.channel = grpc.insecure_channel(f"{rpc_host}:{rpc_port}")
-        self.stub = TowerServicesStub(self.channel)
+        channel = grpc.insecure_channel(f"{rpc_host}:{rpc_port}")
+        self.stub = TowerServicesStub(channel)
 
     @formatted
     def get_all_appointments(self):
