@@ -529,7 +529,7 @@ class Watcher:
                 # Remove expired and completed appointments from the Gatekeeper
                 Cleaner.delete_gatekeeper_appointments(self.gatekeeper, appointments_to_delete_gatekeeper)
 
-                if len(self.appointments) != 0:
+                if not self.appointments:
                     self.logger.info("No more pending appointments")
 
             # Register the last processed block for the Watcher
