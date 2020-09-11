@@ -12,6 +12,11 @@ from io import StringIO
 from common.constants import TCP_LOGGING_PORT
 
 
+# Ignore SIGINT so this process does not crash on CTRL+C, but comply on other signals
+def ignore_signal(_, __):
+    pass
+
+
 def _repr(val):
     """Returns the representation of *val* if it's not a ``str``."""
 
@@ -54,12 +59,11 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
     Handler for a streaming logging request. Sends to the logger any received log message, after some preprocessing.
     """
 
-    # Taken almost Verbatim from Python's logging cookbook.
+    # Taken almost verbatim from Python's logging cookbook.
     def handle(self):
         """
-        Handle multiple requests - each expected to be a 4-byte length,
-        followed by the LogRecord in pickle format. Logs the record
-        according to whatever policy is configured locally.
+        Handle multiple requests - each expected to be a 4-byte length, followed by the LogRecord in pickle format.
+        Logs the record according to whatever policy is configured locally.
         """
 
         while True:
@@ -74,10 +78,8 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
             record = logging.makeLogRecord(obj)
             self.handle_log_record(record)
 
-    def unPickle(self, data):
-        return pickle.loads(data)
-
-    def handle_log_record(self, record):
+    @staticmethod
+    def handle_log_record(record):
         """
         Processes log records received via the socket. The record's ``msg`` field is expected to be an encoded ``dict``
         produced by structlog. The ``dict`` is encoded to a string using ``encode_event_dict`` and sent to the logger
@@ -103,17 +105,13 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
 
     def __init__(self, host="localhost", port=TCP_LOGGING_PORT, handler=LogRecordStreamHandler):
         socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
-        self.abort = 0
         self.timeout = 1
-        self.logname = None
 
-    def serve_until_stopped(self):
-        abort = 0
-        while not abort:
+    def serve_forever(self):
+        while True:
             rd, wr, ex = select.select([self.socket.fileno()], [], [], self.timeout)
             if rd:
                 self.handle_request()
-            abort = self.abort
 
 
 def serve(log_file_path, silent, ready):
@@ -123,7 +121,7 @@ def serve(log_file_path, silent, ready):
     Args:
         log_file_path (:obj:`str`): the full path and log file name.
         silent (:obj:`bool`) if True, only CRITICAL errors are shown to console; otherwise INFO and above.
-        ready (:obs):`multiprocessing.Event`) an ``Event`` that is set once the logging server is ready.
+        ready (:obj:`multiprocessing.Event`) an ``Event`` that is set once the logging server is ready.
     """
 
     logging.config.dictConfig(
@@ -131,8 +129,8 @@ def serve(log_file_path, silent, ready):
             "version": 1,
             "disable_existing_loggers": False,
             "handlers": {
-                "console": {"level": "INFO" if not silent else "CRITICAL", "class": "logging.StreamHandler",},
-                "file": {"level": "DEBUG", "class": "logging.handlers.WatchedFileHandler", "filename": log_file_path,},
+                "console": {"level": "INFO" if not silent else "CRITICAL", "class": "logging.StreamHandler"},
+                "file": {"level": "DEBUG", "class": "logging.handlers.WatchedFileHandler", "filename": log_file_path},
             },
             "loggers": {"": {"handlers": ["console", "file"], "level": "DEBUG", "propagate": True}},
         }
@@ -140,11 +138,7 @@ def serve(log_file_path, silent, ready):
 
     tcpserver = LogRecordSocketReceiver()
 
-    # Ignore SIGINT so this process does not crash on CTRL+C, but comply on other signals
-    def ignore_signal(_, __):
-        pass
-
     signal(SIGINT, ignore_signal)
 
     ready.set()
-    tcpserver.serve_until_stopped()
+    tcpserver.serve_forever()
