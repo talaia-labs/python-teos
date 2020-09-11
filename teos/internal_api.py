@@ -3,7 +3,7 @@ from concurrent import futures
 from readerwriterlock import rwlock
 from google.protobuf.struct_pb2 import Struct
 
-from common.logger import get_logger
+from teos.logger import get_logger
 from common.appointment import Appointment
 from common.exceptions import InvalidParameter
 
@@ -35,7 +35,7 @@ class InternalAPI:
         stop_command_event (:obj:`multiprocessing.Event`): an Event to be set when a `stop` command is issued.
 
     Attributes:
-        logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
         endpoint (:obj:`str`): the endpoint where the internal api will be served (gRPC server).
         rpc_server (:obj:`Server <grpc.Server>`): the non-started gRPC server instance.
     """
@@ -58,7 +58,7 @@ class _InternalAPI(TowerServicesServicer):
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to. The Watcher is
             the main backend class of the tower and can interact with the rest.
         stop_command_event (:obj:`multiprocessing.Event`): an Event to be set when a `stop` command is issued.
-        logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
 
     Attributes:
         rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): a reader-writer lock to manage concurrent access to the

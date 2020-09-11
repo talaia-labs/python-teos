@@ -3,7 +3,7 @@ from threading import Thread
 from collections import OrderedDict
 from readerwriterlock import rwlock
 
-from common.logger import get_logger
+from teos.logger import get_logger
 import common.receipts as receipts
 from common.tools import compute_locator
 from common.exceptions import BasicException

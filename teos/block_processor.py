@@ -1,4 +1,4 @@
-from common.logger import get_logger
+from teos.logger import get_logger
 from common.exceptions import BasicException
 
 from teos.tools import bitcoin_cli

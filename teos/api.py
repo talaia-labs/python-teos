@@ -10,7 +10,7 @@ from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
 from common.exceptions import InvalidParameter
-from common.logger import setup_logging, get_logger
+from teos.logger import setup_logging, get_logger
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 

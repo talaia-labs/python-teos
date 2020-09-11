@@ -8,14 +8,13 @@ import threading
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-from common.logger import setup_logging, get_logger
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
 
 import teos.api as api
 import teos.rpc as rpc
-from teos.logging_server import serve as serve_logging
+from teos.logger import setup_logging, get_logger, serve as serve_logging
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder

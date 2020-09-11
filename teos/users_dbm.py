@@ -1,7 +1,7 @@
 import json
 import plyvel
 
-from common.logger import get_logger
+from teos.logger import get_logger
 from common.db_manager import DBManager
 from common.tools import is_compressed_pk
 
