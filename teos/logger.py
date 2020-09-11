@@ -1,4 +1,3 @@
-import json
 import logging
 import logging.config
 import logging.handlers
@@ -35,7 +34,7 @@ def setup_logging():
     Configures the logging options. It must be called only once, before using get_logger.
 
     Raises:
-        :obj:`RuntimeError` setup_logging had already been called.
+        :obj:`RuntimeError`: setup_logging had already been called.
     """
 
     global configured

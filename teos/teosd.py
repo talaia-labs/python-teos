@@ -63,7 +63,7 @@ class TeosDaemon:
     Args:
         config (:obj:`dict`): the configuration object.
         sk (:obj:`PrivateKey`): the ``PrivateKey`` of the tower.
-        logger: the logger instance
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger instance.
 
     Attributes:
         stop_command_event (:obj:`threading.Event`): the Event that will be set to initiate a graceful shutdown.
