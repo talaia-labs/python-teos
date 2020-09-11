@@ -5,7 +5,7 @@ import shutil
 import pytest
 import responses
 from coincurve import PrivateKey
-from requests.exceptions import ConnectionError, Timeout
+from requests.exceptions import ConnectionError
 
 import common.receipts as receipts
 from common.tools import compute_locator, is_compressed_pk
@@ -424,37 +424,3 @@ def test_save_appointment_receipt(monkeypatch):
     assert any([dummy_appointment.locator in f for f in files])
 
     shutil.rmtree(appointments_folder)
-
-
-@responses.activate
-def test_get_all_appointments():
-    # Response of get_all_appointments endpoint is all appointments from watcher and responder.
-    dummy_appointment_dict["status"] = "being_watched"
-    response = {"watcher_appointments": dummy_appointment_dict, "responder_trackers": {}}
-
-    request_url = get_all_appointments_endpoint
-    responses.add(responses.GET, request_url, json=response, status=200)
-    result = teos_client.get_all_appointments(teos_url)
-
-    assert len(responses.calls) == 1
-    assert responses.calls[0].request.url == request_url
-    assert json.loads(result).get("locator") == response.get("locator")
-
-
-@responses.activate
-def test_get_all_appointments_err():
-    # Test that get_all_appointments handles a connection error appropriately.
-    request_url = get_all_appointments_endpoint
-    responses.add(responses.GET, request_url, body=ConnectionError())
-
-    assert not teos_client.get_all_appointments(teos_url)
-
-    # Test that get_all_appointments handles a timeout error appropriately.
-    responses.replace(responses.GET, request_url, body=Timeout())
-
-    assert not teos_client.get_all_appointments(teos_url)
-
-    # Test that get_all_appointments handles a 404 error appropriately.
-    responses.replace(responses.GET, request_url, status=404)
-
-    assert teos_client.get_all_appointments(teos_url) is None
