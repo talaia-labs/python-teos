@@ -1,4 +1,4 @@
-from common.logger import get_logger
+from teos.logger import get_logger
 from teos.tools import bitcoin_cli
 import teos.utils.rpc_errors as rpc_errors
 from teos.utils.auth_proxy import JSONRPCException

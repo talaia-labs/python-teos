@@ -3,7 +3,7 @@ from threading import Thread
 
 from teos.cleaner import Cleaner
 
-from common.logger import get_logger
+from teos.logger import get_logger
 from common.constants import IRREVOCABLY_RESOLVED
 
 CONFIRMATIONS_BEFORE_RETRY = 6

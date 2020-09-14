@@ -1,4 +1,4 @@
-from common.logger import get_logger
+from teos.logger import get_logger
 
 
 class Cleaner:

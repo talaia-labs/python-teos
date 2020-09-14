@@ -4,7 +4,7 @@ import zmq
 import binascii
 from threading import Thread, Event, Condition
 
-from common.logger import get_logger
+from teos.logger import get_logger
 
 
 class ChainMonitorStatus(Enum):

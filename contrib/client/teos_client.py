@@ -6,6 +6,7 @@ import time
 import json
 import binascii
 import requests
+from logging import getLogger
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey
@@ -14,7 +15,6 @@ from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
 from common import constants
-from common.logger import get_logger, setup_logging
 import common.receipts as receipts
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
@@ -26,7 +26,7 @@ from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compre
 from contrib.client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from contrib.client.help import show_usage, help_add_appointment, help_get_appointment, help_register
 
-logger = get_logger(component="Client")
+logger = getLogger("Client")
 
 
 def register(user_id, teos_id, teos_url):
@@ -215,7 +215,7 @@ def get_all_appointments(teos_url):
         response = requests.get(url=get_all_appointments_endpoint, timeout=5)
 
         if response.status_code != constants.HTTP_OK:
-            logger.error("The server returned an error", status_code=response.status_code, reason=response.reason)
+            logger.error("The server returned error code {}: {}".format(response.status_code, response.reason))
             return None
 
         response_json = json.dumps(response.json(), indent=4, sort_keys=True)
@@ -443,7 +443,6 @@ def main(command, args, command_line_conf):
     config = config_loader.build_config()
 
     setup_data_folder(config.get("DATA_DIR"))
-    setup_logging(config.get("LOG_FILE"))
 
     # Set the teos url
     teos_url = "{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))

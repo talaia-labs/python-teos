@@ -10,11 +10,11 @@ from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
 from common.exceptions import InvalidParameter
-from common.logger import setup_logging, get_logger
+from teos.logger import setup_logging, get_logger
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
-# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+# NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_remote_addr():
     """
     Gets the remote client ip address. The HTTP_X_REAL_IP field is tried first in case the server is behind a reverse
@@ -32,7 +32,7 @@ def get_remote_addr():
     return remote_addr
 
 
-# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+# NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_request_data_json(request):
     """
     Gets the content of a json POST request and makes sure it decodes to a dictionary.
@@ -57,7 +57,7 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
-def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run=False):
+def serve(internal_api_endpoint, endpoint, min_to_self_delay, auto_run=False):
     """
     Starts the API.
 
@@ -67,7 +67,6 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run
         internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (host:port).
         endpoint (:obj:`str`): endpoint where the http api will be running (host:port).
         min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the Inspector.
-        log_file (:obj:`str`): the file_path where to store logs.
         auto_run (:obj:`bool`): whether the server should be started by this process. False if run with an external
             WSGI. True is run by Flask.
 
@@ -75,7 +74,7 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, log_file, auto_run
         The application object needed by the WSGI server to run if ``auto_run`` if ``False``, ``None`` otherwise.
     """
 
-    setup_logging(log_file)
+    setup_logging()
     inspector = Inspector(int(min_to_self_delay))
     api = API(inspector, internal_api_endpoint)
 

@@ -3,7 +3,7 @@ import functools
 from concurrent import futures
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-from common.logger import setup_logging, get_logger
+from teos.logger import setup_logging, get_logger
 
 from teos.constants import SHUTDOWN_GRACE_TIME
 from teos.protobuf.tower_services_pb2_grpc import (
@@ -22,7 +22,7 @@ class RPC:
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
     Attributes:
-        logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
         endpoint (:obj:`str`): the endpoint where the RPC api will be served (external gRPC server).
         rpc_server (:obj:`Server <grpc.Server>`): the non-started gRPC server instance.
     """
@@ -67,7 +67,7 @@ class _RPC(TowerServicesServicer):
 
     Args:
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
-        logger (:obj:`Logger <common.logger.Logger>`): the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
     """
 
     def __init__(self, internal_api_endpoint, logger):
@@ -97,7 +97,7 @@ class _RPC(TowerServicesServicer):
         return self.stub.stop(request)
 
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
+def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
@@ -114,7 +114,7 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
             initiate a graceful shutdown once this event is set.
     """
 
-    setup_logging(log_file)
+    setup_logging()
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
     signal(SIGINT, rpc.handle_signals)
     signal(SIGTERM, rpc.handle_signals)
