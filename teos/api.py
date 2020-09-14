@@ -99,6 +99,7 @@ class API:
     Attributes:
         logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
         app: The Flask app of the API server.
+        stub (:obj:`TowerServicesStub`): The rpc client stub.
     """
 
     def __init__(self, inspector, internal_api_endpoint):
@@ -107,6 +108,8 @@ class API:
         self.app = Flask(__name__)
         self.inspector = inspector
         self.internal_api_endpoint = internal_api_endpoint
+        channel = grpc.insecure_channel(internal_api_endpoint)
+        self.stub = TowerServicesStub(channel)
 
         # Adds all the routes to the functions listed above.
         routes = {
@@ -150,15 +153,13 @@ class API:
 
         if user_id:
             try:
-                with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-                    stub = TowerServicesStub(channel)
-                    r = stub.register(RegisterRequest(user_id=user_id))
+                r = self.stub.register(RegisterRequest(user_id=user_id))
 
-                    rcode = HTTP_OK
-                    response = json_format.MessageToDict(
-                        r, including_default_value_fields=True, preserving_proto_field_name=True
-                    )
-                    response["public_key"] = user_id
+                rcode = HTTP_OK
+                response = json_format.MessageToDict(
+                    r, including_default_value_fields=True, preserving_proto_field_name=True
+                )
+                response["public_key"] = user_id
 
             except grpc.RpcError as e:
                 rcode = HTTP_BAD_REQUEST
@@ -202,23 +203,21 @@ class API:
 
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
-            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-                stub = TowerServicesStub(channel)
-                r = stub.add_appointment(
-                    AddAppointmentRequest(
-                        appointment=Appointment(
-                            locator=appointment.locator,
-                            encrypted_blob=appointment.encrypted_blob,
-                            to_self_delay=appointment.to_self_delay,
-                        ),
-                        signature=request_data.get("signature"),
-                    )
+            r = self.stub.add_appointment(
+                AddAppointmentRequest(
+                    appointment=Appointment(
+                        locator=appointment.locator,
+                        encrypted_blob=appointment.encrypted_blob,
+                        to_self_delay=appointment.to_self_delay,
+                    ),
+                    signature=request_data.get("signature"),
                 )
+            )
 
-                rcode = HTTP_OK
-                response = json_format.MessageToDict(
-                    r, including_default_value_fields=True, preserving_proto_field_name=True
-                )
+            rcode = HTTP_OK
+            response = json_format.MessageToDict(
+                r, including_default_value_fields=True, preserving_proto_field_name=True
+            )
         except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
             response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
@@ -280,25 +279,23 @@ class API:
             self.inspector.check_locator(locator)
             self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
 
-            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
-                stub = TowerServicesStub(channel)
-                r = stub.get_appointment(
-                    GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
-                )
-                data = (
-                    r.appointment_data.appointment
-                    if r.appointment_data.WhichOneof("appointment_data") == "appointment"
-                    else r.appointment_data.tracker
-                )
+            r = self.stub.get_appointment(
+                GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
+            )
+            data = (
+                r.appointment_data.appointment
+                if r.appointment_data.WhichOneof("appointment_data") == "appointment"
+                else r.appointment_data.tracker
+            )
 
-                rcode = HTTP_OK
-                response = {
-                    "locator": locator,
-                    "status": r.status,
-                    "appointment": json_format.MessageToDict(
-                        data, including_default_value_fields=True, preserving_proto_field_name=True
-                    ),
-                }
+            rcode = HTTP_OK
+            response = {
+                "locator": locator,
+                "status": r.status,
+                "appointment": json_format.MessageToDict(
+                    data, including_default_value_fields=True, preserving_proto_field_name=True
+                ),
+            }
 
         except (InspectionFailed, grpc.RpcError):
             rcode = HTTP_NOT_FOUND

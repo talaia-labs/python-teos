@@ -67,13 +67,16 @@ class _RPC(TowerServicesServicer):
     Args:
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
         logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
+
+    Attributes:
+        stub (:obj:`TowerServicesStub`): The rpc client stub.
     """
 
     def __init__(self, internal_api_endpoint, logger):
         self.logger = logger
         self.internal_api_endpoint = internal_api_endpoint
-        self.channel = grpc.insecure_channel(self.internal_api_endpoint)
-        self.stub = TowerServicesStub(self.channel)
+        channel = grpc.insecure_channel(self.internal_api_endpoint)
+        self.stub = TowerServicesStub(channel)
 
     @forward_errors
     def get_all_appointments(self, request, context):
