@@ -10,7 +10,6 @@ from teos.inspector import Inspector
 from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
 from common.appointment import Appointment
-from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder
 
@@ -27,6 +26,8 @@ from common.constants import (
     LOCATOR_LEN_BYTES,
     ENCRYPTED_BLOB_MAX_SIZE_HEX,
 )
+
+internal_api_endpoint = "{}:{}".format(config.get("INTERNAL_API_HOST"), config.get("INTERNAL_API_PORT"))
 
 TEOS_API = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
 register_endpoint = "{}/register".format(TEOS_API)
@@ -74,7 +75,7 @@ def internal_api(run_bitcoind, db_manager, gatekeeper, carrier, block_processor)
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT, Event())
+    i_api = InternalAPI(watcher, internal_api_endpoint, config.get("INTERNAL_API_WORKERS"), Event())
     i_api.rpc_server.start()
 
     yield i_api
@@ -85,7 +86,7 @@ def internal_api(run_bitcoind, db_manager, gatekeeper, carrier, block_processor)
 @pytest.fixture(scope="module", autouse=True)
 def api():
     inspector = Inspector(config.get("MIN_TO_SELF_DELAY"))
-    api = API(inspector, INTERNAL_API_ENDPOINT)
+    api = API(inspector, internal_api_endpoint)
 
     return api
 

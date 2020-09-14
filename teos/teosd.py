@@ -28,7 +28,7 @@ from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
 from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
-from teos.constants import INTERNAL_API_ENDPOINT, SHUTDOWN_GRACE_TIME
+from teos.constants import SHUTDOWN_GRACE_TIME
 
 parent_pid = os.getpid()
 
@@ -77,11 +77,12 @@ class TeosDaemon:
         responder_thread (:obj:`multithreading.Thread`): After ``bootstrap_components``, the thread that
             runs the Responder monitoring (set to :obj:`None` beforehand).
         chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`): The ``ChainMonitor`` instance.
-        self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process`): Once the rpc process
+        internal_api_endpoint (:obj:`str`): The full host name and port of the internal api.
+        internal_api (:obj:`teos.internal_api.InternalAPI`): The InternalAPI instance.
+        api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process`): Once the rpc process
             is created, the instance of either ``Popen`` or ``Process`` that is serving the public API (set to
             :obj:`None` beforehand).
-        self.rpc_process (:obj:`multiprocessing.Process`): The instance of the internal RPC server; only set if running.
-        self.internal_api (:obj:`teos.internal_api.InternalAPI`): The InternalAPI instance.
+        rpc_process (:obj:`multiprocessing.Process`): The instance of the internal RPC server; only set if running.
     """
 
     def __init__(self, config, sk, logger):
@@ -138,12 +139,20 @@ class TeosDaemon:
         )
 
         # Set up the internal API
-        self.internal_api = InternalAPI(self.watcher, INTERNAL_API_ENDPOINT, self.stop_command_event)
+        self.internal_api_endpoint = f'{self.config.get("INTERNAL_API_HOST")}:{self.config.get("INTERNAL_API_PORT")}'
+        self.internal_api = InternalAPI(
+            self.watcher, self.internal_api_endpoint, self.config.get("INTERNAL_API_WORKERS"), self.stop_command_event
+        )
 
         # Create the rpc, without starting it
         self.rpc_process = multiprocessing.Process(
             target=rpc.serve,
-            args=(self.config.get("RPC_BIND"), self.config.get("RPC_PORT"), INTERNAL_API_ENDPOINT, self.stop_event),
+            args=(
+                self.config.get("RPC_BIND"),
+                self.config.get("RPC_PORT"),
+                self.internal_api_endpoint,
+                self.stop_event,
+            ),
             daemon=True,
         )
 
@@ -240,7 +249,7 @@ class TeosDaemon:
         # This MUST be done after rpc_process.start to avoid the issue that was solved in
         # https://github.com/talaia-labs/python-teos/pull/198
         self.internal_api.rpc_server.start()
-        self.logger.info(f"Internal API initialized. Serving at {INTERNAL_API_ENDPOINT}")
+        self.logger.info(f"Internal API initialized. Serving at {self.internal_api_endpoint}")
 
         # Start the public API server
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
@@ -250,7 +259,7 @@ class TeosDaemon:
                 [
                     "gunicorn",
                     f"--bind={api_endpoint}",
-                    f"teos.api:serve(internal_api_endpoint='{INTERNAL_API_ENDPOINT}', "
+                    f"teos.api:serve(internal_api_endpoint='{self.internal_api_endpoint}', "
                     f"endpoint='{api_endpoint}', min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}')",
                 ]
             )
@@ -258,7 +267,7 @@ class TeosDaemon:
             self.api_proc = multiprocessing.Process(
                 target=api.serve,
                 kwargs={
-                    "internal_api_endpoint": INTERNAL_API_ENDPOINT,
+                    "internal_api_endpoint": self.internal_api_endpoint,
                     "endpoint": api_endpoint,
                     "min_to_self_delay": self.config.get("MIN_TO_SELF_DELAY"),
                     "auto_run": True,
