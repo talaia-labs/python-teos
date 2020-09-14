@@ -97,7 +97,7 @@ class _RPC(TowerServicesServicer):
         return self.stub.stop(request)
 
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event, log_file):
+def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
