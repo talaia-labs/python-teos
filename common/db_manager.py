@@ -11,8 +11,8 @@ class DBManager:
             database will be create if the specified path does not contain one.
 
     Raises:
-        ValueError: If the provided ``db_path`` is not a string.
-        plyvel.Error: If the db is currently unavailable (being used by another process).
+        :obj:`ValueError`: if the provided ``db_path`` is not a string.
+        :obj:`plyvel.Error`: if the db is currently unavailable (being used by another process).
     """
 
     def __init__(self, db_path):
@@ -31,7 +31,7 @@ class DBManager:
             prefix (:obj:`str`): an optional prefix added to the ``key``.
 
         Raises:
-            (:obj:`TypeError`) if key, value or prefix are not strings.
+            :obj:`TypeError`: if key, value or prefix are not strings.
         """
 
         if not isinstance(key, str):
@@ -62,10 +62,10 @@ class DBManager:
         Returns:
             :obj:`bytes` or :obj:`None`: A byte-array containing the requested data.
 
-            Returns ``None`` if the entry is not found.
+            Returns :obj:`None` if the entry is not found.
 
         Raises:
-            (:obj:`TypeError`) if key or prefix are not strings.
+            :obj:`TypeError`: if key or prefix are not strings.
         """
 
         if not isinstance(key, str):
@@ -88,7 +88,7 @@ class DBManager:
             prefix (:obj:`str`): an optional prefix to be prepended to the ``key``.
 
         Raises:
-            (:obj:`TypeError`) if key or prefix are not strings.
+            :obj:`TypeError`: if key or prefix are not strings.
         """
 
         if not isinstance(key, str):

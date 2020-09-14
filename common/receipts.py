@@ -12,7 +12,7 @@ def create_registration_receipt(user_id, available_slots, subscription_expiry):
 
     The receipt has the following format:
 
-        user_id (33-byte) | available_slots (4-byte) | subscription_expiry (4-byte)
+        ``user_id (33-byte) | available_slots (4-byte) | subscription_expiry (4-byte)``
 
     All values are big endian.
 
@@ -41,7 +41,7 @@ def create_appointment_receipt(user_signature, start_block):
 
     The receipt has the following format:
 
-        user_signature | start_block (4-byte)
+        ``user_signature | start_block (4-byte)``
 
     All values are big endian.
 

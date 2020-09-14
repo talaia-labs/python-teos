@@ -1,10 +1,9 @@
 import backoff
 from threading import Thread
 
-from common.exceptions import SignatureError
+from common.exceptions import SignatureError, TowerConnectionError, TowerResponseError
 
 from net.http import add_appointment
-from exceptions import TowerConnectionError, TowerResponseError
 
 
 MAX_RETRIES = None

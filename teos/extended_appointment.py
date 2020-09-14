@@ -28,10 +28,10 @@ class ExtendedAppointment(Appointment):
 
     def get_summary(self):
         """
-        Returns the summary of an appointment, consisting on the locator, and the user_id.
+        Returns the summary of an appointment, consisting on the ``locator``, and the ``user_id``.
 
         Returns:
-            :obj:`dict`: the appointment summary.
+            :obj:`dict`: The appointment summary.
         """
         return {"locator": self.locator, "user_id": self.user_id}
 

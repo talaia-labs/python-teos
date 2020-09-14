@@ -12,17 +12,17 @@ class ConfigLoader:
         default_conf (:obj:`dict`): a dictionary populated with the default configuration params and the expected types.
             The format is as follows:
 
-            {"field0": {"value": value_from_conf_file, "type": expected_type, ...}}
+            ``{"field0": {"value": value_from_conf_file, "type": expected_type, ...}}``
 
         command_line_conf (:obj:`dict`): a dictionary containing the command line parameters that may replace the
             ones in default / config file.
 
     Attributes:
-        data_dir (:obj:`str`): the path to the data directory where the configuration file may be found.
-        conf_file_path (:obj:`str`): the path to the config file (the file may not exist).
-        conf_fields (:obj:`dict`): a dictionary populated with the configuration params and the expected types.
-            It follows the same format as default_conf.
-        command_line_conf (:obj:`dict`): a dictionary containing the command line parameters that may replace the
+        data_dir (:obj:`str`): The path to the data directory where the configuration file may be found.
+        conf_file_path (:obj:`str`): The path to the config file (the file may not exist).
+        conf_fields (:obj:`dict`): A dictionary populated with the configuration params and the expected types.
+            It follows the same format as ``default_conf``.
+        command_line_conf (:obj:`dict`): A dictionary containing the command line parameters that may replace the
             ones in default / config file.
     """
 
@@ -43,7 +43,7 @@ class ConfigLoader:
             - defaults
 
         Returns:
-            :obj:`dict`: a dictionary containing all the configuration parameters.
+            :obj:`dict`: A dictionary containing all the configuration parameters.
         """
 
         if os.path.exists(self.conf_file_path):
@@ -83,14 +83,14 @@ class ConfigLoader:
 
     def create_config_dict(self):
         """
-        Checks that the configuration fields (self.conf_fields) have the right type and creates a config dict if so.
+        Checks that the configuration fields (``self.conf_fields``) have the right type and creates a config dict if so.
 
         Returns:
             :obj:`dict`: A dictionary with the same keys as the provided one, but containing only the "value" field as
             value if the provided ``conf_fields`` are correct.
 
         Raises:
-            :obj:`ValueError`: If any of the dictionary elements does not have the expected type.
+            ValueError: If any of the dictionary elements does not have the expected type.
         """
 
         conf_dict = {}

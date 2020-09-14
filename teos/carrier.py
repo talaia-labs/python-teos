@@ -1,6 +1,6 @@
-from common.logger import get_logger
+from teos.logger import get_logger
 from teos.tools import bitcoin_cli
-import teos.rpc_errors as rpc_errors
+import teos.utils.rpc_errors as rpc_errors
 from teos.utils.auth_proxy import JSONRPCException
 from common.errors import UNKNOWN_JSON_RPC_EXCEPTION, RPC_TX_REORGED_AFTER_BROADCAST
 
@@ -38,11 +38,11 @@ class Carrier:
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc password, host and port)
+            (``rpc user, rpc password, host and port``).
 
     Attributes:
-        logger: the logger for this component.
-        issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        issued_receipts (:obj:`dict`): A dictionary of issued receipts to prevent resending the same transaction over
             and over. It should periodically be reset to prevent it from growing unbounded.
 
     """
@@ -113,7 +113,7 @@ class Carrier:
                 # Adding this here just for completeness. We should never end up here. The Carrier only sends txs
                 # handed by the Responder, who receives them from the Watcher, who checks that the tx can be properly
                 # deserialized
-                self.logger.info("Transaction cannot be deserialized".format(txid))
+                self.logger.info("Transaction cannot be deserialized", txid=txid)
                 receipt = Receipt(delivered=False, reason=rpc_errors.RPC_DESERIALIZATION_ERROR)
 
             else:
@@ -134,7 +134,7 @@ class Carrier:
 
         Returns:
             :obj:`dict` or :obj:`None`: A dictionary with the transaction data if the transaction can be found on the
-            chain. ``None`` otherwise.
+            chain. :obj:`None` otherwise.
         """
 
         try:

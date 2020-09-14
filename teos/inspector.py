@@ -16,7 +16,7 @@ BLOCKS_IN_A_MONTH = 4320  # 4320 = roughly a month in blocks
 
 
 class InspectionFailed(Exception):
-    """Raise this the inspector finds a problem with any of the appointment fields"""
+    """Raise this the inspector finds a problem with any of the appointment fields."""
 
     def __init__(self, erno, reason):
         self.erno = erno
@@ -28,13 +28,11 @@ class Inspector:
     The :class:`Inspector` class is in charge of verifying that the appointment data provided by the user is correct.
 
     Args:
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance.
         min_to_self_delay (:obj:`int`): the minimum to_self_delay accepted in appointments.
 
     """
 
-    def __init__(self, block_processor, min_to_self_delay):
-        self.block_processor = block_processor
+    def __init__(self, min_to_self_delay):
         self.min_to_self_delay = min_to_self_delay
 
     def inspect(self, appointment_data):
@@ -55,10 +53,6 @@ class Inspector:
             raise InspectionFailed(errors.APPOINTMENT_EMPTY_FIELD, "empty appointment received")
         elif not isinstance(appointment_data, dict):
             raise InspectionFailed(errors.APPOINTMENT_WRONG_FIELD, "wrong appointment format")
-
-        block_height = self.block_processor.get_block_count()
-        if block_height is None:
-            raise InspectionFailed(errors.UNKNOWN_JSON_RPC_EXCEPTION, "unexpected error occurred")
 
         self.check_locator(appointment_data.get("locator"))
         self.check_to_self_delay(appointment_data.get("to_self_delay"))

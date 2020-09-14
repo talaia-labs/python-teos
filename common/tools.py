@@ -59,8 +59,10 @@ def is_locator(value):
 def compute_locator(tx_id):
     """
     Computes an appointment locator given a transaction id.
+
     Args:
         tx_id (:obj:`str`): the transaction id used to compute the locator.
+
     Returns:
        :obj:`str`: The computed locator.
     """
@@ -77,3 +79,26 @@ def setup_data_folder(data_folder):
     """
 
     Path(data_folder).mkdir(parents=True, exist_ok=True)
+
+
+def intify(obj):
+    """
+    Takes an object that is a recursive composition of primitive types, lists and dictionaries, and returns an
+    equivalent object where every `float` number that is actually an integer is replaced with the corresponding
+    :obj:`int`.
+
+    Args:
+        obj: an object as specified.
+
+    Returns:
+        The modified version of ``obj``.
+    """
+
+    if isinstance(obj, list):
+        return [intify(x) for x in obj]
+    elif isinstance(obj, dict):
+        return {k: intify(v) for k, v in obj.items()}
+    elif isinstance(obj, float) and obj.is_integer():
+        return int(obj)
+    else:
+        return obj

@@ -1,7 +1,7 @@
 import json
 import plyvel
 
-from common.logger import get_logger
+from teos.logger import get_logger
 from common.db_manager import DBManager
 from common.tools import is_compressed_pk
 
@@ -20,7 +20,7 @@ class UsersDBM(DBManager):
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
 
     Attributes:
-        logger: the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
     """
 
     def __init__(self, db_path):
@@ -57,14 +57,16 @@ class UsersDBM(DBManager):
                 return True
 
             except json.JSONDecodeError:
-                self.logger.info("Could't add user to db. Wrong user data format", user_id=user_id, user_data=user_data)
+                self.logger.info(
+                    "Couldn't add user to db. Wrong user data format", user_id=user_id, user_data=user_data
+                )
                 return False
 
             except TypeError:
-                self.logger.info("Could't add user to db", user_id=user_id, user_data=user_data)
+                self.logger.info("Couldn't add user to db", user_id=user_id, user_data=user_data)
                 return False
         else:
-            self.logger.info("Could't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
+            self.logger.info("Couldn't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
             return False
 
     def load_user(self, user_id):
@@ -78,7 +80,7 @@ class UsersDBM(DBManager):
         Returns:
             :obj:`dict`: A dictionary containing the user data if the ``key`` is found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         try:

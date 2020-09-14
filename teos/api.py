@@ -1,29 +1,26 @@
-import os
-from flask import Flask, request, abort, jsonify
+import grpc
+from google.protobuf import json_format
+from flask import Flask, request, jsonify
 
 import common.errors as errors
-from teos.inspector import InspectionFailed
-from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
-from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
+from teos.inspector import Inspector, InspectionFailed
+from teos.protobuf.user_pb2 import RegisterRequest
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
+from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
-from common.logger import get_logger
-from common.appointment import Appointment
 from common.exceptions import InvalidParameter
+from teos.logger import setup_logging, get_logger
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
-# ToDo: #5-add-async-to-api
-app = Flask(__name__)
-
-
-# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+# NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_remote_addr():
     """
-    Gets the remote client ip address. The HTTP_X_REAL_IP field is tried first in case the server is behind a reverse
-     proxy.
+    Gets the remote client ip address. The ``HTTP_X_REAL_IP`` field is tried first in case the server is behind a
+    reverse proxy.
 
     Returns:
-        :obj:`str`: the IP address of the client.
+        :obj:`str`: The IP address of the client.
     """
 
     # Getting the real IP if the server is behind a reverse proxy
@@ -34,16 +31,16 @@ def get_remote_addr():
     return remote_addr
 
 
-# NOTCOVERED: not sure how to monkey path this one. May be related to #77
+# NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_request_data_json(request):
     """
-    Gets the content of a json POST request and makes sure it decodes to a dictionary.
+    Gets the content of a json ``POST`` request and makes sure it decodes to a dictionary.
 
     Args:
         request (:obj:`Request`): the request sent by the user.
 
     Returns:
-        :obj:`dict`: the dictionary parsed from the json request.
+        :obj:`dict`: The dictionary parsed from the json request.
 
     Raises:
         :obj:`InvalidParameter`: if the request is not json encoded or it does not decodes to a dictionary.
@@ -59,39 +56,67 @@ def get_request_data_json(request):
         raise InvalidParameter("Request is not json encoded")
 
 
+def serve(internal_api_endpoint, endpoint, min_to_self_delay, auto_run=False):
+    """
+    Starts the API.
+
+    This method can be handled either form an external WSGI (like gunicorn) or by the Flask development server.
+
+    Args:
+        internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (``host:port``).
+        endpoint (:obj:`str`): endpoint where the http api will be running (``host:port``).
+        min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the :obj:`Inspector`.
+        auto_run (:obj:`bool`): whether the server should be started by this process. False if run with an external
+            WSGI. True is run by Flask.
+
+    Returns:
+        The application object needed by the WSGI server to run if ``auto_run`` is False, :obj:`None` otherwise.
+    """
+
+    setup_logging()
+    inspector = Inspector(int(min_to_self_delay))
+    api = API(inspector, internal_api_endpoint)
+
+    api.logger.info(f"Initialized. Serving at {endpoint}")
+
+    if auto_run:
+        host, port = endpoint.split(":")
+        api.app.run(host=host, port=port)
+    else:
+        return api.app
+
+
 class API:
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and serves user requests.
+    The API is connected with the :class:`InternalAPI <teos.internal_api.InternalAPI>` via gRPC.
 
     Args:
-        host (:obj:`str`): the hostname to listen on.
-        port (:obj:`int`): the port of the webserver.
-        inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
-            the received appointment data.
-        watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance to pass the requests to.
+        inspector (:obj:`Inspector <teos.inspector.Inspector>`): an :obj:`Inspector` instance to check the correctness
+            of the received appointment data.
+        internal_api_endpoint (:obj:`str`): the endpoint where the internal api is served.
 
     Attributes:
-        logger: the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        app: The Flask app of the API server.
     """
 
-    def __init__(self, host, port, inspector, watcher):
+    def __init__(self, inspector, internal_api_endpoint):
+
         self.logger = get_logger(component=API.__name__)
-        self.host = host
-        self.port = port
+        self.app = Flask(__name__)
         self.inspector = inspector
-        self.watcher = watcher
-        self.app = app
+        self.internal_api_endpoint = internal_api_endpoint
 
         # Adds all the routes to the functions listed above.
         routes = {
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
-            "/get_all_appointments": (self.get_all_appointments, ["GET"]),
         }
 
         for url, params in routes.items():
-            app.add_url_rule(url, view_func=params[0], methods=params[1])
+            self.app.add_url_rule(url, view_func=params[0], methods=params[1])
 
     def register(self):
         """
@@ -107,7 +132,7 @@ class API:
             :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
             requests, the ``rcode`` is always 200 and the response contains a json with the public key and number of
             slots in the subscription. For rejected requests, the ``rcode`` is a 404 and the value contains an
-            application error, and an error message. Error messages can be found at :mod:`Errors <teos.errors>`.
+            application error, and an error message. Error messages can be found at ``common.errors``.
         """
 
         remote_addr = get_remote_addr()
@@ -125,18 +150,19 @@ class API:
 
         if user_id:
             try:
-                rcode = HTTP_OK
-                available_slots, subscription_expiry, subscription_signature = self.watcher.register(user_id)
-                response = {
-                    "public_key": user_id,
-                    "available_slots": available_slots,
-                    "subscription_expiry": subscription_expiry,
-                    "subscription_signature": subscription_signature,
-                }
+                with grpc.insecure_channel(self.internal_api_endpoint) as channel:
+                    stub = TowerServicesStub(channel)
+                    r = stub.register(RegisterRequest(user_id=user_id))
 
-            except InvalidParameter as e:
+                    rcode = HTTP_OK
+                    response = json_format.MessageToDict(
+                        r, including_default_value_fields=True, preserving_proto_field_name=True
+                    )
+                    response["public_key"] = user_id
+
+            except grpc.RpcError as e:
                 rcode = HTTP_BAD_REQUEST
-                response = {"error": str(e), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                response = {"error": e.details(), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
@@ -160,7 +186,7 @@ class API:
             :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
             appointments, the ``rcode`` is always 200 and the response contains the receipt signature (json). For
             rejected appointments, the ``rcode`` contains an application error, and an error message. Error messages can
-            be found at :mod:`Errors <teos.errors>`.
+            be found at ``common.errors``.
         """
 
         # Getting the real IP if the server is behind a reverse proxy
@@ -176,30 +202,44 @@ class API:
 
         try:
             appointment = self.inspector.inspect(request_data.get("appointment"))
-            response = self.watcher.add_appointment(appointment, request_data.get("signature"))
-            rcode = HTTP_OK
+            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
+                stub = TowerServicesStub(channel)
+                r = stub.add_appointment(
+                    AddAppointmentRequest(
+                        appointment=Appointment(
+                            locator=appointment.locator,
+                            encrypted_blob=appointment.encrypted_blob,
+                            to_self_delay=appointment.to_self_delay,
+                        ),
+                        signature=request_data.get("signature"),
+                    )
+                )
 
+                rcode = HTTP_OK
+                response = json_format.MessageToDict(
+                    r, including_default_value_fields=True, preserving_proto_field_name=True
+                )
         except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
             response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
 
-        except (AuthenticationFailure, NotEnoughSlots):
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": "appointment rejected. Invalid signature or user does not have enough slots available",
-                "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
-            }
-
-        except AppointmentLimitReached:
-            rcode = HTTP_SERVICE_UNAVAILABLE
-            response = {"error": "appointment rejected"}
-
-        except AppointmentAlreadyTriggered:
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": "appointment rejected. The provided appointment has already been triggered",
-                "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
-            }
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.UNAUTHENTICATED:
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": f"appointment rejected. {e.details()}",
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                }
+            elif e.code() == grpc.StatusCode.ALREADY_EXISTS:
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": f"appointment rejected. {e.details()}",
+                    "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
+                }
+            else:
+                # This covers grpc.StatusCode.RESOURCE_EXHAUSTED (and any other return).
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": "appointment rejected"}
 
         self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
         return jsonify(response), rcode
@@ -239,52 +279,29 @@ class API:
         try:
             self.inspector.check_locator(locator)
             self.logger.info("Received get_appointment request", from_addr="{}".format(remote_addr), locator=locator)
-            appointment_data, status = self.watcher.get_appointment(locator, request_data.get("signature"))
 
-            if status == "being_watched":
-                # Cast the ExtendedAppointment to Appointment to remove all the tower-specific data
-                appointment_data = Appointment.from_dict(appointment_data).to_dict()
-            else:
-                # Remove user_id field from appointment data since it is an internal field.
-                appointment_data.pop("user_id")
+            with grpc.insecure_channel(self.internal_api_endpoint) as channel:
+                stub = TowerServicesStub(channel)
+                r = stub.get_appointment(
+                    GetAppointmentRequest(locator=locator, signature=request_data.get("signature"))
+                )
+                data = (
+                    r.appointment_data.appointment
+                    if r.appointment_data.WhichOneof("appointment_data") == "appointment"
+                    else r.appointment_data.tracker
+                )
 
-            rcode = HTTP_OK
-            response = {"locator": locator, "status": status, "appointment": appointment_data}
+                rcode = HTTP_OK
+                response = {
+                    "locator": locator,
+                    "status": r.status,
+                    "appointment": json_format.MessageToDict(
+                        data, including_default_value_fields=True, preserving_proto_field_name=True
+                    ),
+                }
 
-        except (InspectionFailed, AuthenticationFailure, AppointmentNotFound):
+        except (InspectionFailed, grpc.RpcError):
             rcode = HTTP_NOT_FOUND
             response = {"locator": locator, "status": "not_found"}
 
         return jsonify(response), rcode
-
-    def get_all_appointments(self):
-        """
-        Gives information about all the appointments in the Watchtower.
-
-          This endpoint should only be accessible by the administrator. Requests are only allowed from localhost.
-
-        Returns:
-            :obj:`str`: A json formatted dictionary containing all the appointments hold by the ``Watcher``
-            (``watcher_appointments``) and by the ``Responder>`` (``responder_trackers``).
-        """
-
-        # ToDo: #15-add-system-monitor
-        response = None
-
-        if request.remote_addr in request.host or request.remote_addr == "127.0.0.1":
-            watcher_appointments = self.watcher.db_manager.load_watcher_appointments()
-            responder_trackers = self.watcher.db_manager.load_responder_trackers()
-
-            response = jsonify({"watcher_appointments": watcher_appointments, "responder_trackers": responder_trackers})
-
-        else:
-            abort(404)
-
-        return response
-
-    def start(self):
-        """ This function starts the Flask server used to run the API """
-        # Disable flask initial messages
-        os.environ["WERKZEUG_RUN_MAIN"] = "true"
-
-        app.run(host=self.host, port=self.port)

@@ -10,14 +10,19 @@ from common.tools import compute_locator
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
-from common.exceptions import InvalidParameter, SignatureError, EncryptionError
+from common.exceptions import (
+    InvalidParameter,
+    SignatureError,
+    EncryptionError,
+    TowerConnectionError,
+    TowerResponseError,
+)
 
 import arg_parser
 from retrier import Retrier
 from tower_info import TowerInfo
 from towers_dbm import TowersDBM
 from keys import generate_keys, load_keys
-from exceptions import TowerConnectionError, TowerResponseError
 from net.http import post_request, process_post_response, add_appointment
 
 

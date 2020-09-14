@@ -1,5 +1,7 @@
 pytest
+pytest-timeout
 black
 flake8
 responses
 riemann-tx
+grpcio-tools

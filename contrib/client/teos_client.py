@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import time
 import json
 import binascii
 import requests
+from logging import getLogger
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey
@@ -11,21 +14,19 @@ from getopt import getopt, GetoptError
 from requests import Timeout, ConnectionError
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 
-from cli.exceptions import TowerResponseError
-from cli import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from cli.help import show_usage, help_add_appointment, help_get_appointment, help_register, help_get_all_appointments
-
 from common import constants
-from common.logger import get_logger, setup_logging
 import common.receipts as receipts
 from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
-from common.exceptions import InvalidKey, InvalidParameter, SignatureError
+from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
-logger = get_logger()
+from contrib.client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
+from contrib.client.help import show_usage, help_add_appointment, help_get_appointment, help_register
+
+logger = getLogger("Client")
 
 
 def register(user_id, teos_id, teos_url):
@@ -38,13 +39,13 @@ def register(user_id, teos_id, teos_url):
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`tuple`: A tuple containing the available slots count and the subscription expiry
+        :obj:`tuple`: A tuple containing the available slots count and the subscription expiry.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `user_id` is invalid.
+        :obj:`InvalidParameter`: if `user_id` is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the
+            response was invalid.
     """
 
     if not is_compressed_pk(user_id):
@@ -63,7 +64,7 @@ def register(user_id, teos_id, teos_url):
 
     # Check that the server signed the response as it should.
     if not tower_signature:
-        raise TowerResponseError("The response does not contain the signature of the appointment")
+        raise TowerResponseError("The response does not contain the signature of the subscription")
 
     # Check that the signature is correct.
     subscription_receipt = receipts.create_registration_receipt(user_id, available_slots, subscription_expiry)
@@ -78,6 +79,7 @@ def create_appointment(appointment_data):
     """
     Creates an appointment object from an appointment data dictionary provided by the user. Performs all the required
     sanity checks on the input data:
+
         - Check that the given commitment_txid is correct (proper format and not missing)
         - Check that the transaction is correct (not missing)
 
@@ -108,16 +110,14 @@ def create_appointment(appointment_data):
 
 def add_appointment(appointment, user_sk, teos_id, teos_url):
     """
-    Manages the add_appointment command.
-
-    The life cycle of the function is as follows:
+    Manages the add_appointment command. The life cycle of the function is as follows:
         - Sign the appointment
         - Send the appointment to the tower
         - Wait for the response
         - Check the tower's response and signature
 
     Args:
-        appointment (:obj:`Appointment <common.appointment.Appointment>`): An appointment object.
+        appointment (:obj:`Appointment <common.appointment.Appointment>`): an appointment object.
         user_sk (:obj:`PrivateKey`): the user's private key.
         teos_id (:obj:`str`): the tower's compressed public key.
         teos_url (:obj:`str`): the teos base url.
@@ -128,8 +128,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
     Raises:
         :obj:`ValueError`: if the appointment cannot be signed.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -169,14 +168,12 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
         teos_url (:obj:`str`): the teos base url.
 
     Returns:
-        :obj:`dict`: a dictionary containing the appointment data.
+        :obj:`dict`: A dictionary containing the appointment data.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if `appointment_data` or any of its fields is
-        invalid.
+        :obj:`InvalidParameter`: if `appointment_data` or any of its fields is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     # FIXME: All responses from the tower should be signed. Not using teos_id atm.
@@ -196,39 +193,6 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
     return response
 
 
-def get_all_appointments(teos_url):
-    """
-    Gets information about all appointments stored in the tower, if the user requesting the data is an administrator.
-
-    Args:
-        teos_url (:obj:`str`): the teos base url.
-
-    Returns:
-        :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
-        responds.
-    """
-
-    get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
-
-    try:
-        response = requests.get(url=get_all_appointments_endpoint, timeout=5)
-
-        if response.status_code != constants.HTTP_OK:
-            logger.error("The server returned an error", status_code=response.status_code, reason=response.reason)
-            return None
-
-        response_json = json.dumps(response.json(), indent=4, sort_keys=True)
-        return response_json
-
-    except ConnectionError:
-        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
-        return None
-
-    except requests.exceptions.Timeout:
-        logger.error("The request timed out")
-        return None
-
-
 def load_keys(user_sk_path):
     """
     Loads all the user private key and id.
@@ -237,11 +201,11 @@ def load_keys(user_sk_path):
         user_sk_path (:obj:`str`): path to the user's private key file.
 
     Returns:
-        :obj:`tuple`: a tuple containing a ``PrivateKey`` and a ``str`` representing the user sk and user id
+        :obj:`tuple`: A tuple containing a :obj:`PrivateKey` and a :obj:`str` representing the user sk and user id
         (compressed pk) respectively.
 
     Raises:
-        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if any of the keys is invalid or cannot be loaded.
+        :obj:`InvalidKey`: if any of the keys is invalid or cannot be loaded.
     """
 
     if not user_sk_path:
@@ -274,7 +238,7 @@ def load_teos_id(teos_pk_path):
         :obj:`str`: The tower id.
 
     Raises:
-        :obj:`InvalidKey <cli.exceptions.InvalidKey>`: if the public key is invalid or cannot be loaded.
+        :obj:`InvalidKey`: if the public key is invalid or cannot be loaded.
     """
 
     if not teos_pk_path:
@@ -298,7 +262,7 @@ def post_request(data, endpoint):
         endpoint (:obj:`str`): the endpoint to send the post request.
 
     Returns:
-        :obj:`dict`: a json-encoded dictionary with the server response if the data can be posted.
+        :obj:`dict`: A json-encoded dictionary with the server response if the data can be posted.
 
     Raises:
         :obj:`ConnectionError`: if the client cannot connect to the tower.
@@ -324,15 +288,14 @@ def process_post_response(response):
     Processes the server response to a post request.
 
     Args:
-        response (:obj:`requests.models.Response`): a ``Response`` object obtained from the request.
+        response (:obj:`Response`): a :obj:`Response` object obtained from the request.
 
     Returns:
-        :obj:`dict`: a dictionary containing the tower's response data if the response type is
+        :obj:`dict`: A dictionary containing the tower's response data if the response type is
         ``HTTP_OK``.
 
     Raises:
-        :obj:`TowerResponseError <cli.exceptions.TowerResponseError>`: if the tower responded with an error, or the
-        response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     try:
@@ -357,15 +320,15 @@ def parse_add_appointment_args(args):
 
     Args:
         args (:obj:`list`): a list of command line arguments that must contain a json encoded appointment, or the file
-        option and the path to a file containing a json encoded appointment.
+            option and the path to a file containing a json encoded appointment.
 
     Returns:
         :obj:`dict`: A dictionary containing the appointment data.
 
     Raises:
-        :obj:`InvalidParameter <cli.exceptions.InvalidParameter>`: if the appointment data is not JSON encoded.
-        :obj:`FileNotFoundError`: if -f is passed and the appointment file is not found.
-        :obj:`IOError`: if -f was passed and the file cannot be read.
+        :obj:`InvalidParameter`: if the appointment data is not JSON encoded.
+        :obj:`FileNotFoundError`: if ``-f`` is passed and the appointment file is not found.
+        :obj:`IOError`: if ``-f`` was passed and the file cannot be read.
     """
 
     use_help = "Use 'help add_appointment' for help of how to use the command"
@@ -442,7 +405,6 @@ def main(command, args, command_line_conf):
     config = config_loader.build_config()
 
     setup_data_folder(config.get("DATA_DIR"))
-    setup_logging(config.get("LOG_FILE"))
 
     # Set the teos url
     teos_url = "{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))
@@ -451,14 +413,14 @@ def main(command, args, command_line_conf):
         teos_url = "http://" + teos_url
 
     try:
-        if os.path.exists(config.get("CLI_PRIVATE_KEY")):
+        if os.path.exists(config.get("USER_PRIVATE_KEY")):
             logger.debug("Client id found. Loading keys")
-            user_sk, user_id = load_keys(config.get("CLI_PRIVATE_KEY"))
+            user_sk, user_id = load_keys(config.get("USER_PRIVATE_KEY"))
 
         else:
             logger.info("Client id not found. Generating new keys")
             user_sk = Cryptographer.generate_key()
-            Cryptographer.save_key_file(user_sk.to_der(), "cli_sk", config.get("DATA_DIR"))
+            Cryptographer.save_key_file(user_sk.to_der(), "user_sk", config.get("DATA_DIR"))
             user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
         if command == "register":
@@ -500,11 +462,6 @@ def main(command, args, command_line_conf):
                 if appointment_data:
                     print(appointment_data)
 
-        elif command == "get_all_appointments":
-            appointment_data = get_all_appointments(teos_url)
-            if appointment_data:
-                print(appointment_data)
-
         elif command == "help":
             if args:
                 command = args.pop(0)
@@ -517,9 +474,6 @@ def main(command, args, command_line_conf):
 
                 elif command == "get_appointment":
                     sys.exit(help_get_appointment())
-
-                elif command == "get_all_appointments":
-                    sys.exit(help_get_all_appointments())
 
                 else:
                     logger.error("Unknown command. Use help to check the list of available commands")
@@ -537,7 +491,7 @@ def main(command, args, command_line_conf):
 
 if __name__ == "__main__":
     command_line_conf = {}
-    commands = ["register", "add_appointment", "get_appointment", "get_all_appointments", "help"]
+    commands = ["register", "add_appointment", "get_appointment", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["apiconnect=", "apiport=", "help"])

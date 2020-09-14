@@ -16,6 +16,7 @@ MAX_ITEMS = 100
 ITERATIONS = 10
 
 
+# FIXME: 194 this is using the dummiest appointment, can be updated with the fixture once it's implemented
 def set_up_appointments(db_manager, total_appointments):
     appointments = dict()
     locator_uuid_map = dict()
@@ -44,6 +45,7 @@ def set_up_appointments(db_manager, total_appointments):
     return appointments, locator_uuid_map
 
 
+# FIXME: 194 this is using the dummiest tracker, can be updated with the fixture once it's implemented
 def set_up_trackers(db_manager, total_trackers):
     trackers = dict()
     tx_tracker_map = dict()
@@ -209,6 +211,7 @@ def test_delete_trackers_no_db_match(db_manager):
         assert not set(completed_trackers).issubset(trackers.keys())
 
 
+# FIXME: 194 will do with dummy gatekeeper since this is only deleting data from the structures
 def test_delete_gatekeeper_appointments(gatekeeper):
     # delete_gatekeeper_appointments should delete the appointments from user as long as both exist
 

@@ -63,6 +63,40 @@ In order to contrubite you will need to install additional dependencies. They ca
 ## Code Documentation
 Code should be, at least, documented using docstrings. We use the [Sphinx Google Style](https://www.sphinx-doc.org/en/master/usage/extensions/example_google.html#example-google) for documenting functions.
 
+Here's an example of method docs:
+
+```
+"""
+Manages the add_appointment command. The life cycle of the function is as follows:
+    - Sign the appointment
+    - Send the appointment to the tower
+    - Wait for the response
+    - Check the tower's response and signature
+
+Args:
+    appointment (:obj:`Appointment <common.appointment.Appointment>`): an appointment object.
+    user_sk (:obj:`PrivateKey`): the user's private key.
+    teos_id (:obj:`str`): the tower's compressed public key.
+    teos_url (:obj:`str`): the teos base url.
+
+Returns:
+    :obj:`tuple`: A tuple containing the start block and the tower's signature of the appointment.
+
+Raises:
+    :obj:`ValueError`: if the appointment cannot be signed.
+    :obj:`ConnectionError`: if the client cannot connect to the tower.
+    :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
+"""
+```
+
+- In `Args`, custom types need to be linked (`Appointment <common.appointment.Appointment>`) to the proper file. 
+Same happens within `Return`. `Raises` is special though. Exceptions must not be linked (or it will create a format error).
+- Text that wraps around the line limit need to be indented in `Args` and `Raises`, but not in `Return`.
+- Only `Returns` and `Attributes` docs are capitalized, not `Args`, nor `Raises`. 
+- Variable names can be highlighted using \`\`var_name\`\`. For types, :obj:\`TypeName\` must be used.
+
+      
+
 ## Test Coverage
 We use [pytest](https://docs.pytest.org/en/latest/) to build and run tests. Tests should be provided to cover both positive and negative conditions. Test should cover both the proper execution as well as all the covered error paths. PR with no proper test coverage will be rejected. 
 

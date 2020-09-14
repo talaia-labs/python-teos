@@ -30,7 +30,7 @@ class Appointment:
                 ``{locator, to_self_delay, encrypted_blob}``
 
         Returns:
-            :obj:`Appointment <common.appointment.Appointment>`: An appointment initialized using the provided data.
+            :obj:`Appointment`: An appointment initialized using the provided data.
 
         Raises:
             ValueError: If one of the mandatory keys is missing in ``appointment_data``.

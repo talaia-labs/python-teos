@@ -3,7 +3,7 @@ from threading import Thread
 
 from teos.cleaner import Cleaner
 
-from common.logger import get_logger
+from teos.logger import get_logger
 from common.constants import IRREVOCABLY_RESOLVED
 
 CONFIRMATIONS_BEFORE_RETRY = 6
@@ -20,7 +20,7 @@ class TransactionTracker:
     :obj:`TransactionTracker` and monitor the blockchain until the end of the appointment.
 
     Args:
-        locator (:obj:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
+        locator (:obj:`str`): a 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
             trigger for the tower to decrypt and broadcast the penalty transaction.
         dispute_txid (:obj:`str`): the id of the transaction that created the channel breach and triggered the penalty.
         penalty_txid (:obj:`str`): the id of the transaction that was encrypted under ``dispute_txid``.
@@ -39,7 +39,7 @@ class TransactionTracker:
     def from_dict(cls, tx_tracker_data):
         """
         Constructs a :obj:`TransactionTracker` instance from a dictionary. Requires that all the fields are populated
-        (``not None``).
+        (not :obj:`None`).
 
         Useful to load data from the database.
 
@@ -48,7 +48,7 @@ class TransactionTracker:
                 :obj:`TransactionTracker`.
 
         Returns:
-            :obj:`TransactionTracker`: A ``TransactionTracker`` instantiated with the provided data.
+            :obj:`TransactionTracker`: A transaction tracker instantiated with the provided data.
 
         Raises:
             :obj:`ValueError`: if any of the required fields is missing.
@@ -91,7 +91,7 @@ class TransactionTracker:
         Returns the summary of a tracker, consisting on the locator, the user_id and the penalty_txid.
 
         Returns:
-            :obj:`dict`: the appointment summary.
+            :obj:`dict`: The appointment summary.
         """
 
         return {"locator": self.locator, "user_id": self.user_id, "penalty_txid": self.penalty_txid}
@@ -104,32 +104,32 @@ class Responder:
     the blockchain.
 
     Args:
-        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
-            to interact with the database.
-        carrier (:obj:`Carrier <teos.carrier.Carrier>`): a ``Carrier`` instance to send transactions to bitcoind.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
+                database manager to interact with the database.
+        carrier (:obj:`Carrier <teos.carrier.Carrier>`): a carrier instance to send transactions to bitcoind.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a block processor instance to
             get data from bitcoind.
 
     Attributes:
-        logger: the logger for this component.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
         trackers (:obj:`dict`): A dictionary containing the minimum information about the :obj:`TransactionTracker`
-            required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``user_id``).
-            Each entry is identified by a ``uuid``.
+            required by the :obj:`Responder` (``penalty_txid``, ``locator`` and ``user_id``). Each entry is identified
+            by a ``uuid``.
         tx_tracker_map (:obj:`dict`): A ``penalty_txid:uuid`` map used to allow the :obj:`Responder` to deal with
             several trackers triggered by the same ``penalty_txid``.
         unconfirmed_txs (:obj:`list`): A list that keeps track of all unconfirmed ``penalty_txs``.
         missed_confirmations (:obj:`dict`): A dictionary that keeps count of how many confirmations each ``penalty_tx``
             has missed. Used to trigger rebroadcast if needed.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Responder` to receive block hashes from ``bitcoind``. It
-        is populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
-        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
-            to interact with the database.
-        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the
+            is populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): An instance of the appointment
+                database manager to interact with the database.
+        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): A `Gatekeeper` instance in charge to control the
             user access and subscription expiry.
-        carrier (:obj:`Carrier <teos.carrier.Carrier>`): a ``Carrier`` instance to send transactions to bitcoind.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+        carrier (:obj:`Carrier <teos.carrier.Carrier>`): A carrier instance to send transactions to bitcoind.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): A block processor instance to
             get data from bitcoind.
-        last_known_block (:obj:`str`): the last block known by the ``Responder``.
+        last_known_block (:obj:`str`): The last block known by the :obj:`Responder`.
     """
 
     def __init__(self, db_manager, gatekeeper, carrier, block_processor):
@@ -146,10 +146,16 @@ class Responder:
         self.last_known_block = db_manager.load_last_block_hash_responder()
 
     def awake(self):
-        """Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth"""
+        """
+            Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth.
+            The thread will run until the :obj:`ChainMonitor` adds the ``"END"`` message to the queue.
+
+            Returns:
+                :obj:`Thread <multithreading.Thread>`: The thread object that was just created and is already running.
+        """
+
         responder_thread = Thread(target=self.do_watch, daemon=True)
         responder_thread.start()
-
         return responder_thread
 
     def on_sync(self, block_hash):
@@ -196,7 +202,7 @@ class Responder:
             block_hash (:obj:`str`): the block hash at which the breach was seen (used to see if we are on sync).
 
         Returns:
-            :obj:`Receipt <teos.carrier.Receipt>`: A ``Receipt`` indicating whether or not the ``penalty_tx`` made it
+            :obj:`Receipt <teos.carrier.Receipt>`: A receipt indicating whether or not the ``penalty_tx`` made it
             into the blockchain.
         """
 
@@ -266,6 +272,11 @@ class Responder:
 
         while True:
             block_hash = self.block_queue.get()
+
+            # When the ChainMonitor is stopped, a final "END" message is sent
+            if block_hash == "END":
+                break
+
             block = self.block_processor.get_block(block_hash)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
@@ -372,7 +383,7 @@ class Responder:
         irrevocably resolved).
 
         Returns:
-            :obj:`list`: a list of completed trackers uuids.
+            :obj:`list`: A list of completed trackers uuids.
         """
 
         completed_trackers = []
@@ -409,7 +420,7 @@ class Responder:
             height (:obj:`int`): the height of the last received block.
 
         Returns:
-            :obj:`list`: a list of the expired trackers uuids.
+            :obj:`list`: A list of the expired trackers uuids.
         """
 
         expired_trackers = [
