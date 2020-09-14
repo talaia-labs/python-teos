@@ -29,6 +29,7 @@ DEFAULT_CONF = {
     "TEOS_SECRET_KEY": {"value": "teos_sk.der", "type": str, "path": True},
     "APPOINTMENTS_DB_PATH": {"value": "appointments", "type": str, "path": True},
     "USERS_DB_PATH": {"value": "users", "type": str, "path": True},
+    "INTERNAL_API_HOST": {"value": "localhost", "type": str},
+    "INTERNAL_API_PORT": {"value": 50051, "type": int},
+    "INTERNAL_API_WORKERS": {"value": 10, "type": int},
 }
-
-# Default conf fields

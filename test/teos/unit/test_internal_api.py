@@ -13,7 +13,6 @@ from teos.watcher import Watcher
 from teos.responder import Responder
 from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
-from teos.teosd import INTERNAL_API_ENDPOINT
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse, GetUsersResponse, GetUserRequest, GetUserResponse
@@ -29,6 +28,8 @@ from teos.protobuf.appointment_pb2 import (
 from test.teos.conftest import config
 from test.teos.unit.conftest import generate_keypair, get_random_value_hex
 
+internal_api_endpoint = "{}:{}".format(config.get("INTERNAL_API_HOST"), config.get("INTERNAL_API_PORT"))
+
 MAX_APPOINTMENTS = 100
 teos_sk, teos_pk = generate_keypair()
 
@@ -43,7 +44,7 @@ def internal_api(db_manager, gatekeeper, carrier, block_processor):
         db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
     )
     watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher, INTERNAL_API_ENDPOINT, Event())
+    i_api = InternalAPI(watcher, internal_api_endpoint, config.get("INTERNAL_API_WORKERS"), Event())
     i_api.rpc_server.start()
 
     yield i_api
@@ -64,7 +65,7 @@ def clear_state(internal_api, db_manager):
 
 @pytest.fixture()
 def stub():
-    return TowerServicesStub(grpc.insecure_channel(INTERNAL_API_ENDPOINT))
+    return TowerServicesStub(grpc.insecure_channel(internal_api_endpoint))
 
 
 def send_appointment(stub, appointment, signature):

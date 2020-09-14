@@ -33,6 +33,7 @@ class InternalAPI:
         watcher (:obj:`Watcher <teos.watcher.Watcher>`): a :obj:`Watcher` instance to pass the requests to. The Watcher
             is the main backend class of the tower and can interact with the rest.
         internal_api_endpoint (:obj:`str`): the endpoint where the internal api will be served (gRPC server).
+        max_workers (:obj:`int`): the maximum number of worker threads for the grpc server.
         stop_command_event (:obj:`multiprocessing.Event`): an event to be set when a ``stop`` command is issued.
 
     Attributes:
@@ -41,12 +42,12 @@ class InternalAPI:
         rpc_server (:obj:`grpc.Server <grpc.Server>`): The non-started gRPC server instance.
     """
 
-    def __init__(self, watcher, internal_api_endpoint, stop_command_event):
+    def __init__(self, watcher, internal_api_endpoint, max_workers, stop_command_event):
         self.logger = get_logger(component=InternalAPI.__name__)
         self.watcher = watcher
         self.endpoint = internal_api_endpoint
         self.stop_command_event = stop_command_event
-        self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
         self.rpc_server.add_insecure_port(self.endpoint)
         add_TowerServicesServicer_to_server(_InternalAPI(watcher, stop_command_event, self.logger), self.rpc_server)
 
