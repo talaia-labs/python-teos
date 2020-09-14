@@ -1,7 +1,6 @@
 import pytest
 from multiprocessing import Event
 from shutil import rmtree
-from binascii import hexlify
 
 from teos.api import API
 import common.errors as errors
@@ -46,10 +45,10 @@ locator_dispute_tx_map = {}
 
 
 user_sk, user_pk = generate_keypair()
-user_id = hexlify(user_pk.format(compressed=True)).decode("utf-8")
+user_id = Cryptographer.get_compressed_pk(user_pk)
 
 teos_sk, teos_pk = generate_keypair()
-teos_id = hexlify(teos_pk.format(compressed=True)).decode("utf-8")
+teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
 
 
 # A function that ignores the arguments and returns user_id; used in some tests to mock the result of authenticate_user
@@ -142,7 +141,7 @@ def test_register_top_up(internal_api, client):
     # Calling register more than once will give us SUBSCRIPTION_SLOTS * number_of_calls slots.
     # It will also refresh the expiry.
     temp_sk, tmp_pk = generate_keypair()
-    tmp_user_id = hexlify(tmp_pk.format(compressed=True)).decode("utf-8")
+    tmp_user_id = Cryptographer.get_compressed_pk(tmp_pk)
     current_height = internal_api.watcher.block_processor.get_block_count()
 
     data = {"public_key": tmp_user_id}
@@ -234,12 +233,10 @@ def test_add_appointment_wrong(internal_api, client, appointment):
 def test_add_appointment_not_registered(internal_api, client, appointment):
     # Properly formatted appointment, user is not registered
     tmp_sk, tmp_pk = generate_keypair()
-    tmp_compressed_pk = hexlify(tmp_pk.format(compressed=True)).decode("utf-8")
+    tmp_user_id = Cryptographer.get_compressed_pk(tmp_pk)
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), tmp_sk)
-    r = add_appointment(
-        client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, tmp_compressed_pk
-    )
+    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, tmp_user_id)
     assert r.status_code == HTTP_BAD_REQUEST
     assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
 
@@ -299,17 +296,15 @@ def test_add_appointment_multiple_times_different_users(
     # Create user keys and appointment signatures
     user_keys = [generate_keypair() for _ in range(n)]
     signatures = [Cryptographer.sign(appointment.serialize(), key[0]) for key in user_keys]
-    compressed_pks = [hexlify(pk.format(compressed=True)).decode("utf-8") for sk, pk in user_keys]
+    tmp_user_ids = [Cryptographer.get_compressed_pk(pk) for _, pk in user_keys]
 
     # Add one slot per public key
     for pair in user_keys:
-        tmp_compressed_pk = hexlify(pair[1].format(compressed=True)).decode("utf-8")
-        internal_api.watcher.gatekeeper.registered_users[tmp_compressed_pk] = UserInfo(
-            available_slots=1, subscription_expiry=0
-        )
+        user_id = Cryptographer.get_compressed_pk(pair[1])
+        internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
 
     # Send the appointments
-    for compressed_pk, signature in zip(compressed_pks, signatures):
+    for compressed_pk, signature in zip(tmp_user_ids, signatures):
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": signature}, compressed_pk)
         assert r.status_code == HTTP_OK
         assert r.json.get("available_slots") == 0

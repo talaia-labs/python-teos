@@ -1,6 +1,5 @@
 import struct
 import pytest
-import binascii
 
 from common.appointment import Appointment
 
@@ -63,6 +62,6 @@ def test_serialize(appointment_data):
     encrypted_blob = serialized_appointment[16:-4]
     to_self_delay = serialized_appointment[-4:]
 
-    assert binascii.hexlify(locator).decode() == appointment.locator
-    assert binascii.hexlify(encrypted_blob).decode() == appointment.encrypted_blob
-    assert struct.unpack(">I", to_self_delay)[0] == appointment.to_self_delay
+    assert locator.hex() == appointment.locator
+    assert encrypted_blob.hex() == appointment.encrypted_blob
+    assert int.from_bytes(to_self_delay, "big") == appointment.to_self_delay
