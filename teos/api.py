@@ -16,11 +16,11 @@ from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE
 # NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_remote_addr():
     """
-    Gets the remote client ip address. The HTTP_X_REAL_IP field is tried first in case the server is behind a reverse
-     proxy.
+    Gets the remote client ip address. The ``HTTP_X_REAL_IP`` field is tried first in case the server is behind a
+    reverse proxy.
 
     Returns:
-        :obj:`str`: the IP address of the client.
+        :obj:`str`: The IP address of the client.
     """
 
     # Getting the real IP if the server is behind a reverse proxy
@@ -34,13 +34,13 @@ def get_remote_addr():
 # NOTCOVERED: not sure how to monkey patch this one. May be related to #77
 def get_request_data_json(request):
     """
-    Gets the content of a json POST request and makes sure it decodes to a dictionary.
+    Gets the content of a json ``POST`` request and makes sure it decodes to a dictionary.
 
     Args:
         request (:obj:`Request`): the request sent by the user.
 
     Returns:
-        :obj:`dict`: the dictionary parsed from the json request.
+        :obj:`dict`: The dictionary parsed from the json request.
 
     Raises:
         :obj:`InvalidParameter`: if the request is not json encoded or it does not decodes to a dictionary.
@@ -63,14 +63,14 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, auto_run=False):
     This method can be handled either form an external WSGI (like gunicorn) or by the Flask development server.
 
     Args:
-        internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (host:port).
-        endpoint (:obj:`str`): endpoint where the http api will be running (host:port).
-        min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the Inspector.
+        internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (``host:port``).
+        endpoint (:obj:`str`): endpoint where the http api will be running (``host:port``).
+        min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the :obj:`Inspector`.
         auto_run (:obj:`bool`): whether the server should be started by this process. False if run with an external
             WSGI. True is run by Flask.
 
     Returns:
-        The application object needed by the WSGI server to run if ``auto_run`` if ``False``, ``None`` otherwise.
+        The application object needed by the WSGI server to run if ``auto_run`` is False, :obj:`None` otherwise.
     """
 
     setup_logging()
@@ -89,16 +89,16 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, auto_run=False):
 class API:
     """
     The :class:`API` is in charge of the interface between the user and the tower. It handles and serves user requests.
-    The API is connected with the :class:`InternalAPI` <teos.internal_api.InternalAPI> via gRPC.
+    The API is connected with the :class:`InternalAPI <teos.internal_api.InternalAPI>` via gRPC.
 
     Args:
-        inspector (:obj:`Inspector <teos.inspector.Inspector>`): an ``Inspector`` instance to check the correctness of
-            the received appointment data.
+        inspector (:obj:`Inspector <teos.inspector.Inspector>`): an :obj:`Inspector` instance to check the correctness
+            of the received appointment data.
         internal_api_endpoint (:obj:`str`): the endpoint where the internal api is served.
 
     Attributes:
-        logger: the logger for this component.
-        app: the Flask app of the API server.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        app: The Flask app of the API server.
     """
 
     def __init__(self, inspector, internal_api_endpoint):
@@ -132,7 +132,7 @@ class API:
             :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
             requests, the ``rcode`` is always 200 and the response contains a json with the public key and number of
             slots in the subscription. For rejected requests, the ``rcode`` is a 404 and the value contains an
-            application error, and an error message. Error messages can be found at :mod:`Errors <teos.errors>`.
+            application error, and an error message. Error messages can be found at ``common.errors``.
         """
 
         remote_addr = get_remote_addr()
@@ -186,7 +186,7 @@ class API:
             :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). For accepted
             appointments, the ``rcode`` is always 200 and the response contains the receipt signature (json). For
             rejected appointments, the ``rcode`` contains an application error, and an error message. Error messages can
-            be found at :mod:`Errors <teos.errors>`.
+            be found at ``common.errors``.
         """
 
         # Getting the real IP if the server is behind a reverse proxy

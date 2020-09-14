@@ -18,11 +18,12 @@ configured = False  # set to True once setup_logging is called
 
 class JsonMsgLogger(logging.Logger):
     """
-    Works exactly like logging.Logger but represents dict messages as json. Useful to prevent dicts being cast
-    to strings via str().
+    Works exactly like ``logging.Logger`` but represents dict messages as json. Useful to prevent dicts being cast
+    to strings via ``str()``.
     """
 
     def makeRecord(self, *args, **kwargs):
+        """Makes a record where the message is json encoded."""
         rv = super().makeRecord(*args, **kwargs)
         if isinstance(rv.msg, dict):
             rv.msg = json.dumps(rv.msg)
@@ -35,7 +36,7 @@ def setup_logging():
     Configures the logging options. It must be called only once, before using get_logger.
 
     Raises:
-        :obj:`RuntimeError`: setup_logging had already been called.
+        :obj:`RuntimeError`: if ``setup_logging`` had already been called.
     """
 
     global configured
@@ -81,13 +82,13 @@ def setup_logging():
 
 def get_logger(component=None):
     """
-    Returns a logger, that has the given `component` in all future log entries.
+    Returns a :obj:`Logger`, that has the given `component` in all future log entries.
 
     Returns:
-        a proxy obtained from structlog.get_logger with the `component` as bound variable.
+        A proxy obtained from ``structlog.get_logger`` with the ``component`` as bound variable.
 
     Args:
-        component(:obj:`str`): the value of the "component" field that will be attached to all the logs issued by this
+        component(:obj:`str`): the value of the ``component`` field that will be attached to all the logs issued by this
             logger.
     """
     return structlog.get_logger("teos", component=component)
@@ -103,9 +104,9 @@ def encode_event_dict(event_dict):
     """
     Encodes an event dictionary in a nicely formatted string, following the general format:
 
-        timestamp [component] event (attr1=value1, attr2=value2, ...)
+        ``timestamp [component] event (attr1=value1, attr2=value2, ...)``
 
-    where values that are not present are omitted. See unit tests for a more precise specification.
+    Where values that are not present are omitted. See unit tests for a more precise specification.
     """
 
     sio = StringIO()
@@ -138,8 +139,8 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
     # Taken almost verbatim from Python's logging cookbook.
     def handle(self):
         """
-        Handle multiple requests - each expected to be a 4-byte length, followed by the LogRecord in pickle format.
-        Logs the record according to whatever policy is configured locally.
+        Handle multiple requests - each expected to be a 4-byte length, followed by the :obj:`LogRecord` in pickle
+        format. Logs the record according to whatever policy is configured locally.
         """
 
         while True:
@@ -157,9 +158,9 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
     @staticmethod
     def handle_log_record(record):
         """
-        Processes log records received via the socket. The record's ``msg`` field is expected to be an encoded ``dict``
-        produced by structlog. The ``dict`` is encoded to a string using ``encode_event_dict`` and sent to the logger
-        with the name specified in the record.
+        Processes log records received via the socket. The record's ``msg`` field is expected to be an encoded
+        :obj:`dict` produced by :obj:`StructLog`. The :obj:`dict` is encoded to a string using ``encode_event_dict`` and
+        sent to the logger with the name specified in the record.
 
         Args:
             record (:obj:`logging.LogRecord`): a log record.
@@ -173,9 +174,7 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
 
 
 class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
-    """
-    Simple TCP socket-based logging receiver.
-    """
+    """Simple TCP socket-based logging receiver."""
 
     allow_reuse_address = True
 
@@ -184,6 +183,8 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
         self.timeout = 1
 
     def serve_forever(self, poll_interval=0.5):
+        """Serves the logger server until the tower is stopped."""
+
         while True:
             rd, wr, ex = select.select([self.socket.fileno()], [], [], self.timeout)
             if rd:
@@ -192,13 +193,13 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
 
 def serve(log_file_path, silent, ready):
     """
-    Sets up logging on console and file, and serves the tcp logging server on `localhost:TCP_LOGGING_PORT`.
+    Sets up logging on console and file, and serves the tcp logging server on ``localhost:TCP_LOGGING_PORT``.
     This method is meant to be run in a separate process and provides the logging service.
 
     Args:
         log_file_path (:obj:`str`): the full path and log file name.
-        silent (:obj:`bool`) if True, only CRITICAL errors are shown to console; otherwise INFO and above.
-        ready (:obj:`multiprocessing.Event`) an ``Event`` that is set once the logging server is ready.
+        silent (:obj:`bool`): if True, only ``CRITICAL`` errors are shown to console; otherwise ``INFO`` and above.
+        ready (:obj:`multiprocessing.Event`): an event that is set once the logging server is ready.
     """
 
     logging.config.dictConfig(

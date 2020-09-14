@@ -29,13 +29,15 @@ class AppointmentsDBM(DBManager):
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
             database will be created if the specified path does not contain one.
+            
+    Attributes:
+        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
 
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
 
-    Attributes:
-        logger: the logger for this component.
+
     """  # noqa: E501
 
     def __init__(self, db_path):
@@ -82,17 +84,18 @@ class AppointmentsDBM(DBManager):
 
         Args:
             key (:obj:`str`): the identifier of the db to look into (either ``WATCHER_LAST_BLOCK_KEY`` or
-            ``RESPONDER_LAST_BLOCK_KEY``).
+                ``RESPONDER_LAST_BLOCK_KEY``).
 
         Returns:
             :obj:`str` or :obj:`None`: A 32-byte hex-encoded str representing the last known block hash.
 
-            Returns ``None`` if the entry is not found.
+            Returns :obj:`None` if the entry is not found.
         """
 
         last_block = self.db.get(key.encode("utf-8"))
 
         if last_block:
+
             last_block = last_block.decode("utf-8")
 
         return last_block
@@ -107,7 +110,7 @@ class AppointmentsDBM(DBManager):
         Returns:
             :obj:`dict`: A dictionary containing the appointment data if they ``key`` is found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         try:
@@ -128,7 +131,7 @@ class AppointmentsDBM(DBManager):
         Returns:
             :obj:`dict`: A dictionary containing the tracker data if they ``key`` is found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         try:
@@ -144,7 +147,7 @@ class AppointmentsDBM(DBManager):
         Loads all the appointments from the database (all entries with the ``WATCHER_PREFIX`` prefix).
 
         Args:
-            include_triggered (:obj:`bool`): whether to include the appointments flagged as triggered or not. ``False``
+            include_triggered (:obj:`bool`): whether to include the appointments flagged as triggered or not. False
                 by default.
 
         Returns:
@@ -166,7 +169,7 @@ class AppointmentsDBM(DBManager):
         Loads all the trackers from the database (all entries with the ``RESPONDER_PREFIX`` prefix).
 
         Returns:
-            :obj:`dict`: A dictionary with all the trackers stored in the database. An empty dictionary is there are
+            :obj:`dict`: A dictionary with all the trackers stored in the database. An empty dictionary if there are
             none.
         """
 
@@ -234,7 +237,7 @@ class AppointmentsDBM(DBManager):
         Returns:
             :obj:`dict` or :obj:`None`: The requested ``locator:uuid`` map if found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
 
         key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
@@ -388,7 +391,7 @@ class AppointmentsDBM(DBManager):
         Returns:
             :obj:`str` or :obj:`None`: A 32-byte hex-encoded string representing the last known block hash if found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
         return self.get_last_known_block(WATCHER_LAST_BLOCK_KEY)
 
@@ -399,7 +402,7 @@ class AppointmentsDBM(DBManager):
         Returns:
             :obj:`str` or :obj:`None`: A 32-byte hex-encoded string representing the last known block hash if found.
 
-            Returns ``None`` otherwise.
+            Returns :obj:`None` otherwise.
         """
         return self.get_last_known_block(RESPONDER_LAST_BLOCK_KEY)
 
@@ -452,7 +455,7 @@ class AppointmentsDBM(DBManager):
 
     def batch_create_triggered_appointment_flag(self, uuids):
         """
-        Creates a flag that signals that an appointment has been triggered for every appointment in the given list
+        Creates a flag that signals that an appointment has been triggered for every appointment in the given list.
 
         Args:
             uuids (:obj:`list`): a list of identifiers for the appointments to flag.

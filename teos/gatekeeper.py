@@ -9,7 +9,7 @@ from common.exceptions import InvalidParameter, InvalidKey, SignatureError
 
 
 class NotEnoughSlots(ValueError):
-    """Raised when trying to subtract more slots than a user has available"""
+    """Raised when trying to subtract more slots than a user has available."""
 
     pass
 
@@ -24,6 +24,15 @@ class AuthenticationFailure(Exception):
 
 
 class UserInfo:
+    """
+    Class used to stored information about a user.
+
+    Args:
+        available_slots (:obj:`int`): the number of appointment slots available to the user.
+        subscription_expiry (:obj:`int`): the block height when the user subscription will expire.
+        appointments (:obj:`dict`): a dictionary containing the current appointments of the user. Optional.
+    """
+
     def __init__(self, available_slots, subscription_expiry, appointments=None):
         self.available_slots = available_slots
         self.subscription_expiry = subscription_expiry
@@ -36,6 +45,15 @@ class UserInfo:
 
     @classmethod
     def from_dict(cls, user_data):
+        """
+        Creates a :obj:`UserInfo` instance from a dictionary.
+
+        Args:
+            user_data (:obj:`dict`): a dictionary containing all the necessary ``key:value`` pairs.
+
+        Raises:
+            :obj:`ValueError`: if any of the dictionary entries is missing.
+        """
         available_slots = user_data.get("available_slots")
         appointments = user_data.get("appointments")
         subscription_expiry = user_data.get("subscription_expiry")
@@ -46,6 +64,7 @@ class UserInfo:
         return cls(available_slots, subscription_expiry, appointments)
 
     def to_dict(self):
+        """Converts a :obj:`UserInfo` instance in a dictionary."""
         return self.__dict__
 
 
@@ -55,14 +74,15 @@ class Gatekeeper:
     perform actions.
 
     Attributes:
-        subscription_slots (:obj:`int`): the number of slots assigned to a user subscription.
-        subscription_duration (:obj:`int`): the expiry assigned to a user subscription.
-        expiry_delta (:obj:`int`): the grace period given to the user to renew their subscription.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+        subscription_slots (:obj:`int`): The number of slots assigned to a user subscription.
+        subscription_duration (:obj:`int`): The expiry assigned to a user subscription.
+        expiry_delta (:obj:`int`): The grace period given to the user to renew their subscription.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): A block processor instance to
             get block from bitcoind.
-        user_db (:obj:`UsersDBM <teos.user_dbm.UsersDBM>`): a ``UsersDBM`` instance to interact with the database.
-        registered_users (:obj:`dict`): a map of user_pk:UserInfo.
-        lock (:obj:`Lock`): a Threading.Lock object to lock access to the Gatekeeper on updates.
+        user_db (:obj:`UsersDBM <teos.user_dbm.UsersDBM>`): A user database manager instance to interact with the
+            database.
+        registered_users (:obj:`dict`): A map of ``user_pk:user_info``.
+        lock (:obj:`Lock`): A lock object to lock access to the Gatekeeper on updates.
 
     """
 
@@ -85,7 +105,7 @@ class Gatekeeper:
             user_id(:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
-            :obj:`tuple`: a tuple with the number of available slots in the user subscription, the subscription
+            :obj:`tuple`: A tuple with the number of available slots in the user subscription, the subscription
             expiry (in absolute block height), and the registration_receipt.
 
         Raises:
@@ -129,7 +149,7 @@ class Gatekeeper:
             signature (:obj:`str`): the user's signature (hex-encoded).
 
         Returns:
-            :obj:`str`: a compressed key recovered from the signature and matching a registered user.
+            :obj:`str`: A compressed key recovered from the signature and matching a registered user.
 
         Raises:
             :obj:`AuthenticationFailure`: if the user cannot be authenticated.
@@ -159,14 +179,14 @@ class Gatekeeper:
         Args:
             user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
             uuid (:obj:`str`): the appointment uuid.
-            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment`): the summary of new
+            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the summary of new
                 appointment the user is requesting.
 
         Returns:
-            :obj:`int`: the number of remaining appointment slots.
+            :obj:`int`: The number of remaining appointment slots.
 
         Raises:
-            :obj:`NotEnoughSlots`: If the user does not have enough slots to fill.
+            :obj:`NotEnoughSlots`: if the user does not have enough slots to fill.
         """
 
         self.lock.acquire()
@@ -202,7 +222,7 @@ class Gatekeeper:
             block_height: the block height that wants to be checked.
 
         Returns:
-            :obj:`list`: a list of appointment uuids that will expire at ``block_height``.
+            :obj:`list`: A list of appointment uuids that will expire at ``block_height``.
         """
 
         expired_appointments = []

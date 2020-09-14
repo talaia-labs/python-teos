@@ -15,16 +15,18 @@ from teos.protobuf.tower_services_pb2_grpc import (
 
 class RPC:
     """
-    The RPC is an external RPC server offered by tower to receive requests from the CLI.
+    The :obj:`RPC` is an external RPC server offered by tower to receive requests from the CLI.
     This acts as a proxy between the internal api and the CLI.
+
     Args:
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
+
     Attributes:
-        logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
-        endpoint (:obj:`str`): the endpoint where the RPC api will be served (external gRPC server).
-        rpc_server (:obj:`Server <grpc.Server>`): the non-started gRPC server instance.
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        endpoint (:obj:`str`): The endpoint where the RPC api will be served (external gRPC server).
+        rpc_server (:obj:`grpc.Server <grpc.Server>`): The non-started gRPC server instance.
     """
 
     def __init__(self, rpc_bind, rpc_port, internal_api_endpoint):
@@ -98,15 +100,12 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
-    This method will serve and hold until the main process is stop or a stop signal is received. Notice the latter is
-    not possible possible currently since the stop signal has to be passed to `rpc_server` and it is not returned. This
-    may change once the stop command for the CLI is implemented.
+    This method will serve and hold until the main process is stop or a stop signal is received.
 
     Args:
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
-        log_file (:obj:`str`): the file_path where to store logs.
         stop_event (:obj:`multiprocessing.Event`) the Event that this service will monitor. The rpc server will
             initiate a graceful shutdown once this event is set.
     """

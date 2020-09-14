@@ -62,25 +62,26 @@ class TeosDaemon:
 
     Args:
         config (:obj:`dict`): the configuration object.
-        sk (:obj:`PrivateKey`): the ``PrivateKey`` of the tower.
+        sk (:obj:`PrivateKey`): the :obj:`PrivateKey` of the tower.
         logger (:obj:`Logger <teos.logger.Logger>`): the logger instance.
 
     Attributes:
-        stop_command_event (:obj:`threading.Event`): the Event that will be set to initiate a graceful shutdown.
-        stop_event (:obj:`multiprocessing.Event`): the Event that services running on different processes will monitor
+        stop_command_event (:obj:`threading.Event`): The event that will be set to initiate a graceful shutdown.
+        stop_event (:obj:`multiprocessing.Event`): The event that services running on different processes will monitor
             in order to be informed that they should shutdown.
-        block_processor (:obj:`teos.block_processor.BlockProcessor`): the BlockProcessor instance.
-        db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`): the db manager for appointments.
-        watcher (:obj:`teos.watcher.Watcher`): the `Watcher` instance.
-        watcher_thread (:obj:`multithreading.Thread` or :obj:`None`): after ``bootstrap_components``, the thread that
-            runs the Watcher monitoring.
-        responder_thread (:obj:`multithreading.Thread` or :obj:`None`): after ``bootstrap_components``, the thread that
-            runs the Responder monitoring.
-        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`): the ``ChainMonitor`` instance.
-        self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process` or :obj:`None`): once the rpc process
-            is created, the instance of either ``Popen`` or ``Process`` that is serving the public API.
-        self.rpc_process (:obj:`multiprocessing.Process`): the instance of the internal RPC server; only set if running.
-        self.internal_api (:obj:`teos.internal_api.InternalAPI`): the InternalAPI instance.
+        block_processor (:obj:`teos.block_processor.BlockProcessor`): The block processor instance.
+        db_manager (:obj:`teos.appointments_dbm.AppointmentsDBM`): The db manager for appointments.
+        watcher (:obj:`teos.watcher.Watcher`): The watcher instance.
+        watcher_thread (:obj:`multithreading.Thread`): After ``bootstrap_components``, the thread that
+            runs the Watcher monitoring (set to :obj:`None` beforehand).
+        responder_thread (:obj:`multithreading.Thread`): After ``bootstrap_components``, the thread that
+            runs the Responder monitoring (set to :obj:`None` beforehand).
+        chain_monitor (:obj:`teos.chain_monitor.ChainMonitor`): The ``ChainMonitor`` instance.
+        self.api_proc (:obj:`subprocess.Popen` or :obj:`multiprocessing.Process`): Once the rpc process
+            is created, the instance of either ``Popen`` or ``Process`` that is serving the public API (set to
+            :obj:`None` beforehand).
+        self.rpc_process (:obj:`multiprocessing.Process`): The instance of the internal RPC server; only set if running.
+        self.internal_api (:obj:`teos.internal_api.InternalAPI`): The InternalAPI instance.
     """
 
     def __init__(self, config, sk, logger):

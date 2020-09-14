@@ -17,7 +17,7 @@ def bitcoin_cli(btc_connect_params):
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc password, host and port)
+            (``rpc user, rpc password, host and port``)
 
     Returns:
         :obj:`AuthServiceProxy <teos.utils.auth_proxy.AuthServiceProxy>`: An authenticated service proxy to ``bitcoind``
@@ -42,9 +42,9 @@ def can_connect_to_bitcoind(btc_connect_params):
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc password, host and port)
+            (``rpc user, rpc password, host and port``).
     Returns:
-        :obj:`bool`: ``True`` if the connection can be established. ``False`` otherwise.
+        :obj:`bool`: True if the connection can be established. False otherwise.
     """
 
     can_connect = True
@@ -68,7 +68,7 @@ def in_correct_network(btc_connect_params, network):
         network (:obj:`str`): the network the tower is connected to.
 
     Returns:
-        :obj:`bool`: ``True`` if the network configuration matches. ``False`` otherwise.
+        :obj:`bool`: True if the network configuration matches. False otherwise.
     """
 
     mainnet_genesis_block_hash = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"

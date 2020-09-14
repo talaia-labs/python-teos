@@ -11,7 +11,7 @@ class Builder:
     @staticmethod
     def build_appointments(appointments_data):
         """
-        Builds an appointments dictionary (``uuid:ExtendedAppointment``) and a locator_uuid_map (``locator:uuid``)
+        Builds an appointments dictionary (``uuid:extended_appointment``) and a locator_uuid_map (``locator:uuid``)
         given a dictionary of appointments from the database.
 
         Args:
@@ -83,11 +83,11 @@ class Builder:
         :mod:`Responder <teos.responder.Responder>` using backed up data.
 
         Args:
-            block_queue (:obj:`Queue`): a ``Queue``.
+            block_queue (:obj:`Queue`): a queue.
             missed_blocks (:obj:`list`): list of block hashes missed by the Watchtower (due to a crash or shutdown).
 
         Returns:
-            :obj:`Queue`: A ``Queue`` containing all the missed blocks hashes.
+            :obj:`Queue`: A queue containing all the missed blocks hashes.
         """
 
         for block in missed_blocks:
@@ -103,12 +103,12 @@ class Builder:
         If only one instance has to be updated, ``populate_block_queue`` should be used.
 
         Args:
-            watcher (:obj:`Watcher <teos.watcher.Watcher>`): a ``Watcher`` instance (including a ``Responder``).
-            missed_blocks_watcher (:obj:`list`): the list of block missed by the ``Watcher``.
-            missed_blocks_responder (:obj:`list`): the list of block missed by the ``Responder``.
+            watcher (:obj:`Watcher <teos.watcher.Watcher>`): a :obj:`Watcher` instance (including a :obj:`Responder`).
+            missed_blocks_watcher (:obj:`list`): the list of block missed by the :obj:`Watcher`.
+            missed_blocks_responder (:obj:`list`): the list of block missed by the :obj:`Responder`.
 
         Raises:
-            ValueError: is one of the provided list is empty.
+            ValueError: if one of the provided list is empty.
         """
 
         if len(missed_blocks_responder) == 0 or len(missed_blocks_watcher) == 0:

@@ -16,14 +16,14 @@ class ChainMonitorStatus(Enum):
 
 class ChainMonitor:
     """
-    The ``ChainMonitor`` is in charge of monitoring the blockchain (via ``bitcoind``) to detect new blocks on top
+    The :obj:`ChainMonitor` is in charge of monitoring the blockchain (via ``bitcoind``) to detect new blocks on top
     of the best chain. If a new best block is spotted, the chain monitor will notify the given queues.
 
-    The ``ChainMonitor`` monitors the chain using two methods: ``zmq`` and ``polling``. Blocks are only notified
+    The :obj:`ChainMonitor` monitors the chain using two methods: ``zmq`` and ``polling``. Blocks are only notified
     once per queue and the notification is triggered by the method that detects the block faster.
 
-    The ``ChainMonitor`` lifecycle goes through 4 states: idle, listening, active and terminated.
-    When a ``ChainMonitor`` instance is created, it is not yet monitoring the chain and the ``status`` attribute
+    The :obj:`ChainMonitor` lifecycle goes through 4 states: idle, listening, active and terminated.
+    When a :obj:`ChainMonitor` instance is created, it is not yet monitoring the chain and the ``status`` attribute
     is set to ``ChainMonitorStatus.IDLE``.
     Once the ``monitor_chain`` method is called, the chain monitor changes ``status`` to
     ``ChainMonitorStatus.LISTENING``, and starts monitoring the chain for new blocks; it does not yet notify the
@@ -33,24 +33,24 @@ class ChainMonitor:
     detected.
     Finally, once the ``terminate`` method is called, the ``status`` is changed to ``ChainMonitorStatus.TERMINATED``,
     the chain monitor stops monitoring the chain and no receiving queue will be notified about new blocks (including
-    any block that is currently in the internal queue). A final "END" message is sent to all the subscribers.
+    any block that is currently in the internal queue). A final ``"END"`` message is sent to all the subscribers.
 
     Args:
-        receiving_queues (:obj:`list`): a list of ``Queue`` objects that will be notified when the chain_monitor is
+        receiving_queues (:obj:`list`): a list of :obj:`Queue` objects that will be notified when the chain_monitor is
             active and it received new blocks hashes.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a :obj:`BlockProcessor` instance.
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
     Attributes:
-        logger: the logger for this component.
-        last_tips (:obj:`list`): a list of last chain tips. Used as a sliding window to avoid notifying about old tips.
-        check_tip (:obj:`Event`): an event that is triggered at fixed time intervals and controls the polling thread.
-        lock (:obj:`Condition`): a lock used to protect concurrent access to the queues by the zmq and polling threads.
-        zmqSubSocket (:obj:`socket`): a socket to connect to ``bitcoind`` via ``zmq``.
-        polling_delta (:obj:`int`): time between polls (in seconds).
-        max_block_window_size (:obj:`int`): max size of last_tips.
-        queue (:obj:`Queue`): a ``Queue`` where blocks are stored before they are processed.
-        status (:obj:`ChainMonitorStatus`): the current status of the monitor, either ``ChainMonitorStatus.IDLE``,
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        last_tips (:obj:`list`): A list of last chain tips. Used as a sliding window to avoid notifying about old tips.
+        check_tip (:obj:`Event`): An event that is triggered at fixed time intervals and controls the polling thread.
+        lock (:obj:`Condition`): A lock used to protect concurrent access to the queues by the zmq and polling threads.
+        zmqSubSocket (:obj:`socket`): A socket to connect to ``bitcoind`` via ``zmq``.
+        polling_delta (:obj:`int`): Time between polls (in seconds).
+        max_block_window_size (:obj:`int`): Max size of ``last_tips``.
+        queue (:obj:`Queue`): A queue where blocks are stored before they are processed.
+        status (:obj:`ChainMonitorStatus`): The current status of the monitor, either ``ChainMonitorStatus.IDLE``,
             ``ChainMonitorStatus.LISTENING``, ``ChainMonitorStatus.ACTIVE`` or ``ChainMonitorStatus.TERMINATED``.
     """
 
@@ -84,7 +84,7 @@ class ChainMonitor:
 
     def enqueue(self, block_hash):
         """
-        Adds a new block hash to the internal queue of the  ``ChainMonitor`` and the internal state. The state contains
+        Adds a new block hash to the internal queue of the  :obj:`ChainMonitor` and the internal state. The state contains
         the list of ``last_tips`` to prevent notifying about old blocks. ``last_tips`` is bounded to
         ``max_block_window_size``.
 
@@ -160,12 +160,12 @@ class ChainMonitor:
 
     def monitor_chain(self):
         """
-        Changes the ``status`` of the ``ChainMonitor`` from idle to listening. It initializes the ``last_tips`` list to
-        the current best tip (by querying the :obj:`BlockProcessor <teos.block_processor.BlockProcessor>`) and creates
-        two threads, one per each monitoring approach (``zmq`` and ``polling``).
+        Changes the ``status`` of the :obj:`ChainMonitor` from idle to listening. It initializes the ``last_tips`` list
+        to terminate the current best tip (by querying the :obj:`BlockProcessor <teos.block_processor.BlockProcessor>`)
+        and creates two threads, one per each monitoring approach (``zmq`` and ``polling``).
 
         Raises:
-            :obj:RuntimeError: if the ``status`` was not ``ChainMonitor.IDLE`` when the method was called.
+            :obj:`RuntimeError`: if the ``status`` was not ``ChainMonitor.IDLE`` when the method was called.
         """
 
         if self.status != ChainMonitorStatus.IDLE:
@@ -179,12 +179,12 @@ class ChainMonitor:
 
     def activate(self):
         """
-        Changes the ``status`` of the ``ChainMonitor`` from listening to active. It creates a new thread that runs
+        Changes the ``status`` of the :obj:`ChainMonitor` from listening to active. It creates a new thread that runs
         the ``notify_subscribers`` method, which is in charge of notifying the receiving queue for each block hash that
         is added to the internal queue.
 
         Raises:
-            :obj:RuntimeError: if the ``status`` was not ``ChainMonitor.LISTENING`` when the method was called.
+            :obj:`RuntimeError`: if the ``status`` was not ``ChainMonitor.LISTENING`` when the method was called.
         """
 
         if self.status != ChainMonitorStatus.LISTENING:
@@ -196,8 +196,8 @@ class ChainMonitor:
 
     def terminate(self):
         """
-        Changes the ``status`` of the ``ChainMonitor`` to terminated and sends the "END" message to the internal queue.
-        All the threads will stop as soon as possible.
+        Changes the ``status`` of the :obj:`ChainMonitor` to terminated and sends the "END" message to the internal
+        queue. All the threads will stop as soon as possible.
         """
 
         self.status = ChainMonitorStatus.TERMINATED

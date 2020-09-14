@@ -17,34 +17,36 @@ from teos.block_processor import InvalidTransactionFormat
 
 
 class AppointmentLimitReached(BasicException):
-    """Raised when the tower maximum appointment count has been reached"""
+    """Raised when the tower maximum appointment count has been reached."""
 
 
 class AppointmentAlreadyTriggered(BasicException):
-    """Raised when an appointment is sent to the Watcher but that same data has already been sent to the Responder"""
+    """
+    Raised when an appointment is sent to the Watcher but that same data has already been sent to the :obj:`Responder`.
+    """
 
 
 class AppointmentNotFound(BasicException):
-    """Raised when an appointment is not found on the tower"""
+    """Raised when an appointment is not found on the tower."""
 
 
 class LocatorCache:
     """
-    The LocatorCache keeps the data about the last ``cache_size`` blocks around so appointments can be checked against
-    it. The data is indexed by locator and it's mainly built during the normal ``Watcher`` operation so no extra steps
-    are normally needed.
+    The :obj:`LocatorCache` keeps the data about the last ``cache_size`` blocks around so appointments can be checked
+    against it. The data is indexed by locator and it's mainly built during the normal :obj:`Watcher` operation so no
+    extra steps are normally needed.
 
     Args:
         blocks_in_cache (:obj:`int`): the numbers of blocks to keep in the cache.
 
     Attributes:
-        logger: the logger for this component.
-        cache (:obj:`dict`): a dictionary of ``locator:dispute_txid`` pairs that received appointments are checked
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        cache (:obj:`dict`): A dictionary of ``locator:dispute_txid`` pairs that received appointments are checked
             against.
-        blocks (:obj:`OrderedDict`): An ordered dictionary of the last ``blocks_in_cache`` blocks (block_hash:locators).
-            Used to keep track of what data belongs to what block, so data can be pruned accordingly. Also needed to
-            rebuild the cache in case of reorgs.
-        cache_size (:obj:`int`): the size of the cache in blocks.
+        blocks (:obj:`OrderedDict`): An ordered dictionary of the last ``blocks_in_cache`` blocks
+            (``block_hash:locators``). Used to keep track of what data belongs to what block, so data can be pruned
+            accordingly. Also needed to rebuild the cache in case of reorgs.
+        cache_size (:obj:`int`): The size of the cache in blocks.
     """
 
     def __init__(self, blocks_in_cache):
@@ -59,8 +61,8 @@ class LocatorCache:
         Sets the initial state of the locator cache.
 
         Args:
-            last_known_block (:obj:`str`): the last known block by the ``Watcher``.
-            block_processor (:obj:`teos.block_processor.BlockProcessor`): a ``BlockProcessor`` instance.
+            last_known_block (:obj:`str`): the last known block by the :obj:`Watcher`.
+            block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a block processor instance.
         """
 
         # This is needed as a separate method from __init__ since it has to be initialized right before start watching.
@@ -117,13 +119,13 @@ class LocatorCache:
             self.remove_oldest_block()
 
     def is_full(self):
-        """  Returns whether the cache is full or not """
+        """  Returns whether the cache is full or not."""
         with self.rw_lock.gen_rlock():
             full = len(self.blocks) > self.cache_size
         return full
 
     def remove_oldest_block(self):
-        """ Removes the oldest block from the cache """
+        """ Removes the oldest block from the cache."""
         with self.rw_lock.gen_wlock():
             block_hash, locators = self.blocks.popitem(last=False)
             for locator in locators:
@@ -137,7 +139,7 @@ class LocatorCache:
 
         Args:
             last_known_block (:obj:`str`): the last known block hash after the reorg.
-            block_processor (:obj:`teos.block_processor.BlockProcessor`): a ``BlockProcessor`` instance.
+            block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a block processor instance.
         """
 
         tmp_cache = LocatorCache(self.cache_size)
@@ -175,39 +177,40 @@ class Watcher:
     :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
 
     Args:
-        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
-            to interact with the database.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
+                database manager to interact with the database.
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a block processor instance to
             get block from bitcoind.
-        responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
-        sk_der (:obj:`bytes`): a DER encoded private key used to sign appointment receipts (signaling acceptance).
-        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
+        responder (:obj:`Responder <teos.responder.Responder>`): a responder instance.
+        sk (:obj:`PrivateKey`): a private key used to sign accepted appointments.
+        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the :obj:`Watcher` at the same
+            time.
         blocks_in_cache (:obj:`int`): the number of blocks to keep in cache so recently triggered appointments can be
             covered.
 
     Attributes:
-        appointments (:obj:`dict`): a dictionary containing a summary of the appointments (:obj:`ExtendedAppointment
+        appointments (:obj:`dict`): A dictionary containing a summary of the appointments (:obj:`ExtendedAppointment
             <teos.extended_appointment.ExtendedAppointment>` instances) accepted by the tower (``locator`` and
             ``user_id``). It's populated trough ``add_appointment``.
-        locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
+        locator_uuid_map (:obj:`dict`): A ``locator:uuid`` map used to allow the :obj:`Watcher` to deal with several
             appointments with the same ``locator``.
         block_queue (:obj:`Queue`): A queue used by the :obj:`Watcher` to receive block hashes from ``bitcoind``. It is
-        populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
-        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): a ``AppointmentsDBM`` instance
-            to interact with the database.
-        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control the
+            populated by the :obj:`ChainMonitor <teos.chain_monitor.ChainMonitor>`.
+        db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): An instance of the appointment
+                database manager to interact with the database.
+        gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): A gatekeeper instance in charge to control the
             user access and subscription expiry.
-        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a ``BlockProcessor`` instance to
+        block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): A block processor instance to
             get block from bitcoind.
-        responder (:obj:`Responder <teos.responder.Responder>`): a ``Responder`` instance.
-        signing_key (:mod:`PrivateKey`): a private key used to sign accepted appointments.
-        max_appointments (:obj:`int`): the maximum amount of appointments accepted by the ``Watcher`` at the same time.
-        last_known_block (:obj:`str`): the last block known by the ``Watcher``.
-        locator_cache (:obj:`LocatorCache`): a cache of locators for the last ``blocks_in_cache`` blocks.
+        responder (:obj:`Responder <teos.responder.Responder>`): A responder instance.
+        signing_key (:obj:`PrivateKey`): A private key used to sign accepted appointments.
+        max_appointments (:obj:`int`): The maximum amount of appointments accepted by the :obj:`Watcher` at the same
+            time.
+        last_known_block (:obj:`str`): The last block known by the :obj:`Watcher`.
+        locator_cache (:obj:`LocatorCache`): A cache of locators for the last ``blocks_in_cache`` blocks.
 
     Raises:
-        :obj:`InvalidKey <common.exceptions.InvalidKey>`: if teos sk cannot be loaded.
-
+        :obj:`InvalidKey`: if teos sk cannot be loaded.\
     """
 
     def __init__(self, db_manager, gatekeeper, block_processor, responder, sk, max_appointments, blocks_in_cache):
@@ -248,10 +251,10 @@ class Watcher:
     def awake(self):
         """
             Starts a new thread to monitor the blockchain for channel breaches. The thread will run until the
-            ``ChainMonitor`` adds the "END" message to the queue.
+            :obj:`ChainMonitor` adds the ``"END"`` message to the queue.
 
             Returns:
-                :obj:`Thread <multithreading.Thread>`: the Thread object that was just created and is already running.
+                :obj:`Thread <multithreading.Thread>`: The thread object that was just created and is already running.
         """
 
         watcher_thread = Thread(target=self.do_watch, daemon=True)
@@ -279,18 +282,18 @@ class Watcher:
         """
         Gets information about an appointment.
 
-        The appointment can either be in the Watcher, the Responder, or not found.
+        The appointment can either be in the watcher, the responder, or not found.
 
         Args:
             locator (:obj:`str`): a 16-byte hex-encoded value used by the tower to detect channel breaches.
             user_signature (:obj:`str`): the signature of the request by the user.
 
         Returns:
-            :obj:`tuple`: A tuple containing the appointment data and the status (either "being_watched" or
-            "dispute_responded").
+            :obj:`tuple`: A tuple containing the appointment data and the status (either ``"being_watched"`` or
+            ``"dispute_responded"``).
 
         Raises:
-            :obj:`AppointmentNotFound`: If the appointment is not found in the tower.
+            :obj:`AppointmentNotFound`: if the appointment is not found in the tower.
         """
 
         message = "get appointment {}".format(locator).encode()
@@ -312,7 +315,7 @@ class Watcher:
         """
         Adds a new appointment to the ``appointments`` dictionary if ``max_appointments`` has not been reached.
 
-        ``add_appointment`` is the entry point of the ``Watcher``. Upon receiving a new appointment it will start
+        ``add_appointment`` is the entry point of the :obj:`Watcher`. Upon receiving a new appointment it will start
         monitoring the blockchain (``do_watch``) until ``appointments`` is empty.
 
         Once a breach is seen on the blockchain, the :obj:`Watcher` will decrypt the corresponding ``encrypted_blob``
@@ -329,14 +332,13 @@ class Watcher:
             user_signature (:obj:`str`): the user's appointment signature (hex-encoded).
 
         Returns:
-            :obj:`dict`: The tower response as a dict, containing: locator, signature, available_slots and
-            subscription_expiry.
+            :obj:`dict`: The tower response as a dict, containing: ``locator``, ``signature``, ``available_slots`` and
+            ``subscription_expiry``.
 
         Raises:
             :obj:`AppointmentLimitReached`: If the tower cannot hold more appointments (cap reached).
-            :obj:`AuthenticationFailure <teos.gatekeeper.AuthenticationFailure>`: If the user cannot be authenticated.
-            :obj:`NotEnoughSlots <teos.gatekeeper.NotEnoughSlots>`: If the user does not have enough available slots,
-            so the appointment is rejected.
+            :obj:`AuthenticationFailure`: If the user cannot be authenticated.
+            :obj:`NotEnoughSlots`: If the user does not have enough available slots, so the appointment is rejected.
         """
 
         if len(self.appointments) >= self.max_appointments:
@@ -539,7 +541,7 @@ class Watcher:
 
     def get_breaches(self, locator_txid_map):
         """
-        Gets a dictionary of channel breaches given a map of locator:dispute_txid.
+        Gets a dictionary of channel breaches given a map of ``locator:dispute_txid``.
 
         Args:
             locator_txid_map (:obj:`dict`): the dictionary of locators (locator:txid) derived from a list of
@@ -568,16 +570,17 @@ class Watcher:
 
         Args:
             uuid (:obj:`str`): the uuid of the appointment that was triggered by the breach.
-            appointment (:obj:`teos.extended_appointment.ExtendedAppointment`): the appointment data.
+            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the appointment
+                data.
             dispute_txid (:obj:`str`): the id of the transaction that triggered the breach.
 
         Returns:
             :obj:`tuple`: A tuple containing the penalty txid and the raw penalty tx.
 
         Raises:
-            :obj:`EncryptionError`: If the encrypted blob from the provided appointment cannot be decrypted with the
-            key derived from the breach transaction id.
-            :obj:`InvalidTransactionFormat`: If the decrypted data does not have a valid transaction format.
+            :obj:`EncryptionError`: if the encrypted blob from the provided appointment cannot be decrypted with the
+                key derived from the breach transaction id.
+            :obj:`InvalidTransactionFormat`: if the decrypted data does not have a valid transaction format.
         """
 
         try:
@@ -658,14 +661,14 @@ class Watcher:
 
     def get_user_info(self, user_id):
         """
-        Returns the `UserInfo` of the user with the given id.
+        Returns the data hold by the tower about the user given an ``user_id``.
 
         Args:
             user_id (:obj:`str`): the id of the requested user.
 
         Returns:
-            :obj:`teos.gatekeeper.UserInfo` or :obj:`None`: The `UserInfo` object if found. `None` if not found, or
-            the `user_id` is invalid.
+            :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user data if found. :obj:`None` if not found, or
+            the ``user_id`` is invalid.
         """
         return self.gatekeeper.registered_users.get(user_id)
 

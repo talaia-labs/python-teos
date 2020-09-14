@@ -38,11 +38,11 @@ class Carrier:
 
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
-            (rpc user, rpc password, host and port)
+            (``rpc user, rpc password, host and port``).
 
     Attributes:
-        logger: the logger for this component.
-        issued_receipts (:obj:`dict`): a dictionary of issued receipts to prevent resending the same transaction over
+        logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
+        issued_receipts (:obj:`dict`): A dictionary of issued receipts to prevent resending the same transaction over
             and over. It should periodically be reset to prevent it from growing unbounded.
 
     """
@@ -134,7 +134,7 @@ class Carrier:
 
         Returns:
             :obj:`dict` or :obj:`None`: A dictionary with the transaction data if the transaction can be found on the
-            chain. ``None`` otherwise.
+            chain. :obj:`None` otherwise.
         """
 
         try:

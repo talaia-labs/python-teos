@@ -22,7 +22,7 @@ def sha256d(message):
         message(:obj:`bytes`): the message to be used as input to the hash function.
 
     Returns:
-        :obj:`bytes`: the sha256d of the given message.
+        :obj:`bytes`: The sha256d of the given message.
     """
 
     return sha256(sha256(message).digest()).digest()
@@ -32,10 +32,10 @@ def hash_160(message):
     """ Calculates the RIPEMD-160 hash of a given message.
 
     Args:
-        message (:obj:`str`) the message to be hashed.
+        message (:obj:`str`): the message to be hashed.
 
     Returns:
-        :obj:`str`: the ripemd160 hash of the given message.
+        :obj:`str`: The ripemd160 hash of the given message.
     """
 
     # Calculate the RIPEMD-160 hash of the given data.
@@ -57,7 +57,7 @@ def sigrec_encode(rsig_rid):
         rsig_rid(:obj:`bytes`): the signature to be encoded.
 
     Returns:
-        :obj:`bytes`: the encoded signature.
+        :obj:`bytes`: The encoded signature.
     """
 
     rsig, rid = rsig_rid[:64], rsig_rid[64]
@@ -75,7 +75,7 @@ def sigrec_decode(sigrec):
         sigrec(:obj:`bytes`): the signature to be decoded.
 
     Returns:
-        :obj:`bytes`: the decoded signature.
+        :obj:`bytes`: The decoded signature.
 
     Raises:
         :obj:`ValueError`: if the SigRec is not properly encoded (first byte is not 31 + recovery id)
@@ -205,7 +205,7 @@ class Cryptographer:
             data_dir (:obj:`str`): the data directory where the file will be saved.
 
         Raises:
-            :obj:InvalidParameter: If the given key is not bytes or the name or data_dir are not strings.
+            :obj:`InvalidParameter`: If the given key is not bytes or the name or data_dir are not strings.
         """
 
         if not isinstance(key, bytes):
@@ -232,7 +232,7 @@ class Cryptographer:
             file_path (:obj:`str`): the path to the key file to be loaded.
 
         Returns:
-            :obj:`bytes`: the key file data if the file can be found and read.
+            :obj:`bytes`: The key file data if the file can be found and read.
 
         Raises:
              :obj:`InvalidParameter`: if the file_path has wrong format or cannot be found.
@@ -262,10 +262,10 @@ class Cryptographer:
              sk_der(:obj:`str`): a private key encoded in ``DER`` format.
 
         Returns:
-             :obj:`PrivateKey`: A ``PrivateKey`` object if the private key can be loaded.
+             :obj:`PrivateKey`: A :obj:`PrivateKey` object if the private key can be loaded.
 
         Raises:
-            :obj:`InvalidKey`: if a ``PrivateKey`` cannot be loaded from the given data.
+            :obj:`InvalidKey`: if a :obj:`PrivateKey` cannot be loaded from the given data.
         """
 
         try:
@@ -357,7 +357,7 @@ class Cryptographer:
     @staticmethod
     def get_compressed_pk(pk):
         """
-        Computes a compressed, hex-encoded, public key given a ``PublicKey``.
+        Computes a compressed, hex-encoded, public key given a :obj:`PublicKey` .
 
         Args:
             pk(:obj:`PublicKey`): a given public key.

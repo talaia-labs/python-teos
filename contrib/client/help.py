@@ -10,7 +10,7 @@ def show_usage():
         "\n\nGLOBAL OPTIONS:"
         "\n\t--apiconnect \tAPI server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
         "\n\t--apiport \tAPI port where to send the requests. Defaults to '9814' (modifiable in conf file)."
-        "\n\t-d, --debug \tShows debug information and stores."
+        "\n\t-d, --debug \tShows debug information."
         "\n\t-h, --help \tShows this message."
     )
 
