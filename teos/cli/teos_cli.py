@@ -138,10 +138,10 @@ def main(command, args, command_line_conf):
             if len(args) > 1:
                 sys.exit(f"Expected only one argument, not {len(args)}")
 
-            rpc_client.get_user(args[0])
+            result = rpc_client.get_user(args[0])
 
         elif command == "stop":
-            result = rpc_client.stop()
+            rpc_client.stop()
 
         elif command == "help":
             if args:

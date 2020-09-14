@@ -109,3 +109,9 @@ def get_default_rpc_port(network):
         return REGTEST_RPC_PORT
     else:
         raise ValueError("Wrong Bitcoin network. Expected: mainnet, testnet or regtest. Received: {}".format(network))
+
+
+# Convenience method to ignore a signal
+def ignore_signal(_, __):
+    """Placeholder function to ignore signals sent to child processes so the main process can manage the teardown."""
+    pass

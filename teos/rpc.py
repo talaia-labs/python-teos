@@ -1,10 +1,10 @@
 import grpc
 import functools
 from concurrent import futures
-from signal import signal, SIGINT, SIGQUIT, SIGTERM
+from signal import signal, SIGINT
 
+from teos.tools import ignore_signal
 from teos.logger import setup_logging, get_logger
-
 from teos.constants import SHUTDOWN_GRACE_TIME
 from teos.protobuf.tower_services_pb2_grpc import (
     TowerServicesStub,
@@ -33,9 +33,6 @@ class RPC:
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
         add_TowerServicesServicer_to_server(_RPC(internal_api_endpoint, self.logger), self.rpc_server)
-
-    def handle_signals(self, signum, frame):
-        self.teardown()
 
     def teardown(self):
         self.logger.info("Stopping")
@@ -116,9 +113,8 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
 
     setup_logging()
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
-    signal(SIGINT, rpc.handle_signals)
-    signal(SIGTERM, rpc.handle_signals)
-    signal(SIGQUIT, rpc.handle_signals)
+    # Ignores SIGINT so the main process can handle the teardown
+    signal(SIGINT, ignore_signal)
     rpc.rpc_server.start()
 
     rpc.logger.info(f"Initialized. Serving at {rpc.endpoint}")

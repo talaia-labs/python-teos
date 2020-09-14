@@ -113,7 +113,7 @@ class Carrier:
                 # Adding this here just for completeness. We should never end up here. The Carrier only sends txs
                 # handed by the Responder, who receives them from the Watcher, who checks that the tx can be properly
                 # deserialized
-                self.logger.info("Transaction cannot be deserialized".format(txid))
+                self.logger.info("Transaction cannot be deserialized", txid=txid)
                 receipt = Receipt(delivered=False, reason=rpc_errors.RPC_DESERIALIZATION_ERROR)
 
             else:

@@ -286,7 +286,7 @@ class TeosDaemon:
             self.api_proc.kill()
             self.api_proc.join()
 
-        self.logger.info("Terminated public API")
+        self.logger.info("Public API terminated")
 
         # Signals readiness to shutdown to the other processes
         self.stop_event.set()
@@ -295,7 +295,7 @@ class TeosDaemon:
         self.rpc_process.join()
 
         # Stops the internal API, after waiting for some grace time
-        self.logger.info("Internal API stopping")
+        self.logger.info("Stopping internal API")
         self.internal_api.rpc_server.stop(SHUTDOWN_GRACE_TIME).wait()
         self.logger.info("Internal API stopped")
 

@@ -1,5 +1,4 @@
 import grpc
-import multiprocessing as mpp
 from google.protobuf import json_format
 from flask import Flask, request, jsonify
 

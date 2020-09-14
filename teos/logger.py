@@ -10,6 +10,7 @@ import select
 import json
 from io import StringIO
 
+from teos.tools import ignore_signal
 from common.constants import TCP_LOGGING_PORT
 
 configured = False  # set to True once setup_logging is called
@@ -90,11 +91,6 @@ def get_logger(component=None):
             logger.
     """
     return structlog.get_logger("teos", component=component)
-
-
-# Convenience method to ignore a signal
-def ignore_signal(_, __):
-    pass
 
 
 def _repr(val):

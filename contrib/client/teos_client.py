@@ -197,39 +197,6 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
     return response
 
 
-def get_all_appointments(teos_url):
-    """
-    Gets information about all appointments stored in the tower, if the user requesting the data is an administrator.
-
-    Args:
-        teos_url (:obj:`str`): the teos base url.
-
-    Returns:
-        :obj:`dict` a dictionary containing all the appointments stored by the Responder and Watcher if the tower
-        responds.
-    """
-
-    get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
-
-    try:
-        response = requests.get(url=get_all_appointments_endpoint, timeout=5)
-
-        if response.status_code != constants.HTTP_OK:
-            logger.error("The server returned error code {}: {}".format(response.status_code, response.reason))
-            return None
-
-        response_json = json.dumps(response.json(), indent=4, sort_keys=True)
-        return response_json
-
-    except ConnectionError:
-        logger.error("Can't connect to the Eye of Satoshi's API. Server cannot be reached")
-        return None
-
-    except requests.exceptions.Timeout:
-        logger.error("The request timed out")
-        return None
-
-
 def load_keys(user_sk_path):
     """
     Loads all the user private key and id.
@@ -499,11 +466,6 @@ def main(command, args, command_line_conf):
                 appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
                 if appointment_data:
                     print(appointment_data)
-
-        elif command == "get_all_appointments":
-            appointment_data = get_all_appointments(teos_url)
-            if appointment_data:
-                print(appointment_data)
 
         elif command == "help":
             if args:
