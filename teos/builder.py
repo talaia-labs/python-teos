@@ -30,14 +30,14 @@ class Builder:
         locator_uuid_map = {}
 
         for uuid, data in appointments_data.items():
-            appointment = ExtendedAppointment.from_dict(data)
-            appointments[uuid] = appointment.get_summary()
+            ext_appointment = ExtendedAppointment.from_dict(data)
+            appointments[uuid] = ext_appointment.get_summary()
 
-            if appointment.locator in locator_uuid_map:
-                locator_uuid_map[appointment.locator].append(uuid)
+            if ext_appointment.locator in locator_uuid_map:
+                locator_uuid_map[ext_appointment.locator].append(uuid)
 
             else:
-                locator_uuid_map[appointment.locator] = [uuid]
+                locator_uuid_map[ext_appointment.locator] = [uuid]
 
         return appointments, locator_uuid_map
 

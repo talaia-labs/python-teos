@@ -167,7 +167,7 @@ class Gatekeeper:
         except (InvalidParameter, InvalidKey, SignatureError):
             raise AuthenticationFailure("Wrong message or signature.")
 
-    def add_update_appointment(self, user_id, uuid, appointment):
+    def add_update_appointment(self, user_id, uuid, ext_appointment):
         """
         Adds (or updates) an appointment to a user subscription. The user slots are updated accordingly.
 
@@ -179,8 +179,8 @@ class Gatekeeper:
         Args:
             user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
             uuid (:obj:`str`): the appointment uuid.
-            appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the summary of new
-                appointment the user is requesting.
+            ext_appointment (:obj:`ExtendedAppointment <teos.extended_appointment.ExtendedAppointment>`): the summary of
+                new appointment the user is requesting.
 
         Returns:
             :obj:`int`: The number of remaining appointment slots.
@@ -198,7 +198,7 @@ class Gatekeeper:
             # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
             used_slots = 0
 
-        required_slots = ceil(len(appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+        required_slots = ceil(len(ext_appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
         if required_slots - used_slots <= self.registered_users.get(user_id).available_slots:
             # Filling / freeing slots depending on whether this is an update or not, and if it is bigger or smaller than
