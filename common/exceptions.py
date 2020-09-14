@@ -16,9 +16,7 @@ class BasicException(Exception):
         return message
 
     def to_json(self):
-        response = {"error": self.msg}
-        response.update(self.kwargs)
-        return response
+        return {"error": self.msg, **self.kwargs}
 
 
 class InvalidParameter(BasicException):
