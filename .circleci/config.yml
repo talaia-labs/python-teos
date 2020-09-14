@@ -165,22 +165,23 @@ workflows:
     jobs:
       - publish_docker_linuxamd64:
           filters:
-            # ignore any commit on any branch by default
+            # filters work like an or statement, specifying both tag and branch will make it run on the given branch
+            # even if the tag does not match
             branches:
-              only: master
-            # only act on version tags
+              ignore: /.*/
+            # Only act on tagged versions
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
       - publish_docker_linuxarm32:
           filters:
             branches:
-              only: master
+              ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
       - publish_docker_linuxarm64:
           filters:
             branches:
-              only: master
+              ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
       - publish_docker_multiarch:
@@ -188,8 +189,3 @@ workflows:
             - publish_docker_linuxamd64
             - publish_docker_linuxarm32
             - publish_docker_linuxarm64
-          filters:
-            branches:
-              only: master
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
