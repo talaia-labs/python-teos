@@ -89,7 +89,7 @@ class TowerMock:
         locator = request.get_json().get("locator")
         message = f"get appointment {locator}"
         user_id = Cryptographer.get_compressed_pk(
-            Cryptographer.recover_pk(message.encode(), request.get_json().get("signature"))
+            Cryptographer.recover_pk(message.encode("utf-8"), request.get_json().get("signature"))
         )
 
         if (

@@ -226,7 +226,7 @@ def get_appointment(plugin, tower_id, locator):
             raise InvalidParameter("tower_id is not within the registered towers", tower_id=tower_id)
 
         message = f"get appointment {locator}"
-        signature = Cryptographer.sign(message.encode(), plugin.wt_client.sk)
+        signature = Cryptographer.sign(message.encode("utf-8"), plugin.wt_client.sk)
         data = {"locator": locator, "signature": signature}
 
         # Send request to the server.
