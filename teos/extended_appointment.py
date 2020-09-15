@@ -8,6 +8,9 @@ class ExtendedAppointment(Appointment):
     It extends the :class:`Appointment <common.appointment.Appointment>` with information relevant to the tower, such
     as the ``user_id``, ``user_signature`` and ``start_block``.
 
+    **All appointments are instances of** :obj:`Appointment <common.appointment.Appointment>` **on the user-side but**
+    :obj:`ExtendedAppointment` **on the tower-side.**
+
     Args:
         locator (:obj:`str`): A 16-byte hex-encoded value used by the tower to detect channel breaches. It serves as a
             trigger for the tower to decrypt and broadcast the penalty transaction.
