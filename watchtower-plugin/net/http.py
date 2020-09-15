@@ -1,5 +1,4 @@
 import json
-import binascii
 import requests
 from requests import ConnectionError, ConnectTimeout
 from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
@@ -88,7 +87,7 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
             tower_id=tower_id,
             recovered_id=recovered_id,
             signature=tower_signature,
-            receipt=binascii.hexlify(appointment_receipt).decode(),
+            receipt=appointment_receipt.hex(),
         )
 
     return response

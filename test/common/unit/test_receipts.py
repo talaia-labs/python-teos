@@ -1,7 +1,6 @@
 import struct
 import pytest
 import pyzbase32
-from binascii import hexlify
 from coincurve import PrivateKey
 
 from common import receipts as receipts
@@ -21,9 +20,9 @@ def test_create_registration_receipt():
 
     registration_receipt = receipts.create_registration_receipt(user_id, available_slots, subscription_expiry)
 
-    assert hexlify(registration_receipt[:33]).decode() == user_id
-    assert struct.unpack(">I", registration_receipt[33:37])[0] == available_slots
-    assert struct.unpack(">I", registration_receipt[37:])[0] == subscription_expiry
+    assert registration_receipt[:33].hex() == user_id
+    assert int.from_bytes(registration_receipt[33:37], "big") == available_slots
+    assert int.from_bytes(registration_receipt[37:], "big") == subscription_expiry
 
 
 def test_create_registration_receipt_wrong_inputs():
@@ -55,7 +54,7 @@ def test_create_appointment_receipt(appointment_data):
     # The receipt format is user_signature | start_block
     sk = PrivateKey.from_int(42)
     data = get_random_value_hex(120)
-    signature = Cryptographer.sign(data.encode(), sk)
+    signature = Cryptographer.sign(data.encode("utf-8"), sk)
     start_block = 200
 
     receipt = receipts.create_appointment_receipt(signature, start_block)
@@ -67,7 +66,7 @@ def test_create_appointment_receipt(appointment_data):
 def test_create_appointment_receipt_wrong_inputs():
     sk = PrivateKey.from_int(42)
     data = get_random_value_hex(120)
-    signature = Cryptographer.sign(data.encode(), sk)
+    signature = Cryptographer.sign(data.encode("utf-8"), sk)
     start_block = 200
     overflow_iu4nt = pow(2, 32)
 

@@ -2,7 +2,6 @@ import os.path
 import pyzbase32
 from pathlib import Path
 from hashlib import sha256, new
-from binascii import unhexlify, hexlify
 from coincurve.utils import int_to_bytes
 from coincurve import PrivateKey, PublicKey
 from cryptography.exceptions import InvalidTag
@@ -40,7 +39,7 @@ def hash_160(message):
 
     # Calculate the RIPEMD-160 hash of the given data.
     md = new("ripemd160")
-    md.update(unhexlify(message))
+    md.update(bytes.fromhex(message))
     h160 = md.hexdigest()
 
     return h160
@@ -135,13 +134,12 @@ class Cryptographer:
         Cryptographer.check_data_key_format(message, secret)
 
         # sk is the H(txid) (32-byte) and nonce is set to 0 (12-byte)
-        sk = sha256(unhexlify(secret)).digest()
+        sk = sha256(bytes.fromhex(secret)).digest()
         nonce = bytearray(12)
 
         # Encrypt the data
         cipher = ChaCha20Poly1305(sk)
-        encrypted_blob = cipher.encrypt(nonce=nonce, data=unhexlify(message), associated_data=None)
-        encrypted_blob = hexlify(encrypted_blob).decode("utf8")
+        encrypted_blob = cipher.encrypt(nonce=nonce, data=bytes.fromhex(message), associated_data=None).hex()
 
         return encrypted_blob
 
@@ -168,16 +166,15 @@ class Cryptographer:
         Cryptographer.check_data_key_format(encrypted_blob, secret)
 
         # sk is the H(txid) (32-byte) and nonce is set to 0 (12-byte)
-        sk = sha256(unhexlify(secret)).digest()
+        sk = sha256(bytes.fromhex(secret)).digest()
         nonce = bytearray(12)
 
         # Decrypt
         cipher = ChaCha20Poly1305(sk)
-        data = unhexlify(encrypted_blob)
+        data = bytes.fromhex(encrypted_blob)
 
         try:
-            blob = cipher.decrypt(nonce=nonce, data=data, associated_data=None)
-            blob = hexlify(blob).decode("utf8")
+            blob = cipher.decrypt(nonce=nonce, data=data, associated_data=None).hex()
 
         except InvalidTag:
             raise EncryptionError("Cannot decrypt blob with the provided key", blob=encrypted_blob, key=secret)
@@ -374,8 +371,7 @@ class Cryptographer:
             raise InvalidParameter("Wrong value passed as pk. Received {}, expected (PublicKey)".format(type(pk)))
 
         try:
-            compressed_pk = pk.format(compressed=True)
-            return hexlify(compressed_pk).decode("utf-8")
+            return pk.format(compressed=True).hex()
 
         except TypeError as e:
             raise InvalidKey("PublicKey has invalid initializer", error=str(e))

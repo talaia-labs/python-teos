@@ -107,9 +107,9 @@ def test_identify_user(gatekeeper):
     gatekeeper.add_update_user(user_id)
 
     message = "Hey, it's me"
-    signature = Cryptographer.sign(message.encode(), sk)
+    signature = Cryptographer.sign(message.encode("utf-8"), sk)
 
-    assert gatekeeper.authenticate_user(message.encode(), signature) == user_id
+    assert gatekeeper.authenticate_user(message.encode("utf-8"), signature) == user_id
 
 
 def test_identify_user_non_registered(gatekeeper):
@@ -117,10 +117,10 @@ def test_identify_user_non_registered(gatekeeper):
     sk, pk = generate_keypair()
 
     message = "Hey, it's me"
-    signature = Cryptographer.sign(message.encode(), sk)
+    signature = Cryptographer.sign(message.encode("utf-8"), sk)
 
     with pytest.raises(AuthenticationFailure):
-        gatekeeper.authenticate_user(message.encode(), signature)
+        gatekeeper.authenticate_user(message.encode("utf-8"), signature)
 
 
 def test_identify_user_invalid_signature(gatekeeper):
@@ -129,7 +129,7 @@ def test_identify_user_invalid_signature(gatekeeper):
     signature = get_random_value_hex(72)
 
     with pytest.raises(AuthenticationFailure):
-        gatekeeper.authenticate_user(message.encode(), signature)
+        gatekeeper.authenticate_user(message.encode("utf-8"), signature)
 
 
 def test_identify_user_wrong(gatekeeper):
@@ -137,7 +137,7 @@ def test_identify_user_wrong(gatekeeper):
     sk, pk = generate_keypair()
 
     message = "Hey, it's me"
-    signature = Cryptographer.sign(message.encode(), sk)
+    signature = Cryptographer.sign(message.encode("utf-8"), sk)
 
     # Non-byte message and str sig
     with pytest.raises(AuthenticationFailure):
@@ -145,11 +145,11 @@ def test_identify_user_wrong(gatekeeper):
 
     # byte message and non-str sig
     with pytest.raises(AuthenticationFailure):
-        gatekeeper.authenticate_user(message.encode(), signature.encode())
+        gatekeeper.authenticate_user(message.encode("utf-8"), signature.encode("utf-8"))
 
     # non-byte message and non-str sig
     with pytest.raises(AuthenticationFailure):
-        gatekeeper.authenticate_user(message, signature.encode())
+        gatekeeper.authenticate_user(message, signature.encode("utf-8"))
 
 
 # FIXME: 194 will do with dummy appointment
