@@ -1,7 +1,6 @@
 from multiprocessing import Event
 import grpc
 import pytest
-from binascii import hexlify
 from uuid import uuid4
 
 from google.protobuf import json_format
@@ -34,7 +33,7 @@ MAX_APPOINTMENTS = 100
 teos_sk, teos_pk = generate_keypair()
 
 user_sk, user_pk = generate_keypair()
-user_id = hexlify(user_pk.format(compressed=True)).decode("utf-8")
+user_id = Cryptographer.get_compressed_pk(user_pk)
 
 
 @pytest.fixture(scope="module")

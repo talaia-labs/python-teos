@@ -1,5 +1,4 @@
 import struct
-from binascii import unhexlify
 
 
 class Appointment:
@@ -68,4 +67,4 @@ class Appointment:
         Returns:
               :obj:`bytes`: The serialized data to be signed.
         """
-        return unhexlify(self.locator) + unhexlify(self.encrypted_blob) + struct.pack(">I", self.to_self_delay)
+        return bytes.fromhex(self.locator) + bytes.fromhex(self.encrypted_blob) + self.to_self_delay.to_bytes(4, "big")

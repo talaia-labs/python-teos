@@ -1,18 +1,19 @@
+import configparser
+import logging
 import os
 import random
-import pytest
 import shutil
-import logging
-import configparser
-from time import sleep
-from coincurve import PrivateKey
 from threading import Thread
+from time import sleep
+
+import pytest
+from coincurve import PrivateKey
 from flask import Flask, request, jsonify
 from pyln.testing.fixtures import *  # noqa: F401,F403
 
-from common import errors
-from common import constants
 import common.receipts as receipts
+from common import constants
+from common import errors
 from common.appointment import Appointment
 from common.cryptographer import Cryptographer
 
