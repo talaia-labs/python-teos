@@ -11,6 +11,7 @@ from common.exceptions import BasicException, EncryptionError, InvalidParameter,
 from common.cryptographer import Cryptographer, hash_160
 
 from teos.cleaner import Cleaner
+from teos.chain_monitor import ChainMonitor
 from teos.extended_appointment import ExtendedAppointment
 from teos.block_processor import InvalidTransactionFormat
 
@@ -250,7 +251,7 @@ class Watcher:
     def awake(self):
         """
             Starts a new thread to monitor the blockchain for channel breaches. The thread will run until the
-            :obj:`ChainMonitor` adds the ``"END"`` message to the queue.
+            :obj:`ChainMonitor` adds ``ChainMonitor.END_MESSAGE`` to the queue.
 
             Returns:
                 :obj:`Thread <multithreading.Thread>`: The thread object that was just created and is already running.
@@ -451,8 +452,8 @@ class Watcher:
         while True:
             block_hash = self.block_queue.get()
 
-            # When the ChainMonitor is stopped, a final "END" message is sent
-            if block_hash == "END":
+            # When the ChainMonitor is stopped, a final ChainMonitor.END_MESSAGE message is sent
+            if block_hash == ChainMonitor.END_MESSAGE:
                 break
 
             block = self.block_processor.get_block(block_hash)

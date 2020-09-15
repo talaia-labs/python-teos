@@ -2,7 +2,7 @@ from queue import Queue
 from threading import Thread
 
 from teos.cleaner import Cleaner
-
+from teos.chain_monitor import ChainMonitor
 from teos.logger import get_logger
 from common.constants import IRREVOCABLY_RESOLVED
 
@@ -148,7 +148,7 @@ class Responder:
     def awake(self):
         """
             Starts a new thread to monitor the blockchain to make sure triggered appointments get enough depth.
-            The thread will run until the :obj:`ChainMonitor` adds the ``"END"`` message to the queue.
+            The thread will run until the :obj:`ChainMonitor` adds the ``ChainMonitor.END_MESSAGE`` to the queue.
 
             Returns:
                 :obj:`Thread <multithreading.Thread>`: The thread object that was just created and is already running.
@@ -273,8 +273,8 @@ class Responder:
         while True:
             block_hash = self.block_queue.get()
 
-            # When the ChainMonitor is stopped, a final "END" message is sent
-            if block_hash == "END":
+            # When the ChainMonitor is stopped, a final ChainMonitor.END_MESSAGE is sent
+            if block_hash == ChainMonitor.END_MESSAGE:
                 break
 
             block = self.block_processor.get_block(block_hash)

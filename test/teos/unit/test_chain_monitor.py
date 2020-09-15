@@ -288,9 +288,10 @@ def test_terminate(block_processor):
     generate_blocks(1)
     time.sleep(0.11)  # wait longer than the polling_delta
 
-    # there should be only the "END" message in the receiving queue, as the new block was generated after terminating
+    # there should be only the ChainMonitor.END_MESSAGE message in the receiving queue, as the new block was generated
+    # after terminating
     assert queue.qsize() == 1
-    assert queue.get() == "END"
+    assert queue.get() == ChainMonitor.END_MESSAGE
 
 
 @pytest.mark.timeout(5)
