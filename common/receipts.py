@@ -1,6 +1,5 @@
 import struct
 import pyzbase32
-from binascii import unhexlify
 
 from common.tools import is_compressed_pk, is_u4int
 from common.exceptions import InvalidParameter
@@ -32,7 +31,7 @@ def create_registration_receipt(user_id, available_slots, subscription_expiry):
     elif not is_u4int(subscription_expiry):
         raise InvalidParameter("Provided subscription_expiry must be a 4-byte unsigned integer")
 
-    return unhexlify(user_id) + struct.pack(">I", available_slots) + struct.pack(">I", subscription_expiry)
+    return bytes.fromhex(user_id) + available_slots.to_bytes(4, "big") + subscription_expiry.to_bytes(4, "big")
 
 
 def create_appointment_receipt(user_signature, start_block):

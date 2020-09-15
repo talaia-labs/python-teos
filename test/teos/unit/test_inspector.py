@@ -1,5 +1,4 @@
 import pytest
-from binascii import unhexlify
 
 import common.errors as errors
 from teos.inspector import Inspector, InspectionFailed
@@ -27,7 +26,7 @@ WRONG_TYPES = [
     " " * LOCATOR_LEN_HEX,
     object(),
 ]
-WRONG_TYPES_NO_STR = [[], unhexlify(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
+WRONG_TYPES_NO_STR = [[], bytes.fromhex(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
 
 MIN_TO_SELF_DELAY = config.get("MIN_TO_SELF_DELAY")
 inspector = Inspector(MIN_TO_SELF_DELAY)

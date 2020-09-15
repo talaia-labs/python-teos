@@ -2,7 +2,6 @@ import pytest
 import json
 from time import sleep
 from riemann.tx import Tx
-from binascii import hexlify
 from coincurve import PrivateKey
 
 from contrib.client import teos_client
@@ -317,7 +316,7 @@ def test_two_identical_appointments(run_bitcoind):
 #
 #     # tmp keys from a different user
 #     tmp_user_sk = PrivateKey()
-#     tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
+#     tmp_user_id = Cryptographer.get_compressed_pk(tmp_user_sk.public_key)
 #     teos_client.register(tmp_user_id, teos_base_endpoint)
 #
 #     # Send the appointment twice
@@ -364,7 +363,7 @@ def test_two_appointment_same_locator_different_penalty_different_users(run_bitc
 
     # tmp keys for a different user
     tmp_user_sk = PrivateKey()
-    tmp_user_id = hexlify(tmp_user_sk.public_key.format(compressed=True)).decode("utf-8")
+    tmp_user_id = Cryptographer.get_compressed_pk(tmp_user_sk.public_key)
     teos_client.register(tmp_user_id, teos_id, teos_base_endpoint)
 
     appointment_1 = teos_client.create_appointment(appointment1_data)

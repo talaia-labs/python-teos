@@ -1,7 +1,6 @@
 from enum import Enum
 from queue import Queue
 import zmq
-import binascii
 from threading import Thread, Event, Condition
 
 from teos.logger import get_logger
@@ -139,7 +138,7 @@ class ChainMonitor:
             body = msg[1]
 
             if topic == b"hashblock":
-                block_hash = binascii.hexlify(body).decode("utf-8")
+                block_hash = body.hex()
                 if block_hash not in self.last_tips:
                     self.logger.info("New block received via zmq", block_hash=block_hash)
                     self.enqueue(block_hash)

@@ -4,7 +4,6 @@ import os
 import sys
 import time
 import json
-import binascii
 import requests
 from logging import getLogger
 from sys import argv
@@ -436,7 +435,7 @@ def main(command, args, command_line_conf):
                 logger.info("Subscription expires at block {}".format(subscription_expiry))
 
                 teos_id_file = os.path.join(config.get("DATA_DIR"), "teos_pk")
-                Cryptographer.save_key_file(binascii.unhexlify(teos_id), teos_id_file, config.get("DATA_DIR"))
+                Cryptographer.save_key_file(bytes.fromhex(teos_id), teos_id_file, config.get("DATA_DIR"))
 
         if command == "add_appointment":
             teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
