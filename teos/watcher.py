@@ -296,7 +296,7 @@ class Watcher:
             :obj:`AppointmentNotFound`: if the appointment is not found in the tower.
         """
 
-        message = "get appointment {}".format(locator).encode()
+        message = "get appointment {}".format(locator).encode("utf-8")
         user_id = self.gatekeeper.authenticate_user(message, user_signature)
         uuid = hash_160("{}{}".format(locator, user_id))
 

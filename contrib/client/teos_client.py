@@ -181,7 +181,7 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
         raise InvalidParameter("The provided locator is not valid", locator=locator)
 
     message = "get appointment {}".format(locator)
-    signature = Cryptographer.sign(message.encode(), user_sk)
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
     data = {"locator": locator, "signature": signature}
 
     # Send request to the server.

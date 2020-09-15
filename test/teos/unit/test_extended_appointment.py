@@ -15,7 +15,7 @@ def appointment_data():
     encrypted_blob_data = get_random_value_hex(100)
     to_self_delay = 20
     user_id = Cryptographer.get_compressed_pk(pk)
-    user_signature = Cryptographer.sign(encrypted_blob_data.encode(), sk)
+    user_signature = Cryptographer.sign(encrypted_blob_data.encode("utf-8"), sk)
     start_block = 300
 
     return {

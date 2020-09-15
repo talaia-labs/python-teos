@@ -54,7 +54,7 @@ def test_create_appointment_receipt(appointment_data):
     # The receipt format is user_signature | start_block
     sk = PrivateKey.from_int(42)
     data = get_random_value_hex(120)
-    signature = Cryptographer.sign(data.encode(), sk)
+    signature = Cryptographer.sign(data.encode("utf-8"), sk)
     start_block = 200
 
     receipt = receipts.create_appointment_receipt(signature, start_block)
@@ -66,7 +66,7 @@ def test_create_appointment_receipt(appointment_data):
 def test_create_appointment_receipt_wrong_inputs():
     sk = PrivateKey.from_int(42)
     data = get_random_value_hex(120)
-    signature = Cryptographer.sign(data.encode(), sk)
+    signature = Cryptographer.sign(data.encode("utf-8"), sk)
     start_block = 200
     overflow_iu4nt = pow(2, 32)
 

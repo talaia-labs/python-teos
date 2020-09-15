@@ -195,7 +195,7 @@ def test_get_appointment(internal_api, stub, generate_dummy_appointment):
 
     # Request it back
     message = f"get appointment {appointment.locator}"
-    request_signature = Cryptographer.sign(message.encode(), user_sk)
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
     response = stub.get_appointment(GetAppointmentRequest(locator=appointment.locator, signature=request_signature))
 
     assert isinstance(response, GetAppointmentResponse)
@@ -214,7 +214,7 @@ def test_get_appointment_non_registered(internal_api, stub, generate_dummy_appoi
 
     # Request it back
     message = f"get appointment {appointment.locator}"
-    request_signature = Cryptographer.sign(message.encode(), another_user_sk)
+    request_signature = Cryptographer.sign(message.encode("utf-8"), another_user_sk)
 
     with pytest.raises(grpc.RpcError) as e:
         stub.get_appointment(GetAppointmentRequest(locator=appointment.locator, signature=request_signature))
@@ -223,7 +223,7 @@ def test_get_appointment_non_registered(internal_api, stub, generate_dummy_appoi
     assert "Appointment not found" in e.value.details()
 
     # Notice how the request will succeed if `user` (user_id) requests it
-    request_signature = Cryptographer.sign(message.encode(), user_sk)
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
     response = stub.get_appointment(GetAppointmentRequest(locator=appointment.locator, signature=request_signature))
     assert isinstance(response, GetAppointmentResponse)
 
@@ -235,7 +235,7 @@ def test_get_appointment_non_existent(internal_api, stub):
     # Request it back
     locator = get_random_value_hex(16)
     message = f"get appointment {locator}"
-    request_signature = Cryptographer.sign(message.encode(), user_sk)
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
 
     with pytest.raises(grpc.RpcError) as e:
         stub.get_appointment(GetAppointmentRequest(locator=locator, signature=request_signature))
