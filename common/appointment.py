@@ -1,4 +1,12 @@
-import struct
+from enum import Enum
+
+
+class AppointmentStatus(str, Enum):
+    """Represents all the possible states of an appointment in the system, or in a response to a client request."""
+
+    NOT_FOUND = "not_found"
+    BEING_WATCHED = "being_watched"
+    DISPUTE_RESPONDED = "dispute_responded"
 
 
 class Appointment:

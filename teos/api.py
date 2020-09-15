@@ -3,15 +3,17 @@ from google.protobuf import json_format
 from waitress import serve as wsgi_serve
 from flask import Flask, request, jsonify
 
+
 import common.errors as errors
+from common.appointment import AppointmentStatus
+from common.exceptions import InvalidParameter
+from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 from teos.inspector import Inspector, InspectionFailed
 from teos.protobuf.user_pb2 import RegisterRequest
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
-from common.exceptions import InvalidParameter
 from teos.logger import setup_logging, get_logger
-from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 
 # NOTCOVERED: not sure how to monkey patch this one. May be related to #77
@@ -257,9 +259,11 @@ class API:
             A ``status`` flag is added to the data provided by either the :obj:`Watcher <teos.watcher.Watcher>` or the
             :obj:`Responder <teos.responder.Responder>` that signals the status of the appointment.
 
-            - Appointments hold by the :obj:`Watcher <teos.watcher.Watcher>` are flagged as ``being_watched``.
-            - Appointments hold by the :obj:`Responder <teos.responder.Responder>` are flagged as ``dispute_triggered``.
-            - Unknown appointments are flagged as ``not_found``.
+            - Appointments held by the :obj:`Watcher <teos.watcher.Watcher>` are flagged as
+              ``AppointmentStatus.BEING_WATCHED``.
+            - Appointments held by the :obj:`Responder <teos.responder.Responder>` are flagged as
+              ``AppointmentStatus.DISPUTE_RESPONDED``.
+            - Unknown appointments are flagged as ``AppointmentStatus.NOT_FOUND``.
         """
 
         # Getting the real IP if the server is behind a reverse proxy
@@ -299,6 +303,6 @@ class API:
 
         except (InspectionFailed, grpc.RpcError):
             rcode = HTTP_NOT_FOUND
-            response = {"locator": locator, "status": "not_found"}
+            response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
 
         return jsonify(response), rcode

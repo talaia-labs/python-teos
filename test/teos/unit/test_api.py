@@ -8,7 +8,7 @@ from teos.watcher import Watcher
 from teos.inspector import Inspector
 from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
-from common.appointment import Appointment
+from common.appointment import Appointment, AppointmentStatus
 from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder
 
@@ -468,7 +468,7 @@ def test_get_random_appointment_registered_user(client, user_sk=user_sk):
     # We should get a 404 not found since we are using a made up locator
     received_appointment = r.json
     assert r.status_code == HTTP_NOT_FOUND
-    assert received_appointment.get("status") == "not_found"
+    assert received_appointment.get("status") == AppointmentStatus.NOT_FOUND
 
 
 def test_get_appointment_not_registered_user(client):
@@ -499,7 +499,7 @@ def test_get_appointment_in_watcher(internal_api, client, appointment, monkeypat
     assert r.status_code == HTTP_OK
 
     # Check that the appointment is on the Watcher
-    assert r.json.get("status") == "being_watched"
+    assert r.json.get("status") == AppointmentStatus.BEING_WATCHED
 
     # Cast the extended appointment (used by the tower) to a regular appointment (used by the user)
     appointment = Appointment.from_dict(appointment.to_dict())
@@ -531,7 +531,7 @@ def test_get_appointment_in_responder(internal_api, client, generate_dummy_track
     assert r.status_code == HTTP_OK
 
     # Check that the appointment is on the Responder
-    assert r.json.get("status") == "dispute_responded"
+    assert r.json.get("status") == AppointmentStatus.DISPUTE_RESPONDED
 
     # Check the the sent appointment matches the received one
     assert tx_tracker.locator == r.json.get("locator")

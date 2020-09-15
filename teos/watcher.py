@@ -5,11 +5,10 @@ from readerwriterlock import rwlock
 
 from teos.logger import get_logger
 import common.receipts as receipts
+from common.appointment import AppointmentStatus
 from common.tools import compute_locator
-from common.exceptions import BasicException
-from common.exceptions import EncryptionError
+from common.exceptions import BasicException, EncryptionError, InvalidParameter, SignatureError
 from common.cryptographer import Cryptographer, hash_160
-from common.exceptions import InvalidParameter, SignatureError
 
 from teos.cleaner import Cleaner
 from teos.extended_appointment import ExtendedAppointment
@@ -289,8 +288,8 @@ class Watcher:
             user_signature (:obj:`str`): the signature of the request by the user.
 
         Returns:
-            :obj:`tuple`: A tuple containing the appointment data and the status (either ``"being_watched"`` or
-            ``"dispute_responded"``).
+            :obj:`tuple`: A tuple containing the appointment data and the status, either
+                ``AppointmentStatus.BEING_WATCHED`` or ``AppointmentStatus.DISPUTE_RESPONDED``
 
         Raises:
             :obj:`AppointmentNotFound`: if the appointment is not found in the tower.
@@ -302,10 +301,10 @@ class Watcher:
 
         if uuid in self.appointments:
             appointment_data = self.db_manager.load_watcher_appointment(uuid)
-            status = "being_watched"
+            status = AppointmentStatus.BEING_WATCHED
         elif uuid in self.responder.trackers:
             appointment_data = self.db_manager.load_responder_tracker(uuid)
-            status = "dispute_responded"
+            status = AppointmentStatus.DISPUTE_RESPONDED
         else:
             raise AppointmentNotFound("Cannot find {}".format(locator))
 
@@ -661,7 +660,7 @@ class Watcher:
 
     def get_user_info(self, user_id):
         """
-        Returns the data hold by the tower about the user given an ``user_id``.
+        Returns the data held by the tower about the user given an ``user_id``.
 
         Args:
             user_id (:obj:`str`): the id of the requested user.

@@ -9,7 +9,7 @@ from contrib.client import teos_client
 import common.receipts as receipts
 from common.exceptions import TowerResponseError
 from common.tools import compute_locator
-from common.appointment import Appointment
+from common.appointment import Appointment, AppointmentStatus
 from common.cryptographer import Cryptographer
 
 from teos.cli.teos_cli import RPCClient
@@ -106,7 +106,7 @@ def test_appointment_life_cycle(run_bitcoind):
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
-    assert appointment_info.get("status") == "being_watched"
+    assert appointment_info.get("status") == AppointmentStatus.BEING_WATCHED
     assert appointment_info.get("locator") == locator
     assert appointment_info.get("appointment") == appointment.to_dict()
 
@@ -121,7 +121,7 @@ def test_appointment_life_cycle(run_bitcoind):
     # Trigger a breach and check again
     generate_block_with_transactions(commitment_tx)
     appointment_info = get_appointment_info(locator)
-    assert appointment_info.get("status") == "dispute_responded"
+    assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
     assert appointment_info.get("locator") == locator
     appointments_in_watcher -= 1
     appointments_in_responder += 1
@@ -230,7 +230,7 @@ def test_appointment_malformed_penalty(run_bitcoind):
 
     # Get the information from the tower to check that it matches
     appointment_info = get_appointment_info(locator)
-    assert appointment_info.get("status") == "being_watched"
+    assert appointment_info.get("status") == AppointmentStatus.BEING_WATCHED
     assert appointment_info.get("locator") == locator
     assert appointment_info.get("appointment") == appointment.to_dict()
 
@@ -298,7 +298,7 @@ def test_two_identical_appointments(run_bitcoind):
     # The last appointment should have made it to the Responder
     appointment_info = get_appointment_info(locator)
 
-    assert appointment_info.get("status") == "dispute_responded"
+    assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
     assert appointment_info.get("appointment").get("penalty_rawtx") == penalty_tx
 
 
@@ -325,9 +325,9 @@ def test_two_identical_appointments(run_bitcoind):
 #
 #     # Check that we can get it from both users
 #     appointment_info = get_appointment_info(locator)
-#     assert appointment_info.get("status") == "being_watched"
+#     assert appointment_info.get("status") == AppointmentStatus.BEING_WATCHED
 #     appointment_info = get_appointment_info(locator, sk=tmp_user_sk)
-#     assert appointment_info.get("status") == "being_watched"
+#     assert appointment_info.get("status") == AppointmentStatus.BEING_WATCHED
 #
 #     # Broadcast the commitment transaction and mine a block
 #     generate_block_with_transactions(commitment_tx)
@@ -344,7 +344,7 @@ def test_two_identical_appointments(run_bitcoind):
 #
 #     appointment_info = appointment_info if appointment_info is None else appointment_dup_info
 #
-#     assert appointment_info.get("status") == "dispute_responded"
+#     assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
 #     assert appointment_info.get("appointment").get("penalty_rawtx") == penalty_tx
 
 
@@ -385,7 +385,7 @@ def test_two_appointment_same_locator_different_penalty_different_users(run_bitc
         appointment_info = appointment2_info
         appointment1_data = appointment2_data
 
-    assert appointment_info.get("status") == "dispute_responded"
+    assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
     assert appointment_info.get("locator") == appointment1_data.get("locator")
     assert appointment_info.get("appointment").get("penalty_tx") == appointment1_data.get("penalty_tx")
 
@@ -402,7 +402,7 @@ def test_add_appointment_trigger_on_cache(run_bitcoind):
     # Send the data to the tower and request it back. It should have gone straightaway to the Responder
     appointment = teos_client.create_appointment(appointment_data)
     add_appointment(appointment)
-    assert get_appointment_info(locator).get("status") == "dispute_responded"
+    assert get_appointment_info(locator).get("status") == AppointmentStatus.DISPUTE_RESPONDED
 
 
 def test_add_appointment_invalid_trigger_on_cache(run_bitcoind):
@@ -483,7 +483,7 @@ def test_appointment_shutdown_teos_trigger_back_online(run_bitcoind):
     # Check that the appointment is still in the Watcher
     appointment_info = get_appointment_info(locator)
 
-    assert appointment_info.get("status") == "being_watched"
+    assert appointment_info.get("status") == AppointmentStatus.BEING_WATCHED
     assert appointment_info.get("appointment") == appointment.to_dict()
 
     # Trigger appointment after restart
@@ -491,7 +491,7 @@ def test_appointment_shutdown_teos_trigger_back_online(run_bitcoind):
 
     # The appointment should have been moved to the Responder
     appointment_info = get_appointment_info(locator)
-    assert appointment_info.get("status") == "dispute_responded"
+    assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
 
 
 def test_appointment_shutdown_teos_trigger_while_offline(run_bitcoind):
@@ -509,7 +509,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(run_bitcoind):
 
     # Check that the appointment is still in the Watcher
     appointment_info = get_appointment_info(locator)
-    assert appointment_info.get("status") == "being_watched"
+    assert appointment_info.get("status") == AppointmentStatus.BEING_WATCHED
     assert appointment_info.get("appointment") == appointment.to_dict()
 
     # Shutdown and trigger
@@ -525,4 +525,4 @@ def test_appointment_shutdown_teos_trigger_while_offline(run_bitcoind):
 
     # The appointment should have been moved to the Responder
     appointment_info = get_appointment_info(locator)
-    assert appointment_info.get("status") == "dispute_responded"
+    assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
