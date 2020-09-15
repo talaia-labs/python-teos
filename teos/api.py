@@ -1,5 +1,6 @@
 import grpc
 from google.protobuf import json_format
+from waitress import serve as wsgi_serve
 from flask import Flask, request, jsonify
 
 import common.errors as errors
@@ -80,8 +81,7 @@ def serve(internal_api_endpoint, endpoint, min_to_self_delay, auto_run=False):
     api.logger.info(f"Initialized. Serving at {endpoint}")
 
     if auto_run:
-        host, port = endpoint.split(":")
-        api.app.run(host=host, port=port)
+        wsgi_serve(api.app, listen=endpoint)
     else:
         return api.app
 

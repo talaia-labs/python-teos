@@ -2,7 +2,7 @@ wheel
 zmq
 flask
 grpcio
-cryptography==2.8
+cryptography>=2.8
 coincurve
 pyzbase32
 requests
@@ -10,4 +10,5 @@ plyvel
 readerwriterlock
 structlog
 python-daemon
-gunicorn
+waitress
+gunicorn; platform_system != "Windows"

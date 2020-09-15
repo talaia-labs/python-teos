@@ -119,6 +119,10 @@ def encode_event_dict(event_dict):
     if component:
         sio.write("[" + component + "] ")
 
+    log_level = event_dict.pop("log_level", None)
+    if log_level and log_level != "INFO":
+        sio.write(log_level + ": ")
+
     event = _repr(event_dict.pop("event"))
 
     sio.write(event)
@@ -167,6 +171,7 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
         """
 
         event_dict = json.loads(record.msg)
+        event_dict.update({"log_level": record.levelname})
         message = encode_event_dict(event_dict)
 
         logger = logging.getLogger(record.name)
