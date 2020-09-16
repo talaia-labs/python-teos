@@ -1,6 +1,6 @@
 class TowerInfo:
     """
-    TowerInfo represents all the data the plugin hold about a tower.
+    TowerInfo represents all the data the plugin holds about a tower.
 
     Args:
         netaddr (:obj:`str`): the tower network address.

@@ -32,7 +32,8 @@ class ChainMonitor:
     detected.
     Finally, once the ``terminate`` method is called, the ``status`` is changed to ``ChainMonitorStatus.TERMINATED``,
     the chain monitor stops monitoring the chain and no receiving queue will be notified about new blocks (including
-    any block that is currently in the internal queue). A final ``"END"`` message is sent to all the subscribers.
+    any block that is currently in the internal queue). A final ``ChainMonitor.END_MESSAGE`` is sent to all the
+    subscribers.
 
     Args:
         receiving_queues (:obj:`list`): a list of :obj:`Queue` objects that will be notified when the chain_monitor is
@@ -52,6 +53,8 @@ class ChainMonitor:
         status (:obj:`ChainMonitorStatus`): The current status of the monitor, either ``ChainMonitorStatus.IDLE``,
             ``ChainMonitorStatus.LISTENING``, ``ChainMonitorStatus.ACTIVE`` or ``ChainMonitorStatus.TERMINATED``.
     """
+
+    END_MESSAGE = "END"
 
     def __init__(self, receiving_queues, block_processor, bitcoind_feed_params):
         self.logger = get_logger(component=ChainMonitor.__name__)
@@ -151,7 +154,7 @@ class ChainMonitor:
 
         while self.status != ChainMonitorStatus.TERMINATED:
             message = self.queue.get()
-            # A special "END" message is added to the queue after the status is set to TERMINATED
+            # A special ChainMonitor.END_MESSAGE is added to the queue after the status is set to TERMINATED
             # In all the other cases, message is a block_hash
             with self.lock:
                 for rec_queue in self.receiving_queues:
@@ -164,7 +167,7 @@ class ChainMonitor:
         and creates two threads, one per each monitoring approach (``zmq`` and ``polling``).
 
         Raises:
-            :obj:`RuntimeError`: if the ``status`` was not ``ChainMonitor.IDLE`` when the method was called.
+            :obj:`RuntimeError`: if the ``status`` was not ``ChainMonitorStatus.IDLE`` when the method was called.
         """
 
         if self.status != ChainMonitorStatus.IDLE:
@@ -183,7 +186,7 @@ class ChainMonitor:
         is added to the internal queue.
 
         Raises:
-            :obj:`RuntimeError`: if the ``status`` was not ``ChainMonitor.LISTENING`` when the method was called.
+            :obj:`RuntimeError`: if the ``status`` was not ``ChainMonitorStatus.LISTENING`` when the method was called.
         """
 
         if self.status != ChainMonitorStatus.LISTENING:
@@ -195,9 +198,9 @@ class ChainMonitor:
 
     def terminate(self):
         """
-        Changes the ``status`` of the :obj:`ChainMonitor` to terminated and sends the "END" message to the internal
-        queue. All the threads will stop as soon as possible.
+        Changes the ``status`` of the :obj:`ChainMonitor` to terminated and sends the ``ChainMonitor.END_MESSAGE``
+        message to the internal queue. All the threads will stop as soon as possible.
         """
 
         self.status = ChainMonitorStatus.TERMINATED
-        self.queue.put("END")
+        self.queue.put(ChainMonitor.END_MESSAGE)

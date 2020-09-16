@@ -1,4 +1,3 @@
-import struct
 import pytest
 
 from common.appointment import Appointment

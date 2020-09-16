@@ -12,9 +12,8 @@ from flask import Flask, request, jsonify
 from pyln.testing.fixtures import *  # noqa: F401,F403
 
 import common.receipts as receipts
-from common import constants
-from common import errors
-from common.appointment import Appointment
+from common import constants, errors
+from common.appointment import Appointment, AppointmentStatus
 from common.cryptographer import Cryptographer
 
 plugin_path = os.path.join(os.path.dirname(__file__), "watchtower.py")
@@ -100,11 +99,11 @@ class TowerMock:
         ):
             rcode = constants.HTTP_OK
             response = self.users[user_id]["appointments"][locator]
-            response["status"] = "being_watched"
+            response["status"] = AppointmentStatus.BEING_WATCHED
 
         else:
             rcode = constants.HTTP_NOT_FOUND
-            response = {"locator": locator, "status": "not_found"}
+            response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
 
         return jsonify(response), rcode
 
@@ -421,10 +420,10 @@ def test_get_appointment(node_factory):
     for locator in local_appointments:
         response = l2.rpc.getappointment(tower_id, locator)
         assert response.get("locator") == locator
-        assert response.get("status") == "being_watched"
+        assert response.get("status") == AppointmentStatus.BEING_WATCHED
 
     # Made up appointments should return a 404
     rand_locator = get_random_value_hex(16)
     response = l2.rpc.getappointment(tower_id, rand_locator)
     assert response.get("locator") == rand_locator
-    assert response.get("status") == "not_found"
+    assert response.get("status") == AppointmentStatus.NOT_FOUND

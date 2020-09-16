@@ -4,7 +4,7 @@ from readerwriterlock import rwlock
 from google.protobuf.struct_pb2 import Struct
 
 from teos.logger import get_logger
-from common.appointment import Appointment
+from common.appointment import Appointment, AppointmentStatus
 from common.exceptions import InvalidParameter
 
 from teos.protobuf.appointment_pb2 import (
@@ -122,7 +122,7 @@ class _InternalAPI(TowerServicesServicer):
         with self.rw_lock.gen_rlock():
             try:
                 data, status = self.watcher.get_appointment(request.locator, request.signature)
-                if status == "being_watched":
+                if status == AppointmentStatus.BEING_WATCHED:
                     data = AppointmentData(
                         appointment=AppointmentProto(
                             locator=data.get("locator"),

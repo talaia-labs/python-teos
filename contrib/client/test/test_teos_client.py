@@ -9,7 +9,7 @@ from requests.exceptions import ConnectionError
 
 import common.receipts as receipts
 from common.tools import compute_locator, is_compressed_pk
-from common.appointment import Appointment
+from common.appointment import Appointment, AppointmentStatus
 from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter, InvalidKey, TowerResponseError
 
@@ -247,7 +247,7 @@ def test_get_appointment():
     # Response of get_appointment endpoint is an appointment with status added to it.
     response = {
         "locator": dummy_appointment_dict.get("locator"),
-        "status": "being_watched",
+        "status": AppointmentStatus.BEING_WATCHED,
         "appointment": dummy_appointment_dict,
     }
 
