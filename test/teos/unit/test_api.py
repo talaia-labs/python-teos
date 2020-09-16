@@ -2,6 +2,8 @@ import pytest
 from multiprocessing import Event
 from shutil import rmtree
 
+from bitcoin.core import b2x
+
 from teos.api import API
 import common.errors as errors
 from teos.watcher import Watcher
@@ -403,7 +405,7 @@ def test_add_appointment_update_smaller(internal_api, client, appointment, block
     )
 
 
-def test_add_appointment_in_cache_invalid_transaction(internal_api, client, block_processor):
+def test_add_appointment_in_cache_invalid_transaction(internal_api, client, block_processor, monkeypatch):
     internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
         available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
     )
@@ -411,9 +413,9 @@ def test_add_appointment_in_cache_invalid_transaction(internal_api, client, bloc
     # We need to create the appointment manually
     commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    locator = compute_locator(commitment_tx)
-    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(penalty_tx[::-1], commitment_txid)
+    locator = compute_locator(commitment_txid)
+    dummy_appointment_data = {"tx": b2x(penalty_tx.serialize()), "tx_id": commitment_txid, "to_self_delay": 20}
+    encrypted_blob = Cryptographer.encrypt(b2x(penalty_tx.serialize()), commitment_txid)
 
     appointment_data = {
         "locator": locator,
@@ -536,6 +538,7 @@ def test_get_appointment_in_responder(internal_api, client, generate_dummy_track
 
     # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
     monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
+    monkeypatch.setattr(internal_api.watcher.gatekeeper, "has_subscription_expired", lambda *args: False)
 
     # Request back the data
     message = "get appointment {}".format(tx_tracker.locator)

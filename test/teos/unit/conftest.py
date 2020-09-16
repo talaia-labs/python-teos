@@ -2,6 +2,8 @@ import pytest
 from shutil import rmtree
 from coincurve import PrivateKey
 
+from bitcoin.core import b2x, b2lx
+
 from teos.carrier import Carrier
 from teos.users_dbm import UsersDBM
 from teos.gatekeeper import Gatekeeper
@@ -79,7 +81,7 @@ def generate_keypair():
 
 
 def fork(block_hash, blocks):
-    bitcoin_cli.invalidateblock(block_hash)
+    bitcoin_cli.call("invalidateblock", block_hash)
     bitcoin_cli.generatetoaddress(blocks, bitcoin_cli.getnewaddress())
 
 
@@ -88,18 +90,20 @@ def generate_dummy_appointment(run_bitcoind):
     def _generate_dummy_appointment():
         commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-        dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
+        penalty_tx_hex = b2x(penalty_tx.serialize())
+
+        dummy_appointment_data = {"tx": penalty_tx_hex, "tx_id": commitment_txid, "to_self_delay": 20}
 
         appointment_data = {
             "locator": compute_locator(commitment_txid),
             "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-            "encrypted_blob": Cryptographer.encrypt(penalty_tx, commitment_txid),
+            "encrypted_blob": Cryptographer.encrypt(penalty_tx_hex, commitment_txid),
             "user_id": get_random_value_hex(16),
             "user_signature": get_random_value_hex(50),
             "start_block": 200,
         }
 
-        return ExtendedAppointment.from_dict(appointment_data), commitment_tx
+        return ExtendedAppointment.from_dict(appointment_data), b2x(commitment_tx.serialize())
 
     return _generate_dummy_appointment
 
@@ -109,15 +113,15 @@ def generate_dummy_tracker(run_bitcoind):
     def _generate_dummy_tracker(commitment_tx=None):
         if not commitment_tx:
             commitment_tx = create_commitment_tx()
-        decoded_commitment_tx = bitcoin_cli.decoderawtransaction(commitment_tx)
+        decoded_commitment_tx = bitcoin_cli.call("decoderawtransaction", b2x(commitment_tx.serialize()))
         penalty_tx = create_penalty_tx(decoded_commitment_tx)
         locator = decoded_commitment_tx.get("txid")[:LOCATOR_LEN_HEX]
 
         tracker_data = dict(
             locator=locator,
-            dispute_txid=bitcoin_cli.decoderawtransaction(commitment_tx).get("txid"),
-            penalty_txid=bitcoin_cli.decoderawtransaction(penalty_tx).get("txid"),
-            penalty_rawtx=penalty_tx,
+            dispute_txid=b2lx(commitment_tx.GetTxid()),
+            penalty_txid=b2lx(penalty_tx.GetTxid()),
+            penalty_rawtx=b2x(penalty_tx.serialize()),
             user_id="02" + get_random_value_hex(32),
         )
 

@@ -1,7 +1,8 @@
 from socket import timeout
 from http.client import HTTPException
 
-from teos.utils.auth_proxy import AuthServiceProxy, JSONRPCException
+import bitcoin.rpc
+from bitcoin.rpc import JSONRPCError
 
 from common.constants import MAINNET_RPC_PORT, TESTNET_RPC_PORT, REGTEST_RPC_PORT
 
@@ -20,11 +21,11 @@ def bitcoin_cli(btc_connect_params):
             (``rpc user, rpc password, host and port``)
 
     Returns:
-        :obj:`AuthServiceProxy <teos.utils.auth_proxy.AuthServiceProxy>`: An authenticated service proxy to ``bitcoind``
+        :obj:`Proxy <bitcoin.rpc.Proxy>`: An authenticated service proxy to ``bitcoind``
         that can be used to send ``json-rpc`` commands.
     """
 
-    return AuthServiceProxy(
+    return bitcoin.rpc.Proxy(
         "http://%s:%s@%s:%d"
         % (
             btc_connect_params.get("BTC_RPC_USER"),
@@ -50,8 +51,8 @@ def can_connect_to_bitcoind(btc_connect_params):
     can_connect = True
 
     try:
-        bitcoin_cli(btc_connect_params).help()
-    except (timeout, ConnectionRefusedError, JSONRPCException, HTTPException, OSError):
+        bitcoin_cli(btc_connect_params).getbestblockhash()
+    except (timeout, ConnectionRefusedError, JSONRPCError, HTTPException, OSError) as e:
         can_connect = False
 
     return can_connect
