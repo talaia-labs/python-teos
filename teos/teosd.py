@@ -290,9 +290,7 @@ class TeosDaemon:
             self.api_proc.terminate()
             self.api_proc.wait()
         elif isinstance(self.api_proc, multiprocessing.Process):
-            # FIXME: when the public API process is ran with flask, there is no SIGTERM handler attempting
-            # a graceful shutdown (rejecting new requests, trying to complete ongoing ones); therefore, we send
-            # a SIGKILL instead.
+            # FIXME: using SIGKILL for now, adapt it to use SIGTERM so the shutdown can be grateful
             self.api_proc.kill()
             self.api_proc.join()
 
@@ -360,6 +358,10 @@ def main(config):
         if not secret_key_der:
             raise IOError("TEOS private key cannot be loaded")
         sk = Cryptographer.load_private_key_der(secret_key_der)
+
+    # Windows cannot run gunicorn
+    if os.name == "nt" and config.get("WSGI") == "gunicorn":
+        logger.warning("Windows cannot run gunicorn as WSGI. Changing to waitress")
 
     try:
         TeosDaemon(config, sk, logger).start()
@@ -437,10 +439,10 @@ if __name__ == "__main__":
             if opt in ["--datadir"]:
                 data_dir = os.path.expanduser(arg)
             if opt in ["--wsgi"]:
-                if arg in ["gunicorn", "flask"]:
+                if arg in ["gunicorn", "waitress"]:
                     command_line_conf["WSGI"] = arg
                 else:
-                    exit("wsgi must be either gunicorn or flask")
+                    exit("wsgi must be either gunicorn or waitress")
             if opt in ["-d", "--daemon"]:
                 command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:

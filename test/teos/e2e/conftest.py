@@ -47,8 +47,9 @@ def run_teosd():
 
     teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
 
-    # Set teos to run with flask (should be good enough for testing).
-    config["WSGI"] = "flask"
+    # Change the default WSGI for Windows
+    if os.name == "nt":
+        config["WSGI"] = "waitress"
     teosd_process = Process(target=main, kwargs={"config": config})
     teosd_process.start()
 
