@@ -11,7 +11,7 @@ import json
 from io import StringIO
 
 from teos.tools import ignore_signal
-from common.constants import TCP_LOGGING_PORT
+from teos.constants import TCP_LOGGING_PORT
 
 configured = False  # set to True once setup_logging is called
 
