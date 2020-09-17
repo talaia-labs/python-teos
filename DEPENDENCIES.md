@@ -58,7 +58,7 @@ And, if it happens to be installed, change the alias to `pip3`, or use `pip3` in
 
 You can get Bitcoin Core from [bitcoin.org](https://bitcoin.org/en/download).
 
-Bitcoin needs to be running with the following options enables:
+Bitcoin needs to be running with the following options enabled:
 
 - `zmq` for rawblockhash notifications
 - `txindex` to be able to look for non-wallet transactions
@@ -114,15 +114,5 @@ and for `pip3`:
 
 ## Python Dependencies
 
-`teos` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
-
-- `wheel`
-- `zmq`
-- `flask`
-- `cryptography`
-- `coincurve`
-- `pyzbase32`
-- `requests`
-- `plyvel`
-- `readerwriterlock`
+`teos` has several python dependencies, which can be satisfied by using `pip install -r requirements.txt`
 

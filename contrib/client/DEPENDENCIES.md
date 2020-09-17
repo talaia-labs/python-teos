@@ -75,8 +75,4 @@ and for `pip3`:
 
 ## Python dependencies
 
-`teos_client` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
-
-- `cryptography`
-- `requests`
-- `structlog`
+`teos_client` has several python dependencies, which can be satisfied by using `pip install -r requirements.txt`
