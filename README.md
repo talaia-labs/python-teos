@@ -13,7 +13,9 @@ The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://git
 - `common`: including shared functionality between `teos` and `cli`.
 - `watchtower-plugin`: including a watchtower client plugin for c-lightning.
 
-Additionally `contrib` contains tools that are external to the tower (currently `teos_client`, an example Python client for the tower). Tests for every module can be found at `tests`.
+Additionally `contrib` contains tools that are external to the tower (currently `teos_client`, an example Python client for the tower). 
+
+Tests for every module can be found at `tests`.
 
 ## Dependencies
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
@@ -26,8 +28,6 @@ Refer to [INSTALL.md](INSTALL.md)
 
 Make sure bitcoind is running before running TEOS (it will fail at startup if it cannot connect to bitcoind). You can find
 [here](DEPENDENCIES.md#installing-bitcoind) a sample config file.
-
-Before you can run TEOS, you need to follow a few more configuration steps.
 
 ### Starting the TEOS daemon 👁
 
@@ -84,7 +84,7 @@ btc_network = regtest
 ```
 
 ## Running `teos` in a docker container
-A `teos` image can be built from the Dockerfile located in `/docker`. You can create the image by running:
+A `teos` image can be built from the Dockerfile located in `docker/`. You can create the image by running:
 
 	cd python-teos
 	docker build -f docker/Dockerfile -t teos .
@@ -161,7 +161,7 @@ Otherwise it will bind to `localost` and we won't be able to send requests to th
 
 ## Interacting with a TEOS Instance
 
-You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `cli`. This is an admin tool that has privileged access to the watchtower, and it should therefore only be used within a trusted environment (for example, the same machine).
+You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `teos/cli`. This is an admin tool that has privileged access to the watchtower, and it should therefore only be used within a trusted environment (for example, the same machine).
 
 While `teos_cli` works independently of `teos`, it shares the same configuration file by default, of which it only uses a subset of its settings. The folder can be changed using the `--datadir` command line argument, if desired.
 

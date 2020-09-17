@@ -5,7 +5,7 @@ import sys
 import time
 import json
 import requests
-from logging import getLogger
+import logging
 from sys import argv
 from uuid import uuid4
 from coincurve import PublicKey
@@ -25,7 +25,9 @@ from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compre
 from contrib.client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from contrib.client.help import show_usage, help_add_appointment, help_get_appointment, help_register
 
-logger = getLogger("Client")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+logger = logging.getLogger()
 
 
 def register(user_id, teos_id, teos_url):
