@@ -51,7 +51,7 @@ And, if it happens to be installed, change the alias to `pip3`, or use `pip3` in
 
 ### Installing the dependencies
 
-`python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
+`python3` can be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
 
 #### Ubuntu
 

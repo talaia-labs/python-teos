@@ -90,7 +90,7 @@ maxtxfee=1
 
 ### Installing the Dependencies
 
-`python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
+`python3` can be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
 
 #### Ubuntu
 

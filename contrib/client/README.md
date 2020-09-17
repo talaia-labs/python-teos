@@ -13,8 +13,14 @@ Refer to [INSTALL.md](INSTALL.md)
 
 ## Usage
 
+If the root of teos was added to the PATH:
+
 	python -m teos_client [global options] command [command options] [arguments]
-	
+
+Otherwise, from the root folder of teos, you can run it as:
+
+	python -m contrib.client.teos_client [global options] command [command options] [arguments]
+
 #### Global options
 
 - `--apiconnect`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
@@ -23,7 +29,7 @@ Refer to [INSTALL.md](INSTALL.md)
 
 #### Commands
 
-The command line interface has, currently, four commands:
+The client has four commands:
 
 - `register`: registers your user with the tower.
 - `add_appointment`: sends a json formatted appointment to the tower.
@@ -31,14 +37,13 @@ The command line interface has, currently, four commands:
 - `help`: shows a list of commands or help for a specific command.
 
 ### register
-This commands serves as registration. It sends your public key to the tower to create a subscription (fee atm) and returns a number of available appointment slots in the tower. Toping up the subscription can be done by simply sending a register message again.
+This commands serves as registration. It sends your public key to the tower to create a subscription (free at the moment) and returns a number of available appointment slots in the tower. Topping up the subscription can be done by simply sending a register message again.
 
-Notice that you need to be register before sending any other type of request to the tower.
+Notice that you need to be registered before sending any other type of request to the tower.
 
 #### Usage
 
 	python -m teos_client register tower_id
-	
 	
 ### add_appointment
 
@@ -48,7 +53,7 @@ This command is used to send appointments to the watchtower. Appointments **must
 	  "tx_id": tx_id,
 	  "to_self_delay": d }
 	
-`tx` **must** be the raw penalty transaction that will be encrypted before sent to the watchtower. `type(tx) = hex encoded str`
+`tx` **must** be the raw penalty transaction that will be encrypted before being sent to the watchtower. `type(tx) = hex encoded str`
 
 `tx_id` **must** match the **commitment transaction id**, and will be used to encrypt the **penalty transaction** and **generate the locator**. `type(tx_id) = hex encoded str`
 

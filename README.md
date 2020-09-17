@@ -8,12 +8,12 @@ The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://git
 
 `teos` consists in four main modules:
 
-- `teos`: including the tower's main functionality (server-side)
-- `cli`: including a reference command line interface (client-side)
+- `teos`: including the tower's main functionality (server-side).
+- `cli`: including a reference command line interface (client-side).
 - `common`: including shared functionality between `teos` and `cli`.
 - `watchtower-plugin`: including a watchtower client plugin for c-lightning.
 
-Additionally, tests for every module can be found at `tests`.
+Additionally `contrib` contains tools that are external to the tower (currently `teos_client`, an example Python client for the tower). Tests for every module can be found at `tests`.
 
 ## Dependencies
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
@@ -161,17 +161,23 @@ Otherwise it will bind to `localost` and we won't be able to send requests to th
 
 ## Interacting with a TEOS Instance
 
-You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `cli`.
+You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `cli`. This is an admin tool that has privileged access to the watchtower, and it should therefore only be used within a trusted environment (for example, the same machine).
 
-Since `teos_cli` works independently of `teos`, it uses a different configuration. The defaults can be found at [cli/\_\_init\_\_.py](cli/__init__.py). The same approach as with `teosd` is followed:
+While `teos_cli` works independently of `teos`, it shares the same configuration file by default, of which it only uses a subset of its settings. The folder can be changed using the `--datadir` command line argument, if desired.
 
-- A config file (`~/.teos_cli/teos_cli.conf`) can be set to change the defaults.
-- Some options ca also be changed via command line. 
-- The configuration file template can be found at [cli/template.conf](cli/template.conf))
+For help on the available arguments and commands, you can run:
 
-`teos_cli` needs an independent set of keys that are also automatically generated in the same way as `teos`.
+```
+python -m teos.cli.teos_cli -h
+```
 
-Notice that `teos_cli` is a simple way to interact with `teos`, but ideally that should be part of your wallet functionality (therefore why they are independent entities). `teos_cli` can be used as an example for how to send data to a [BOLT13](https://github.com/sr-gi/bolt13) compliant watchtower.
+## Interacting with TEOS as a client
+
+The [contrib/client](contrib/client) folder contains an example Python client that can interact with the watchtower in order to register, add appointments and later retrieve them.
+
+See [here](contrib/client) for more information on how to use the client.
+
+Note that while the client is a simple way to interact with `teos`, ideally its functionality should be part of your wallet or lightning node. `teos_client` can be used as an example for how to send data to a [BOLT13](https://github.com/sr-gi/bolt13) compliant watchtower.
 
 ## Contributing 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md)
