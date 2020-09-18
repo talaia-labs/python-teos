@@ -370,7 +370,7 @@ def main(config):
         exit(1)
 
 
-if __name__ == "__main__":
+def run():
     # Subprocess need to be run using "spawn" for consistent execution between different OS. No state is really shared
     # between process.
     multiprocessing.set_start_method("spawn")
@@ -461,3 +461,7 @@ if __name__ == "__main__":
             main(config)
     else:
         main(config)
+
+
+if __name__ == "__main__":
+    run()

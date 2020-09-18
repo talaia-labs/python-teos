@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import sys
 import json
@@ -185,7 +183,7 @@ def main(command, args, data_dir, command_line_conf):
         sys.exit(f"Unknown error occurred: {str(e)}")
 
 
-if __name__ == "__main__":
+def run():
     command_line_conf = {}
     commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "stop", "help"]
 
@@ -222,3 +220,7 @@ if __name__ == "__main__":
 
     except GetoptError as e:
         sys.exit("{}".format(e))
+
+
+if __name__ == "__main__":
+    run()
