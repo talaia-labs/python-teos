@@ -9,8 +9,8 @@ The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://git
 `teos` consists in four main modules:
 
 - `teos`: including the tower's main functionality (server-side).
-- `cli`: including a reference command line interface (client-side).
-- `common`: including shared functionality between `teos` and `cli`.
+- `cli`: including a reference command line interface.
+- `common`: including shared functionality between server and client side (useful to build a client).
 - `watchtower-plugin`: including a watchtower client plugin for c-lightning.
 
 Additionally `contrib` contains tools that are external to the tower (currently `teos_client`, an example Python client for the tower). 
@@ -84,7 +84,7 @@ btc_network = regtest
 ```
 
 ## Running `teos` in a docker container
-A `teos` image can be built from the Dockerfile located in `docker/`. You can create the image by running:
+A `teos` image can be built from the Dockerfile located in `docker`. You can create the image by running:
 
 	cd python-teos
 	docker build -f docker/Dockerfile -t teos .
