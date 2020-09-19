@@ -19,7 +19,7 @@ from common.appointment import Appointment
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
-from common.exceptions import InvalidKey, InvalidParameter, SignatureError, TowerResponseError
+from common.exceptions import BasicException, InvalidKey, InvalidParameter, SignatureError, TowerResponseError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 from contrib.client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
@@ -482,10 +482,8 @@ def main(command, args, command_line_conf):
             else:
                 sys.exit(show_usage())
 
-    except (FileNotFoundError, IOError, ConnectionError, ValueError) as e:
+    except (FileNotFoundError, IOError, ConnectionError, ValueError, BasicException,) as e:
         logger.error(str(e))
-    except (InvalidKey, InvalidParameter, TowerResponseError, SignatureError) as e:
-        logger.error(e.msg, **e.kwargs)
     except Exception as e:
         logger.error("Unknown error occurred", error=str(e))
 
