@@ -463,7 +463,7 @@ def test_get_completed_trackers(db_manager, gatekeeper, carrier, responder, bloc
     assert set(completed_trackers) == set(ended_trackers_keys)
 
 
-def test_get_expired_trackers(responder, generate_dummy_tracker):
+def test_get_outdated_trackers(responder, generate_dummy_tracker):
     # Expired trackers are those whose subscription has reached the expiry block and have not been confirmed.
     # Confirmed trackers that have reached their expiry will be kept until completed
     current_block = responder.block_processor.get_block_count()
@@ -479,14 +479,14 @@ def test_get_expired_trackers(responder, generate_dummy_tracker):
     )
 
     # And create some trackers and add them to the corresponding user in the Gatekeeper
-    expired_unconfirmed_trackers_15 = {}
-    expired_unconfirmed_trackers_16 = {}
-    expired_confirmed_trackers_15 = {}
+    outdated_unconfirmed_trackers_15 = {}
+    outdated_unconfirmed_trackers_16 = {}
+    outdated_confirmed_trackers_15 = {}
     for _ in range(10):
         uuid = uuid4().hex
         dummy_tracker = generate_dummy_tracker()
         dummy_tracker.user_id = user1_id
-        expired_unconfirmed_trackers_15[uuid] = dummy_tracker
+        outdated_unconfirmed_trackers_15[uuid] = dummy_tracker
         responder.unconfirmed_txs.append(dummy_tracker.penalty_txid)
         # Assume the appointment only took a single slot
         responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
@@ -495,7 +495,7 @@ def test_get_expired_trackers(responder, generate_dummy_tracker):
         uuid = uuid4().hex
         dummy_tracker = generate_dummy_tracker()
         dummy_tracker.user_id = user1_id
-        expired_confirmed_trackers_15[uuid] = dummy_tracker
+        outdated_confirmed_trackers_15[uuid] = dummy_tracker
         # Assume the appointment only took a single slot
         responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
 
@@ -503,31 +503,31 @@ def test_get_expired_trackers(responder, generate_dummy_tracker):
         uuid = uuid4().hex
         dummy_tracker = generate_dummy_tracker()
         dummy_tracker.user_id = user2_id
-        expired_unconfirmed_trackers_16[uuid] = dummy_tracker
+        outdated_unconfirmed_trackers_16[uuid] = dummy_tracker
         responder.unconfirmed_txs.append(dummy_tracker.penalty_txid)
         # Assume the appointment only took a single slot
         responder.gatekeeper.registered_users[dummy_tracker.user_id].appointments[uuid] = 1
 
     all_trackers = {}
-    all_trackers.update(expired_confirmed_trackers_15)
-    all_trackers.update(expired_unconfirmed_trackers_15)
-    all_trackers.update(expired_unconfirmed_trackers_16)
+    all_trackers.update(outdated_confirmed_trackers_15)
+    all_trackers.update(outdated_unconfirmed_trackers_15)
+    all_trackers.update(outdated_unconfirmed_trackers_16)
 
     # Add everything to the Responder
     for uuid, tracker in all_trackers.items():
         responder.trackers[uuid] = tracker.get_summary()
 
-    # Currently nothing should be expired
-    assert responder.get_expired_trackers(current_block) == []
+    # Currently nothing should be outdated
+    assert responder.get_outdated_trackers(current_block) == []
 
-    # 15 blocks (+ EXPIRY_DELTA) afterwards only user1's confirmed trackers should be expired
-    assert responder.get_expired_trackers(current_block + 15 + config.get("EXPIRY_DELTA")) == list(
-        expired_unconfirmed_trackers_15.keys()
+    # 15 blocks (+ EXPIRY_DELTA) afterwards only user1's confirmed trackers should be outdated
+    assert responder.get_outdated_trackers(current_block + 15 + config.get("EXPIRY_DELTA")) == list(
+        outdated_unconfirmed_trackers_15.keys()
     )
 
-    # 1 (+ EXPIRY_DELTA) block after that user2's should be expired
-    assert responder.get_expired_trackers(current_block + 16 + config.get("EXPIRY_DELTA")) == list(
-        expired_unconfirmed_trackers_16.keys()
+    # 1 (+ EXPIRY_DELTA) block after that user2's should be outdated
+    assert responder.get_outdated_trackers(current_block + 16 + config.get("EXPIRY_DELTA")) == list(
+        outdated_unconfirmed_trackers_16.keys()
     )
 
 

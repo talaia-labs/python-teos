@@ -189,8 +189,10 @@ def test_register_json_no_inner_dict(client):
 
 
 def test_add_appointment(internal_api, client, appointment, block_processor):
-    # Simulate the user registration (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
+    # Simulate the user registration (end time does not matter here as long as it is in the future)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
+    )
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -277,7 +279,9 @@ def test_add_appointment_multiple_times_same_user(
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
     # Simulate registering enough slots (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=n, subscription_expiry=0)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=n, subscription_expiry=block_processor.get_block_count() + 1
+    )
     for _ in range(n):
         r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
         assert r.status_code == HTTP_OK
@@ -301,7 +305,9 @@ def test_add_appointment_multiple_times_different_users(
     # Add one slot per public key
     for pair in user_keys:
         user_id = Cryptographer.get_compressed_pk(pair[1])
-        internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
+        internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+            available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
+        )
 
     # Send the appointments
     for compressed_pk, signature in zip(tmp_user_ids, signatures):
@@ -317,7 +323,9 @@ def test_add_appointment_multiple_times_different_users(
 # FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_update_same_size(internal_api, client, appointment, block_processor):
     # Update an appointment by one of the same size and check that no additional slots are filled
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
+    )
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
@@ -342,7 +350,9 @@ def test_add_appointment_update_same_size(internal_api, client, appointment, blo
 # FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_update_bigger(internal_api, client, appointment, block_processor):
     # Update an appointment by one bigger, and check additional slots are filled
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=2, subscription_expiry=0)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=2, subscription_expiry=block_processor.get_block_count() + 1
+    )
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
@@ -369,7 +379,9 @@ def test_add_appointment_update_bigger(internal_api, client, appointment, block_
 # FIXME: 194 will do with dummy appointment and block_processor
 def test_add_appointment_update_smaller(internal_api, client, appointment, block_processor):
     # Update an appointment by one bigger, and check slots are freed
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=2, subscription_expiry=0)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=2, subscription_expiry=block_processor.get_block_count() + 1
+    )
     # This should take 2 slots
     appointment.encrypted_blob = TWO_SLOTS_BLOTS
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -392,7 +404,9 @@ def test_add_appointment_update_smaller(internal_api, client, appointment, block
 
 
 def test_add_appointment_in_cache_invalid_transaction(internal_api, client, block_processor):
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
+    )
 
     # We need to create the appointment manually
     commitment_tx, commitment_txid, penalty_tx = create_txs()
@@ -426,7 +440,9 @@ def test_add_appointment_in_cache_invalid_transaction(internal_api, client, bloc
 # FIXME: 194 will do with dummy appointment and block processor
 def test_add_too_many_appointment(internal_api, client, block_processor, generate_dummy_appointment):
     # Give slots to the user
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=200, subscription_expiry=0)
+    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=200, subscription_expiry=block_processor.get_block_count() + 1
+    )
 
     free_appointment_slots = MAX_APPOINTMENTS - len(internal_api.watcher.appointments)
 
