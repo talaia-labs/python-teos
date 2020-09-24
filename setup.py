@@ -23,7 +23,6 @@ for package in PACKAGES:
 CLASSIFIERS = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3 :: Only",
@@ -45,7 +44,7 @@ setuptools.setup(
     url="https://github.com/talaia-labs/python-teos",
     packages=setuptools.find_packages(include=PACKAGES),
     classifiers=CLASSIFIERS,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=requirements,
     entry_points={"console_scripts": ["teosd=teos.teosd:run", "teos_cli=teos.cli.teos_cli:run"]},
 )

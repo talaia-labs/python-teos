@@ -6,7 +6,7 @@
 
 `teos` has the following system-wide dependencies:
 
-- `python3` version 3.6+
+- `python3` version 3.7+
 - `pip3`
 - `openssl` version 1.1+
 - `bitcoind`
