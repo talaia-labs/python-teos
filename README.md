@@ -98,6 +98,8 @@ Notice that ENV variables are optional, if unset the corresponding default setti
 ```
 - API_BIND=<teos_api_hostname>
 - API_PORT=<teos_api_port>
+- RPC_BIND=<teos_rpc_hostname>
+- RPC_PORT=<teos_rpc_port>
 - BTC_NETWORK=<btc_network>
 - BTC_RPC_CONNECT=<btc_node_hostname>
 - BTC_RPC_PORT=<btc_node_port>

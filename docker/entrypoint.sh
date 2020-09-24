@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-START_COMMAND="python3 -m teos.teosd "
+START_COMMAND="teosd "
 
 if [[ ! -z ${API_BIND} ]]; then
     START_COMMAND=$START_COMMAND" --apibind=""$API_BIND"
@@ -8,6 +8,14 @@ fi
 
 if [[ ! -z ${API_PORT} ]]; then
     START_COMMAND=$START_COMMAND" --apiport=""$API_PORT"
+fi
+
+if [[ ! -z ${RPC_BIND} ]]; then
+    START_COMMAND=$START_COMMAND" --rpcbind=""$RPC_BIND"
+fi
+
+if [[ ! -z ${RPC_PORT} ]]; then
+    START_COMMAND=$START_COMMAND" --rpcport=""$RPC_PORT"
 fi
 
 if [[ ! -z ${BTC_NETWORK} ]]; then
