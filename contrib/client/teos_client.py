@@ -488,7 +488,7 @@ def main(command, args, command_line_conf):
         logger.error("Unknown error occurred", error=str(e))
 
 
-if __name__ == "__main__":
+def run():
     command_line_conf = {}
     commands = ["register", "add_appointment", "get_appointment", "help"]
 
@@ -520,3 +520,7 @@ if __name__ == "__main__":
 
     except GetoptError as e:
         sys.exit("{}".format(e))
+
+
+if __name__ == "__main__":
+    run()
