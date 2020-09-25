@@ -1,7 +1,7 @@
 def show_usage():
     return (
         "USAGE: "
-        "\n\tpython teos_client.py [global options] command [command options] [arguments]"
+        "\n\tteos-client [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
         "\n\tregister \t\tRegisters your user public key with the tower."
         "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
@@ -20,7 +20,7 @@ def help_register():
         "NAME:"
         "\n\n\tregister"
         "\n\nUSAGE:"
-        '\n\n\tpython teos_client.py register "tower_id"'
+        '\n\n\tteos-client register "tower_id"'
         "\n\nDESCRIPTION:"
         "\n\n\tRegisters your user public key with the tower."
     )
@@ -31,8 +31,8 @@ def help_add_appointment():
         "NAME:"
         "\n\tadd_appointment - Registers a json formatted appointment to the tower."
         "\n\nUSAGE:"
-        '\n\tpython teos_client.py add_appointment "appointment"'
-        '\n\tpython teos_client.py add_appointment -f "path_to_appointment_file"'
+        '\n\tteos-client add_appointment "appointment"'
+        '\n\tteos-client add_appointment -f "path_to_appointment_file"'
         "\n\nDESCRIPTION:"
         "\n\n\tRegisters a json-formatted appointment to the tower."
         "\n\tIf -f, --file *is* specified, then the command expects a path to a json file instead of a json encoded "
@@ -45,7 +45,7 @@ def help_get_appointment():
         "NAME:"
         "\n\tget_appointment - Gets json formatted data about an appointment from the tower."
         "\n\nUSAGE:"
-        '\n\tpython teos_client.py get_appointment "appointment_locator"'
+        '\n\tteos-client get_appointment "appointment_locator"'
         "\n\nDESCRIPTION:"
         "\n\n\tGets json formatted data about an appointment from the tower.\n"
     )
