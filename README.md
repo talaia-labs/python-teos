@@ -6,7 +6,7 @@ Currently working on updating the software to match [BOLT13 rev1](https://github
 
 The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://github.com/sr-gi/bolt13), written in Python 3.
 
-`teos` consists in four main modules:
+`python-teos` consists in four main modules:
 
 - `teos`: including the tower's main functionality (server-side).
 - `cli`: including a reference command line interface.
@@ -32,7 +32,7 @@ Make sure bitcoind is running before running TEOS (it will fail at startup if it
 
 ### Starting the TEOS daemon 👁
 
-You can run `teos` by running `teosd.py` under `teos`:
+Once installed, you can start the tower by running:
 
 ```
 teosd
@@ -50,7 +50,7 @@ To change the configuration defaults you can:
 
 and / or 
 
-- Add some global options when running the daemon (run `teosd.py -h` for more info).
+- Add some global options when running the daemon (run `teosd -h` for more info).
 
 ### Passing command line options to `teosd`
 
