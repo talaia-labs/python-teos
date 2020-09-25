@@ -112,7 +112,10 @@ and for `pip3`:
 
 `pip3` will be installed alongside `python3` in this case.
 
-## Python Dependencies
+## Python Dependencies	
 
-`teos` has several python dependencies, which can be satisfied by using `pip install -r requirements.txt`
+ `teos` has several python dependencies that are automatically alongside the it. Should you need to install them manually, you can do so by running:
 
+```
+ pip install -r requirements.txt`
+```

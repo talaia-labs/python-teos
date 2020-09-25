@@ -18,6 +18,7 @@ Additionally `contrib` contains tools that are external to the tower (currently 
 Tests for every module can be found at `tests`.
 
 ## Dependencies
+
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
 
 ## Installation
@@ -34,7 +35,7 @@ Make sure bitcoind is running before running TEOS (it will fail at startup if it
 You can run `teos` by running `teosd.py` under `teos`:
 
 ```
-python -m teos.teosd
+teosd
 ```
 
 ### Configuration file and command line parameters
@@ -56,7 +57,7 @@ and / or
 Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
 
 ```
-python -m teos.teosd --btcnetwork=regtest
+teosd --btcnetwork=regtest
 ```
 
 ### Running TEOS in another network
@@ -163,14 +164,14 @@ Otherwise it will bind to `localost` and we won't be able to send requests to th
 
 ## Interacting with a TEOS Instance
 
-You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `teos/cli`. This is an admin tool that has privileged access to the watchtower, and it should therefore only be used within a trusted environment (for example, the same machine).
+You can interact with a `teos` instance (either run by yourself or someone else) by using `teos-cli` under `teos/cli`. This is an admin tool that has privileged access to the watchtower, and it should therefore only be used within a trusted environment (for example, the same machine).
 
-While `teos_cli` works independently of `teos`, it shares the same configuration file by default, of which it only uses a subset of its settings. The folder can be changed using the `--datadir` command line argument, if desired.
+While `teos-cli` works independently of `teos`, it shares the same configuration file by default, of which it only uses a subset of its settings. The folder can be changed using the `--datadir` command line argument, if desired.
 
 For help on the available arguments and commands, you can run:
 
 ```
-python -m teos.cli.teos_cli -h
+teos-cli -h
 ```
 
 ## Interacting with TEOS as a client
