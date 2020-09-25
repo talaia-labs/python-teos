@@ -62,7 +62,7 @@ class TowerMock:
             "public_key": user_id,
             "available_slots": self.users[user_id].get("available_slots"),
             "subscription_expiry": self.users[user_id].get("subscription_expiry"),
-            "signature": Cryptographer.sign(registration_receipt, self.sk),
+            "subscription_signature": Cryptographer.sign(registration_receipt, self.sk),
         }
 
         return response, rcode

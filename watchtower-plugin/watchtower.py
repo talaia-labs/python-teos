@@ -173,7 +173,7 @@ def register(plugin, tower_id, host=None, port=None):
         response = process_post_response(post_request(data, register_endpoint, tower_id))
         available_slots = response.get("available_slots")
         subscription_expiry = response.get("subscription_expiry")
-        tower_signature = response.get("signature")
+        tower_signature = response.get("subscription_signature")
 
         if available_slots is None or not isinstance(available_slots, int):
             raise TowerResponseError(f"available_slots is missing or of wrong type ({available_slots})")
