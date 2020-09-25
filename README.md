@@ -18,6 +18,7 @@ Additionally `contrib` contains tools that are external to the tower (currently 
 Tests for every module can be found at `tests`.
 
 ## Dependencies
+
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
 
 ## Installation
@@ -34,7 +35,7 @@ Make sure bitcoind is running before running TEOS (it will fail at startup if it
 You can run `teos` by running `teosd.py` under `teos`:
 
 ```
-python -m teos.teosd
+teosd
 ```
 
 ### Configuration file and command line parameters
@@ -56,7 +57,7 @@ and / or
 Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
 
 ```
-python -m teos.teosd --btcnetwork=regtest
+teosd --btcnetwork=regtest
 ```
 
 ### Running TEOS in another network
@@ -170,7 +171,7 @@ While `teos_cli` works independently of `teos`, it shares the same configuration
 For help on the available arguments and commands, you can run:
 
 ```
-python -m teos.cli.teos_cli -h
+teos_cli -h
 ```
 
 ## Interacting with TEOS as a client

@@ -4,30 +4,9 @@
 
 There are two ways of running `teos`: running it as a module or adding the library to the `PYTHONPATH` env variable.
 
-## Running `teos` as a Module
-The **easiest** way to run `teos` is as a module. To do so you need to use `python -m`. From the teos parent directory run:
+    python setup.py install
 
-    python -m teos.teosd -h
-    
-Notice that if you run `teos` as a module, you'll need to replace all the calls from `python teosd.py` to `python -m teos.teosd` 
-
-## Modifying `PYTHONPATH`
-**Alternatively**, you can add `teos` to your `PYTHONPATH` by running:
-
-	export PYTHONPATH=$PYTHONPATH:<absolute_path_to_teos_parent>
-	
-For example, for user alice running a UNIX system and having `python-teos` in her home folder, she would run:
-	
-	export PYTHONPATH=$PYTHONPATH:/home/alice/python-teos/
-	
-You should also include the command in your `.bashrc` to avoid having to run it every time you open a new terminal. You can do it by running:
-
-	echo 'export PYTHONPATH=$PYTHONPATH:<absolute_path_to_teos_parent>' >> ~/.bashrc
-	
-Once the `PYTHONPATH` is set, you should be able to run `teos` straightaway. Try it by running:
-
-	cd <absolute_path_to_cli_parent>/teos
-	python teosd.py -h
+Once this command is completed, the executables for `teosd` and `teos_cli` will be available in the shell.
 	
 ## Modify Configuration Parameters
 If you'd like to modify some of the configuration defaults (such as the bitcoind rpcuser and password) you can do so in the config file located at:

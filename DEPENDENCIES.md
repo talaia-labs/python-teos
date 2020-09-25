@@ -111,8 +111,3 @@ and for `pip3`:
 	brew install python3
 
 `pip3` will be installed alongside `python3` in this case.
-
-## Python Dependencies
-
-`teos` has several python dependencies, which can be satisfied by using `pip install -r requirements.txt`
-
