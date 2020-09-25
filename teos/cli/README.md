@@ -4,7 +4,7 @@
 
 ## Usage
 
-	python -m teos_cli [global options] command [command options] [arguments]
+	teos_cli [global options] command [command options] [arguments]
 	
 #### Global options
 
@@ -14,31 +14,12 @@
 
 #### Commands
 
-The command line interface has, currently, two commands:
+The command line interface has, currently, the following commands:
 
 - `get_all_appointments`: returns a list of all the appointments currently in the watchtower.
+- `get_tower_info`: gets generic information about the tower.
+- `get_users`: gets the list of registered user ids.
+- `get_user`: gets information about a specific user.
 - `help`: shows a list of commands or help for a specific command.
-	
-	
-### get_all_appointments
 
-This command is used to get information about all the appointments stored in a Eye of Satoshi tower.
-
-**Responses**
-
-This command returns all appointments stored in the watchtower. More precisely, it returns all the "response_trackers" and "watchtower_appointments" in a dictionary. 
-
-#### Usage
-
-    python -m teos_cli get_all_appointments
-
-### help
-
-Shows the list of commands or help about how to run a specific command.
-
-#### Usage
-	python -m teos_cli help
-	
-or
-
-	python -m teos_cli help command
+Run `teos_cli help <command>` for detailed information about each command and its arguments.
