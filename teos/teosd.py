@@ -135,7 +135,9 @@ class TeosDaemon:
 
         # Create the chain monitor
         self.chain_monitor = ChainMonitor(
-            [self.watcher.block_queue, self.watcher.responder.block_queue], self.block_processor, bitcoind_feed_params
+            [self.watcher.block_queue, responder.block_queue, gatekeeper.block_queue],
+            self.block_processor,
+            bitcoind_feed_params,
         )
 
         # Set up the internal API

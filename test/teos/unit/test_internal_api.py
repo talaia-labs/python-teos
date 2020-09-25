@@ -151,6 +151,24 @@ def test_add_appointment_not_enough_slots(internal_api, stub, generate_dummy_app
 
 
 # FIXME: 194 will do with dummy appointment
+def test_add_appointment_subscription_expired(internal_api, stub, generate_dummy_appointment):
+    # UNAUTHENTICATED is returned if the subscription has expired
+    # Register the user and set the expiry to the current block
+    stub.register(RegisterRequest(user_id=user_id))
+    internal_api.watcher.gatekeeper.registered_users[
+        user_id
+    ].subscription_expiry = internal_api.watcher.block_processor.get_block_count()
+
+    appointment, _ = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    e = send_wrong_appointment(stub, appointment, appointment_signature)
+
+    assert e.value.code() == grpc.StatusCode.UNAUTHENTICATED
+    assert "Your subscription expired at" in e.value.details()
+
+
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment_limit_reached(internal_api, stub, generate_dummy_appointment, monkeypatch):
     # If the tower appointment limit is reached RESOURCE_EXHAUSTED should be returned
     monkeypatch.setattr(internal_api.watcher, "max_appointments", 0)
@@ -242,6 +260,31 @@ def test_get_appointment_non_existent(internal_api, stub):
 
     assert e.value.code() == grpc.StatusCode.NOT_FOUND
     assert "Appointment not found" in e.value.details()
+
+
+# FIXME: 194 will do with dummy appointment
+def test_get_appointment_subscription_expired(internal_api, stub, generate_dummy_appointment):
+    # UNAUTHENTICATED is returned if the subscription has expired
+    stub.register(RegisterRequest(user_id=user_id))
+
+    # Send the appointment first
+    appointment, _ = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    send_appointment(stub, appointment, appointment_signature)
+
+    # Modify the user data so the subscription has already ended
+    expiry = internal_api.watcher.block_processor.get_block_count() - internal_api.watcher.gatekeeper.expiry_delta - 1
+    internal_api.watcher.gatekeeper.registered_users[user_id].subscription_expiry = expiry
+
+    # Request it back
+    message = f"get appointment {appointment.locator}"
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+
+    with pytest.raises(grpc.RpcError) as e:
+        stub.get_appointment(GetAppointmentRequest(locator=appointment.locator, signature=request_signature))
+
+    assert e.value.code() == grpc.StatusCode.UNAUTHENTICATED
+    assert "Your subscription expired at" in e.value.details()
 
 
 # METHODS ACCESSIBLE BY THE CLI

@@ -301,8 +301,15 @@ class API:
                 ),
             }
 
-        except (InspectionFailed, grpc.RpcError):
-            rcode = HTTP_NOT_FOUND
-            response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
+        except (InspectionFailed, grpc.RpcError) as e:
+            if isinstance(e, grpc.RpcError) and e.code() == grpc.StatusCode.UNAUTHENTICATED:
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": e.details(),
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                }
+            else:
+                rcode = HTTP_NOT_FOUND
+                response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
 
         return jsonify(response), rcode

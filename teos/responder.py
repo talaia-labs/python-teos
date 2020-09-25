@@ -285,26 +285,31 @@ class Responder:
             if len(self.trackers) > 0 and block is not None:
                 txids = block.get("tx")
 
-                completed_trackers = self.get_completed_trackers()
-                expired_trackers = self.get_expired_trackers(block.get("height"))
-                trackers_to_delete_gatekeeper = {
-                    uuid: self.trackers[uuid].get("user_id") for uuid in completed_trackers + expired_trackers
-                }
-
                 if self.last_known_block == block.get("previousblockhash"):
+                    completed_trackers = self.get_completed_trackers()
+                    outdated_trackers = self.get_outdated_trackers(block.get("height"))
+                    trackers_to_delete_gatekeeper = {
+                        uuid: self.trackers[uuid].get("user_id") for uuid in completed_trackers
+                    }
+
                     self.check_confirmations(txids)
+
                     Cleaner.delete_trackers(
                         completed_trackers, block.get("height"), self.trackers, self.tx_tracker_map, self.db_manager
                     )
                     Cleaner.delete_trackers(
-                        expired_trackers,
+                        outdated_trackers,
                         block.get("height"),
                         self.trackers,
                         self.tx_tracker_map,
                         self.db_manager,
-                        expired=True,
+                        outdated=True,
                     )
-                    Cleaner.delete_gatekeeper_appointments(self.gatekeeper, trackers_to_delete_gatekeeper)
+                    # Remove completed trackers from the gatekeeper.
+                    with self.gatekeeper.lock:
+                        Cleaner.delete_gatekeeper_appointments(
+                            trackers_to_delete_gatekeeper, self.gatekeeper.registered_users, self.gatekeeper.user_db
+                        )
 
                     self.rebroadcast(self.get_txs_to_rebroadcast())
 
@@ -409,9 +414,9 @@ class Responder:
 
         return completed_trackers
 
-    def get_expired_trackers(self, height):
+    def get_outdated_trackers(self, height):
         """
-        Gets trackers than are expired due to the user subscription expiring.
+        Gets trackers than are outdated due to the user subscription being also outdated.
 
         Only gets those trackers which penalty transaction is not going trough (probably because of low fees), the rest
         will be eventually completed once they are irrevocably resolved.
@@ -420,16 +425,16 @@ class Responder:
             height (:obj:`int`): the height of the last received block.
 
         Returns:
-            :obj:`list`: A list of the expired trackers uuids.
+            :obj:`list`: A list of the outdated trackers uuids.
         """
 
-        expired_trackers = [
+        outdated_trackers = [
             uuid
-            for uuid in self.gatekeeper.get_expired_appointments(height)
+            for uuid in self.gatekeeper.get_outdated_appointments(height)
             if self.trackers[uuid].get("penalty_txid") in self.unconfirmed_txs
         ]
 
-        return expired_trackers
+        return outdated_trackers
 
     def rebroadcast(self, txs_to_rebroadcast):
         """
