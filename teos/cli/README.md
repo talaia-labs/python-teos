@@ -1,10 +1,10 @@
-# teos_cli
+# teos-cli
 
-`teos_cli` is a command line interface to interact with the Eye of Satoshi watchtower server, written in Python3.
+`teos-cli` is a command line interface to interact with the Eye of Satoshi watchtower server, written in Python3.
 
 ## Usage
 
-	teos_cli [global options] command [command options] [arguments]
+	teos-cli [global options] command [command options] [arguments]
 	
 #### Global options
 
@@ -22,4 +22,4 @@ The command line interface has, currently, the following commands:
 - `get_user`: gets information about a specific user.
 - `help`: shows a list of commands or help for a specific command.
 
-Run `teos_cli help <command>` for detailed information about each command and its arguments.
+Run `teos-cli help <command>` for detailed information about each command and its arguments.

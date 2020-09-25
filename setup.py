@@ -11,9 +11,9 @@ with open("requirements.txt") as f:
     requirements = [r for r in f.read().split("\n") if len(r)]
 
 
-# Remove undesired files
 PACKAGES = ["common", "teos", "teos.cli", "teos.protobuf", "teos.utils"]
 
+# Remove undesired files
 for package in PACKAGES:
     if os.path.exists(f"{package}/__pycache__"):
         shutil.rmtree(f"{package}/__pycache__")
@@ -46,5 +46,5 @@ setuptools.setup(
     classifiers=CLASSIFIERS,
     python_requires=">=3.7",
     install_requires=requirements,
-    entry_points={"console_scripts": ["teosd=teos.teosd:run", "teos_cli=teos.cli.teos_cli:run"]},
+    entry_points={"console_scripts": ["teosd=teos.teosd:run", "teos-cli=teos.cli.teos_cli:run"]},
 )
