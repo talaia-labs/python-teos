@@ -229,7 +229,7 @@ class API:
                 rcode = HTTP_BAD_REQUEST
                 response = {
                     "error": f"appointment rejected. {e.details()}",
-                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
                 }
             elif e.code() == grpc.StatusCode.ALREADY_EXISTS:
                 rcode = HTTP_BAD_REQUEST

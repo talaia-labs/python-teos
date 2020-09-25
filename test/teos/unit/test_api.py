@@ -240,7 +240,7 @@ def test_add_appointment_not_registered(internal_api, client, appointment):
     appointment_signature = Cryptographer.sign(appointment.serialize(), tmp_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, tmp_user_id)
     assert r.status_code == HTTP_BAD_REQUEST
-    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
+    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR == r.json.get("error_code")
 
 
 # FIXME: 194 will do with dummy appointment
@@ -252,7 +252,7 @@ def test_add_appointment_registered_no_free_slots(internal_api, client, appointm
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_BAD_REQUEST
-    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
+    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR == r.json.get("error_code")
 
 
 # FIXME: 194 will do with dummy appointment
@@ -268,7 +268,7 @@ def test_add_appointment_registered_not_enough_free_slots(internal_api, client, 
 
     r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
     assert r.status_code == HTTP_BAD_REQUEST
-    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS == r.json.get("error_code")
+    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR == r.json.get("error_code")
 
 
 # FIXME: 194 will do with dummy appointment and block_processor
