@@ -64,6 +64,7 @@ class TeosDaemon:
         config (:obj:`dict`): the configuration object.
         sk (:obj:`PrivateKey`): the :obj:`PrivateKey` of the tower.
         logger (:obj:`Logger <teos.logger.Logger>`): the logger instance.
+        logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
 
     Attributes:
         stop_command_event (:obj:`threading.Event`): The event that will be set to initiate a graceful shutdown.
@@ -85,9 +86,10 @@ class TeosDaemon:
         rpc_process (:obj:`multiprocessing.Process`): The instance of the internal RPC server; only set if running.
     """
 
-    def __init__(self, config, sk, logger):
+    def __init__(self, config, sk, logger, logging_port):
         self.config = config
         self.logger = logger
+        self.logging_port = logging_port
 
         # event triggered when a ``stop`` command is issued
         # Using multiprocessing.Event seems to cause a deadlock if event.set() is called in a signal handler that
@@ -153,6 +155,7 @@ class TeosDaemon:
                 self.config.get("RPC_BIND"),
                 self.config.get("RPC_PORT"),
                 self.internal_api_endpoint,
+                self.logging_port,
                 self.stop_event,
             ),
             daemon=True,
@@ -238,8 +241,14 @@ class TeosDaemon:
         # Activate ChainMonitor
         self.chain_monitor.activate()
 
-    def start_services(self):
-        """Readies the tower by setting up signal handling, and starting all the services."""
+    def start_services(self, logging_port):
+        """
+        Readies the tower by setting up signal handling, and starting all the services.
+
+        Args:
+            logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
+        """
+
         signal(SIGINT, self.handle_signals)
         signal(SIGTERM, self.handle_signals)
         signal(SIGQUIT, self.handle_signals)
@@ -262,7 +271,8 @@ class TeosDaemon:
                     "gunicorn",
                     f"--bind={api_endpoint}",
                     f"teos.api:serve(internal_api_endpoint='{self.internal_api_endpoint}', "
-                    f"endpoint='{api_endpoint}', min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}')",
+                    f"endpoint='{api_endpoint}', logging_port='{logging_port}', "
+                    f"min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}')",
                 ]
             )
         else:
@@ -271,6 +281,7 @@ class TeosDaemon:
                 kwargs={
                     "internal_api_endpoint": self.internal_api_endpoint,
                     "endpoint": api_endpoint,
+                    "logging_port": logging_port,
                     "min_to_self_delay": self.config.get("MIN_TO_SELF_DELAY"),
                     "auto_run": True,
                 },
@@ -326,7 +337,7 @@ class TeosDaemon:
         """This method implements the whole lifetime cycle of the the TEOS tower. This method does not return."""
         self.logger.info("Starting TEOS")
         self.bootstrap_components()
-        self.start_services()
+        self.start_services(self.logging_port)
 
         self.stop_command_event.wait()
 
@@ -338,14 +349,15 @@ def main(config):
 
     silent = config.get("DAEMON")
     logging_server_ready = multiprocessing.Event()
+    logging_port = multiprocessing.Value("i")
     logging_process = multiprocessing.Process(
-        target=serve_logging, daemon=True, args=(config.get("LOG_FILE"), silent, logging_server_ready)
+        target=serve_logging, daemon=True, args=(config.get("LOG_FILE"), logging_port, silent, logging_server_ready)
     )
     logging_process.start()
 
     logging_server_ready.wait()
 
-    setup_logging()
+    setup_logging(logging_port.value)
     logger = get_logger(component="Daemon")
 
     if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
@@ -366,7 +378,7 @@ def main(config):
         logger.warning("Windows cannot run gunicorn as WSGI. Changing to waitress")
 
     try:
-        TeosDaemon(config, sk, logger).start()
+        TeosDaemon(config, sk, logger, logging_port.value).start()
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         exit(1)
