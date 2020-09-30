@@ -8,10 +8,10 @@ No matter the way you chose, once installed the executables for `teosd` and `teo
 
 ## Installing from source
 
-`teos` can be installed from source by running:
+`teos` can be installed from source by running (from  `python-teos/`):
 
 ```
-python setup.py install
+pip install .
 ```
 
 ## Installing via PyPi
@@ -19,7 +19,7 @@ python setup.py install
 `teos` can be installed from PyPi bu running:
 
 ```
-pip install teos
+pip install python-teos
 ```
 
 	
