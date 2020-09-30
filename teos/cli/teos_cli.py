@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+import os
 import sys
 import json
 import grpc
@@ -111,12 +110,12 @@ class RPCClient:
         print("Closing the Eye of Satoshi")
 
 
-def main(command, args, command_line_conf):
+def main(command, args, data_dir, command_line_conf):
     # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
     config = config_loader.build_config()
 
-    setup_data_folder(DATA_DIR)
+    setup_data_folder(data_dir)
 
     teos_rpc_host = config.get("RPC_BIND")
     teos_rpc_port = config.get("RPC_PORT")
@@ -184,12 +183,14 @@ def main(command, args, command_line_conf):
         sys.exit(f"Unknown error occurred: {str(e)}")
 
 
-if __name__ == "__main__":
+def run():
     command_line_conf = {}
     commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "stop", "help"]
 
     try:
-        opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "help"])
+        opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "datadir=", "help"])
+
+        data_dir = DATA_DIR
 
         for opt, arg in opts:
             if opt in ["--rpcbind"]:
@@ -203,12 +204,15 @@ if __name__ == "__main__":
                     except ValueError:
                         sys.exit("port must be an integer")
 
+            if opt in ["--datadir"]:
+                data_dir = os.path.expanduser(arg)
+
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
 
         command = args.pop(0) if args else None
         if command in commands:
-            main(command, args, command_line_conf)
+            main(command, args, data_dir, command_line_conf)
         elif not command:
             sys.exit("No command provided. Use help to check the list of available commands")
         else:
@@ -216,3 +220,7 @@ if __name__ == "__main__":
 
     except GetoptError as e:
         sys.exit("{}".format(e))
+
+
+if __name__ == "__main__":
+    run()

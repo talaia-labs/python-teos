@@ -12,6 +12,7 @@ from common.cryptographer import Cryptographer, hash_160
 
 from teos.cleaner import Cleaner
 from teos.chain_monitor import ChainMonitor
+from teos.gatekeeper import SubscriptionExpired
 from teos.extended_appointment import ExtendedAppointment
 from teos.block_processor import InvalidTransactionFormat
 
@@ -210,7 +211,7 @@ class Watcher:
         locator_cache (:obj:`LocatorCache`): A cache of locators for the last ``blocks_in_cache`` blocks.
 
     Raises:
-        :obj:`InvalidKey`: if teos sk cannot be loaded.\
+        :obj:`InvalidKey`: if teos sk cannot be loaded.
     """
 
     def __init__(self, db_manager, gatekeeper, block_processor, responder, sk, max_appointments, blocks_in_cache):
@@ -250,11 +251,11 @@ class Watcher:
 
     def awake(self):
         """
-            Starts a new thread to monitor the blockchain for channel breaches. The thread will run until the
-            :obj:`ChainMonitor` adds ``ChainMonitor.END_MESSAGE`` to the queue.
+        Starts a new thread to monitor the blockchain for channel breaches. The thread will run until the
+        :obj:`ChainMonitor` adds ``ChainMonitor.END_MESSAGE`` to the queue.
 
-            Returns:
-                :obj:`Thread <multithreading.Thread>`: The thread object that was just created and is already running.
+        Returns:
+            :obj:`Thread <multithreading.Thread>`: The thread object that was just created and is already running.
         """
 
         watcher_thread = Thread(target=self.do_watch, daemon=True)
@@ -294,10 +295,15 @@ class Watcher:
 
         Raises:
             :obj:`AppointmentNotFound`: if the appointment is not found in the tower.
+            :obj:`SubscriptionExpired`: If the user subscription has expired.
         """
 
         message = "get appointment {}".format(locator).encode("utf-8")
         user_id = self.gatekeeper.authenticate_user(message, user_signature)
+        if self.gatekeeper.has_subscription_expired(user_id):
+            raise SubscriptionExpired(
+                f"Your subscription expired at block {self.gatekeeper.registered_users[user_id].subscription_expiry}"
+            )
         uuid = hash_160("{}{}".format(locator, user_id))
 
         if uuid in self.appointments:
@@ -338,7 +344,8 @@ class Watcher:
         Raises:
             :obj:`AppointmentLimitReached`: If the tower cannot hold more appointments (cap reached).
             :obj:`AuthenticationFailure`: If the user cannot be authenticated.
-            :obj:`NotEnoughSlots`: If the user does not have enough available slots, so the appointment is rejected.
+            :obj:`NotEnoughSlots`: If the user does not have enough available slots, so the appointment is rejected.\
+            :obj:`SubscriptionExpired`: If the user subscription has expired.
         """
 
         if len(self.appointments) >= self.max_appointments:
@@ -347,6 +354,10 @@ class Watcher:
             raise AppointmentLimitReached(message)
 
         user_id = self.gatekeeper.authenticate_user(appointment.serialize(), user_signature)
+        if self.gatekeeper.has_subscription_expired(user_id):
+            raise SubscriptionExpired(
+                f"Your subscription expired at block {self.gatekeeper.registered_users[user_id].subscription_expiry}"
+            )
         start_block = self.block_processor.get_block(self.last_known_block).get("height")
         extended_appointment = ExtendedAppointment(
             appointment.locator,
@@ -471,17 +482,12 @@ class Watcher:
             self.locator_cache.update(block_hash, locator_txid_map)
 
             if len(self.appointments) > 0 and locator_txid_map:
-                expired_appointments = self.gatekeeper.get_expired_appointments(block["height"])
+                outdated_appointments = self.gatekeeper.get_outdated_appointments(block["height"])
                 # Make sure we only try to delete what is on the Watcher (some appointments may have been triggered)
-                expired_appointments = list(set(expired_appointments).intersection(self.appointments.keys()))
+                outdated_appointments = list(set(outdated_appointments).intersection(self.appointments.keys()))
 
-                # Keep track of the expired appointments before deleting them from memory
-                appointments_to_delete_gatekeeper = {
-                    uuid: self.appointments[uuid].get("user_id") for uuid in expired_appointments
-                }
-
-                Cleaner.delete_expired_appointments(
-                    expired_appointments, self.appointments, self.locator_uuid_map, self.db_manager
+                Cleaner.delete_outdated_appointments(
+                    outdated_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                 )
 
                 valid_breaches, invalid_breaches = self.filter_breaches(self.get_breaches(locator_txid_map))
@@ -517,19 +523,19 @@ class Watcher:
 
                 # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
                 appointments_to_delete.extend(invalid_breaches)
+                appointments_to_delete_gatekeeper = {
+                    uuid: self.appointments[uuid].get("user_id") for uuid in appointments_to_delete
+                }
                 self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
-
-                # Update the dictionary with the completed appointments
-                appointments_to_delete_gatekeeper.update(
-                    {uuid: self.appointments[uuid].get("user_id") for uuid in appointments_to_delete}
-                )
 
                 Cleaner.delete_completed_appointments(
                     appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                 )
-
-                # Remove expired and completed appointments from the Gatekeeper
-                Cleaner.delete_gatekeeper_appointments(self.gatekeeper, appointments_to_delete_gatekeeper)
+                # Remove invalid appointments from the Gatekeeper
+                with self.gatekeeper.lock:
+                    Cleaner.delete_gatekeeper_appointments(
+                        appointments_to_delete_gatekeeper, self.gatekeeper.registered_users, self.gatekeeper.user_db
+                    )
 
                 if not self.appointments:
                     self.logger.info("No more pending appointments")

@@ -1,5 +1,13 @@
 from math import ceil
+from queue import Queue
 from threading import Lock
+from threading import Thread
+from readerwriterlock import rwlock
+from collections import OrderedDict
+
+from teos.cleaner import Cleaner
+from teos.chain_monitor import ChainMonitor
+from teos.constants import OUTDATED_USERS_CACHE_SIZE_BLOCKS
 
 from common.tools import is_compressed_pk, is_u4int
 from common.cryptographer import Cryptographer
@@ -11,8 +19,6 @@ from common.exceptions import InvalidParameter, InvalidKey, SignatureError
 class NotEnoughSlots(ValueError):
     """Raised when trying to subtract more slots than a user has available."""
 
-    pass
-
 
 class AuthenticationFailure(Exception):
     """
@@ -20,7 +26,9 @@ class AuthenticationFailure(Exception):
     not found within the registered ones.
     """
 
-    pass
+
+class SubscriptionExpired(ValueError):
+    """Raised when trying to subtract more slots than a user has available."""
 
 
 class UserInfo:
@@ -82,20 +90,48 @@ class Gatekeeper:
         user_db (:obj:`UsersDBM <teos.user_dbm.UsersDBM>`): A user database manager instance to interact with the
             database.
         registered_users (:obj:`dict`): A map of ``user_pk:user_info``.
+        outdated_users_cache (:obj:`dict`): A cache of outdated user ids to allow the Watcher and Responder to query
+            deleted data. Keys are bock heights, values are lists of user ids. Has a maximum size of
+            ``OUTDATED_USERS_CACHE_SIZE_BLOCKS``.
         lock (:obj:`Lock`): A lock object to lock access to the Gatekeeper on updates.
-
     """
 
     def __init__(self, user_db, block_processor, subscription_slots, subscription_duration, expiry_delta):
         self.subscription_slots = subscription_slots
         self.subscription_duration = subscription_duration
         self.expiry_delta = expiry_delta
+        self.block_queue = Queue()
         self.block_processor = block_processor
         self.user_db = user_db
         self.registered_users = {
             user_id: UserInfo.from_dict(user_data) for user_id, user_data in user_db.load_all_users().items()
         }
+        self.outdated_users_cache = {}
         self.lock = Lock()
+
+        # Starts a child thread to take care of expiring subscriptions
+        Thread(target=self.manage_subscription_expiry, daemon=True).start()
+
+    def manage_subscription_expiry(self):
+        """
+        Manages the subscription expiry of the registered users. Subscriptions are not deleted straightaway for two
+        purposes:
+
+        - First, it gives time to the ``Watcher`` and the ``Responder`` to query the necessary data for housekeeping,
+        and gives some reorg protection.
+        - Second, it gives a grace time to the user to renew their subscription before it is irrevocably deleted.
+        """
+
+        while True:
+            block_hash = self.block_queue.get()
+            # When the ChainMonitor is stopped, a final ChainMonitor.END_MESSAGE message is sent
+            if block_hash == ChainMonitor.END_MESSAGE:
+                break
+
+            # Expired user deletion is delayed. Users are deleted when their subscription is outdated, not expired.
+            block_height = self.block_processor.get_block(block_hash).get("height")
+            self.update_outdated_users_cache(block_height)
+            Cleaner.delete_outdated_users(self.get_outdated_user_ids(block_height), self.registered_users, self.user_db)
 
     def add_update_user(self, user_id):
         """
@@ -115,24 +151,28 @@ class Gatekeeper:
         if not is_compressed_pk(user_id):
             raise InvalidParameter("Provided public key does not match expected format (33-byte hex string)")
 
-        if user_id not in self.registered_users:
-            self.registered_users[user_id] = UserInfo(
-                self.subscription_slots, self.block_processor.get_block_count() + self.subscription_duration
-            )
-        else:
-            # FIXME: For now new calls to register add subscription_slots to the current count and reset the expiry time
-            if not is_u4int(self.registered_users[user_id].available_slots + self.subscription_slots):
-                raise InvalidParameter("Maximum slots reached for the subscription")
+        with self.lock:
+            if user_id not in self.registered_users:
+                self.registered_users[user_id] = UserInfo(
+                    self.subscription_slots, self.block_processor.get_block_count() + self.subscription_duration
+                )
+            else:
+                # FIXME: For now new calls to register add subscription_slots to the current count and reset the expiry
+                #  time
+                if not is_u4int(self.registered_users[user_id].available_slots + self.subscription_slots):
+                    raise InvalidParameter("Maximum slots reached for the subscription")
 
-            self.registered_users[user_id].available_slots += self.subscription_slots
-            self.registered_users[user_id].subscription_expiry = (
-                self.block_processor.get_block_count() + self.subscription_duration
-            )
+                self.registered_users[user_id].available_slots += self.subscription_slots
+                self.registered_users[user_id].subscription_expiry = (
+                    self.block_processor.get_block_count() + self.subscription_duration
+                )
 
-        self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
-        receipt = create_registration_receipt(
-            user_id, self.registered_users[user_id].available_slots, self.registered_users[user_id].subscription_expiry
-        )
+            self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
+            receipt = create_registration_receipt(
+                user_id,
+                self.registered_users[user_id].available_slots,
+                self.registered_users[user_id].subscription_expiry,
+            )
 
         return (
             self.registered_users[user_id].available_slots,
@@ -189,46 +229,117 @@ class Gatekeeper:
             :obj:`NotEnoughSlots`: if the user does not have enough slots to fill.
         """
 
-        self.lock.acquire()
-        # For updates the difference between the existing appointment and the update is computed.
-        if uuid in self.registered_users[user_id].appointments:
-            used_slots = self.registered_users[user_id].appointments[uuid]
+        with self.lock:
+            # For updates the difference between the existing appointment and the update is computed.
+            if uuid in self.registered_users[user_id].appointments:
+                used_slots = self.registered_users[user_id].appointments[uuid]
 
-        else:
-            # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
-            used_slots = 0
+            else:
+                # For regular appointments 1 slot is reserved per ENCRYPTED_BLOB_MAX_SIZE_HEX block.
+                used_slots = 0
 
-        required_slots = ceil(len(ext_appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
+            required_slots = ceil(len(ext_appointment.encrypted_blob) / ENCRYPTED_BLOB_MAX_SIZE_HEX)
 
-        if required_slots - used_slots <= self.registered_users.get(user_id).available_slots:
-            # Filling / freeing slots depending on whether this is an update or not, and if it is bigger or smaller than
-            # the old appointment.
-            self.registered_users.get(user_id).appointments[uuid] = required_slots
-            self.registered_users.get(user_id).available_slots -= required_slots - used_slots
-            self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
+            if required_slots - used_slots <= self.registered_users.get(user_id).available_slots:
+                # Filling / freeing slots depending on whether this is an update or not, and if it is bigger or smaller
+                # than the old appointment.
+                self.registered_users.get(user_id).appointments[uuid] = required_slots
+                self.registered_users.get(user_id).available_slots -= required_slots - used_slots
+                self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
 
-        else:
-            self.lock.release()
-            raise NotEnoughSlots()
+            else:
+                raise NotEnoughSlots()
 
-        self.lock.release()
-        return self.registered_users.get(user_id).available_slots
+            return self.registered_users.get(user_id).available_slots
 
-    def get_expired_appointments(self, block_height):
+    def has_subscription_expired(self, user_id):
         """
-        Gets a list of appointments that expire at a given block height.
+        Checks whether a user subscription has expired at a given block_height.
 
         Args:
-            block_height: the block height that wants to be checked.
+            user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
-            :obj:`list`: A list of appointment uuids that will expire at ``block_height``.
+            :obj:`bool`: True if the subscription has expired. False otherwise.
         """
 
-        expired_appointments = []
-        # Avoiding dictionary changed size during iteration
-        for user_id in list(self.registered_users.keys()):
-            if block_height == self.registered_users[user_id].subscription_expiry + self.expiry_delta:
-                expired_appointments.extend(self.registered_users[user_id].appointments)
+        if user_id not in self.registered_users:
+            raise AuthenticationFailure()
+        return self.block_processor.get_block_count() >= self.registered_users[user_id].subscription_expiry
 
-        return expired_appointments
+    def get_outdated_users(self, block_height):
+        """
+        Gets a dict ``user_id:appointment_uuids`` of outdated subscriptions at a given block height.
+
+        Subscriptions are outdated ``expiry_delta`` block after expiring, giving both the internal components time to
+        do their housekeeping and to the user to renew the subscription. After that period, data will be deleted.
+
+        Args:
+            block_height (:obj:`int`): the block height that wants to be checked.
+
+        Returns:
+            :obj:`dict`: A dictionary of users whose subscription is outdated at ``block_height``.
+        """
+
+        with self.lock:
+            # Try to get the data from the cache
+            outdated_users = self.outdated_users_cache.get(block_height)
+
+            # Get the data from registered_users otherwise
+            if not outdated_users:
+                outdated_users = {
+                    user_id: list(user_info.appointments.keys())
+                    for user_id, user_info in self.registered_users.items()
+                    if block_height == user_info.subscription_expiry + self.expiry_delta
+                }
+
+            return outdated_users
+
+    def get_outdated_user_ids(self, block_height):
+        """
+        Returns a list of all user ids outdated at a given ``block_height``.
+
+        Args:
+            block_height (:obj:`int`): the block height that wants to be checked.
+
+        Returns:
+            :obj:`list`: A list of user ids whose subscription is outdated at ``block_height``.
+        """
+
+        return list(self.get_outdated_users(block_height).keys())
+
+    def get_outdated_appointments(self, block_height):
+        """
+        Returns a flattened list of all appointments outdated at a given ``block_height``, indistinguishably of their
+        user.
+
+        Args:
+            block_height (:obj:`int`): the block height that wants to be checked.
+
+        Returns:
+            :obj:`list`: A list of appointments whose subscription is outdated at ``block_height``.
+        """
+
+        return [
+            appointment_uuid
+            for user_appointments in self.get_outdated_users(block_height).values()
+            for appointment_uuid in user_appointments
+        ]
+
+    def update_outdated_users_cache(self, block_height):
+        """
+        Adds an entry corresponding to ``block_height`` to ``outdated_users_cache`` if the entry is missing, and removes
+        the oldest entry if the cache is full afterwards.
+
+        Args:
+            block_height (:obj:`int`): the block that acts as id for the new entry in the cache.
+        """
+
+        outdated_users = self.get_outdated_users(block_height)
+
+        with self.lock:
+            if block_height not in self.outdated_users_cache:
+                self.outdated_users_cache[block_height] = outdated_users
+                # Remove the first entry from the cache once it grows beyond the limit
+                if len(self.outdated_users_cache) > OUTDATED_USERS_CACHE_SIZE_BLOCKS:
+                    self.outdated_users_cache.pop(next(iter(self.outdated_users_cache)))

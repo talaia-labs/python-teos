@@ -3,7 +3,7 @@ from teos.logger import get_logger
 
 class Cleaner:
     """
-    The :class:`Cleaner` is in charge of removing expired/completed data from the tower.
+    The :class:`Cleaner` is in charge of removing outdated/completed data from the tower.
 
     Mutable objects (like dicts) are passed-by-reference in Python, so no return is needed for the Cleaner.
     """
@@ -84,13 +84,13 @@ class Cleaner:
             Cleaner.logger.error("Locator map not found in the db", locator=locator)
 
     @staticmethod
-    def delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager):
+    def delete_outdated_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager):
         """
-        Deletes appointments which ``expiry`` has been reached (with no trigger) both from memory
+        Deletes appointments that have outdated (with no trigger) both from memory
         (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
 
         Args:
-            expired_appointments (:obj:`list`): a list of appointments to be deleted.
+            outdated_appointments (:obj:`list`): a list of appointments to be deleted.
             appointments (:obj:`dict`): a dictionary containing all the :mod:`Watcher <teos.watcher.Watcher>`
                 appointments.
             locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
@@ -101,7 +101,7 @@ class Cleaner:
 
         locator_maps_to_update = {}
 
-        for uuid in expired_appointments:
+        for uuid in outdated_appointments:
             locator = appointments[uuid].get("locator")
             Cleaner.logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
 
@@ -115,8 +115,8 @@ class Cleaner:
         for locator, uuids in locator_maps_to_update.items():
             Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
 
-        # Expired appointments are not flagged, so they can be deleted without caring about the db flag.
-        db_manager.batch_delete_watcher_appointments(expired_appointments)
+        # Outdated appointments are not flagged, so they can be deleted without caring about the db flag.
+        db_manager.batch_delete_watcher_appointments(outdated_appointments)
 
     @staticmethod
     def delete_completed_appointments(completed_appointments, appointments, locator_uuid_map, db_manager):
@@ -180,9 +180,9 @@ class Cleaner:
             db_manager.create_triggered_appointment_flag(uuid)
 
     @staticmethod
-    def delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager, expired=False):
+    def delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager, outdated=False):
         """
-        Deletes completed/expired trackers both from memory (:obj:`Responder <teos.responder.Responder>`) and disk
+        Deletes completed/outdated trackers both from memory (:obj:`Responder <teos.responder.Responder>`) and disk
         (from the :obj:`Responder`'s and :obj:`Watcher`'s databases).
 
         Args:
@@ -191,18 +191,18 @@ class Cleaner:
             height (:obj:`int`): the block height at which the trackers were completed.
             tx_tracker_map (:obj:`dict`): a ``penalty_txid:uuid`` map for the :obj:`Responder
                 <teos.responder.Responder>` trackers.
-            completed_trackers (:obj:`dict`): a dict of completed/expired trackers to be deleted
+            completed_trackers (:obj:`dict`): a dict of completed/outdated trackers to be deleted
                 (``uuid:confirmations``).
             db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
                 database manager to interact with the database.
-            expired (:obj:`bool`): whether the trackers have expired or not. Defaults to False.
+            outdated (:obj:`bool`): whether the trackers have been outdated or not. Defaults to False.
         """
 
         locator_maps_to_update = {}
 
         for uuid in completed_trackers:
 
-            if expired:
+            if outdated:
                 Cleaner.logger.info(
                     "Appointment couldn't be completed. Expiry reached but penalty didn't make it to the chain",
                     uuid=uuid,
@@ -234,36 +234,52 @@ class Cleaner:
             # Update / delete the locator map
             Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
 
-        # Delete appointment from the db (from watchers's and responder's db) and remove flag
+        # Delete appointment from the db (from watcher's and responder's db) and remove flag
         db_manager.batch_delete_responder_trackers(completed_trackers)
         db_manager.batch_delete_watcher_appointments(completed_trackers)
         db_manager.batch_delete_triggered_appointment_flag(completed_trackers)
 
     @staticmethod
-    def delete_gatekeeper_appointments(gatekeeper, appointment_to_delete):
+    def delete_gatekeeper_appointments(appointment_to_delete, registered_users, user_db):
         """
-        Deletes a list of expired / completed appointments of a given user both from memory and the UserDB.
+        Deletes a list of outdated / completed appointments of a given user both from memory and the UserDB.
 
         Args:
-            gatekeeper (:obj:`Gatekeeper <teos.gatekeeper.Gatekeeper>`): a `Gatekeeper` instance in charge to control
-                the user access and subscription expiry.
             appointment_to_delete (:obj:`dict`): ``uuid:user_id`` dict containing the appointments to delete
-                (expired + completed)
+                (outdated + completed)
+            registered_users (:obj:`dict`): a dictionary of registered users from the gatekeeper.
+            user_db (:obj:`UsersDBM <teos.user_dbm.UsersDBM>`): A user database manager instance to interact with the
+            database.
         """
 
         user_ids = []
         # Remove appointments from memory
         for uuid, user_id in appointment_to_delete.items():
-            if user_id in gatekeeper.registered_users and uuid in gatekeeper.registered_users[user_id].appointments:
+            if user_id in registered_users and uuid in registered_users[user_id].appointments:
                 # Remove the appointment from the appointment list and update the available slots
-                gatekeeper.lock.acquire()
-                freed_slots = gatekeeper.registered_users[user_id].appointments.pop(uuid)
-                gatekeeper.registered_users[user_id].available_slots += freed_slots
-                gatekeeper.lock.release()
+                freed_slots = registered_users[user_id].appointments.pop(uuid)
+                registered_users[user_id].available_slots += freed_slots
 
                 if user_id not in user_ids:
                     user_ids.append(user_id)
 
         # Store the updated users in the DB
         for user_id in user_ids:
-            gatekeeper.user_db.store_user(user_id, gatekeeper.registered_users[user_id].to_dict())
+            user_db.store_user(user_id, registered_users[user_id].to_dict())
+
+    @staticmethod
+    def delete_outdated_users(outdated_users, registered_users, user_db):
+        """
+        Deletes users whose subscription has been outdated, alongside all their associated data (appointments and
+        trackers).
+
+        Args:
+            outdated_users (:obj:`list): a list of user_ids to be deleted.
+            registered_users (:obj:`dict`): a dictionary of registered users from the gatekeeper.
+            user_db (:obj:`UsersDBM <teos.user_dbm.UsersDBM>`): A user database manager instance to interact with the
+            database.
+        """
+
+        for user_id in outdated_users:
+            registered_users.pop(user_id)
+            user_db.delete_user(user_id)

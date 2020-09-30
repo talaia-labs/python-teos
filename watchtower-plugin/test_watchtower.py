@@ -62,7 +62,7 @@ class TowerMock:
             "public_key": user_id,
             "available_slots": self.users[user_id].get("available_slots"),
             "subscription_expiry": self.users[user_id].get("subscription_expiry"),
-            "signature": Cryptographer.sign(registration_receipt, self.sk),
+            "subscription_signature": Cryptographer.sign(registration_receipt, self.sk),
         }
 
         return response, rcode
@@ -133,7 +133,7 @@ def add_appointment_reject_no_slots():
     rcode = constants.HTTP_BAD_REQUEST
     response = {
         "error": "appointment rejected. Invalid signature or user does not have enough slots available",
-        "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+        "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
     }
 
     return response, rcode

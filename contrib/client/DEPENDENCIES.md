@@ -1,12 +1,12 @@
 # Dependencies
 
-`teos_client` has both system-wide and Python dependencies. This document walks you through how to satisfy them.
+`teos-client` has both system-wide and Python dependencies. This document walks you through how to satisfy them.
 
 ## System-wide dependencies
 
-`teos_client` has the following system-wide dependencies:
+`teos-client` has the following system-wide dependencies:
 
-- `python3` version 3.6+
+- `python3` version 3.7+
 - `pip3`
 - `openssl` version 1.1+
 
@@ -28,7 +28,7 @@ It is also likely that, if `python3` is installed in our system, the `python` al
 
 	python3 --version
 
-If `python3` is installed but the `python` alias is not set to it, we should either set it, or use `python3` to run `teos_client`.
+If `python3` is installed but the `python` alias is not set to it, we should either set it, or use `python3` to run `teos-client`.
 
 Regarding `pip`, we can check what version is installed in our system (if any) by running:
 
@@ -51,7 +51,7 @@ And, if it happens to be installed, change the alias to `pip3`, or use `pip3` in
 
 ### Installing the dependencies
 
-`python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
+`python3` can be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
 
 #### Ubuntu
 
@@ -73,10 +73,10 @@ and for `pip3`:
 
 `pip3` will be installed alongside `python3` in this case.
 
-## Python dependencies
+## Python Dependencies	
 
-`teos_client` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
+ `teos-client` has several python dependencies that are automatically alongside the it. Should you need to install them manually, you can do so by running:
 
-- `cryptography`
-- `requests`
-- `structlog`
+```
+ pip install -r requirements.txt`
+```

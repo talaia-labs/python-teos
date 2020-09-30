@@ -11,7 +11,7 @@ from teos.gatekeeper import UserInfo
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
-from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots
+from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots, SubscriptionExpired
 from teos.watcher import (
     Watcher,
     AppointmentLimitReached,
@@ -336,7 +336,9 @@ def test_add_appointment_no_slots(watcher, generate_dummy_appointment):
     # Appointments from register users with no available slots should aso fail
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=0, subscription_expiry=10)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=0, subscription_expiry=watcher.block_processor.get_block_count() + 1
+    )
 
     appointment, dispute_tx = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -346,12 +348,31 @@ def test_add_appointment_no_slots(watcher, generate_dummy_appointment):
 
 
 # FIXME: 194 will do with dummy appointment
+def test_add_appointment_expired_subscription(watcher, generate_dummy_appointment):
+    # Appointments from registered users with expired subscriptions fail as well
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=10,
+        subscription_expiry=watcher.block_processor.get_block_count() - watcher.gatekeeper.expiry_delta - 1,
+    )
+
+    appointment, dispute_tx = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    with pytest.raises(SubscriptionExpired):
+        watcher.add_appointment(appointment, appointment_signature)
+
+
+# FIXME: 194 will do with dummy appointment
 def test_add_appointment(watcher, generate_dummy_appointment):
     # Simulate the user is registered
     user_sk, user_pk = generate_keypair()
     available_slots = 100
     user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=available_slots, subscription_expiry=10)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=available_slots, subscription_expiry=watcher.block_processor.get_block_count() + 1
+    )
 
     appointment, dispute_tx = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
@@ -383,7 +404,7 @@ def test_add_appointment(watcher, generate_dummy_appointment):
     another_user_sk, another_user_pk = generate_keypair()
     another_user_id = Cryptographer.get_compressed_pk(another_user_pk)
     watcher.gatekeeper.registered_users[another_user_id] = UserInfo(
-        available_slots=available_slots, subscription_expiry=10
+        available_slots=available_slots, subscription_expiry=watcher.block_processor.get_block_count() + 1
     )
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), another_user_sk)
@@ -403,7 +424,9 @@ def test_add_appointment_in_cache(watcher, generate_dummy_appointment):
     # Generate an appointment and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=watcher.block_processor.get_block_count() + 10
+    )
 
     appointment, dispute_tx = generate_dummy_appointment()
 
@@ -439,7 +462,9 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
     # Generate an appointment with an invalid transaction and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=watcher.block_processor.get_block_count() + 1
+    )
 
     # We need to create the appointment manually
     commitment_tx, commitment_txid, penalty_tx = create_txs()
@@ -479,7 +504,9 @@ def test_add_appointment_in_cache_invalid_transaction(watcher, generate_dummy_ap
     # Generate an appointment that cannot be decrypted and add the dispute txid to the cache
     user_sk, user_pk = generate_keypair()
     user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=10)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=watcher.block_processor.get_block_count() + 1
+    )
 
     appointment, dispute_tx = generate_dummy_appointment()
     appointment.encrypted_blob = appointment.encrypted_blob[::-1]
@@ -509,7 +536,9 @@ def test_add_too_many_appointments(watcher, generate_dummy_appointment):
     user_sk, user_pk = generate_keypair()
     available_slots = 100
     user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=available_slots, subscription_expiry=10)
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=available_slots, subscription_expiry=watcher.block_processor.get_block_count() + 1
+    )
 
     # Appointments on top of the limit should be rejected
     watcher.appointments = dict()
@@ -570,14 +599,10 @@ def test_do_watch(watcher, temp_db_manager, generate_dummy_appointment):
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
     # The rest of appointments will timeout after the subscription times-out (9 more blocks) + EXPIRY_DELTA
-    # Wait for an additional block to be safe
-    generate_blocks_with_delay(10 + config.get("EXPIRY_DELTA"))
+    generate_blocks_with_delay(9 + config.get("EXPIRY_DELTA"))
     assert len(watcher.appointments) == 0
 
-    # Check that they are not in the Gatekeeper either, only the two that passed to the Responder should remain
-    assert len(watcher.gatekeeper.registered_users[user_id].appointments) == 2
-
-    # FIXME: We should also add cases where the transactions are invalid. bitcoind_mock needs to be extended for this.
+    # FIXME: We should also add cases where the transactions are invalid.
 
 
 # TODO: depends on previous test

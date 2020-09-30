@@ -6,16 +6,19 @@ Currently working on updating the software to match [BOLT13 rev1](https://github
 
 The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://github.com/sr-gi/bolt13), written in Python 3.
 
-`teos` consists in four main modules:
+`python-teos` consists in four main modules:
 
-- `teos`: including the tower's main functionality (server-side)
-- `cli`: including a reference command line interface (client-side)
-- `common`: including shared functionality between `teos` and `cli`.
+- `teos`: including the tower's main functionality (server-side).
+- `cli`: including a reference command line interface.
+- `common`: including shared functionality between server and client side (useful to build a client).
 - `watchtower-plugin`: including a watchtower client plugin for c-lightning.
 
-Additionally, tests for every module can be found at `tests`.
+Additionally `contrib` contains tools that are external to the tower (currently `teos_client`, an example Python client for the tower). 
+
+Tests for every module can be found at `tests`.
 
 ## Dependencies
+
 Refer to [DEPENDENCIES.md](DEPENDENCIES.md)
 
 ## Installation
@@ -27,14 +30,12 @@ Refer to [INSTALL.md](INSTALL.md)
 Make sure bitcoind is running before running TEOS (it will fail at startup if it cannot connect to bitcoind). You can find
 [here](DEPENDENCIES.md#installing-bitcoind) a sample config file.
 
-Before you can run TEOS, you need to follow a few more configuration steps.
-
 ### Starting the TEOS daemon 👁
 
-You can run `teos` by running `teosd.py` under `teos`:
+Once installed, you can start the tower by running:
 
 ```
-python -m teos.teosd
+teosd
 ```
 
 ### Configuration file and command line parameters
@@ -49,14 +50,14 @@ To change the configuration defaults you can:
 
 and / or 
 
-- Add some global options when running the daemon (run `teosd.py -h` for more info).
+- Add some global options when running the daemon (run `teosd -h` for more info).
 
 ### Passing command line options to `teosd`
 
 Some configuration options can also be passed as options when running `teosd`. We can, for instance, pick the network as follows:
 
 ```
-python -m teos.teosd --btcnetwork=regtest
+teosd --btcnetwork=regtest
 ```
 
 ### Running TEOS in another network
@@ -84,7 +85,7 @@ btc_network = regtest
 ```
 
 ## Running `teos` in a docker container
-A `teos` image can be built from the Dockerfile located in `/docker`. You can create the image by running:
+A `teos` image can be built from the Dockerfile located in `docker`. You can create the image by running:
 
 	cd python-teos
 	docker build -f docker/Dockerfile -t teos .
@@ -98,6 +99,8 @@ Notice that ENV variables are optional, if unset the corresponding default setti
 ```
 - API_BIND=<teos_api_hostname>
 - API_PORT=<teos_api_port>
+- RPC_BIND=<teos_rpc_hostname>
+- RPC_PORT=<teos_rpc_port>
 - BTC_NETWORK=<btc_network>
 - BTC_RPC_CONNECT=<btc_node_hostname>
 - BTC_RPC_PORT=<btc_node_port>
@@ -161,17 +164,23 @@ Otherwise it will bind to `localost` and we won't be able to send requests to th
 
 ## Interacting with a TEOS Instance
 
-You can interact with a `teos` instance (either run by yourself or someone else) by using `teos_cli` under `cli`.
+You can interact with a `teos` instance (either run by yourself or someone else) by using `teos-cli` under `teos/cli`. This is an admin tool that has privileged access to the watchtower, and it should therefore only be used within a trusted environment (for example, the same machine).
 
-Since `teos_cli` works independently of `teos`, it uses a different configuration. The defaults can be found at [cli/\_\_init\_\_.py](cli/__init__.py). The same approach as with `teosd` is followed:
+While `teos-cli` works independently of `teos`, it shares the same configuration file by default, of which it only uses a subset of its settings. The folder can be changed using the `--datadir` command line argument, if desired.
 
-- A config file (`~/.teos_cli/teos_cli.conf`) can be set to change the defaults.
-- Some options ca also be changed via command line. 
-- The configuration file template can be found at [cli/template.conf](cli/template.conf))
+For help on the available arguments and commands, you can run:
 
-`teos_cli` needs an independent set of keys that are also automatically generated in the same way as `teos`.
+```
+teos-cli -h
+```
 
-Notice that `teos_cli` is a simple way to interact with `teos`, but ideally that should be part of your wallet functionality (therefore why they are independent entities). `teos_cli` can be used as an example for how to send data to a [BOLT13](https://github.com/sr-gi/bolt13) compliant watchtower.
+## Interacting with TEOS as a client
+
+The [contrib/client](contrib/client) folder contains an example Python client that can interact with the watchtower in order to register, add appointments and later retrieve them.
+
+See [here](contrib/client) for more information on how to use the client.
+
+Note that while the client is a simple way to interact with `teos`, ideally its functionality should be part of your wallet or lightning node. `teos_client` can be used as an example for how to send data to a [BOLT13](https://github.com/sr-gi/bolt13) compliant watchtower.
 
 ## Contributing 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md)

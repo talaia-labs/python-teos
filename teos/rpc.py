@@ -99,7 +99,7 @@ class _RPC(TowerServicesServicer):
         return self.stub.stop(request)
 
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
+def serve(rpc_bind, rpc_port, internal_api_endpoint, logging_port, stop_event):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
@@ -109,11 +109,12 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, stop_event):
         rpc_bind (:obj:`str`): the IP or host where the RPC server will be hosted.
         rpc_port (:obj:`int`): the port where the RPC server will be hosted.
         internal_api_endpoint (:obj:`str`): the endpoint where to reach the internal (gRPC) api.
+        logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
         stop_event (:obj:`multiprocessing.Event`) the Event that this service will monitor. The rpc server will
             initiate a graceful shutdown once this event is set.
     """
 
-    setup_logging()
+    setup_logging(logging_port)
     rpc = RPC(rpc_bind, rpc_port, internal_api_endpoint)
     # Ignores SIGINT so the main process can handle the teardown
     signal(SIGINT, ignore_signal)

@@ -1,7 +1,7 @@
 def show_usage():
     return (
         "USAGE: "
-        "\n\tpython teosd.py [global options]"
+        "\n\tteosd [global options]"
         "\n\nGLOBAL OPTIONS (all modifiable in conf file):"
         "\n\t--apibind \t\tAddress that teos API will bind to. Defaults to 'localhost'."
         "\n\t--apiport \t\tPort that teos API will bind to. Defaults to '9814'."

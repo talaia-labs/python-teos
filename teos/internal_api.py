@@ -18,7 +18,7 @@ from teos.protobuf.appointment_pb2 import (
 from teos.protobuf.user_pb2 import RegisterResponse, GetUserResponse, GetUsersResponse
 from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
-from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure
+from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure, SubscriptionExpired
 from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
 from google.protobuf.empty_pb2 import Empty
 
@@ -108,6 +108,10 @@ class _InternalAPI(TowerServicesServicer):
                 msg = "Appointment limit reached"
                 status_code = grpc.StatusCode.RESOURCE_EXHAUSTED
 
+            except SubscriptionExpired as e:
+                msg = str(e)
+                status_code = grpc.StatusCode.UNAUTHENTICATED
+
             except AppointmentAlreadyTriggered:
                 msg = "The provided appointment has already been triggered"
                 status_code = grpc.StatusCode.ALREADY_EXISTS
@@ -142,9 +146,17 @@ class _InternalAPI(TowerServicesServicer):
                 return GetAppointmentResponse(appointment_data=data, status=status)
 
             except (AuthenticationFailure, AppointmentNotFound):
-                context.set_details("Appointment not found")
-                context.set_code(grpc.StatusCode.NOT_FOUND)
-                return GetAppointmentResponse()
+                msg = "Appointment not found"
+                status_code = grpc.StatusCode.NOT_FOUND
+
+            except SubscriptionExpired as e:
+                msg = str(e)
+                status_code = grpc.StatusCode.UNAUTHENTICATED
+
+            context.set_details(msg)
+            context.set_code(status_code)
+
+            return GetAppointmentResponse()
 
     def get_all_appointments(self, request, context):
         """Returns all the appointments in the tower."""

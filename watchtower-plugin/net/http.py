@@ -37,7 +37,7 @@ def add_appointment(plugin, tower_id, tower, appointment_dict, signature):
         status_code = e.kwargs.get("status_code")
 
         if data and status_code == constants.HTTP_BAD_REQUEST:
-            if data.get("error_code") == errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS:
+            if data.get("error_code") == errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR:
                 message = f"There is a subscription issue with {tower_id}"
                 raise TowerResponseError(message, status="subscription error")
 

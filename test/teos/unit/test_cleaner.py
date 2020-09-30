@@ -117,14 +117,14 @@ def test_update_delete_db_locator_map(db_manager):
             assert uuid in locator_map_before and uuid not in locator_map_after
 
 
-def test_delete_expired_appointment(db_manager):
+def test_delete_outdated_appointments(db_manager):
     for _ in range(ITERATIONS):
         appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
-        expired_appointments = random.sample(list(appointments.keys()), k=ITEMS)
+        outdated_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-        Cleaner.delete_expired_appointments(expired_appointments, appointments, locator_uuid_map, db_manager)
+        Cleaner.delete_outdated_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager)
 
-        assert not set(expired_appointments).issubset(appointments.keys())
+        assert not set(outdated_appointments).issubset(appointments.keys())
 
 
 def test_delete_completed_appointments(db_manager):
@@ -160,7 +160,7 @@ def test_flag_triggered_appointments(db_manager):
 
 
 def test_delete_trackers_db_match(db_manager):
-    # Completed and expired trackers are deleted using the same method. The only difference is the logging message
+    # Completed and outdated trackers are deleted using the same method. The only difference is the logging message
     height = 0
 
     for _ in range(ITERATIONS):
@@ -233,7 +233,7 @@ def test_delete_gatekeeper_appointments(gatekeeper):
                 appointments_not_to_delete[uuid] = user_id
 
     # Now let's delete half of them
-    Cleaner.delete_gatekeeper_appointments(gatekeeper, appointments_to_delete)
+    Cleaner.delete_gatekeeper_appointments(appointments_to_delete, gatekeeper.registered_users, gatekeeper.user_db)
 
     all_appointments_gatekeeper = []
     # Let's get all the appointments in the Gatekeeper
@@ -243,3 +243,30 @@ def test_delete_gatekeeper_appointments(gatekeeper):
     # Check that the first half of the appointments are not in the Gatekeeper, but the second half is
     assert not set(appointments_to_delete).issubset(all_appointments_gatekeeper)
     assert set(appointments_not_to_delete).issubset(all_appointments_gatekeeper)
+
+
+def test_delete_outdated_users(gatekeeper):
+    # This tests the deletion of users whose subscription has outdated (subscription expires now)
+
+    # Create some users with associated data and add them to the gatekeeper
+    users = {}
+    current_height = gatekeeper.block_processor.get_block_count()
+    for _ in range(10):
+        appointments = {get_random_value_hex(32): Appointment(get_random_value_hex(32), None, None)}
+        user_id = get_random_value_hex(16)
+        user_info = UserInfo(available_slots=100, subscription_expiry=current_height, appointments=appointments)
+
+        users[user_id] = user_info
+        gatekeeper.registered_users[user_id] = user_info
+
+    # Get a list of the users that should be deleted at this block height (must match the newly generated ones)
+    users_to_be_deleted = gatekeeper.get_outdated_user_ids(current_height + gatekeeper.expiry_delta)
+    assert users_to_be_deleted == list(users.keys())
+
+    # Delete the users
+    Cleaner.delete_outdated_users(users_to_be_deleted, gatekeeper.registered_users, gatekeeper.user_db)
+
+    # Check that the users are not in the gatekeeper anymore
+    for user_id in users_to_be_deleted:
+        assert user_id not in gatekeeper.registered_users
+        assert not gatekeeper.user_db.load_user(user_id)

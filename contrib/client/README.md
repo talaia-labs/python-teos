@@ -1,6 +1,6 @@
-# teos_client
+# teos-client
 
-`teos_client` is an example command line client to interact with the Eye of Satoshi watchtower server, written in
+`teos-client` is an example command line client to interact with the Eye of Satoshi watchtower server, written in
 Python3. It has commands to register a user to the watchtower (generating user keys if necessary), to add an
 appointment and to retrieve information about appointments.
 
@@ -13,8 +13,9 @@ Refer to [INSTALL.md](INSTALL.md)
 
 ## Usage
 
-	python -m teos_client [global options] command [command options] [arguments]
-	
+    teos-client [global options] command [command options] [arguments]
+
+
 #### Global options
 
 - `--apiconnect`:	API server where to send the requests. Defaults to 'localhost' (modifiable in conf file).
@@ -23,7 +24,7 @@ Refer to [INSTALL.md](INSTALL.md)
 
 #### Commands
 
-The command line interface has, currently, four commands:
+The client has four commands:
 
 - `register`: registers your user with the tower.
 - `add_appointment`: sends a json formatted appointment to the tower.
@@ -31,14 +32,13 @@ The command line interface has, currently, four commands:
 - `help`: shows a list of commands or help for a specific command.
 
 ### register
-This commands serves as registration. It sends your public key to the tower to create a subscription (fee atm) and returns a number of available appointment slots in the tower. Toping up the subscription can be done by simply sending a register message again.
+This commands serves as registration. It sends your public key to the tower to create a subscription (free at the moment) and returns a number of available appointment slots in the tower. Topping up the subscription can be done by simply sending a register message again.
 
-Notice that you need to be register before sending any other type of request to the tower.
+Notice that you need to be registered before sending any other type of request to the tower.
 
 #### Usage
 
-	python -m teos_client register tower_id
-	
+	teos-client register tower_id
 	
 ### add_appointment
 
@@ -48,7 +48,7 @@ This command is used to send appointments to the watchtower. Appointments **must
 	  "tx_id": tx_id,
 	  "to_self_delay": d }
 	
-`tx` **must** be the raw penalty transaction that will be encrypted before sent to the watchtower. `type(tx) = hex encoded str`
+`tx` **must** be the raw penalty transaction that will be encrypted before being sent to the watchtower. `type(tx) = hex encoded str`
 
 `tx_id` **must** match the **commitment transaction id**, and will be used to encrypt the **penalty transaction** and **generate the locator**. `type(tx_id) = hex encoded str`
 
@@ -59,7 +59,7 @@ The API will return a `application/json` HTTP response code `200/OK` if the appo
 
 #### Usage
 
-	python -m teos_client add_appointment [command options] <appointment>/<path_to_appointment_file>
+	teos-client add_appointment [command options] <appointment>/<path_to_appointment_file>
 	
 if `-f, --file` **is** specified, then the command expects a path to a json file instead of a json encoded string as parameter.
 	
@@ -116,13 +116,13 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 	
 #### Usage
 
-	python -m teos_client get_appointment <appointment_locator>
+	teos-client get_appointment <appointment_locator>
 
 ## Example
 1. Register with the tower. A tower with the given id should be running (replace the id with the one you'll be using).
 
 ```
-python -m teos_client register 03a3a3e196def1950f332556d046648d960102da33f61665a910febe38a1c3f825
+teos-client register 03a3a3e196def1950f332556d046648d960102da33f61665a910febe38a1c3f825
 ```
 
 2. Generate a new dummy appointment. **Note:** this appointment will never be fulfilled (it will eventually expire) since it does not correspond to a valid transaction. However it can be used to interact with the Eye of Satoshi's API.
@@ -136,7 +136,7 @@ python -m teos_client register 03a3a3e196def1950f332556d046648d960102da33f61665a
 3. Send the appointment to the tower API. Which will then start monitoring for matching transactions.
 
     ```
-    python -m teos_client add_appointment -f dummy_appointment_data.json
+    teos-client add_appointment -f dummy_appointment_data.json
     ```
 
     This returns an appointment locator that can be used to get updates about this appointment from the tower.
@@ -144,12 +144,12 @@ python -m teos_client register 03a3a3e196def1950f332556d046648d960102da33f61665a
 4. Test that the tower is still watching the appointment by replacing the appointment locator received into the following command:
 
     ```
-    python -m teos_client get_appointment <appointment_locator>
+    pteos-client get_appointment <appointment_locator>
     ```
 
 ## Try our live instance
 
-By default, `teos_client` will connect to your local instance (running on localhost). There are also a couple of live instances running, one for mainet and one for testnet:
+By default, `teos-client` will connect to your local instance (running on localhost). There are also a couple of live instances running, one for mainet and one for testnet:
 
 - testnet endpoint = `teos-testnet.pisa.watch:443`
 - mainnet endpoint = `teos.pisa.watch:443` or `theeyeofsatoshi.pisa.watch:443`
@@ -159,7 +159,7 @@ By default, `teos_client` will connect to your local instance (running on localh
 Add `--apiconnect  --apiport 443` to your calls, for example:
 
 ```
-python -m teos_client --apiconnect=https://teos.pisa.watch --apiport=443 add_appointment   -f dummy_appointment_data.json 
+teos-client --apiconnect=https://teos.pisa.watch --apiport=443 add_appointment   -f dummy_appointment_data.json 
 ```
 
 You can also change the config file to avoid specifying the server every time:

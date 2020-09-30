@@ -104,3 +104,10 @@ We use [pytest](https://docs.pytest.org/en/latest/) to build and run tests. Test
 
 We require that all commits to be merge into master are signed. You can enable commit signing on GitHub by following [Signing commits](https://help.github.com/en/github/authenticating-to-github/signing-commits).
 
+## Installing the development client
+
+You can install the development client for easier testing by setting the development flag (DEV=1) when installing `teos`.
+
+```
+DEV=1 python setup.py install
+```

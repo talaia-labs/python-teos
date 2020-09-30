@@ -6,7 +6,7 @@
 
 `teos` has the following system-wide dependencies:
 
-- `python3` version 3.6+
+- `python3` version 3.7+
 - `pip3`
 - `openssl` version 1.1+
 - `bitcoind`
@@ -58,7 +58,7 @@ And, if it happens to be installed, change the alias to `pip3`, or use `pip3` in
 
 You can get Bitcoin Core from [bitcoin.org](https://bitcoin.org/en/download).
 
-Bitcoin needs to be running with the following options enables:
+Bitcoin needs to be running with the following options enabled:
 
 - `zmq` for rawblockhash notifications
 - `txindex` to be able to look for non-wallet transactions
@@ -90,7 +90,7 @@ maxtxfee=1
 
 ### Installing the Dependencies
 
-`python3` ca be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
+`python3` can be downloaded from the [Python official website](https://www.python.org/downloads/) or installed using a package manager, depending on your distribution. Examples for both UNIX-like and OSX systems are provided.
 
 #### Ubuntu
 
@@ -112,17 +112,10 @@ and for `pip3`:
 
 `pip3` will be installed alongside `python3` in this case.
 
-## Python Dependencies
+## Python Dependencies	
 
-`teos` has the following dependencies (which can be satisfied by using `pip install -r requirements.txt`):
+ `teos` has several python dependencies that are automatically alongside the it. Should you need to install them manually, you can do so by running:
 
-- `wheel`
-- `zmq`
-- `flask`
-- `cryptography`
-- `coincurve`
-- `pyzbase32`
-- `requests`
-- `plyvel`
-- `readerwriterlock`
-
+```
+ pip install -r requirements.txt`
+```

@@ -1,5 +1,3 @@
-import logging.handlers
-
 # Locator
 LOCATOR_LEN_HEX = 32
 LOCATOR_LEN_BYTES = LOCATOR_LEN_HEX // 2
@@ -20,6 +18,3 @@ IRREVOCABLY_RESOLVED = 100
 
 # Temporary constants, may be changed
 ENCRYPTED_BLOB_MAX_SIZE_HEX = 2 * 2048
-
-# The port used for the tcp logging service is 9020
-TCP_LOGGING_PORT = logging.handlers.DEFAULT_TCP_LOGGING_PORT

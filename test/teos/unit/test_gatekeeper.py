@@ -1,14 +1,17 @@
 import pytest
+from copy import deepcopy
 
 from teos.users_dbm import UsersDBM
+from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
+from teos.constants import OUTDATED_USERS_CACHE_SIZE_BLOCKS
 from teos.gatekeeper import AuthenticationFailure, NotEnoughSlots, UserInfo
 
 from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter
 from common.constants import ENCRYPTED_BLOB_MAX_SIZE_HEX
 
-from test.teos.conftest import config
+from test.teos.conftest import config, generate_blocks, generate_blocks_with_delay
 from test.teos.unit.conftest import get_random_value_hex, generate_keypair
 
 
@@ -24,6 +27,50 @@ def test_init(gatekeeper):
     assert isinstance(gatekeeper.block_processor, BlockProcessor)
     assert isinstance(gatekeeper.user_db, UsersDBM)
     assert isinstance(gatekeeper.registered_users, dict) and len(gatekeeper.registered_users) == 0
+
+
+def test_manage_subscription_expiry(gatekeeper):
+    # The subscription are expired at expiry but data is deleted once outdated (expiry_delta blocks after)
+    current_height = gatekeeper.block_processor.get_block_count()
+    expiring_users = {
+        get_random_value_hex(32): UserInfo(available_slots=10, subscription_expiry=current_height + 1)
+        for _ in range(10)
+    }
+    gatekeeper.registered_users.update(expiring_users)
+
+    # We will need a ChainMonitor instance for this so data can be feed to us
+    bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
+    chain_monitor = ChainMonitor([gatekeeper.block_queue], gatekeeper.block_processor, bitcoind_feed_params)
+    chain_monitor.monitor_chain()
+    chain_monitor.activate()
+
+    # Users expire after this block. Check that they are currently not expired
+    for user_id in expiring_users.keys():
+        assert not gatekeeper.has_subscription_expired(user_id)
+
+    # Generate a block and users must have expired
+    generate_blocks_with_delay(1)
+    for user_id in expiring_users.keys():
+        assert gatekeeper.has_subscription_expired(user_id)
+
+    # Users will remain in the registered_users dictionary until expiry_delta blocks later.
+    generate_blocks_with_delay(gatekeeper.expiry_delta - 1)
+    # Users will be deleted in the next block
+    assert set(expiring_users).issubset(gatekeeper.registered_users)
+
+    generate_blocks_with_delay(1)
+    # Data has just been deleted but should still be present on the cache
+    block_height_deletion = gatekeeper.block_processor.get_block_count()
+    assert not set(expiring_users).issubset(gatekeeper.registered_users)
+    for user_id, _ in expiring_users.items():
+        assert not gatekeeper.user_db.load_user(user_id)
+    assert gatekeeper.outdated_users_cache[block_height_deletion].keys() == expiring_users.keys()
+
+    # After OUTDATED_USERS_CACHE_SIZE_BLOCKS they data should not be there anymore (check one before and the one)
+    generate_blocks_with_delay(OUTDATED_USERS_CACHE_SIZE_BLOCKS - 1)
+    assert block_height_deletion in gatekeeper.outdated_users_cache
+    generate_blocks_with_delay(1)
+    assert block_height_deletion not in gatekeeper.outdated_users_cache
 
 
 def test_add_update_user(gatekeeper):
@@ -196,19 +243,178 @@ def test_add_update_appointment(gatekeeper, generate_dummy_appointment):
         gatekeeper.add_update_appointment(user_id, appointment_uuid, appointment_x2_size)
 
 
-def test_get_expired_appointments(gatekeeper):
-    # get_expired_appointments returns a list of appointment uuids expiring at a given block
+def test_has_subscription_expired(gatekeeper):
+    user_info = UserInfo(available_slots=1, subscription_expiry=gatekeeper.block_processor.get_block_count() + 1)
+    user_id = get_random_value_hex(32)
+    gatekeeper.registered_users[user_id] = user_info
+
+    # Check that the subscription is still live
+    assert not gatekeeper.has_subscription_expired(user_id)
+
+    # Generating 1 additional block will expire the subscription
+    generate_blocks(1)
+    assert gatekeeper.has_subscription_expired(user_id)
+
+    # Check it remains expired afterwards
+    generate_blocks(1)
+    assert gatekeeper.has_subscription_expired(user_id)
+
+
+def test_has_subscription_expired_not_registered(gatekeeper):
+    # If the users is unknown by the Gatekeeper, the method will fail
+    with pytest.raises(AuthenticationFailure):
+        gatekeeper.has_subscription_expired(get_random_value_hex(32))
+
+
+def test_get_outdated_users(gatekeeper):
+    # Gets a list of users whose subscription gets outdated at a given height
+    current_height = gatekeeper.block_processor.get_block_count()
+    uuids = [get_random_value_hex(32) for _ in range(20)]
+    outdated_users_next = {
+        get_random_value_hex(32): UserInfo(
+            available_slots=10,
+            subscription_expiry=current_height - gatekeeper.expiry_delta + 1,
+            appointments={uuids[i]: 1},  # uuid:1 slot
+        )
+        for i in range(10)
+    }
+
+    outdated_users_next_next = {
+        get_random_value_hex(32): UserInfo(
+            available_slots=10,
+            subscription_expiry=current_height - gatekeeper.expiry_delta + 2,
+            appointments={uuids[i + 10]: 1},  # uuid:1 slot
+        )
+        for i in range(10)
+    }
+
+    # Add users to the Gatekeeper
+    gatekeeper.registered_users.update(outdated_users_next)
+    gatekeeper.registered_users.update(outdated_users_next_next)
+
+    # Check that outdated_users_cache are outdated at the current height
+    outdated_users = gatekeeper.get_outdated_users(current_height + 1).keys()
+    outdated_appointment_uuids = [
+        uuid
+        for user_appointments in gatekeeper.get_outdated_users(current_height + 1).values()
+        for uuid in user_appointments
+    ]
+    assert outdated_users == outdated_users_next.keys() and outdated_appointment_uuids == uuids[:10]
+
+    outdated_users = gatekeeper.get_outdated_users(current_height + 2).keys()
+    outdated_appointment_uuids = [
+        uuid
+        for user_appointments in gatekeeper.get_outdated_users(current_height + 2).values()
+        for uuid in user_appointments
+    ]
+    assert outdated_users == outdated_users_next_next.keys() and outdated_appointment_uuids == uuids[10:]
+
+
+def test_get_outdated_user_ids(gatekeeper):
+    # get_outdated_user_ids returns a list of user ids being outdated a a given height.
+    uuids = []
+    # Let's simulate adding some users with dummy expiry times
+    gatekeeper.registered_users = {}
+    for i in range(100):
+        # Add more than one user expiring at the same time to check it works for multiple users
+        iter_uuids = []
+        for _ in range(2):
+            uuid = get_random_value_hex(16)
+            user_appointments = {get_random_value_hex(16): 1}
+            # Add a single appointment to the user
+            gatekeeper.registered_users[uuid] = UserInfo(100, i, user_appointments)
+            iter_uuids.append(uuid)
+        uuids.append(iter_uuids)
+
+    # Now let's check that the appointments are outdated at the proper time
+    for i in range(100):
+        assert gatekeeper.get_outdated_user_ids(i + gatekeeper.expiry_delta) == uuids[i]
+
+
+def test_get_outdated_user_ids_empty(gatekeeper):
+    # Test how an empty list is returned if no users are being outdated
+    empty = gatekeeper.get_outdated_user_ids(gatekeeper.block_processor.get_block_count() + 1000)
+    assert isinstance(empty, list) and len(empty) == 0
+
+
+def test_get_outdated_appointments(gatekeeper):
+    # get_outdated_appointments returns a list of appointment uuids being outdated a a given height
 
     appointment = {}
     # Let's simulate adding some users with dummy expiry times
     gatekeeper.registered_users = {}
-    for i in reversed(range(100)):
-        uuid = get_random_value_hex(16)
-        user_appointments = [get_random_value_hex(16)]
-        # Add a single appointment to the user
-        gatekeeper.registered_users[uuid] = UserInfo(100, i, user_appointments)
-        appointment[i] = user_appointments
-
-    # Now let's check that reversed
     for i in range(100):
-        assert gatekeeper.get_expired_appointments(i + gatekeeper.expiry_delta) == appointment[i]
+        # Add more than one user expiring at the same time to check it works for multiple users
+        for _ in range(2):
+            uuid = get_random_value_hex(16)
+            user_appointments = {get_random_value_hex(16): 1 for _ in range(10)}
+            # Add a single appointment to the user
+            gatekeeper.registered_users[uuid] = UserInfo(100, i, user_appointments)
+
+            if i in appointment:
+                appointment[i].update(user_appointments)
+            else:
+                appointment[i] = deepcopy(user_appointments)
+
+    # Now let's check that the appointments are outdated a the proper time
+    for i in range(100):
+        assert gatekeeper.get_outdated_appointments(i + gatekeeper.expiry_delta) == list(appointment[i].keys())
+
+
+def test_get_outdated_appointments_empty(gatekeeper):
+    # Test how an empty list is returned if no appointments are being outdated
+    empty = gatekeeper.get_outdated_appointments(gatekeeper.block_processor.get_block_count() + 1000)
+    assert isinstance(empty, list) and len(empty) == 0
+
+
+def test_update_outdated_users_cache(gatekeeper):
+    # update_outdated_users_cache is used to add new entries to the cache and prune old ones if it grows beyond the
+    # limit. In normal conditions (no reorg) the method is called once per block height, meaning that the data won't be
+    # in the cache when called and it will be afterwards
+    current_block_height = gatekeeper.block_processor.get_block_count()
+    appointments = {get_random_value_hex(32): 1 for _ in range(10)}
+    user_info = UserInfo(available_slots=1, subscription_expiry=current_block_height + 42, appointments=appointments)
+    user_id = get_random_value_hex(32)
+    gatekeeper.registered_users[user_id] = user_info
+
+    # Check that the entry is not in the cache
+    target_height = current_block_height + gatekeeper.expiry_delta + 42
+    assert target_height not in gatekeeper.outdated_users_cache
+
+    # Update the cache and check
+    gatekeeper.update_outdated_users_cache(target_height)
+    cache_entry = gatekeeper.outdated_users_cache.get(target_height)
+    # Values is not meant to be used straightaway for checking, but we can flatten it to check it matches
+    flattened_appointments = [uuid for user_appointments in cache_entry.values() for uuid in user_appointments]
+    assert list(cache_entry.keys()) == [user_id] and flattened_appointments == list(appointments.keys())
+
+
+def test_update_outdated_users_cache_remove_data(gatekeeper):
+    # Tests how the oldest piece of data is removed after OUTDATED_USERS_CACHE_SIZE_BLOCKS
+    current_block_height = gatekeeper.block_processor.get_block_count()
+
+    # Add users that are expiring from the current block to OUTDATED_USERS_CACHE_SIZE_BLOCKS -1 and fill the cache with
+    # them
+    data = {}
+    for i in range(OUTDATED_USERS_CACHE_SIZE_BLOCKS):
+        appointments = {get_random_value_hex(32): 1 for _ in range(10)}
+        user_info = UserInfo(available_slots=1, subscription_expiry=current_block_height + i, appointments=appointments)
+        user_id = get_random_value_hex(32)
+        gatekeeper.registered_users[user_id] = user_info
+
+        target_block = current_block_height + gatekeeper.expiry_delta + i
+        gatekeeper.update_outdated_users_cache(target_block)
+        # Create a local version of the expected data to compare {block_id: {user_id: [appointment_uuids]}, ...}
+        data[target_block] = {user_id: list(appointments.keys())}
+
+    # Check that the cache is full and that each position matches
+    assert len(gatekeeper.outdated_users_cache) == OUTDATED_USERS_CACHE_SIZE_BLOCKS
+    assert gatekeeper.outdated_users_cache == data
+
+    # Add more blocks and check what data gets kicked (data has an offset of OUTDATED_USERS_CACHE_SIZE_BLOCKS, so we can
+    # check if the previous key is there easily)
+    for i in range(OUTDATED_USERS_CACHE_SIZE_BLOCKS):
+        target_block = current_block_height + gatekeeper.expiry_delta + OUTDATED_USERS_CACHE_SIZE_BLOCKS + i
+        assert target_block - OUTDATED_USERS_CACHE_SIZE_BLOCKS in gatekeeper.outdated_users_cache
+        gatekeeper.update_outdated_users_cache(target_block)
+        assert target_block - OUTDATED_USERS_CACHE_SIZE_BLOCKS not in gatekeeper.outdated_users_cache

@@ -4,7 +4,7 @@ VOLUME ["~/.teos"]
 WORKDIR /srv
 ADD . /srv/python-teos
 RUN apt-get update && apt-get -y install python3 python3-pip libffi-dev libssl-dev pkg-config libleveldb-dev
-RUN mkdir ~/.teos && cd python-teos && pip3 install -r requirements.txt
+RUN mkdir ~/.teos && cd python-teos && python3 setup.py install
 ENV PYTHONPATH=$APP_PATH
 WORKDIR /srv/python-teos
 EXPOSE 9814/tcp

@@ -1,6 +1,9 @@
 import os
 from common.constants import MAINNET_RPC_PORT
 
+version_info = (0, 1, 1)
+__version__ = ".".join([str(v) for v in version_info])
+
 DATA_DIR = os.path.expanduser("~/.teos/")
 CONF_FILE_NAME = "teos.conf"
 DEFAULT_CONF = {
