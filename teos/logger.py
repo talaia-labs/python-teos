@@ -11,7 +11,6 @@ import json
 from io import StringIO
 
 from teos.tools import ignore_signal
-from teos.constants import TCP_LOGGING_PORT
 
 configured = False  # set to True once setup_logging is called
 
@@ -31,9 +30,12 @@ class JsonMsgLogger(logging.Logger):
         return rv
 
 
-def setup_logging():
+def setup_logging(logging_port):
     """
     Configures the logging options. It must be called only once, before using get_logger.
+
+    Args:
+        logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
 
     Raises:
         :obj:`RuntimeError`: if ``setup_logging`` had already been called.
@@ -56,7 +58,7 @@ def setup_logging():
                     "level": "DEBUG",
                     "class": "logging.handlers.SocketHandler",
                     "host": "localhost",
-                    "port": TCP_LOGGING_PORT,
+                    "port": logging_port,
                     "filters": ["onlyteos"],
                 },
             },
@@ -179,11 +181,19 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
 
 
 class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
-    """Simple TCP socket-based logging receiver."""
+    """
+    Simple TCP socket-based logging receiver.
+
+    Args:
+        host (:obj:`str`): the hostname or ip where the logging server can be reached. Defaults to localhost.
+        port (:obj:`int`): the port where the logging server can be reached. Defaults to 0 so the OS can pick a free
+            one.
+        handler (:obj:`StreamRequestHandler`): the log handler.
+    """
 
     allow_reuse_address = True
 
-    def __init__(self, host="localhost", port=TCP_LOGGING_PORT, handler=LogRecordStreamHandler):
+    def __init__(self, host="localhost", port=0, handler=LogRecordStreamHandler):
         socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
         self.timeout = 1
 
@@ -196,13 +206,14 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
                 self.handle_request()
 
 
-def serve(log_file_path, silent, ready):
+def serve(log_file_path, logging_port, silent, ready):
     """
-    Sets up logging on console and file, and serves the tcp logging server on ``localhost:TCP_LOGGING_PORT``.
+    Sets up logging on console and file, and serves the tcp logging server on ``localhost:tcp_logging_port``.
     This method is meant to be run in a separate process and provides the logging service.
 
     Args:
         log_file_path (:obj:`str`): the full path and log file name.
+        logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
         silent (:obj:`bool`): if True, only ``CRITICAL`` errors are shown to console; otherwise ``INFO`` and above.
         ready (:obj:`multiprocessing.Event`): an event that is set once the logging server is ready.
     """
@@ -222,6 +233,7 @@ def serve(log_file_path, silent, ready):
     # Ignore SIGINT so this process does not crash on CTRL+C, but comply on other signals
     signal(SIGINT, ignore_signal)
 
-    tcpserver = LogRecordSocketReceiver()
+    tcpserver = LogRecordSocketReceiver(port=logging_port.value)
+    logging_port.value = tcpserver.server_address[1]
     ready.set()
     tcpserver.serve_forever()
