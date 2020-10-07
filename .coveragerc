@@ -4,4 +4,3 @@ omit =
     teos/teosd.py
     teos/logger.py
     teos/sample_conf.py
-    teos/utils/auth_proxy.py

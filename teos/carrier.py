@@ -73,7 +73,6 @@ class Carrier:
         )
         return bitcoin.rpc.Proxy(service_url)
 
-
     # NOTCOVERED
     def send_transaction(self, rawtx, txid):
         """
@@ -108,12 +107,12 @@ class Carrier:
         except VerifyRejectedError as e:
             # DISCUSS: 37-transaction-rejection
             receipt = Receipt(delivered=False, reason=rpc_errors.RPC_VERIFY_REJECTED)
-            self.logger.error("Transaction couldn't be broadcasted", error=e)
+            self.logger.error("Transaction couldn't be broadcasted", error=e.error)
 
         except VerifyError as e:
             # DISCUSS: 37-transaction-rejection
             receipt = Receipt(delivered=False, reason=rpc_errors.RPC_VERIFY_ERROR)
-            self.logger.error("Transaction couldn't be broadcasted", error=e)
+            self.logger.error("Transaction couldn't be broadcasted", error=e.error)
 
         except VerifyAlreadyInChainError as e:
             self.logger.info("Transaction is already in the blockchain. Getting confirmation count", txid=txid)

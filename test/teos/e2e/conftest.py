@@ -6,6 +6,8 @@ import multiprocessing
 from grpc import RpcError
 from multiprocessing import Process
 
+from bitcoin.core import b2x
+
 from teos.teosd import main
 from teos.cli.teos_cli import RPCClient
 from common.cryptographer import Cryptographer
@@ -61,6 +63,6 @@ def run_teosd():
 
 
 def build_appointment_data(commitment_tx_id, penalty_tx):
-    appointment_data = {"tx": penalty_tx, "tx_id": commitment_tx_id, "to_self_delay": 20}
+    appointment_data = {"tx": b2x(penalty_tx.serialize()), "tx_id": commitment_tx_id, "to_self_delay": 20}
 
     return appointment_data
