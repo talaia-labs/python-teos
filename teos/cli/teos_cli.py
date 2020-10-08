@@ -1,194 +1,328 @@
 import os
 import sys
-import json
-import grpc
 from sys import argv
-import functools
 from getopt import getopt, GetoptError
-from google.protobuf import json_format
-from google.protobuf.empty_pb2 import Empty
+import grpc
 
 from common.config_loader import ConfigLoader
-from common.tools import setup_data_folder, is_compressed_pk, intify
+from common.tools import setup_data_folder
 from common.exceptions import InvalidParameter
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from teos.cli.help import (
-    show_usage,
-    help_get_all_appointments,
-    help_get_tower_info,
-    help_get_users,
-    help_get_user,
-    help_stop,
-)
-from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
-from teos.protobuf.user_pb2 import GetUserRequest
+from teos.cli.rpc_client import RPCClient
 
 
-def to_json(obj):
+def show_usage():
     """
-    All conversions to json in this module should be consistent, therefore we restrict the options using
-    this function.
-    """
-    return json.dumps(obj, indent=4)
+    Generates the help message shown when teos-cli is called incorrectly, no command was given, or it is called with
+    `teos-cli help` or `teos-cli -h`.
 
-
-def formatted(func):
-    """
-    Transforms the given function by wrapping the return value with ``json_format.MessageToDict`` followed by
-    json.dumps, in order to print the result in a prettyfied json format.
+    This function iterates the docstring of each registered command, and looks for a line with the format:
+       NAME:   teos-cli command_name - One line description of the command called "command_name".
+    If such a line is not found, or it is not formatted as above, ``ValueError`` is raised.
     """
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
-        result_dict = json_format.MessageToDict(
-            result, including_default_value_fields=True, preserving_proto_field_name=True
-        )
-        return to_json(intify(result_dict))
+    command_help_lines = []
+    longest_command_length = max(len(x) for x in CLI.COMMANDS.keys())
 
-    return wrapper
+    for command_name, command_class in CLI.COMMANDS.items():
+        doc = command_class.__doc__
+
+        # find and parse the first line containing NAME:
+        name_line = next(line for line in doc.split("\n") if "NAME:" in line)
+        if "teos-cli" not in name_line:
+            raise ValueError(f"The NAME line of the {command_name} command is malformed")
+
+        _, rest = name_line.split("teos-cli")
+
+        if " - " not in rest:
+            raise ValueError(f"The NAME line of the {command_name} command is malformed")
+
+        command_name_in_line, command_description = map(lambda x: x.strip(), rest.split(" - "))
+
+        if command_name_in_line != command_name:
+            raise ValueError(f"The NAME line of the {command_name} command is malformed")
+
+        padded_command_name = command_name.ljust(longest_command_length, " ")
+
+        command_help_lines.append(f"\t{padded_command_name}  {command_description}")
+
+    commands_help = "\n".join(command_help_lines)
+
+    return (
+        "USAGE: "
+        "\n\tteos-cli [global options] command [command options] [arguments]"
+        "\n\nCOMMANDS:\n"
+        f"{commands_help}"
+        "\n\nGLOBAL OPTIONS:"
+        "\n\t--rpcconnect  RPC server where to send the requests. Defaults to 'localhost' (modifiable in conf file)."
+        "\n\t--rpcport     RPC port where to send the requests. Defaults to '8814' (modifiable in conf file)."
+        "\n\t--datadir     Specify data directory used for the config file. Defaults to '~\\.teos'."
+        "\n\t-d, --debug   Shows debug information and stores it in teos_cli.log."
+        "\n\t-h, --help    Shows this message."
+        "\n"
+    )
 
 
-class RPCClient:
+class CLICommand:
     """
-    Creates and keeps a connection to the an RPC serving TowerServices. It has methods to call each of the
-    available grpc services, and it returns a pretty-printed json response.
-    Errors from the grpc calls are not handled.
+    Base class of each CLI command.
+
+    All the implementations should have an appropriately formatted docstring. See existing commands for an example.
+    Any implementation _must_ override the ``name`` attribute, and it might override the ``shortopts`` and ``longopts``
+    attributes.
+    """
+
+    name = None
+    shortopts = ""
+    longopts = []
+
+    @classmethod
+    def parse_args(cls, args):
+        """Parses the ``args`` array using ``getopt``, using ``shortopts`` and ``longopts`` as options."""
+
+        return getopt(args, cls.shortopts, cls.longopts)
+
+    @staticmethod
+    def run(rpc_client, opts_args):
+        """
+        Executes the command. Receives as parameters the rpc_client and the output of ``parse_args`` on the command
+        arguments.
+        """
+
+        raise NotImplementedError()
+
+
+class CLI:
+    """
+    This class contains the logic for running all the commands of the command line interface. All the commands must be
+    subclasses of :class:`CLICommand` and need to be added to this class using the ``command`` decorator.
 
     Args:
-        rpc_host (:obj:`str`): the IP or host where the RPC server will be hosted.
-        rpc_port (:obj:`int`): the port where the RPC server will be hosted.
+        data_dir (:obj:`str`): the path to the data directory where the configuration file may be found.
+        command_line_conf (:obj:`dict`): the command line settings, parsed in a dictionary.
 
     Attributes:
-        stub: The rpc client stub.
+        rpc_client (:class:`RpcClient`): the rpc client that is passed to the ``run`` method of the commands.
     """
 
-    def __init__(self, rpc_host, rpc_port):
-        self.rpc_host = rpc_host
-        self.rpc_port = rpc_port
-        channel = grpc.insecure_channel(f"{rpc_host}:{rpc_port}")
-        self.stub = TowerServicesStub(channel)
+    # A dictionary mapping each command's name to the corresponding CLICommand subclass.
+    # It is populated by the ``command`` decorator.
+    COMMANDS = {}
 
-    @formatted
-    def get_all_appointments(self):
-        """Gets a list of all the appointments in the watcher, and trackers in the responder."""
-        result = self.stub.get_all_appointments(Empty())
-        return result.appointments
+    def __init__(self, data_dir, command_line_conf):
+        # Loads config and sets up the data folder and log file
+        config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+        config = config_loader.build_config()
 
-    @formatted
-    def get_tower_info(self):
-        """Gets generic information about the tower."""
-        return self.stub.get_tower_info(Empty())
+        setup_data_folder(data_dir)
 
-    def get_users(self):
-        """Gets the list of registered user ids."""
-        result = self.stub.get_users(Empty())
-        return to_json(list(result.user_ids))
+        teos_rpc_host = config.get("RPC_BIND")
+        teos_rpc_port = config.get("RPC_PORT")
 
-    @formatted
-    def get_user(self, user_id):
+        self.rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
+
+    @classmethod
+    def command(cls, command_cls):
         """
-        Gets information about a specific user.
-
-        Args:
-            user_id (:obj:`str`): the id of the requested user.
+        Decorator used to register a new command, which must be a subclass of :class:`CLICommand` and must override
+        the ``name`` field with an appropriate string.
 
         Raises:
-            :obj:`InvalidParameter`: if `user_id` is not in the valid format.
+            :obj:`TypeError`: ``command_cls`` is not a subclass of :class:`CLICommand`, or its ``name`` field is not a
+            string.
         """
 
-        if not is_compressed_pk(user_id):
-            raise InvalidParameter("Invalid user id")
+        if not issubclass(command_cls, CLICommand):
+            raise TypeError(f"{command_cls.__name__} is not a subclass of CLICommand")
 
-        result = self.stub.get_user(GetUserRequest(user_id=user_id))
-        return result.user
+        if not isinstance(command_cls.name, str):
+            raise TypeError(f'The "name" attribute of {command_cls.__name__} must be a string.')
 
-    def stop(self):
-        """Stops TEOS gracefully."""
-        self.stub.stop(Empty())
+        cls.COMMANDS[command_cls.name] = command_cls
+        return command_cls
+
+    def run(self, command_name, raw_args):
+        """
+        Parses ``raw_args`` using the ``parse_args`` method of the command.
+        Then, executes the command's ``run`` method, passing the ``rpc_client`` and the output of ``parse_args``.
+        It any error that might happen, showing an appropriate message to console.
+
+        Returns:
+            The return value of the ``run`` command, or :obj:`None` if an error was raised.
+        """
+
+        if command_name not in self.COMMANDS:
+            sys.exit("Unknown command. Use help to check the list of available commands")
+
+        command = self.COMMANDS[command_name]
+
+        try:
+            args = command.parse_args(raw_args)
+            return command.run(self.rpc_client, args)
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.UNAVAILABLE:
+                sys.exit("It was not possible to reach the Eye of Satoshi. Are you sure the tower is running?")
+            else:
+                sys.exit(e.details())
+        except InvalidParameter as e:
+            sys.exit(e.msg if not e.kwargs else f"{e.msg}. Error arguments: {e.kwargs}")
+        except Exception as e:
+            sys.exit(f"Unknown error occurred: {str(e)}")
+
+
+@CLI.command
+class GetAllAppointmentsCommand(CLICommand):
+    """
+    NAME:   teos-cli get_all_appointments - Gets information about all the appointments stored in the tower.
+
+    USAGE:  teos-cli get_all_appointments
+
+    DESCRIPTION:
+
+        Gets information about all appointments stored in the tower.
+    """
+
+    name = "get_all_appointments"
+
+    @staticmethod
+    def run(rpc_client, opts_args):
+        return rpc_client.get_all_appointments()
+
+
+@CLI.command
+class GetTowerInfoCommand(CLICommand):
+    """
+    NAME:   teos-cli get_tower_info - Gets generic information about the tower.
+
+    USAGE:  teos-cli get_tower_info
+
+    DESCRIPTION:
+
+        Gets generic information about the tower, like tower_id and aggregate data on users and appointments.
+    """
+
+    name = "get_tower_info"
+
+    @staticmethod
+    def run(rpc_client, opts_args):
+        return rpc_client.get_tower_info()
+
+
+@CLI.command
+class GetUsersCommand(CLICommand):
+    """
+    NAME:   teos-cli get_users - Gets the list of registered user ids.
+
+    USAGE:  teos-cli get_users
+
+    DESCRIPTION:
+
+        Gets an array with the user ids of all the users registered to the tower.
+    """
+
+    name = "get_users"
+
+    @staticmethod
+    def run(rpc_client, opts_args):
+        return rpc_client.get_users()
+
+
+@CLI.command
+class GetUserCommand(CLICommand):
+    """
+    NAME:   teos-cli get_user - Gets information about a specific user.
+
+    USAGE:  teos-cli get_user "user_id"
+
+    DESCRIPTION:
+
+        Gets information about a specific user.
+    """
+
+    name = "get_user"
+
+    @staticmethod
+    def run(rpc_client, opts_args):
+        opts, args = opts_args
+
+        if not args:
+            sys.exit("No user_id was given")
+        if len(args) > 1:
+            sys.exit(f"Expected only one argument, not {len(args)}")
+
+        return rpc_client.get_user(args[0])
+
+
+@CLI.command
+class StopCommand(CLICommand):
+    """
+    NAME:   teos-cli stop - Requests a graceful shutdown of the tower..
+
+    USAGE:  teos-cli stop
+
+    DESCRIPTION:
+
+        Requests a graceful shutdown of the tower.
+    """
+
+    name = "stop"
+
+    @staticmethod
+    def run(rpc_client, opts_args):
+        rpc_client.stop()
         print("Closing the Eye of Satoshi")
 
 
-def main(command, args, data_dir, command_line_conf):
-    # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
-    config = config_loader.build_config()
+@CLI.command
+class HelpCommand(CLICommand):
+    """
+    NAME:   teos-cli help - Shows general help, or help for a specific command.
 
-    setup_data_folder(data_dir)
+    USAGE:  teos-cli help [command]
 
-    teos_rpc_host = config.get("RPC_BIND")
-    teos_rpc_port = config.get("RPC_PORT")
+    DESCRIPTION:
 
-    rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
+        Shows a summary of all the commands and global options. If command is given, shows detailed help for the
+        command.
+    """
 
-    result = None
-    try:
-        if command == "get_all_appointments":
-            result = rpc_client.get_all_appointments()
+    name = "help"
 
-        elif command == "get_tower_info":
-            result = rpc_client.get_tower_info()
+    @staticmethod
+    def run(rpc_client, opts_args):
+        opts, args = opts_args
 
-        elif command == "get_users":
-            result = rpc_client.get_users()
+        if not args:
+            sys.exit(show_usage())
+        elif len(args) > 1:
+            sys.exit(f"Expected only one argument, not {len(args)}")
 
-        elif command == "get_user":
-            if not args:
-                sys.exit("No user_id was given")
-            if len(args) > 1:
-                sys.exit(f"Expected only one argument, not {len(args)}")
+        command_name = args.pop(0)
+        if command_name not in CLI.COMMANDS:
+            sys.exit("Unknown command.")
 
-            result = rpc_client.get_user(args[0])
-
-        elif command == "stop":
-            rpc_client.stop()
-
-        elif command == "help":
-            if args:
-                command = args.pop(0)
-
-                if command == "get_all_appointments":
-                    sys.exit(help_get_all_appointments())
-
-                elif command == "get_tower_info":
-                    sys.exit(help_get_tower_info())
-
-                elif command == "get_users":
-                    sys.exit(help_get_users())
-
-                elif command == "get_user":
-                    sys.exit(help_get_user())
-
-                elif command == "stop":
-                    sys.exit(help_stop())
-
-                else:
-                    sys.exit("Unknown command. Use help to check the list of available commands")
-
-            else:
-                sys.exit(show_usage())
-
-        if result:
-            print(result)
-
-    except grpc.RpcError as e:
-        if e.code() == grpc.StatusCode.UNAVAILABLE:
-            sys.exit("It was not possible to reach the Eye of Satoshi. Are you sure the tower is running?")
-        else:
-            sys.exit(e.details())
-    except InvalidParameter as e:
-        sys.exit(e.msg if not e.kwargs else f"{e.msg}. Error arguments: {e.kwargs}")
-    except Exception as e:
-        sys.exit(f"Unknown error occurred: {str(e)}")
+        sys.exit(CLI.COMMANDS[command_name].__doc__)
 
 
 def run():
-    command_line_conf = {}
-    commands = ["get_all_appointments", "get_appointments", "get_tower_info", "get_users", "get_user", "stop", "help"]
+    # Split the command line as follows: global options, command, command args,
+    # where command is the first argument not starting with "-".
 
     try:
-        opts, args = getopt(argv[1:], "h", ["rpcbind=", "rpcport=", "datadir=", "help"])
+        command_index = next(i for i in range(len(argv)) if i > 0 and not argv[i].startswith("-"))
+    except StopIteration:
+        sys.exit(show_usage())
+
+    command = argv[command_index]
+    global_options = argv[1:command_index]
+    command_args = argv[command_index + 1 :]
+
+    command_line_conf = {}
+
+    # Process global options
+    try:
+        opts, args = getopt(global_options, "h", ["rpcbind=", "rpcport=", "datadir=", "help"])
 
         data_dir = DATA_DIR
 
@@ -209,17 +343,21 @@ def run():
 
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
-
-        command = args.pop(0) if args else None
-        if command in commands:
-            main(command, args, data_dir, command_line_conf)
-        elif not command:
-            sys.exit("No command provided. Use help to check the list of available commands")
-        else:
-            sys.exit("Unknown command. Use help to check the list of available commands")
-
     except GetoptError as e:
         sys.exit("{}".format(e))
+
+    if command in CLI.COMMANDS:
+        try:
+            cli = CLI(data_dir, command_line_conf)
+            result = cli.run(command, command_args)
+            if result:
+                print(result)
+        except InvalidParameter:
+            sys.exit(show_usage())
+    elif not command:
+        sys.exit("No command provided. Use help to check the list of available commands")
+    else:
+        sys.exit("Unknown command. Use help to check the list of available commands")
 
 
 if __name__ == "__main__":
