@@ -326,7 +326,8 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
         responder.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
     # Let's start to watch
-    Thread(target=responder.do_watch, daemon=True).start()
+    do_watch_thread = Thread(target=responder.do_watch, daemon=True)
+    do_watch_thread.start()
 
     # And broadcast some of the penalties
     broadcast_txs = []
@@ -360,6 +361,9 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
     # Check they are not in the Gatekeeper either
     for tracker in trackers[5:]:
         assert len(responder.gatekeeper.registered_users[tracker.user_id].appointments) == 0
+
+    chain_monitor.terminate()
+    do_watch_thread.join()
 
 
 def test_check_confirmations(db_manager, gatekeeper, carrier, responder, block_processor):

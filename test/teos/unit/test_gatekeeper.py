@@ -46,12 +46,14 @@ def test_manage_subscription_expiry(gatekeeper):
 
     # Users expire after this block. Check that they are currently not expired
     for user_id in expiring_users.keys():
-        assert not gatekeeper.has_subscription_expired(user_id)
+        has_subscription_expired, _ = gatekeeper.has_subscription_expired(user_id)
+        assert not has_subscription_expired
 
     # Generate a block and users must have expired
     generate_blocks_with_delay(1)
     for user_id in expiring_users.keys():
-        assert gatekeeper.has_subscription_expired(user_id)
+        has_subscription_expired, _ = gatekeeper.has_subscription_expired(user_id)
+        assert has_subscription_expired
 
     # Users will remain in the registered_users dictionary until expiry_delta blocks later.
     generate_blocks_with_delay(gatekeeper.expiry_delta - 1)
@@ -249,15 +251,18 @@ def test_has_subscription_expired(gatekeeper):
     gatekeeper.registered_users[user_id] = user_info
 
     # Check that the subscription is still live
-    assert not gatekeeper.has_subscription_expired(user_id)
+    has_subscription_expired, expiry = gatekeeper.has_subscription_expired(user_id)
+    assert not has_subscription_expired
 
     # Generating 1 additional block will expire the subscription
     generate_blocks(1)
-    assert gatekeeper.has_subscription_expired(user_id)
+    has_subscription_expired, expiry = gatekeeper.has_subscription_expired(user_id)
+    assert has_subscription_expired
 
     # Check it remains expired afterwards
     generate_blocks(1)
-    assert gatekeeper.has_subscription_expired(user_id)
+    has_subscription_expired, expiry = gatekeeper.has_subscription_expired(user_id)
+    assert has_subscription_expired
 
 
 def test_has_subscription_expired_not_registered(gatekeeper):
