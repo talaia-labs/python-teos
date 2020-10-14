@@ -307,7 +307,7 @@ class API:
                 rcode = HTTP_BAD_REQUEST
                 response = {
                     "error": e.details(),
-                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_INSUFFICIENT_SLOTS,
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
                 }
             else:
                 rcode = HTTP_NOT_FOUND
