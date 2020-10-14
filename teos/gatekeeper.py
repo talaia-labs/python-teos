@@ -1,9 +1,7 @@
 from math import ceil
 from queue import Queue
-from threading import Lock
 from threading import Thread
 from readerwriterlock import rwlock
-from collections import OrderedDict
 
 from teos.cleaner import Cleaner
 from teos.chain_monitor import ChainMonitor
@@ -93,7 +91,7 @@ class Gatekeeper:
         outdated_users_cache (:obj:`dict`): A cache of outdated user ids to allow the Watcher and Responder to query
             deleted data. Keys are bock heights, values are lists of user ids. Has a maximum size of
             ``OUTDATED_USERS_CACHE_SIZE_BLOCKS``.
-        lock (:obj:`Lock`): A lock object to lock access to the Gatekeeper on updates.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to lock access to the Gatekeeper on updates.
     """
 
     def __init__(self, user_db, block_processor, subscription_slots, subscription_duration, expiry_delta):
@@ -107,7 +105,7 @@ class Gatekeeper:
             user_id: UserInfo.from_dict(user_data) for user_id, user_data in user_db.load_all_users().items()
         }
         self.outdated_users_cache = {}
-        self.lock = Lock()
+        self.rw_lock = rwlock.RWLockWrite()
 
         # Starts a child thread to take care of expiring subscriptions
         Thread(target=self.manage_subscription_expiry, daemon=True).start()
@@ -151,7 +149,7 @@ class Gatekeeper:
         if not is_compressed_pk(user_id):
             raise InvalidParameter("Provided public key does not match expected format (33-byte hex string)")
 
-        with self.lock:
+        with self.rw_lock.gen_wlock():
             if user_id not in self.registered_users:
                 self.registered_users[user_id] = UserInfo(
                     self.subscription_slots, self.block_processor.get_block_count() + self.subscription_duration
@@ -174,11 +172,11 @@ class Gatekeeper:
                 self.registered_users[user_id].subscription_expiry,
             )
 
-        return (
-            self.registered_users[user_id].available_slots,
-            self.registered_users[user_id].subscription_expiry,
-            receipt,
-        )
+            return (
+                self.registered_users[user_id].available_slots,
+                self.registered_users[user_id].subscription_expiry,
+                receipt,
+            )
 
     def authenticate_user(self, message, signature):
         """
@@ -199,10 +197,11 @@ class Gatekeeper:
             rpk = Cryptographer.recover_pk(message, signature)
             user_id = Cryptographer.get_compressed_pk(rpk)
 
-            if user_id in self.registered_users:
-                return user_id
-            else:
-                raise AuthenticationFailure("User not found.")
+            with self.rw_lock.gen_rlock():
+                if user_id in self.registered_users:
+                    return user_id
+                else:
+                    raise AuthenticationFailure("User not found.")
 
         except (InvalidParameter, InvalidKey, SignatureError):
             raise AuthenticationFailure("Wrong message or signature.")
@@ -229,7 +228,7 @@ class Gatekeeper:
             :obj:`NotEnoughSlots`: if the user does not have enough slots to fill.
         """
 
-        with self.lock:
+        with self.rw_lock.gen_wlock():
             # For updates the difference between the existing appointment and the update is computed.
             if uuid in self.registered_users[user_id].appointments:
                 used_slots = self.registered_users[user_id].appointments[uuid]
@@ -260,12 +259,15 @@ class Gatekeeper:
             user_id (:obj:`str`): the public key that identifies the user (33-bytes hex str).
 
         Returns:
-            :obj:`bool`: True if the subscription has expired. False otherwise.
+            :obj:`tuple`: A tuple ``(bool:int)`` containing whether or not the subscription has expired, and the expiry
+                time.
         """
 
-        if user_id not in self.registered_users:
-            raise AuthenticationFailure()
-        return self.block_processor.get_block_count() >= self.registered_users[user_id].subscription_expiry
+        with self.rw_lock.gen_rlock():
+            if user_id not in self.registered_users:
+                raise AuthenticationFailure()
+            expiry = self.registered_users[user_id].subscription_expiry
+            return self.block_processor.get_block_count() >= expiry, expiry
 
     def get_outdated_users(self, block_height):
         """
@@ -281,7 +283,7 @@ class Gatekeeper:
             :obj:`dict`: A dictionary of users whose subscription is outdated at ``block_height``.
         """
 
-        with self.lock:
+        with self.rw_lock.gen_rlock():
             # Try to get the data from the cache
             outdated_users = self.outdated_users_cache.get(block_height)
 
@@ -337,9 +339,22 @@ class Gatekeeper:
 
         outdated_users = self.get_outdated_users(block_height)
 
-        with self.lock:
+        with self.rw_lock.gen_wlock():
             if block_height not in self.outdated_users_cache:
                 self.outdated_users_cache[block_height] = outdated_users
                 # Remove the first entry from the cache once it grows beyond the limit
                 if len(self.outdated_users_cache) > OUTDATED_USERS_CACHE_SIZE_BLOCKS:
                     self.outdated_users_cache.pop(next(iter(self.outdated_users_cache)))
+
+    def delete_appointments(self, appointments):
+        """
+        Proxy function to clean completed / outdated data from the gatekeeper. It uses the
+        :obj:`Cleaner <teos.cleaner.Cleaner>`, but allows the :obj:`Watcher <teos.watcher.Watcher>` and the
+        :obj:`Responder <teos.responder.Responder>` to call it without having to handle internal stuff from the
+        :obj:`Gatekeeper`.
+
+        Args:
+            appointments (:obj:`dict`): A collection of appointments to be deleted.
+        """
+        with self.rw_lock.gen_wlock():
+            Cleaner.delete_gatekeeper_appointments(appointments, self.registered_users, self.user_db)
