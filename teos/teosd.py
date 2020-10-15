@@ -266,14 +266,17 @@ class TeosDaemon:
         api_endpoint = f"{self.config.get('API_BIND')}:{self.config.get('API_PORT')}"
         if self.config.get("WSGI") == "gunicorn":
             # FIXME: We may like to add workers depending on a config value
+            teos_folder = os.path.dirname(os.path.realpath(__file__))
             self.api_proc = subprocess.Popen(
                 [
                     "gunicorn",
+                    f"--config={os.path.join(teos_folder, 'gunicorn_config.py')}",
                     f"--bind={api_endpoint}",
                     f"teos.api:serve(internal_api_endpoint='{self.internal_api_endpoint}', "
                     f"endpoint='{api_endpoint}', logging_port='{logging_port}', "
                     f"min_to_self_delay='{self.config.get('MIN_TO_SELF_DELAY')}')",
-                ]
+                ],
+                env={**os.environ, **{"LOG_SERVER_PORT": str(logging_port)}},
             )
         else:
             self.api_proc = multiprocessing.Process(
