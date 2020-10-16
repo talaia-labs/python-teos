@@ -48,6 +48,7 @@ class LocatorCache:
             (``block_hash:locators``). Used to keep track of what data belongs to what block, so data can be pruned
             accordingly. Also needed to rebuild the cache in case of reorgs.
         cache_size (:obj:`int`): The size of the cache in blocks.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the cache on updates.
     """
 
     def __init__(self, blocks_in_cache):
@@ -208,6 +209,7 @@ class Watcher:
             time.
         last_known_block (:obj:`str`): The last block known by the :obj:`Watcher`.
         locator_cache (:obj:`LocatorCache`): A cache of locators for the last ``blocks_in_cache`` blocks.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the Watcher on updates.
 
     Raises:
         :obj:`InvalidKey`: if teos sk cannot be loaded.
@@ -237,8 +239,7 @@ class Watcher:
     @property
     def n_registered_users(self):
         """Get the number of users currently registered to the tower."""
-        with self.gatekeeper.rw_lock.gen_rlock():
-            return len(self.gatekeeper.registered_users)
+        return self.gatekeeper.n_registered_users
 
     @property
     def n_watcher_appointments(self):
@@ -249,8 +250,7 @@ class Watcher:
     @property
     def n_responder_trackers(self):
         """Get the total number of trackers in the responder."""
-        with self.responder.rw_lock.gen_rlock():
-            return len(self.responder.trackers)
+        return self.responder.n_responder_trackers
 
     def awake(self):
         """
@@ -310,17 +310,16 @@ class Watcher:
         uuid = hash_160("{}{}".format(locator, user_id))
 
         with self.rw_lock.gen_rlock():
-            with self.responder.rw_lock.gen_rlock():
-                if uuid in self.appointments:
-                    appointment_data = self.db_manager.load_watcher_appointment(uuid)
-                    status = AppointmentStatus.BEING_WATCHED
-                elif uuid in self.responder.trackers:
-                    appointment_data = self.db_manager.load_responder_tracker(uuid)
-                    status = AppointmentStatus.DISPUTE_RESPONDED
-                else:
-                    raise AppointmentNotFound("Cannot find {}".format(locator))
+            if uuid in self.appointments:
+                appointment_data = self.db_manager.load_watcher_appointment(uuid)
+                status = AppointmentStatus.BEING_WATCHED
+            elif self.responder.has_tracker(uuid):
+                appointment_data = self.db_manager.load_responder_tracker(uuid)
+                status = AppointmentStatus.DISPUTE_RESPONDED
+            else:
+                raise AppointmentNotFound("Cannot find {}".format(locator))
 
-                return appointment_data, status
+            return appointment_data, status
 
     def add_appointment(self, appointment, user_signature):
         """
@@ -379,11 +378,10 @@ class Watcher:
             uuid = hash_160("{}{}".format(extended_appointment.locator, user_id))
 
             # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
-            with self.responder.rw_lock.gen_rlock():
-                if uuid in self.responder.trackers:
-                    message = "Appointment already in Responder"
-                    self.logger.info(message)
-                    raise AppointmentAlreadyTriggered(message)
+            if self.responder.has_tracker(uuid):
+                message = "Appointment already in Responder"
+                self.logger.info(message)
+                raise AppointmentAlreadyTriggered(message)
 
             # Add the appointment to the Gatekeeper
             available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, extended_appointment)
@@ -667,9 +665,7 @@ class Watcher:
         return valid_breaches, invalid_breaches
 
     def get_registered_user_ids(self):
-        """Returns the list of user ids of all the registered users."""
-        with self.gatekeeper.rw_lock.gen_rlock():
-            return list(self.gatekeeper.registered_users.keys())
+        return self.gatekeeper.user_ids
 
     def get_user_info(self, user_id):
         """
@@ -682,8 +678,7 @@ class Watcher:
             :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user data if found. :obj:`None` if not found,
             or the ``user_id`` is invalid.
         """
-        with self.gatekeeper.rw_lock.gen_rlock():
-            return self.gatekeeper.registered_users.get(user_id)
+        return self.gatekeeper.get_user_info(user_id)
 
     def get_subscription_info(self, signature):
         """
@@ -706,16 +701,15 @@ class Watcher:
         if has_expired:
             raise SubscriptionExpired(f"Your subscription expired at block {expiry}")
 
-        with self.gatekeeper.rw_lock.gen_rlock():
-            subscription_info = self.gatekeeper.registered_users.get(user_id)
+        subscription_info = self.gatekeeper.get_user_info(user_id)
 
         with self.rw_lock.gen_rlock():
             locators = []
             for appt_uuid in subscription_info.appointments:
                 if appt_uuid in self.appointments:
                     locators.append(self.appointments.get(appt_uuid).get("locator"))
-                elif appt_uuid in self.responder.trackers:
-                    locators.append(self.responder.trackers.get(appt_uuid).get("locator"))
+                elif self.responder.has_tracker(appt_uuid):
+                    locators.append(self.responder.get_tracker(appt_uuid).get("locator"))
                 else:
                     self.logger.debug("The appointment uuid was not found in the watcher or the responder.")
 

@@ -131,6 +131,7 @@ class Responder:
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): A block processor instance to
             get data from bitcoind.
         last_known_block (:obj:`str`): The last block known by the :obj:`Responder`.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the Responder on updates.
     """
 
     def __init__(self, db_manager, gatekeeper, carrier, block_processor):
@@ -146,6 +147,22 @@ class Responder:
         self.block_processor = block_processor
         self.last_known_block = db_manager.load_last_block_hash_responder()
         self.rw_lock = rwlock.RWLockWrite()
+
+    @property
+    def n_responder_trackers(self):
+        """Get the total number of trackers in the Responder."""
+        with self.rw_lock.gen_rlock():
+            return len(self.trackers)
+
+    def has_tracker(self, uuid):
+        """Returns whether a tracker can be found in the Responder."""
+        with self.rw_lock.gen_rlock():
+            return uuid in self.trackers
+
+    def get_tracker(self, uuid):
+        """Returns a tracker from the Responder if found."""
+        with self.rw_lock.gen_rlock():
+            return self.trackers.get(uuid)
 
     def awake(self):
         """

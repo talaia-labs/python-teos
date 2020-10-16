@@ -91,7 +91,7 @@ class Gatekeeper:
         outdated_users_cache (:obj:`dict`): A cache of outdated user ids to allow the Watcher and Responder to query
             deleted data. Keys are bock heights, values are lists of user ids. Has a maximum size of
             ``OUTDATED_USERS_CACHE_SIZE_BLOCKS``.
-        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to lock access to the Gatekeeper on updates.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the Gatekeeper on updates.
     """
 
     def __init__(self, user_db, block_processor, subscription_slots, subscription_duration, expiry_delta):
@@ -109,6 +109,23 @@ class Gatekeeper:
 
         # Starts a child thread to take care of expiring subscriptions
         Thread(target=self.manage_subscription_expiry, daemon=True).start()
+
+    @property
+    def n_registered_users(self):
+        """Get the number of users currently registered to the tower."""
+        with self.rw_lock.gen_rlock():
+            return len(self.registered_users)
+
+    @property
+    def user_ids(self):
+        """Returns the list of user ids of all the registered users."""
+        with self.rw_lock.gen_rlock():
+            return list(self.registered_users.keys())
+
+    def get_user_info(self, user_id):
+        """Returns the data held by the tower about the user given an ``user_id``."""
+        with self.rw_lock.gen_rlock():
+            return self.registered_users.get(user_id)
 
     def manage_subscription_expiry(self):
         """
