@@ -53,7 +53,7 @@ if os.getenv("DEV", False):
     CONSOLE_SCRIPTS.append("teos-client=contrib.client.teos_client:run")
 
 setuptools.setup(
-    name="python-   teos",
+    name="python-teos",
     version=__version__,
     author="Talaia Labs",
     author_email="contact@talaia.watch",
