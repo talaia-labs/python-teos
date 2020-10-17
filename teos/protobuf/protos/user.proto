@@ -37,3 +37,9 @@ message GetUsersResponse {
 
   repeated string user_ids = 1;
 }
+
+message GetSubscriptionInfoRequest {
+    // Request to get a specific user's subscription info.
+
+    string signature = 1;
+}

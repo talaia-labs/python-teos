@@ -52,6 +52,11 @@ class TowerServicesStub(object):
             request_serializer=user__pb2.GetUserRequest.SerializeToString,
             response_deserializer=user__pb2.GetUserResponse.FromString,
         )
+        self.get_subscription_info = channel.unary_unary(
+            "/teos.protobuf.protos.v1.TowerServices/get_subscription_info",
+            request_serializer=user__pb2.GetSubscriptionInfoRequest.SerializeToString,
+            response_deserializer=user__pb2.GetUserResponse.FromString,
+        )
         self.stop = channel.unary_unary(
             "/teos.protobuf.protos.v1.TowerServices/stop",
             request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -104,6 +109,12 @@ class TowerServicesServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def get_subscription_info(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def stop(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -148,6 +159,11 @@ def add_TowerServicesServicer_to_server(servicer, server):
             request_deserializer=user__pb2.GetUserRequest.FromString,
             response_serializer=user__pb2.GetUserResponse.SerializeToString,
         ),
+        "get_subscription_info": grpc.unary_unary_rpc_method_handler(
+            servicer.get_subscription_info,
+            request_deserializer=user__pb2.GetSubscriptionInfoRequest.FromString,
+            response_serializer=user__pb2.GetUserResponse.SerializeToString,
+        ),
         "stop": grpc.unary_unary_rpc_method_handler(
             servicer.stop,
             request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
@@ -169,6 +185,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -182,6 +199,7 @@ class TowerServices(object):
             user__pb2.RegisterResponse.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -196,6 +214,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -209,6 +228,7 @@ class TowerServices(object):
             appointment__pb2.AddAppointmentResponse.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -223,6 +243,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -236,6 +257,7 @@ class TowerServices(object):
             appointment__pb2.GetAppointmentResponse.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -250,6 +272,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -263,6 +286,7 @@ class TowerServices(object):
             appointment__pb2.GetAllAppointmentsResponse.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -277,6 +301,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -290,6 +315,7 @@ class TowerServices(object):
             tower__services__pb2.GetTowerInfoResponse.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -304,6 +330,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -317,6 +344,7 @@ class TowerServices(object):
             user__pb2.GetUsersResponse.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -331,6 +359,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -344,6 +373,36 @@ class TowerServices(object):
             user__pb2.GetUserResponse.FromString,
             options,
             channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def get_subscription_info(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/teos.protobuf.protos.v1.TowerServices/get_subscription_info",
+            user__pb2.GetSubscriptionInfoRequest.SerializeToString,
+            user__pb2.GetUserResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
@@ -358,6 +417,7 @@ class TowerServices(object):
         options=(),
         channel_credentials=None,
         call_credentials=None,
+        insecure=False,
         compression=None,
         wait_for_ready=None,
         timeout=None,
@@ -371,6 +431,7 @@ class TowerServices(object):
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
+            insecure,
             call_credentials,
             compression,
             wait_for_ready,
