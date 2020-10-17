@@ -673,10 +673,48 @@ class Watcher:
             user_id (:obj:`str`): the id of the requested user.
 
         Returns:
-            :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user data if found. :obj:`None` if not found, or
-            the ``user_id`` is invalid.
+            :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user data if found. :obj:`None` if not found,
+            or the ``user_id`` is invalid.
         """
         return self.gatekeeper.registered_users.get(user_id)
+
+    def get_subscription_info(self, signature):
+        """
+        Gets information about a user's subscription.
+
+        Args:
+            signature (:obj:`str`): the signature of the request by the user.
+
+        Returns:
+            :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user's subscription data if found. :obj:`None`
+            if not found, or the ``user_id`` is invalid.
+
+        Raises:
+            :obj:`SubscriptionExpired`: If the user subscription has expired.
+        """
+
+        message = "get subscription info".encode("utf-8")
+        user_id = self.gatekeeper.authenticate_user(message, signature)
+        if self.gatekeeper.has_subscription_expired(user_id):
+            raise SubscriptionExpired(
+                f"Your subscription expired at block {self.gatekeeper.registered_users[user_id].subscription_expiry}"
+            )
+
+        subscription_info = self.gatekeeper.registered_users.get(user_id)
+
+        locators = []
+
+        for appt_uuid in subscription_info.appointments:
+            if appt_uuid in self.appointments:
+                locators.append(self.appointments.get(appt_uuid).get("locator"))
+            elif appt_uuid in self.responder.trackers:
+                locators.append(self.responder.trackers.get(appt_uuid).get("locator"))
+            else:
+                self.logger.debug("The appointment uuid was not found in the watcher or the responder.")
+
+        subscription_info.locators = locators
+
+        return subscription_info
 
     def get_all_watcher_appointments(self):
         """Returns a dictionary with all the appointment stored in the db for the watcher."""
