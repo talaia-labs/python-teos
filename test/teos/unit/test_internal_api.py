@@ -14,7 +14,14 @@ from teos.gatekeeper import UserInfo
 from teos.internal_api import InternalAPI
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
-from teos.protobuf.user_pb2 import RegisterRequest, RegisterResponse, GetUsersResponse, GetUserRequest, GetUserResponse
+from teos.protobuf.user_pb2 import (
+    RegisterRequest,
+    RegisterResponse,
+    GetUsersResponse,
+    GetUserRequest,
+    GetUserResponse,
+    GetSubscriptionInfoRequest,
+)
 from teos.protobuf.appointment_pb2 import (
     Appointment,
     AddAppointmentRequest,
@@ -282,6 +289,35 @@ def test_get_appointment_subscription_expired(internal_api, stub, generate_dummy
 
     with pytest.raises(grpc.RpcError) as e:
         stub.get_appointment(GetAppointmentRequest(locator=appointment.locator, signature=request_signature))
+
+    assert e.value.code() == grpc.StatusCode.UNAUTHENTICATED
+    assert "Your subscription expired at" in e.value.details()
+
+
+def test_get_subscription_info(internal_api, stub):
+    stub.register(RegisterRequest(user_id=user_id))
+
+    # Request subscription details
+    message = "get subscription info"
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    response = stub.get_subscription_info(GetSubscriptionInfoRequest(signature=request_signature))
+
+    assert isinstance(response, GetUserResponse)
+
+
+def test_get_subscription_info_expired(internal_api, stub):
+    stub.register(RegisterRequest(user_id=user_id))
+
+    # Modify the user data so the subscription has already ended
+    expiry = internal_api.watcher.block_processor.get_block_count() - internal_api.watcher.gatekeeper.expiry_delta - 1
+    internal_api.watcher.gatekeeper.registered_users[user_id].subscription_expiry = expiry
+
+    # Request subscription details
+    message = "get subscription info"
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+
+    with pytest.raises(grpc.RpcError) as e:
+        stub.get_subscription_info(GetSubscriptionInfoRequest(signature=request_signature))
 
     assert e.value.code() == grpc.StatusCode.UNAUTHENTICATED
     assert "Your subscription expired at" in e.value.details()

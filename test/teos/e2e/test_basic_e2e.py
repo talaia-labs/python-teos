@@ -30,6 +30,7 @@ teos_base_endpoint = "http://{}:{}".format(config.get("API_BIND"), config.get("A
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
 teos_get_appointment_endpoint = "{}/get_appointment".format(teos_base_endpoint)
 teos_get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_base_endpoint)
+teos_get_subscription_info_endpoint = "{}/get_subscription_info".format(teos_base_endpoint)
 
 
 user_sk = Cryptographer.generate_key()
@@ -52,6 +53,10 @@ def add_appointment(appointment_data, sk=user_sk):
     return teos_client.add_appointment(appointment_data, sk, teos_id, teos_base_endpoint)
 
 
+def get_subscription_info(sk=user_sk):
+    return teos_client.get_subscription_info(sk, teos_id, teos_base_endpoint)
+
+
 def test_commands_non_registered(run_bitcoind, teosd):
     # All commands should fail if the user is not registered
     global teosd_process, teos_id
@@ -68,6 +73,10 @@ def test_commands_non_registered(run_bitcoind, teosd):
     # Get appointment
     with pytest.raises(TowerResponseError):
         assert get_appointment_info(appointment_data.get("locator"))
+
+    # Get user's subscription info
+    with pytest.raises(TowerResponseError):
+        assert get_subscription_info()
 
 
 def test_commands_registered(run_bitcoind):
@@ -88,6 +97,10 @@ def test_commands_registered(run_bitcoind):
     assert r.get("locator") == appointment.locator
     assert r.get("appointment") == appointment.to_dict()
     appointments_in_watcher += 1
+
+    # Get subscription info
+    r = get_subscription_info()
+    assert r.get("appointments")[0] == appointment.locator
 
 
 def test_appointment_life_cycle(run_bitcoind):
