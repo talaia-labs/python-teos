@@ -50,7 +50,7 @@ signing_key, public_key = generate_keypair()
 MAX_APPOINTMENTS = 100
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def temp_db_manager():
     db_name = get_random_value_hex(8)
     db_manager = AppointmentsDBM(db_name)

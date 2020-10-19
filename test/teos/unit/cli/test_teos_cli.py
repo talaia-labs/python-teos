@@ -94,20 +94,11 @@ def test_run_rpcerror_other(cli, monkeypatch):
 
 
 def test_run_invalid_parameter(cli, monkeypatch):
-    assert "Invalid parameter" == cli.run("mock_command_invalid_parameter", [])
+    assert "Invalid parameter" in cli.run("mock_command_invalid_parameter", [])
 
 
 def test_run_exception(cli, monkeypatch):
     assert "Unknown error occurred: Mock Exception" == cli.run("mock_command_exception", [])
-
-
-def test_get_tower_info(cli, monkeypatch):
-    rpc_client_mock = MagicMock(cli.rpc_client)
-    monkeypatch.setattr(cli, "rpc_client", rpc_client_mock)
-
-    cli.run("get_tower_info", [])
-
-    rpc_client_mock.get_tower_info.assert_called_once()
 
 
 def test_unknown_command_exits(cli):
@@ -145,8 +136,8 @@ def test_get_user(cli, monkeypatch):
     rpc_client_mock = MagicMock(cli.rpc_client)
     monkeypatch.setattr(cli, "rpc_client", rpc_client_mock)
 
-    assert cli.run("get_user", []) == "No user_id was given"
-    assert cli.run("get_user", ["1", "2"]) == "Expected only one argument, not 2"
+    assert "No user_id was given" in cli.run("get_user", [])
+    assert "Expected only one argument, not 2" in cli.run("get_user", ["1", "2"])
 
     # the previous calls should not have called the rpc client, since the arguments number was wrong
     cli.run("get_user", ["42"])
