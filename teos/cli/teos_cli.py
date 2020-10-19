@@ -145,15 +145,15 @@ class CLI:
     def run(self, command_name, raw_args):
         """
         Parses ``raw_args`` using the ``parse_args`` method of the command.
-        Then, executes the command's ``run`` method, passing the ``rpc_client`` and the output of ``parse_args``.
-        It any error that might happen, showing an appropriate message to console.
+        Then, executes the command's ``run`` method, passing the ``rpc_client`` and the output of ``parse_args`` to it.
+        If any error is raised by the command, returns an error message.
 
         Returns:
-            The return value of the ``run`` command, or :obj:`None` if an error was raised.
+            :obj:`str`: The return value of the ``run`` method of the command or an error message.
         """
 
         if command_name not in self.COMMANDS:
-            sys.exit("Unknown command. Use help to check the list of available commands")
+            return "Unknown command. Use help to check the list of available commands"
 
         command = self.COMMANDS[command_name]
 
@@ -162,13 +162,14 @@ class CLI:
             return command.run(self.rpc_client, args)
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.UNAVAILABLE:
-                sys.exit("It was not possible to reach the Eye of Satoshi. Are you sure the tower is running?")
+                return "It was not possible to reach the Eye of Satoshi. Are you sure the tower is running?"
             else:
-                sys.exit(e.details())
+                return e.details()
         except InvalidParameter as e:
-            sys.exit(e.msg if not e.kwargs else f"{e.msg}. Error arguments: {e.kwargs}")
+            error_message = e.msg if not e.kwargs else f"{e.msg}. Error arguments: {e.kwargs}"
+            return error_message + "\n\n" + show_usage()
         except Exception as e:
-            sys.exit(f"Unknown error occurred: {str(e)}")
+            return f"Unknown error occurred: {str(e)}"
 
 
 @CLI.command
@@ -247,9 +248,9 @@ class GetUserCommand(CLICommand):
         opts, args = opts_args
 
         if not args:
-            sys.exit("No user_id was given")
+            raise InvalidParameter("No user_id was given")
         if len(args) > 1:
-            sys.exit(f"Expected only one argument, not {len(args)}")
+            raise InvalidParameter(f"Expected only one argument, not {len(args)}")
 
         return rpc_client.get_user(args[0])
 
@@ -271,7 +272,7 @@ class StopCommand(CLICommand):
     @staticmethod
     def run(rpc_client, opts_args):
         rpc_client.stop()
-        print("Closing the Eye of Satoshi")
+        return "Closing the Eye of Satoshi"
 
 
 @CLI.command
@@ -294,15 +295,15 @@ class HelpCommand(CLICommand):
         opts, args = opts_args
 
         if not args:
-            sys.exit(show_usage())
+            return show_usage()
         elif len(args) > 1:
-            sys.exit(f"Expected only one argument, not {len(args)}")
+            return f"Expected only one argument, not {len(args)}"
 
         command_name = args.pop(0)
         if command_name not in CLI.COMMANDS:
-            sys.exit("Unknown command.")
+            return "Unknown command."
 
-        sys.exit(CLI.COMMANDS[command_name].__doc__)
+        return CLI.COMMANDS[command_name].__doc__
 
 
 def run():
@@ -347,13 +348,10 @@ def run():
         sys.exit("{}".format(e))
 
     if command in CLI.COMMANDS:
-        try:
-            cli = CLI(data_dir, command_line_conf)
-            result = cli.run(command, command_args)
-            if result:
-                print(result)
-        except InvalidParameter:
-            sys.exit(show_usage())
+        cli = CLI(data_dir, command_line_conf)
+        result = cli.run(command, command_args)
+        if result:
+            print(result)
     elif not command:
         sys.exit("No command provided. Use help to check the list of available commands")
     else:
