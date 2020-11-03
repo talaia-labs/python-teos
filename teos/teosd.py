@@ -376,6 +376,7 @@ def main(config):
     # Windows cannot run gunicorn
     if os.name == "nt" and config.get("WSGI") == "gunicorn":
         logger.warning("Windows cannot run gunicorn as WSGI. Changing to waitress")
+        config["WSGI"] = "waitress"
 
     try:
         TeosDaemon(config, sk, logger, logging_port.value).start()
