@@ -565,9 +565,6 @@ def test_get_subscription_info(internal_api, client):
     internal_api.watcher.gatekeeper.registered_users[user_id].subscription_expiry = 700
     internal_api.watcher.gatekeeper.registered_users[user_id].appointments = {}
 
-    # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
-    monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
-
     # Request back the data
     message = "get subscription info"
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)

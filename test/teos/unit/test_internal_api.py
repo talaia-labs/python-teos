@@ -305,6 +305,18 @@ def test_get_subscription_info(internal_api, stub):
     assert isinstance(response, GetUserResponse)
 
 
+def test_get_subscription_info_non_registered(internal_api, stub):
+    # Now let's try sending an invalid signature with the correct user key, but the wrong message signed.
+    message = "wrong message"
+    wrong_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+
+    with pytest.raises(grpc.RpcError) as e:
+        stub.get_subscription_info(GetSubscriptionInfoRequest(signature=wrong_signature))
+
+    assert e.value.code() == grpc.StatusCode.UNAUTHENTICATED
+    assert "User not found. Have you registered?" in e.value.details()
+
+
 def test_get_subscription_info_expired(internal_api, stub):
     stub.register(RegisterRequest(user_id=user_id))
 

@@ -40,6 +40,8 @@ user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 appointments_in_watcher = 0
 appointments_in_responder = 0
 
+available_slots = 0
+subscription_expiry = 0
 
 teosd_process, teos_id = None, None
 
@@ -72,18 +74,18 @@ def test_commands_non_registered(run_bitcoind, teosd):
 
     # Get appointment
     with pytest.raises(TowerResponseError):
-        assert get_appointment_info(appointment_data.get("locator"))
+        get_appointment_info(appointment_data.get("locator"))
 
     # Get user's subscription info
     with pytest.raises(TowerResponseError):
-        assert get_subscription_info()
+        get_subscription_info()
 
 
 def test_commands_registered(run_bitcoind):
-    global appointments_in_watcher
+    global appointments_in_watcher, available_slots
 
     # Test registering and trying again
-    teos_client.register(user_id, teos_id, teos_base_endpoint)
+    available_slots, subscription_expiry = teos_client.register(user_id, teos_id, teos_base_endpoint)
 
     # Add appointment
     commitment_tx, commitment_txid, penalty_tx = create_txs()
@@ -97,14 +99,18 @@ def test_commands_registered(run_bitcoind):
     assert r.get("locator") == appointment.locator
     assert r.get("appointment") == appointment.to_dict()
     appointments_in_watcher += 1
+    available_slots -= 1
 
     # Get subscription info
     r = get_subscription_info()
     assert r.get("appointments")[0] == appointment.locator
+    # Subtract 1 since we just added an appointment
+    assert r.get("available_slots") == available_slots
+    assert r.get("subscription_expiry") == subscription_expiry
 
 
 def test_appointment_life_cycle(run_bitcoind):
-    global appointments_in_watcher, appointments_in_responder
+    global appointments_in_watcher, appointments_in_responder, available_slots, subscription_expiry
 
     # First of all we need to register
     available_slots, subscription_expiry = teos_client.register(user_id, teos_id, teos_base_endpoint)
@@ -125,7 +131,7 @@ def test_appointment_life_cycle(run_bitcoind):
 
     rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
 
-    # Check also the get_all_appointment endpoint
+    # Check also the get_all_appointments endpoint
     all_appointments = json.loads(rpc_client.get_all_appointments())
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
@@ -163,17 +169,11 @@ def test_appointment_life_cycle(run_bitcoind):
     with pytest.raises(TowerResponseError):
         get_appointment_info(locator)
 
-    # Check that the appointment is not in the Gatekeeper by checking the available slots (should have increase by 1)
-    # We can do so by topping up the subscription (FIXME: find a better way to check this).
-    available_slots_response, _ = teos_client.register(user_id, teos_id, teos_base_endpoint)
-    assert (
-        available_slots_response
-        == available_slots + config.get("SUBSCRIPTION_SLOTS") + 1 - appointments_in_watcher - appointments_in_responder
-    )
+    assert get_subscription_info().get("available_slots") == available_slots
 
 
 def test_multiple_appointments_life_cycle(run_bitcoind):
-    global appointments_in_watcher, appointments_in_responder
+    global appointments_in_watcher, appointments_in_responder, available_slots
     # Tests that get_all_appointments returns all the appointments the tower is storing at various stages in the
     # appointment lifecycle.
     appointments = []
@@ -199,6 +199,14 @@ def test_multiple_appointments_life_cycle(run_bitcoind):
         appointment = teos_client.create_appointment(appt.get("appointment_data"))
         add_appointment(appointment)
         appointments_in_watcher += 1
+        available_slots -= 1
+
+    # Check that get_subscription_info also detects these new appointments and returns the correct info.
+    r = get_subscription_info()
+    # We've added 6 appointments so far
+    assert len(r.get("appointments")) == appointments_in_watcher + appointments_in_responder
+    assert r.get("available_slots") == available_slots
+    assert r.get("subscription_expiry") == subscription_expiry
 
     # Two of these appointments are breached, and the watchtower responds to them.
     breached_appointments = []
