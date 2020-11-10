@@ -5,6 +5,8 @@ from copy import deepcopy
 from threading import Thread
 from coincurve import PrivateKey
 
+from bitcoin.core import b2x, b2lx
+
 from teos.carrier import Carrier
 from teos.responder import Responder
 from teos.gatekeeper import UserInfo
@@ -33,6 +35,7 @@ from test.teos.conftest import (
     create_txs,
     bitcoin_cli,
     generate_block_with_transactions,
+    makeCTransaction,
 )
 from test.teos.unit.conftest import (
     get_random_value_hex,
@@ -123,7 +126,7 @@ def test_locator_cache_init_not_enough_blocks(block_processor):
         generate_blocks(3 - block_count)
 
     # Simulate there are only 3 blocks
-    third_block_hash = bitcoin_cli.getblockhash(2)
+    third_block_hash = b2lx(bitcoin_cli.getblockhash(2))
     locator_cache.init(third_block_hash, block_processor)
     assert len(locator_cache.blocks) == 3
     for k, v in locator_cache.blocks.items():
@@ -300,7 +303,7 @@ def test_fix_cache(block_processor):
     # The data in the new cache corresponds to the last ``cache_size`` blocks.
     block_count = block_processor.get_block_count()
     for i in range(block_count, block_count - locator_cache.cache_size, -1):
-        block_hash = bitcoin_cli.getblockhash(i)
+        block_hash = b2lx(bitcoin_cli.getblockhash(i))
         assert block_hash in locator_cache.blocks
         for locator in locator_cache.blocks[block_hash]:
             assert locator in locator_cache.cache
@@ -469,9 +472,9 @@ def test_add_appointment_in_cache_invalid_blob(watcher):
     # We need to create the appointment manually
     commitment_tx, commitment_txid, penalty_tx = create_txs()
 
-    locator = compute_locator(commitment_tx)
+    locator = compute_locator(commitment_txid)
     dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(penalty_tx[::-1], commitment_txid)
+    encrypted_blob = Cryptographer.encrypt(b2x(penalty_tx.serialize())[::-1], commitment_txid)
 
     appointment_data = {
         "locator": locator,
@@ -591,7 +594,7 @@ def test_do_watch(watcher, temp_db_manager, generate_dummy_appointment):
 
     # Broadcast the first two
     for dispute_tx in dispute_txs[:2]:
-        bitcoin_cli.sendrawtransaction(dispute_tx)
+        bitcoin_cli.sendrawtransaction(makeCTransaction(dispute_tx))
 
     # After generating a block, the appointment count should have been reduced by 2 (two breaches)
     generate_blocks_with_delay(1)

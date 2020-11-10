@@ -1,3 +1,5 @@
+from bitcoin.core import b2x
+
 from test.teos.conftest import generate_blocks
 from test.teos.unit.conftest import get_random_value_hex
 from teos.utils.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
@@ -16,9 +18,9 @@ sent_txs = []
 
 def test_send_transaction(carrier):
     tx = create_commitment_tx()
-    txid = bitcoin_cli.decoderawtransaction(tx).get("txid")
-
-    receipt = carrier.send_transaction(tx, txid)
+    tx_hex = b2x(tx.serialize())
+    rawtx = bitcoin_cli.call("decoderawtransaction", tx_hex)
+    receipt = carrier.send_transaction(tx_hex, rawtx.get("txid"))
 
     assert receipt.delivered is True
 
@@ -26,9 +28,11 @@ def test_send_transaction(carrier):
 def test_send_double_spending_transaction(carrier):
     # We can test what happens if the same transaction is sent twice
     tx = create_commitment_tx()
-    txid = bitcoin_cli.decoderawtransaction(tx).get("txid")
+    tx_hex = b2x(tx.serialize())
+    rawtx = bitcoin_cli.call("decoderawtransaction", tx_hex)
+    txid = rawtx.get("txid")
 
-    receipt = carrier.send_transaction(tx, txid)
+    receipt = carrier.send_transaction(tx_hex, txid)
     sent_txs.append(txid)
 
     # Wait for a block to be mined. Issued receipts is reset from the Responder every block, so we should do it too.
@@ -36,7 +40,7 @@ def test_send_double_spending_transaction(carrier):
     carrier.issued_receipts = {}
 
     # Try to send it again
-    receipt2 = carrier.send_transaction(tx, txid)
+    receipt2 = carrier.send_transaction(tx_hex, txid)
 
     # The carrier should report delivered True for both, but in the second case the transaction was already delivered
     # (either by himself or someone else)
@@ -46,7 +50,9 @@ def test_send_double_spending_transaction(carrier):
 
 def test_send_transaction_invalid_format(carrier):
     # Test sending a transaction that does not fits the format
-    txid = create_commitment_tx()[::-1]
+    tx = create_commitment_tx()
+    tx_hex = b2x(tx.serialize())
+    txid = tx_hex[::-1]
     receipt = carrier.send_transaction(txid, txid)
 
     assert receipt.delivered is False and receipt.reason == RPC_DESERIALIZATION_ERROR

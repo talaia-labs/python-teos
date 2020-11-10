@@ -6,6 +6,8 @@ from shutil import rmtree
 from copy import deepcopy
 from threading import Thread
 
+from bitcoin.core import b2x
+
 from teos.carrier import Carrier
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
@@ -21,6 +23,7 @@ from test.teos.conftest import (
     generate_blocks_with_delay,
     create_commitment_tx,
     generate_block_with_transactions,
+    makeCTransaction,
 )
 from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
 
@@ -147,7 +150,7 @@ def test_handle_breach(db_manager, gatekeeper, carrier, responder, block_process
     uuid = uuid4().hex
     commitment_tx = create_commitment_tx()
     tracker = generate_dummy_tracker(commitment_tx)
-    generate_block_with_transactions(commitment_tx)
+    generate_block_with_transactions(b2x(commitment_tx.serialize()))
 
     # The block_hash passed to add_response does not matter much now. It will in the future to deal with errors
     receipt = responder.handle_breach(
@@ -296,7 +299,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
     subscription_expiry = block_processor.get_block_count() + 110
 
     # Broadcast all commitment transactions
-    generate_block_with_transactions(commitment_txs)
+    generate_block_with_transactions([*map(lambda tx: b2x(tx.serialize()), commitment_txs)])
 
     # Create a fresh responder to simplify the test
     responder = Responder(temp_db_manager, gatekeeper, carrier, block_processor)
@@ -331,7 +334,7 @@ def test_do_watch(temp_db_manager, gatekeeper, carrier, block_processor, generat
     # And broadcast some of the penalties
     broadcast_txs = []
     for tracker in trackers[:5]:
-        bitcoin_cli.sendrawtransaction(tracker.penalty_rawtx)
+        bitcoin_cli.sendrawtransaction(makeCTransaction(tracker.penalty_rawtx))
         broadcast_txs.append(tracker.penalty_txid)
 
     # Mine a block
@@ -416,7 +419,7 @@ def test_get_txs_to_rebroadcast(responder):
 
 def test_get_completed_trackers(db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker):
     commitment_txs = [create_commitment_tx() for _ in range(30)]
-    generate_block_with_transactions(commitment_txs)
+    generate_block_with_transactions([*map(lambda tx: b2x(tx.serialize()), commitment_txs)])
     # A complete tracker is a tracker whose penalty transaction has been irrevocably resolved (i.e. has reached 100
     # confirmations)
     # We'll create 3 type of txs: irrevocably resolved, confirmed but not irrevocably resolved, and unconfirmed
@@ -440,12 +443,12 @@ def test_get_completed_trackers(db_manager, gatekeeper, carrier, responder, bloc
         responder.trackers[uuid] = tracker.get_summary()
 
     for uuid, tracker in trackers_ir_resolved.items():
-        bitcoin_cli.sendrawtransaction(tracker.penalty_rawtx)
+        bitcoin_cli.sendrawtransaction(makeCTransaction(tracker.penalty_rawtx))
 
     generate_blocks_with_delay(1)
 
     for uuid, tracker in trackers_confirmed.items():
-        bitcoin_cli.sendrawtransaction(tracker.penalty_rawtx)
+        bitcoin_cli.sendrawtransaction(makeCTransaction(tracker.penalty_rawtx))
 
     # ir_resolved have 100 confirmations and confirmed have 99
     generate_blocks_with_delay(99)
@@ -534,7 +537,7 @@ def test_get_outdated_trackers(responder, generate_dummy_tracker):
 def test_rebroadcast(db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker):
     # Include the commitment txs in a block
     commitment_txs = [create_commitment_tx() for _ in range(20)]
-    generate_block_with_transactions(commitment_txs)
+    generate_block_with_transactions([*map(lambda tx: b2x(tx.serialize()), commitment_txs)])
     txs_to_rebroadcast = []
 
     # Rebroadcast calls add_response with retry=True. The tracker data is already in trackers.

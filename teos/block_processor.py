@@ -1,8 +1,10 @@
 from teos.logger import get_logger
+import teos.utils.rpc_errors as rpc_errors
 from common.exceptions import BasicException
 
-from teos.tools import bitcoin_cli
-from teos.utils.auth_proxy import JSONRPCException
+import bitcoin.rpc
+from bitcoin.rpc import JSONRPCError
+from bitcoin.core import b2x, b2lx, lx
 
 
 class InvalidTransactionFormat(BasicException):
@@ -26,6 +28,24 @@ class BlockProcessor:
         self.logger = get_logger(component=BlockProcessor.__name__)
         self.btc_connect_params = btc_connect_params
 
+    def proxy(self):
+        """
+        Returns a new ``http`` connection with ``bitcoind`` using the ``json-rpc`` interface, using
+        ``btc_connect_params`` for the connectio parameters.
+
+        Returns:
+            :obj:`Proxy <bitcoin.rpc.Proxy>`: An authenticated service proxy to ``bitcoind``
+            that can be used to send ``json-rpc`` commands.
+        """
+
+        service_url = "http://%s:%s@%s:%d" % (
+            self.btc_connect_params.get("BTC_RPC_USER"),
+            self.btc_connect_params.get("BTC_RPC_PASSWORD"),
+            self.btc_connect_params.get("BTC_RPC_CONNECT"),
+            self.btc_connect_params.get("BTC_RPC_PORT"),
+        )
+        return bitcoin.rpc.Proxy(service_url)
+
     def get_block(self, block_hash):
         """
         Gets a block given a block hash by querying ``bitcoind``.
@@ -38,15 +58,12 @@ class BlockProcessor:
 
             Returns :obj:`None` otherwise.
         """
-
         try:
-            block = bitcoin_cli(self.btc_connect_params).getblock(block_hash)
-
-        except JSONRPCException as e:
-            block = None
+            # by using "call" we obtain a dict, rather than a CBlock that we obtain calling .getblock().
+            return self.proxy().call("getblock", block_hash)
+        except JSONRPCError as e:
             self.logger.error("Couldn't get block from bitcoind", error=e.error)
-
-        return block
+            return None
 
     def get_best_block_hash(self):
         """
@@ -57,15 +74,11 @@ class BlockProcessor:
 
             Returns :obj:`None` otherwise (not even sure this can actually happen).
         """
-
         try:
-            block_hash = bitcoin_cli(self.btc_connect_params).getbestblockhash()
-
-        except JSONRPCException as e:
-            block_hash = None
+            return b2lx(self.proxy().getbestblockhash())
+        except JSONRPCError as e:
             self.logger.error("Couldn't get block hash", error=e.error)
-
-        return block_hash
+            return None
 
     def get_block_count(self):
         """
@@ -78,13 +91,10 @@ class BlockProcessor:
         """
 
         try:
-            block_count = bitcoin_cli(self.btc_connect_params).getblockcount()
-
-        except JSONRPCException as e:
-            block_count = None
+            return self.proxy().getblockcount()
+        except JSONRPCError as e:
             self.logger.error("Couldn't get block count", error=e.error)
-
-        return block_count
+            return None
 
     def decode_raw_transaction(self, raw_tx):
         """
@@ -99,17 +109,20 @@ class BlockProcessor:
 
         Raises:
             :obj:`InvalidTransactionFormat`: If the `provided ``raw_tx`` has invalid format.
+            :obj:`JSONRPCError`: on any other error from the rpc call.
         """
 
         try:
-            tx = bitcoin_cli(self.btc_connect_params).decoderawtransaction(raw_tx)
-
-        except JSONRPCException as e:
-            msg = "Cannot build transaction from decoded data"
-            self.logger.error(msg, error=e.error)
-            raise InvalidTransactionFormat(msg)
-
-        return tx
+            return self.proxy().call("decoderawtransaction", raw_tx)
+        except JSONRPCError as e:
+            errno = e.error.get("code")
+            if errno == rpc_errors.RPC_DESERIALIZATION_ERROR:
+                msg = "Cannot build transaction from decoded data"
+                self.logger.error(msg, error=e.error)
+                raise InvalidTransactionFormat(msg)
+            else:
+                self.logger.error(e.error.get("message"), error=e.error)
+                raise e
 
     def get_distance_to_tip(self, target_block_hash):
         """

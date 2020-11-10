@@ -13,3 +13,4 @@ structlog
 python-daemon
 waitress
 gunicorn; platform_system != "Windows"
+python-bitcoinlib

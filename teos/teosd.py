@@ -8,6 +8,8 @@ import threading
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+import bitcoin
+
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
@@ -469,6 +471,8 @@ def run():
         exit(e)
 
     config = get_config(command_line_conf, data_dir)
+
+    bitcoin.SelectParams(config.get("BTC_NETWORK"))
 
     if config.get("DAEMON"):
         print("Starting TEOS")
