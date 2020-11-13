@@ -764,16 +764,18 @@ def test_get_subscription_info(block_processor, watcher, generate_dummy_appointm
     user_id = Cryptographer.get_compressed_pk(user_pk)
 
     # Need to simulate registration for this user.
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
-    )
+    available_slots = 1
+    subscription_expiry = block_processor.get_block_count() + 1
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots, subscription_expiry)
 
     message = "get subscription info"
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
 
-    sub_info = watcher.get_subscription_info(signature)
+    sub_info, locators = watcher.get_subscription_info(signature)
 
-    assert len(sub_info.locators) == 0
+    assert len(locators) == 0
+    assert sub_info.available_slots == available_slots
+    assert sub_info.subscription_expiry == subscription_expiry
 
     uuid = get_random_value_hex(32)
     uuid2 = get_random_value_hex(32)
@@ -787,6 +789,8 @@ def test_get_subscription_info(block_processor, watcher, generate_dummy_appointm
     watcher.gatekeeper.registered_users[user_id].appointments[uuid] = {uuid: 1}
     watcher.gatekeeper.registered_users[user_id].appointments[uuid2] = {uuid2: 1}
 
-    sub_info = watcher.get_subscription_info(signature)
+    sub_info, locators = watcher.get_subscription_info(signature)
 
-    assert set(sub_info.locators) == set([appointment.locator, tracker.locator])
+    assert set(locators) == set([appointment.locator, tracker.locator])
+    assert sub_info.available_slots == available_slots
+    assert sub_info.subscription_expiry == subscription_expiry

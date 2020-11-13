@@ -1,5 +1,6 @@
 from queue import Queue
 from threading import Thread
+from readerwriterlock import rwlock
 
 from teos.cleaner import Cleaner
 from teos.chain_monitor import ChainMonitor
@@ -130,6 +131,7 @@ class Responder:
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): A block processor instance to
             get data from bitcoind.
         last_known_block (:obj:`str`): The last block known by the :obj:`Responder`.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the Responder on updates.
     """
 
     def __init__(self, db_manager, gatekeeper, carrier, block_processor):
@@ -144,6 +146,23 @@ class Responder:
         self.carrier = carrier
         self.block_processor = block_processor
         self.last_known_block = db_manager.load_last_block_hash_responder()
+        self.rw_lock = rwlock.RWLockWrite()
+
+    @property
+    def n_responder_trackers(self):
+        """Get the total number of trackers in the Responder."""
+        with self.rw_lock.gen_rlock():
+            return len(self.trackers)
+
+    def has_tracker(self, uuid):
+        """Returns whether a tracker can be found in the Responder."""
+        with self.rw_lock.gen_rlock():
+            return uuid in self.trackers
+
+    def get_tracker(self, uuid):
+        """Returns a tracker from the Responder if found."""
+        with self.rw_lock.gen_rlock():
+            return self.trackers.get(uuid)
 
     def awake(self):
         """
@@ -239,23 +258,24 @@ class Responder:
         """
 
         tracker = TransactionTracker(locator, dispute_txid, penalty_txid, penalty_rawtx, user_id)
+        with self.rw_lock.gen_wlock():
+            # We only store the penalty_txid, locator and user_id in memory. The rest is dumped into the db.
+            self.trackers[uuid] = tracker.get_summary()
 
-        # We only store the penalty_txid, locator and user_id in memory. The rest is dumped into the db.
-        self.trackers[uuid] = tracker.get_summary()
+            if penalty_txid in self.tx_tracker_map:
+                self.tx_tracker_map[penalty_txid].append(uuid)
 
-        if penalty_txid in self.tx_tracker_map:
-            self.tx_tracker_map[penalty_txid].append(uuid)
+            else:
+                self.tx_tracker_map[penalty_txid] = [uuid]
 
-        else:
-            self.tx_tracker_map[penalty_txid] = [uuid]
+            # In the case we receive two trackers with the same penalty txid we only add it to the unconfirmed txs list
+            # once
+            if penalty_txid not in self.unconfirmed_txs and confirmations == 0:
+                self.unconfirmed_txs.append(penalty_txid)
 
-        # In the case we receive two trackers with the same penalty txid we only add it to the unconfirmed txs list once
-        if penalty_txid not in self.unconfirmed_txs and confirmations == 0:
-            self.unconfirmed_txs.append(penalty_txid)
+            self.db_manager.store_responder_tracker(uuid, tracker.to_dict())
 
-        self.db_manager.store_responder_tracker(uuid, tracker.to_dict())
-
-        self.logger.info("New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, user_id=user_id)
+            self.logger.info("New tracker added", dispute_txid=dispute_txid, penalty_txid=penalty_txid, user_id=user_id)
 
     def do_watch(self):
         """
@@ -286,32 +306,30 @@ class Responder:
                 txids = block.get("tx")
 
                 if self.last_known_block == block.get("previousblockhash"):
-                    completed_trackers = self.get_completed_trackers()
-                    outdated_trackers = self.get_outdated_trackers(block.get("height"))
-                    trackers_to_delete_gatekeeper = {
-                        uuid: self.trackers[uuid].get("user_id") for uuid in completed_trackers
-                    }
+                    with self.rw_lock.gen_wlock():
+                        completed_trackers = self.get_completed_trackers()
+                        outdated_trackers = self.get_outdated_trackers(block.get("height"))
+                        trackers_to_delete_gatekeeper = {
+                            uuid: self.trackers[uuid].get("user_id") for uuid in completed_trackers
+                        }
 
-                    self.check_confirmations(txids)
+                        self.check_confirmations(txids)
 
-                    Cleaner.delete_trackers(
-                        completed_trackers, block.get("height"), self.trackers, self.tx_tracker_map, self.db_manager
-                    )
-                    Cleaner.delete_trackers(
-                        outdated_trackers,
-                        block.get("height"),
-                        self.trackers,
-                        self.tx_tracker_map,
-                        self.db_manager,
-                        outdated=True,
-                    )
-                    # Remove completed trackers from the gatekeeper.
-                    with self.gatekeeper.lock:
-                        Cleaner.delete_gatekeeper_appointments(
-                            trackers_to_delete_gatekeeper, self.gatekeeper.registered_users, self.gatekeeper.user_db
+                        Cleaner.delete_trackers(
+                            completed_trackers, block.get("height"), self.trackers, self.tx_tracker_map, self.db_manager
                         )
+                        Cleaner.delete_trackers(
+                            outdated_trackers,
+                            block.get("height"),
+                            self.trackers,
+                            self.tx_tracker_map,
+                            self.db_manager,
+                            outdated=True,
+                        )
+                        # Remove completed trackers from the Gatekeeper
+                        self.gatekeeper.delete_appointments(trackers_to_delete_gatekeeper)
 
-                    self.rebroadcast(self.get_txs_to_rebroadcast())
+                        self.rebroadcast(self.get_txs_to_rebroadcast())
 
                 # NOTCOVERED
                 else:
@@ -500,15 +518,16 @@ class Responder:
                 penalty_tx = self.carrier.get_transaction(tracker.penalty_txid)
 
                 if penalty_tx is not None:
-                    # If the penalty exists we need to check is it's on the blockchain or not so we can update the
-                    # unconfirmed transactions list accordingly.
-                    if penalty_tx.get("confirmations") is None:
-                        self.unconfirmed_txs.append(tracker.penalty_txid)
+                    with self.rw_lock.gen_wlock():
+                        # If the penalty exists we need to check is it's on the blockchain or not so we can update the
+                        # unconfirmed transactions list accordingly.
+                        if penalty_tx.get("confirmations") is None:
+                            self.unconfirmed_txs.append(tracker.penalty_txid)
 
-                        self.logger.info(
-                            "Penalty transaction back in mempool. Updating unconfirmed transactions",
-                            penalty_txid=tracker.penalty_txid,
-                        )
+                            self.logger.info(
+                                "Penalty transaction back in mempool. Updating unconfirmed transactions",
+                                penalty_txid=tracker.penalty_txid,
+                            )
 
                 else:
                     # If the penalty transaction is missing, we need to reset the tracker.

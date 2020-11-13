@@ -48,6 +48,7 @@ class LocatorCache:
             (``block_hash:locators``). Used to keep track of what data belongs to what block, so data can be pruned
             accordingly. Also needed to rebuild the cache in case of reorgs.
         cache_size (:obj:`int`): The size of the cache in blocks.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the cache on updates.
     """
 
     def __init__(self, blocks_in_cache):
@@ -98,8 +99,7 @@ class LocatorCache:
         """
 
         with self.rw_lock.gen_rlock():
-            locator = self.cache.get(locator)
-        return locator
+            return self.cache.get(locator)
 
     def update(self, block_hash, locator_txid_map):
         """
@@ -209,6 +209,7 @@ class Watcher:
             time.
         last_known_block (:obj:`str`): The last block known by the :obj:`Watcher`.
         locator_cache (:obj:`LocatorCache`): A cache of locators for the last ``blocks_in_cache`` blocks.
+        rw_lock (:obj:`RWLockWrite <rwlock.RWLockWrite>`): A lock object to manage access to the Watcher on updates.
 
     Raises:
         :obj:`InvalidKey`: if teos sk cannot be loaded.
@@ -228,6 +229,7 @@ class Watcher:
         self.signing_key = sk
         self.last_known_block = db_manager.load_last_block_hash_watcher()
         self.locator_cache = LocatorCache(blocks_in_cache)
+        self.rw_lock = rwlock.RWLockWrite()
 
     @property
     def tower_id(self):
@@ -237,17 +239,18 @@ class Watcher:
     @property
     def n_registered_users(self):
         """Get the number of users currently registered to the tower."""
-        return len(self.gatekeeper.registered_users)
+        return self.gatekeeper.n_registered_users
 
     @property
     def n_watcher_appointments(self):
         """Get the total number of appointments stored in the watcher."""
-        return len(self.appointments)
+        with self.rw_lock.gen_rlock():
+            return len(self.appointments)
 
     @property
     def n_responder_trackers(self):
         """Get the total number of trackers in the responder."""
-        return len(self.responder.trackers)
+        return self.responder.n_responder_trackers
 
     def awake(self):
         """
@@ -300,22 +303,23 @@ class Watcher:
 
         message = "get appointment {}".format(locator).encode("utf-8")
         user_id = self.gatekeeper.authenticate_user(message, user_signature)
-        if self.gatekeeper.has_subscription_expired(user_id):
-            raise SubscriptionExpired(
-                f"Your subscription expired at block {self.gatekeeper.registered_users[user_id].subscription_expiry}"
-            )
+        has_expired, expiry = self.gatekeeper.has_subscription_expired(user_id)
+        if has_expired:
+            raise SubscriptionExpired(f"Your subscription expired at block {expiry}")
+
         uuid = hash_160("{}{}".format(locator, user_id))
 
-        if uuid in self.appointments:
-            appointment_data = self.db_manager.load_watcher_appointment(uuid)
-            status = AppointmentStatus.BEING_WATCHED
-        elif uuid in self.responder.trackers:
-            appointment_data = self.db_manager.load_responder_tracker(uuid)
-            status = AppointmentStatus.DISPUTE_RESPONDED
-        else:
-            raise AppointmentNotFound("Cannot find {}".format(locator))
+        with self.rw_lock.gen_rlock():
+            if uuid in self.appointments:
+                appointment_data = self.db_manager.load_watcher_appointment(uuid)
+                status = AppointmentStatus.BEING_WATCHED
+            elif self.responder.has_tracker(uuid):
+                appointment_data = self.db_manager.load_responder_tracker(uuid)
+                status = AppointmentStatus.DISPUTE_RESPONDED
+            else:
+                raise AppointmentNotFound("Cannot find {}".format(locator))
 
-        return appointment_data, status
+            return appointment_data, status
 
     def add_appointment(self, appointment, user_signature):
         """
@@ -344,105 +348,106 @@ class Watcher:
         Raises:
             :obj:`AppointmentLimitReached`: If the tower cannot hold more appointments (cap reached).
             :obj:`AuthenticationFailure`: If the user cannot be authenticated.
-            :obj:`NotEnoughSlots`: If the user does not have enough available slots, so the appointment is rejected.\
+            :obj:`NotEnoughSlots`: If the user does not have enough available slots, so the appointment is rejected.
             :obj:`SubscriptionExpired`: If the user subscription has expired.
         """
 
-        if len(self.appointments) >= self.max_appointments:
-            message = "Maximum appointments reached, appointment rejected"
-            self.logger.info(message, locator=appointment.locator)
-            raise AppointmentLimitReached(message)
+        with self.rw_lock.gen_wlock():
+            if len(self.appointments) >= self.max_appointments:
+                message = "Maximum appointments reached, appointment rejected"
+                self.logger.info(message, locator=appointment.locator)
+                raise AppointmentLimitReached(message)
 
-        user_id = self.gatekeeper.authenticate_user(appointment.serialize(), user_signature)
-        if self.gatekeeper.has_subscription_expired(user_id):
-            raise SubscriptionExpired(
-                f"Your subscription expired at block {self.gatekeeper.registered_users[user_id].subscription_expiry}"
+            user_id = self.gatekeeper.authenticate_user(appointment.serialize(), user_signature)
+            has_subscription_expired, expiry = self.gatekeeper.has_subscription_expired(user_id)
+            if has_subscription_expired:
+                raise SubscriptionExpired(f"Your subscription expired at block {expiry}")
+
+            start_block = self.block_processor.get_block(self.last_known_block).get("height")
+            extended_appointment = ExtendedAppointment(
+                appointment.locator,
+                appointment.encrypted_blob,
+                appointment.to_self_delay,
+                user_id,
+                user_signature,
+                start_block,
             )
-        start_block = self.block_processor.get_block(self.last_known_block).get("height")
-        extended_appointment = ExtendedAppointment(
-            appointment.locator,
-            appointment.encrypted_blob,
-            appointment.to_self_delay,
-            user_id,
-            user_signature,
-            start_block,
-        )
 
-        # The uuids are generated as the RIPEMD160(locator||user_pubkey).
-        # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
-        uuid = hash_160("{}{}".format(extended_appointment.locator, user_id))
+            # The uuids are generated as the RIPEMD160(locator||user_pubkey).
+            # If an appointment is requested by the user the uuid can be recomputed and queried straightaway (no maps).
+            uuid = hash_160("{}{}".format(extended_appointment.locator, user_id))
 
-        # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
-        if uuid in self.responder.trackers:
-            message = "Appointment already in Responder"
-            self.logger.info(message)
-            raise AppointmentAlreadyTriggered(message)
+            # If this is a copy of an appointment we've already reacted to, the new appointment is rejected.
+            if self.responder.has_tracker(uuid):
+                message = "Appointment already in Responder"
+                self.logger.info(message)
+                raise AppointmentAlreadyTriggered(message)
 
-        # Add the appointment to the Gatekeeper
-        available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, extended_appointment)
+            # Add the appointment to the Gatekeeper
+            available_slots = self.gatekeeper.add_update_appointment(user_id, uuid, extended_appointment)
 
-        # Appointments that were triggered in blocks held in the cache
-        dispute_txid = self.locator_cache.get_txid(extended_appointment.locator)
-        if dispute_txid:
+            # Appointments that were triggered in blocks held in the cache
+            dispute_txid = self.locator_cache.get_txid(extended_appointment.locator)
+            if dispute_txid:
+                try:
+                    penalty_txid, penalty_rawtx = self.check_breach(uuid, extended_appointment, dispute_txid)
+                    receipt = self.responder.handle_breach(
+                        uuid,
+                        extended_appointment.locator,
+                        dispute_txid,
+                        penalty_txid,
+                        penalty_rawtx,
+                        user_id,
+                        self.last_known_block,
+                    )
+
+                    # At this point the appointment is accepted but data is only kept if it goes through the Responder.
+                    # Otherwise it is dropped.
+                    if receipt.delivered:
+                        self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
+                        self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
+                        self.db_manager.create_triggered_appointment_flag(uuid)
+
+                except (EncryptionError, InvalidTransactionFormat):
+                    # If data inside the encrypted blob is invalid, the appointment is accepted but the data is dropped.
+                    # (same as with data that bounces in the Responder). This reduces the appointment slot count so it
+                    # could be used to discourage user misbehaviour.
+                    pass
+
+            # Regular appointments that have not been triggered (or, at least, not recently)
+            else:
+                self.appointments[uuid] = extended_appointment.get_summary()
+
+                if extended_appointment.locator in self.locator_uuid_map:
+                    # If the uuid is already in the map it means this is an update.
+                    if uuid not in self.locator_uuid_map[extended_appointment.locator]:
+                        self.locator_uuid_map[extended_appointment.locator].append(uuid)
+                else:
+                    # Otherwise two users have sent an appointment with the same locator, so we need to store both.
+                    self.locator_uuid_map[extended_appointment.locator] = [uuid]
+
+                self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
+                self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
+
             try:
-                penalty_txid, penalty_rawtx = self.check_breach(uuid, extended_appointment, dispute_txid)
-                receipt = self.responder.handle_breach(
-                    uuid,
-                    extended_appointment.locator,
-                    dispute_txid,
-                    penalty_txid,
-                    penalty_rawtx,
-                    user_id,
-                    self.last_known_block,
+                signature = Cryptographer.sign(
+                    receipts.create_appointment_receipt(user_signature, start_block), self.signing_key
                 )
 
-                # At this point the appointment is accepted but data is only kept if it goes through the Responder.
-                # Otherwise it is dropped.
-                if receipt.delivered:
-                    self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
-                    self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
-                    self.db_manager.create_triggered_appointment_flag(uuid)
+            except (InvalidParameter, SignatureError):
+                # This should never happen since data is sanitized, just in case to avoid a crash
+                self.logger.error("Data couldn't be signed", appointment=extended_appointment.to_dict())
+                signature = None
 
-            except (EncryptionError, InvalidTransactionFormat):
-                # If data inside the encrypted blob is invalid, the appointment is accepted but the data is dropped.
-                # (same as with data that bounces in the Responder). This reduces the appointment slot count so it
-                # could be used to discourage user misbehaviour.
-                pass
+            self.logger.info("New appointment accepted", locator=extended_appointment.locator)
 
-        # Regular appointments that have not been triggered (or, at least, not recently)
-        else:
-            self.appointments[uuid] = extended_appointment.get_summary()
-
-            if extended_appointment.locator in self.locator_uuid_map:
-                # If the uuid is already in the map it means this is an update.
-                if uuid not in self.locator_uuid_map[extended_appointment.locator]:
-                    self.locator_uuid_map[extended_appointment.locator].append(uuid)
-            else:
-                # Otherwise two users have sent an appointment with the same locator, so we need to store both.
-                self.locator_uuid_map[extended_appointment.locator] = [uuid]
-
-            self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
-            self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
-
-        try:
-            signature = Cryptographer.sign(
-                receipts.create_appointment_receipt(user_signature, start_block), self.signing_key
-            )
-
-        except (InvalidParameter, SignatureError):
-            # This should never happen since data is sanitized, just in case to avoid a crash
-            self.logger.error("Data couldn't be signed", appointment=extended_appointment.to_dict())
-            signature = None
-
-        self.logger.info("New appointment accepted", locator=extended_appointment.locator)
-
-        return {
-            "locator": extended_appointment.locator,
-            "start_block": extended_appointment.start_block,
-            "signature": signature,
-            "available_slots": available_slots,
-            "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
-        }
+            return {
+                "locator": extended_appointment.locator,
+                "start_block": extended_appointment.start_block,
+                "signature": signature,
+                "available_slots": available_slots,
+                "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
+            }
 
     def do_watch(self):
         """
@@ -481,64 +486,62 @@ class Watcher:
             locator_txid_map = {compute_locator(txid): txid for txid in txids}
             self.locator_cache.update(block_hash, locator_txid_map)
 
-            if len(self.appointments) > 0 and locator_txid_map:
-                outdated_appointments = self.gatekeeper.get_outdated_appointments(block["height"])
-                # Make sure we only try to delete what is on the Watcher (some appointments may have been triggered)
-                outdated_appointments = list(set(outdated_appointments).intersection(self.appointments.keys()))
+            with self.rw_lock.gen_wlock():
+                if len(self.appointments) > 0 and locator_txid_map:
+                    outdated_appointments = self.gatekeeper.get_outdated_appointments(block["height"])
+                    # Make sure we only try to delete what is on the Watcher (some appointments may have been triggered)
+                    outdated_appointments = list(set(outdated_appointments).intersection(self.appointments.keys()))
 
-                Cleaner.delete_outdated_appointments(
-                    outdated_appointments, self.appointments, self.locator_uuid_map, self.db_manager
-                )
-
-                valid_breaches, invalid_breaches = self.filter_breaches(self.get_breaches(locator_txid_map))
-
-                triggered_flags = []
-                appointments_to_delete = []
-
-                for uuid, breach in valid_breaches.items():
-                    self.logger.info(
-                        "Notifying responder and deleting appointment",
-                        penalty_txid=breach["penalty_txid"],
-                        locator=breach["locator"],
-                        uuid=uuid,
+                    Cleaner.delete_outdated_appointments(
+                        outdated_appointments, self.appointments, self.locator_uuid_map, self.db_manager
                     )
 
-                    receipt = self.responder.handle_breach(
-                        uuid,
-                        breach["locator"],
-                        breach["dispute_txid"],
-                        breach["penalty_txid"],
-                        breach["penalty_rawtx"],
-                        self.appointments[uuid].get("user_id"),
-                        block_hash,
+                    valid_breaches, invalid_breaches = self.filter_breaches(self.get_breaches(locator_txid_map))
+
+                    triggered_flags = []
+                    appointments_to_delete = []
+
+                    for uuid, breach in valid_breaches.items():
+                        self.logger.info(
+                            "Notifying responder and deleting appointment",
+                            penalty_txid=breach["penalty_txid"],
+                            locator=breach["locator"],
+                            uuid=uuid,
+                        )
+
+                        receipt = self.responder.handle_breach(
+                            uuid,
+                            breach["locator"],
+                            breach["dispute_txid"],
+                            breach["penalty_txid"],
+                            breach["penalty_rawtx"],
+                            self.appointments[uuid].get("user_id"),
+                            block_hash,
+                        )
+
+                        # FIXME: Only necessary because of the triggered appointment approach. Fix if it changes.
+
+                        if receipt.delivered:
+                            Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
+                            triggered_flags.append(uuid)
+                        else:
+                            appointments_to_delete.append(uuid)
+
+                    # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
+                    appointments_to_delete.extend(invalid_breaches)
+                    appointments_to_delete_gatekeeper = {
+                        uuid: self.appointments[uuid].get("user_id") for uuid in appointments_to_delete
+                    }
+                    self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
+
+                    Cleaner.delete_completed_appointments(
+                        appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                     )
+                    # Remove invalid appointments from the Gatekeeper
+                    self.gatekeeper.delete_appointments(appointments_to_delete_gatekeeper)
 
-                    # FIXME: Only necessary because of the triggered appointment approach. Fix if it changes.
-
-                    if receipt.delivered:
-                        Cleaner.delete_appointment_from_memory(uuid, self.appointments, self.locator_uuid_map)
-                        triggered_flags.append(uuid)
-                    else:
-                        appointments_to_delete.append(uuid)
-
-                # Appointments are only flagged as triggered if they are delivered, otherwise they are just deleted.
-                appointments_to_delete.extend(invalid_breaches)
-                appointments_to_delete_gatekeeper = {
-                    uuid: self.appointments[uuid].get("user_id") for uuid in appointments_to_delete
-                }
-                self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
-
-                Cleaner.delete_completed_appointments(
-                    appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
-                )
-                # Remove invalid appointments from the Gatekeeper
-                with self.gatekeeper.lock:
-                    Cleaner.delete_gatekeeper_appointments(
-                        appointments_to_delete_gatekeeper, self.gatekeeper.registered_users, self.gatekeeper.user_db
-                    )
-
-                if not self.appointments:
-                    self.logger.info("No more pending appointments")
+                    if not self.appointments:
+                        self.logger.info("No more pending appointments")
 
             # Register the last processed block for the Watcher
             self.db_manager.store_last_block_hash_watcher(block_hash)
@@ -662,8 +665,7 @@ class Watcher:
         return valid_breaches, invalid_breaches
 
     def get_registered_user_ids(self):
-        """Returns the list of user ids of all the registered users."""
-        return list(self.gatekeeper.registered_users.keys())
+        return self.gatekeeper.user_ids
 
     def get_user_info(self, user_id):
         """
@@ -676,7 +678,7 @@ class Watcher:
             :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user data if found. :obj:`None` if not found,
             or the ``user_id`` is invalid.
         """
-        return self.gatekeeper.registered_users.get(user_id)
+        return self.gatekeeper.get_user_info(user_id)
 
     def get_subscription_info(self, signature):
         """
@@ -686,8 +688,8 @@ class Watcher:
             signature (:obj:`str`): the signature of the request by the user.
 
         Returns:
-            :obj:`UserInfo <teos.gatekeeper.UserInfo> or :obj:`None`: The user's subscription data if found. :obj:`None`
-            if not found, or the ``user_id`` is invalid.
+            :obj:`tuple`: A 2-item tuple containing the user info (:obj:`UserInfo <teos.gatekeeper.UserInfo>) and the
+            list of locators associated with the appointments that match the subscription.
 
         Raises:
             :obj:`SubscriptionExpired`: If the user subscription has expired.
@@ -695,26 +697,23 @@ class Watcher:
 
         message = "get subscription info".encode("utf-8")
         user_id = self.gatekeeper.authenticate_user(message, signature)
-        if self.gatekeeper.has_subscription_expired(user_id):
-            raise SubscriptionExpired(
-                f"Your subscription expired at block {self.gatekeeper.registered_users[user_id].subscription_expiry}"
-            )
+        has_expired, expiry = self.gatekeeper.has_subscription_expired(user_id)
+        if has_expired:
+            raise SubscriptionExpired(f"Your subscription expired at block {expiry}")
 
-        subscription_info = self.gatekeeper.registered_users.get(user_id)
+        subscription_info = self.gatekeeper.get_user_info(user_id)
 
-        locators = []
+        with self.rw_lock.gen_rlock():
+            locators = []
+            for appt_uuid in subscription_info.appointments:
+                if appt_uuid in self.appointments:
+                    locators.append(self.appointments.get(appt_uuid).get("locator"))
+                elif self.responder.has_tracker(appt_uuid):
+                    locators.append(self.responder.get_tracker(appt_uuid).get("locator"))
+                else:
+                    self.logger.debug("The appointment uuid was not found in the watcher or the responder.")
 
-        for appt_uuid in subscription_info.appointments:
-            if appt_uuid in self.appointments:
-                locators.append(self.appointments.get(appt_uuid).get("locator"))
-            elif appt_uuid in self.responder.trackers:
-                locators.append(self.responder.trackers.get(appt_uuid).get("locator"))
-            else:
-                self.logger.debug("The appointment uuid was not found in the watcher or the responder.")
-
-        subscription_info.locators = locators
-
-        return subscription_info
+        return subscription_info, locators
 
     def get_all_watcher_appointments(self):
         """Returns a dictionary with all the appointment stored in the db for the watcher."""
