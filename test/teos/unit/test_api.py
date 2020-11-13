@@ -33,6 +33,7 @@ register_endpoint = "{}/register".format(TEOS_API)
 add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
 get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
 get_all_appointment_endpoint = "{}/get_all_appointments".format(TEOS_API)
+get_subscription_info_endpoint = "{}/get_subscription_info".format(TEOS_API)
 
 # Reduce the maximum number of appointments to something we can test faster
 MAX_APPOINTMENTS = 100
@@ -554,3 +555,24 @@ def test_get_appointment_in_responder(internal_api, client, generate_dummy_track
     assert tx_tracker.dispute_txid == r.json.get("appointment").get("dispute_txid")
     assert tx_tracker.penalty_txid == r.json.get("appointment").get("penalty_txid")
     assert tx_tracker.penalty_rawtx == r.json.get("appointment").get("penalty_rawtx")
+
+
+def test_get_subscription_info(internal_api, client):
+    internal_api.watcher.gatekeeper.add_update_user(user_id)
+
+    # Need to mock a user
+    internal_api.watcher.gatekeeper.registered_users[user_id].available_slots = 100
+    internal_api.watcher.gatekeeper.registered_users[user_id].subscription_expiry = 700
+    internal_api.watcher.gatekeeper.registered_users[user_id].appointments = {}
+
+    # Request back the data
+    message = "get subscription info"
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    data = {"signature": signature}
+
+    # Next we can request the subscription info
+    r = client.post(get_subscription_info_endpoint, json=data)
+    assert r.status_code == HTTP_OK
+    assert r.get_json().get("available_slots") == 100
+    assert r.get_json().get("subscription_expiry") == 700
+    assert r.get_json().get("appointments") == []

@@ -8,8 +8,9 @@ import common.errors as errors
 from common.appointment import AppointmentStatus
 from common.exceptions import InvalidParameter
 from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
+from common.tools import intify
 from teos.inspector import Inspector, InspectionFailed
-from teos.protobuf.user_pb2 import RegisterRequest
+from teos.protobuf.user_pb2 import RegisterRequest, GetSubscriptionInfoRequest
 from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
 from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
@@ -119,6 +120,7 @@ class API:
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
+            "/get_subscription_info": (self.get_subscription_info, ["POST"]),
         }
 
         for url, params in routes.items():
@@ -312,5 +314,47 @@ class API:
             else:
                 rcode = HTTP_NOT_FOUND
                 response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
+
+        return jsonify(response), rcode
+
+    def get_subscription_info(self):
+        """
+        Gives information about a user's subscription from the watchtower.
+
+        Only a user who has registered can retrieve this information. User must provide the correct signature.
+
+        Returns:
+            :obj:`str`: A json formatted dictionary containing information about the user's subscription.
+
+            Returns not found if the user is not yet registered with the watchtower.
+        """
+
+        # Getting the real IP if the server is behind a reverse proxy
+        remote_addr = get_remote_addr()
+
+        # Check that data type and content are correct. Abort otherwise.
+        try:
+            request_data = get_request_data_json(request)
+
+        except InvalidParameter as e:
+            self.logger.info("Received invalid get_subscription_info request", from_addr="{}".format(remote_addr))
+            return jsonify({"error": str(e), "error_code": errors.INVALID_REQUEST_FORMAT}), HTTP_BAD_REQUEST
+
+        self.logger.info("Received get_subscription_info request", from_addr="{}".format(remote_addr))
+
+        try:
+            r = self.stub.get_subscription_info(GetSubscriptionInfoRequest(signature=request_data.get("signature")))
+
+            response = intify(
+                json_format.MessageToDict(r.user, including_default_value_fields=True, preserving_proto_field_name=True)
+            )
+            rcode = HTTP_OK
+
+        except grpc.RpcError as e:
+            rcode = HTTP_BAD_REQUEST
+            response = {
+                "error": e.details(),
+                "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
+            }
 
         return jsonify(response), rcode

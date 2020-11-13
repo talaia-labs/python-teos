@@ -118,6 +118,16 @@ if `-f, --file` **is** specified, then the command expects a path to a json file
 
 	teos-client get_appointment <appointment_locator>
 
+### get_subscription_info
+
+This command is used to get information about a user's subscription from the Eye of Satoshi. get_subscription_info will return number of slots remaining, when the subscription is set to expire, and user's existing appointments.
+
+A user needs to be registered before he or she can use this command.
+
+#### Usage
+
+        teos-client get_subscription_info 
+
 ## Example
 1. Register with the tower. A tower with the given id should be running (replace the id with the one you'll be using).
 
@@ -144,7 +154,7 @@ teos-client register 03a3a3e196def1950f332556d046648d960102da33f61665a910febe38a
 4. Test that the tower is still watching the appointment by replacing the appointment locator received into the following command:
 
     ```
-    pteos-client get_appointment <appointment_locator>
+    teos-client get_appointment <appointment_locator>
     ```
 
 ## Try our live instance

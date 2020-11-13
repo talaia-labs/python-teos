@@ -31,6 +31,7 @@ add_appointment_endpoint = "{}/add_appointment".format(teos_url)
 register_endpoint = "{}/register".format(teos_url)
 get_appointment_endpoint = "{}/get_appointment".format(teos_url)
 get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
+get_subscription_info_endpoint = "{}/get_subscription_info".format(teos_url)
 
 dummy_appointment_data = {"tx": get_random_value_hex(192), "tx_id": get_random_value_hex(32), "to_self_delay": 200}
 
@@ -41,6 +42,8 @@ dummy_appointment_dict = {
     "encrypted_blob": Cryptographer.encrypt(dummy_appointment_data.get("tx"), dummy_appointment_data.get("tx_id")),
 }
 dummy_appointment = Appointment.from_dict(dummy_appointment_dict)
+
+dummy_user_data = {"appointments": [], "available_slots": 100, "subscription_expiry": 7000}
 
 # The height is never checked in the tests, so we can make it up
 CURRENT_HEIGHT = 300
@@ -286,6 +289,27 @@ def test_get_appointment_connection_error():
 
     with pytest.raises(ConnectionError):
         teos_client.get_appointment(locator, dummy_user_sk, dummy_teos_id, teos_url)
+
+
+@responses.activate
+def test_get_subscription_info():
+    # Response of get_appointment endpoint is an appointment with status added to it.
+    response = dummy_user_data
+
+    responses.add(responses.POST, get_subscription_info_endpoint, json=response, status=200)
+    result = teos_client.get_subscription_info(dummy_user_sk, dummy_teos_id, teos_url)
+
+    assert len(responses.calls) == 1
+    assert responses.calls[0].request.url == get_subscription_info_endpoint
+    assert result.get("available_slots") == response.get("available_slots")
+
+
+@responses.activate
+def test_get_subscription_info_wrong_user_sk():
+    responses.add(responses.POST, get_subscription_info_endpoint, body=TowerResponseError("Wrong signature"))
+
+    with pytest.raises(TowerResponseError):
+        teos_client.get_subscription_info(another_sk, dummy_teos_id, teos_url)
 
 
 def test_load_keys(keyfiles):

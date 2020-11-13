@@ -158,6 +158,33 @@ class _InternalAPI(TowerServicesServicer):
 
             return GetAppointmentResponse()
 
+    def get_subscription_info(self, request, context):
+        """Returns a user's subscription information stored in the tower, if the user is registered."""
+        with self.rw_lock.gen_rlock():
+            try:
+                subscription_info = self.watcher.get_subscription_info(request.signature)
+
+                user_struct = Struct()
+                user_struct.update(
+                    {
+                        "subscription_expiry": subscription_info.subscription_expiry,
+                        "available_slots": subscription_info.available_slots,
+                        "appointments": subscription_info.locators,
+                    }
+                )
+                return GetUserResponse(user=user_struct)
+
+            except AuthenticationFailure:
+                msg = "User not found. Have you registered?"
+
+            except SubscriptionExpired as e:
+                msg = str(e)
+
+            context.set_details(msg)
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+
+            return GetUserResponse()
+
     def get_all_appointments(self, request, context):
         """Returns all the appointments in the tower."""
         with self.rw_lock.gen_rlock():

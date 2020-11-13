@@ -757,3 +757,36 @@ def test_filter_breaches_random_data(watcher, generate_dummy_appointment):
 
     # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
     assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
+
+
+def test_get_subscription_info(block_processor, watcher, generate_dummy_appointment, generate_dummy_tracker):
+    user_sk, user_pk = generate_keypair()
+    user_id = Cryptographer.get_compressed_pk(user_pk)
+
+    # Need to simulate registration for this user.
+    watcher.gatekeeper.registered_users[user_id] = UserInfo(
+        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
+    )
+
+    message = "get subscription info"
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+
+    sub_info = watcher.get_subscription_info(signature)
+
+    assert len(sub_info.locators) == 0
+
+    uuid = get_random_value_hex(32)
+    uuid2 = get_random_value_hex(32)
+
+    appointment, _ = generate_dummy_appointment()
+    tracker = generate_dummy_tracker()
+    watcher.appointments = {uuid: appointment.get_summary()}
+    watcher.responder.trackers = {uuid2: tracker.get_summary()}
+
+    # The gatekeeper appointments dict format is of the form uuid:required_slots
+    watcher.gatekeeper.registered_users[user_id].appointments[uuid] = {uuid: 1}
+    watcher.gatekeeper.registered_users[user_id].appointments[uuid2] = {uuid2: 1}
+
+    sub_info = watcher.get_subscription_info(signature)
+
+    assert set(sub_info.locators) == set([appointment.locator, tracker.locator])

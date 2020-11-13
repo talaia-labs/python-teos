@@ -23,7 +23,13 @@ from common.exceptions import BasicException, InvalidKey, InvalidParameter, Towe
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
 from contrib.client import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
-from contrib.client.help import show_usage, help_add_appointment, help_get_appointment, help_register
+from contrib.client.help import (
+    show_usage,
+    help_add_appointment,
+    help_get_appointment,
+    help_get_subscription_info,
+    help_register,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -190,6 +196,36 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
     get_appointment_endpoint = "{}/get_appointment".format(teos_url)
     logger.info("Requesting appointment from the Eye of Satoshi")
     response = process_post_response(post_request(data, get_appointment_endpoint))
+
+    return response
+
+
+def get_subscription_info(user_sk, teos_id, teos_url):
+    """
+    Gets information about a user's subscription status from the tower.
+
+    Args:
+        user_sk (:obj:`PrivateKey`): the user's private key.
+        teos_id (:obj:`str`): the tower's compressed public key.
+        teos_url (:obj:`str`): the teos base url.
+
+    Returns:
+        :obj:`dict`: A dictionary containing the subscription data, including number of remaining slots and the
+            subscription's expiry time.
+
+    Raises:
+        :obj:`ConnectionError`: if the client cannot connect to the tower.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
+    """
+
+    message = "get subscription info"
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    data = {"signature": signature}
+
+    # Send request to the server.
+    get_subscription_info_endpoint = "{}/get_subscription_info".format(teos_url)
+    logger.info("Requesting subscription information from the Eye of Satoshi")
+    response = process_post_response(post_request(data, get_subscription_info_endpoint))
 
     return response
 
@@ -461,7 +497,19 @@ def main(command, args, command_line_conf):
                 teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
                 appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
                 if appointment_data:
-                    print(appointment_data)
+                    logger.info(json.dumps(appointment_data, indent=4))
+
+        elif command == "get_subscription_info":
+            if args:
+                arg_opt = args.pop(0)
+
+                if arg_opt in ["-h", "--help"]:
+                    sys.exit(help_get_subscription_info())
+
+            teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
+            subscription_info = get_subscription_info(user_sk, teos_id, teos_url)
+            if subscription_info:
+                logger.info(json.dumps(subscription_info, indent=4))
 
         elif command == "help":
             if args:
@@ -472,6 +520,9 @@ def main(command, args, command_line_conf):
 
                 if command == "add_appointment":
                     sys.exit(help_add_appointment())
+
+                if command == "get_subscription_info":
+                    sys.exit(help_get_subscription_info())
 
                 elif command == "get_appointment":
                     sys.exit(help_get_appointment())
@@ -490,7 +541,7 @@ def main(command, args, command_line_conf):
 
 def run():
     command_line_conf = {}
-    commands = ["register", "add_appointment", "get_appointment", "help"]
+    commands = ["register", "add_appointment", "get_appointment", "get_subscription_info", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["apiconnect=", "apiport=", "help"])
