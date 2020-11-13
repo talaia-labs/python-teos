@@ -15,8 +15,8 @@ multiprocessing.set_start_method("spawn")
 
 
 # This fixture needs to be manually run on the first E2E.
-@pytest.fixture(scope="session")
-def teosd():
+@pytest.fixture(scope="module")
+def teosd(run_bitcoind):
     teosd_process, teos_id = run_teosd()
 
     yield teosd_process, teos_id
@@ -34,6 +34,9 @@ def teosd():
 
     teosd_process.join()
     shutil.rmtree(".teos")
+
+    # FIXME: wait some time, otherwise it might fail when multiple e2e tests are ran in the same session. Not sure why.
+    sleep(1)
 
 
 def run_teosd():
