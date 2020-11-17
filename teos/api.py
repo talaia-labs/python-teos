@@ -85,7 +85,9 @@ def serve(internal_api_endpoint, endpoint, logging_port, min_to_self_delay, auto
     api.logger.info(f"Initialized. Serving at {endpoint}")
 
     if auto_run:
-        wsgi_serve(api.app, listen=endpoint)
+        # Waitress will serve both on IPV4 and IPV6 if localhost is passed as endpoint. Defaulting to IPV4 only in that
+        # case.
+        wsgi_serve(api.app, listen=endpoint.replace("localhost", "127.0.0.1"))
     else:
         return api.app
 

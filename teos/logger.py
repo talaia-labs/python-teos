@@ -1,6 +1,7 @@
 import logging
 import logging.config
 import logging.handlers
+from logging.handlers import SocketHandler
 import structlog
 import pickle
 import socketserver
@@ -14,20 +15,52 @@ from teos.tools import ignore_signal
 
 configured = False  # set to True once setup_logging is called
 
+timestamper = structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S")
 
-class JsonMsgLogger(logging.Logger):
+
+class FormattedSocketHandler(SocketHandler):
+    """ Works in the same way as SocketHandler, but it uses formatters. """
+
+    def emit(self, record):
+        """
+        Works exactly like SocketHandler.emit but formats the record before sending it.
+        record.args is set to ``None`` since they are already used by self.format, otherwise makePickle would try to
+        use them again and fail.
+
+        Args:
+            record (:obj:LogRecord <logging.LogRecord>): the record to be emitted.
+        """
+        try:
+            record.msg = self.format(record)
+            record.args = None
+
+            s = self.makePickle(record)
+            self.send(s)
+
+        except Exception:
+            self.handleError(record)
+
+
+class MultiNameFilter(logging.Filter):
     """
-    Works exactly like ``logging.Logger`` but represents dict messages as json. Useful to prevent dicts being cast
-    to strings via ``str()``.
+    Filters log records based on a list of logger names. Only loggers in the list are accepted.
     """
 
-    def makeRecord(self, *args, **kwargs):
-        """Makes a record where the message is json encoded."""
-        rv = super().makeRecord(*args, **kwargs)
-        if isinstance(rv.msg, dict):
-            rv.msg = json.dumps(rv.msg)
+    def __init__(self, names):
+        super().__init__()
+        self.names = names
 
-        return rv
+    def filter(self, record):
+        return record.name in self.names
+
+
+def add_api_component(logger, name, event_dict):
+    """
+    Adds the component to the entry if the entry is not from structlog. This only applies to the API since it is
+    handled by external WSGI servers.
+    """
+    event_dict["component"] = "API"
+    return event_dict
 
 
 def setup_logging(logging_port):
@@ -51,15 +84,23 @@ def setup_logging(logging_port):
             "version": 1,
             "disable_existing_loggers": False,
             "filters": {  # filter out logs that do not come from teos
-                "onlyteos": {"()": logging.Filter, "name": "teos"}
+                "teos": {"()": MultiNameFilter, "names": ["teos", "waitress"]},
+            },
+            "formatters": {
+                "json_formatter": {
+                    "()": structlog.stdlib.ProcessorFormatter,
+                    "processor": structlog.processors.JSONRenderer(),
+                    "foreign_pre_chain": [timestamper, add_api_component],
+                }
             },
             "handlers": {
                 "socket": {
                     "level": "DEBUG",
-                    "class": "logging.handlers.SocketHandler",
+                    "class": "teos.logger.FormattedSocketHandler",
                     "host": "localhost",
                     "port": logging_port,
-                    "filters": ["onlyteos"],
+                    "filters": ["teos"],
+                    "formatter": "json_formatter",
                 },
             },
             "loggers": {"": {"handlers": ["socket"], "level": "DEBUG", "propagate": True}},
@@ -69,7 +110,7 @@ def setup_logging(logging_port):
     structlog.configure(
         processors=[
             structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="%d/%m/%Y %H:%M:%S"),
+            timestamper,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         context_class=dict,
@@ -78,7 +119,6 @@ def setup_logging(logging_port):
         cache_logger_on_first_use=True,
     )
 
-    logging.setLoggerClass(JsonMsgLogger)
     configured = True
 
 
