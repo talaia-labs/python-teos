@@ -5,4 +5,4 @@ cryptography>=2.8
 pyzbase32
 plyvel
 backoff
-teos-common==0.0.5
+teos-common==0.1.1
