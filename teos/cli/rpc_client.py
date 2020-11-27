@@ -5,6 +5,7 @@ import grpc
 from google.protobuf import json_format
 from google.protobuf.empty_pb2 import Empty
 
+from common.cryptographer import Cryptographer
 from common.tools import is_compressed_pk, intify
 from common.exceptions import InvalidParameter
 
@@ -46,15 +47,26 @@ class RPCClient:
     Args:
         rpc_host (:obj:`str`): the IP or host where the RPC server is hosted.
         rpc_port (:obj:`int`): the port where the RPC server is hosted.
+        rpc_cert_path (:obj:`str`): path to certificate used to validate the server's TSL credentials.
+        rpc_user (:obj:`str`): a username that will be authenticated by the grpc server.
+        rpc_pass (:obj:`str`): a password that will be authenticated by the grpc server.
+
 
     Attributes:
         stub: The rpc client stub.
     """
 
-    def __init__(self, rpc_host, rpc_port):
+    def __init__(self, rpc_host, rpc_port, rpc_cert_path, rpc_user, rpc_pass):
         self.rpc_host = rpc_host
         self.rpc_port = rpc_port
-        channel = grpc.insecure_channel(f"{rpc_host}:{rpc_port}")
+
+        cert = Cryptographer.load_key_file(rpc_cert_path)
+        user_creds = UserPassCallCredentials(rpc_user, rpc_pass)
+        call_creds = grpc.metadata_call_credentials(user_creds)
+        ssl_creds = grpc.ssl_channel_credentials(root_certificates=cert)
+        creds = grpc.composite_channel_credentials(ssl_creds, call_creds)
+
+        channel = grpc.secure_channel(f"{rpc_host}:{rpc_port}", creds)
         self.stub = TowerServicesStub(channel)
 
     @formatted
@@ -95,3 +107,20 @@ class RPCClient:
         """Stops TEOS gracefully."""
         self.stub.stop(Empty())
         print("Closing the Eye of Satoshi")
+
+
+class UserPassCallCredentials(grpc.AuthMetadataPlugin):
+    """ 
+    Creates call credentials, which include a username and password, to be passed to grpc.
+
+    Args:
+        username (:obj:`str`): a username that will be authenticated by the grpc server.
+        password (:obj:`str`): a password that will be authenticated by the grpc server. 
+    """
+    def __init__(self, username, password):
+        self._username = username
+        self._password = password
+
+    def __call__(self, context, callback): 
+        metadata = [('user', self._username), ('pass', self._password)]
+        callback(metadata, None)

@@ -119,8 +119,10 @@ class CLI:
 
         teos_rpc_host = config.get("RPC_BIND")
         teos_rpc_port = config.get("RPC_PORT")
-
-        self.rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
+        rpc_cert = config.get("RPC_CERT")
+        rpc_user = config.get("RPC_USER")
+        rpc_pass = config.get("RPC_PASS")
+        self.rpc_client = RPCClient(teos_rpc_host, teos_rpc_port, rpc_cert, rpc_user, rpc_pass)
 
     @classmethod
     def command(cls, command_cls):
