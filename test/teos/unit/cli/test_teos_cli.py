@@ -1,9 +1,14 @@
 import os
 import pytest
+import time
 import grpc
+from grpc_testing import channel, strict_fake_time
 from unittest.mock import MagicMock
 
+from common.cryptographer import Cryptographer
 from teos.cli.teos_cli import show_usage, CLI, CLICommand
+from teos.cli.rpc_client import UserPassCallCredentials
+from teos.protobuf import tower_services_pb2 
 from common.exceptions import InvalidParameter
 
 
@@ -66,9 +71,34 @@ class MockCommandException(CLICommand):
         raise Exception("Mock Exception")
 
 
+def return_none(*args, **kwargs):
+    return None
+
+
+def create_test_channel(*args):
+    descriptors = tower_services_pb2.DESCRIPTOR.services_by_name.values()
+    fake_time = strict_fake_time(time.time()) 
+    test_channel = channel(descriptors, fake_time)
+
+    return test_channel
+
+
+def monkeypatch_rpcclient(monkeypatch, function, func_args):
+    for attr in [(Cryptographer, "load_key_file"), (UserPassCallCredentials, "__init__"), (grpc, "metadata_call_credentials"), (grpc, "ssl_channel_credentials"), (grpc, "composite_channel_credentials")]:
+        monkeypatch.setattr(attr[0], attr[1], return_none, raising=True)
+
+    monkeypatch.setattr(grpc, "secure_channel", create_test_channel, raising=True)
+
+    result = function(*func_args) 
+
+    return monkeypatch, result
+
+
 @pytest.fixture
-def cli():
-    cli = CLI(".teos-cli-test", {})
+def cli(monkeypatch):
+    monkeypatch, cli = monkeypatch_rpcclient(monkeypatch, CLI, [".teos-cli-test", {}])
+
+    # cli = CLI(".teos-cli-test", {})
     yield cli
     os.rmdir(".teos-cli-test")
 
@@ -78,9 +108,9 @@ def test_show_usage_does_not_throw():
     show_usage()
 
 
-def test_cli_init_does_not_throw():
+def test_cli_init_does_not_throw(monkeypatch):
     try:
-        CLI(".teos-cli-test", {})
+        monkeypatch, cli = monkeypatch_rpcclient(monkeypatch, CLI, [".teos-cli-test", {}])
     finally:
         os.rmdir(".teos-cli-test")
 
