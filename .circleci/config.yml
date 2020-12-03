@@ -79,14 +79,10 @@ jobs:
           name: docker linux amd64
           command: |
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
-            if [ -z "$LATEST_TAG" ]
-            then
-                  LATEST_TAG="latest"
-            fi
-            #
-            sudo docker build --pull -t $DOCKERHUB_REPO:$LATEST_TAG-amd64 -f docker/Dockerfile .
+            LATEST_TAG=0.1.1
+            sudo docker build --pull -t $DOCKERHUB_REPO:$LATEST_TAG-amd64 -t $DOCKERHUB_REPO:latest-amd64 -f docker/Dockerfile .
             sudo docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
-            sudo docker push $DOCKERHUB_REPO:$LATEST_TAG-amd64
+            sudo docker push $DOCKERHUB_REPO
   publish_docker_linuxarm32:
     machine:
       docker_layer_caching: false
@@ -99,14 +95,10 @@ jobs:
           command: |
             sudo docker run --rm --privileged multiarch/qemu-user-static:register --reset
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
-            if [ -z "$LATEST_TAG" ]
-            then
-                  LATEST_TAG="latest"
-            fi
-            #
-            sudo docker build --pull -t $DOCKERHUB_REPO:$LATEST_TAG-arm32v7 -f docker/arm32v7.Dockerfile .
+            LATEST_TAG=0.1.1
+            sudo docker build --pull -t $DOCKERHUB_REPO:$LATEST_TAG-arm32v7 -t $DOCKERHUB_REPO:latest-arm32v7 -f docker/arm32v7.Dockerfile .
             sudo docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
-            sudo docker push $DOCKERHUB_REPO:$LATEST_TAG-arm32v7
+            sudo docker push $DOCKERHUB_REPO
   publish_docker_linuxarm64:
     machine:
       docker_layer_caching: false
@@ -119,14 +111,10 @@ jobs:
           command: |
             sudo docker run --rm --privileged multiarch/qemu-user-static:register --reset
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
-            if [ -z "$LATEST_TAG" ]
-            then
-                  LATEST_TAG="latest"
-            fi
-            #
-            sudo docker build --pull -t $DOCKERHUB_REPO:$LATEST_TAG-arm64v8 -f docker/arm64v8.Dockerfile .
+            LATEST_TAG=0.1.1
+            sudo docker build --pull -t $DOCKERHUB_REPO:$LATEST_TAG-arm64v8 -t $DOCKERHUB_REPO:latest-arm64v8 -f docker/arm64v8.Dockerfile .
             sudo docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
-            sudo docker push $DOCKERHUB_REPO:$LATEST_TAG-arm64v8
+            sudo docker push $DOCKERHUB_REPO
   publish_docker_multiarch:
     machine:
       enabled: true
@@ -140,19 +128,18 @@ jobs:
             # Turn on Experimental features
             sudo mkdir $HOME/.docker
             sudo sh -c 'echo "{ \"experimental\": \"enabled\" }" >> $HOME/.docker/config.json'
-            #
             sudo docker login --username=$DOCKERHUB_USER --password=$DOCKERHUB_PASS
-            #
+
             LATEST_TAG=${CIRCLE_TAG:1} #trim v from tag
-            if [ -z "$LATEST_TAG" ]
-            then
-                  LATEST_TAG="latest"
-            fi
-            sudo docker manifest create --amend $DOCKERHUB_REPO:$LATEST_TAG $DOCKERHUB_REPO:$LATEST_TAG-amd64 $DOCKERHUB_REPO:$LATEST_TAG-arm32v7 $DOCKERHUB_REPO:$LATEST_TAG-arm64v8
-            sudo docker manifest annotate $DOCKERHUB_REPO:$LATEST_TAG $DOCKERHUB_REPO:$LATEST_TAG-amd64 --os linux --arch amd64
-            sudo docker manifest annotate $DOCKERHUB_REPO:$LATEST_TAG $DOCKERHUB_REPO:$LATEST_TAG-arm32v7 --os linux --arch arm --variant v7
-            sudo docker manifest annotate $DOCKERHUB_REPO:$LATEST_TAG $DOCKERHUB_REPO:$LATEST_TAG-arm64v8 --os linux --arch arm64 --variant v8
-            sudo docker manifest push $DOCKERHUB_REPO:$LATEST_TAG -p
+            LATEST_TAG=0.1.1
+            for TAG in $LATEST_TAG latest
+            do
+              sudo docker manifest create --amend $DOCKERHUB_REPO:$TAG $DOCKERHUB_REPO:$TAG-amd64 $DOCKERHUB_REPO:$TAG-arm32v7 $DOCKERHUB_REPO:$TAG-arm64v8
+              sudo docker manifest annotate $DOCKERHUB_REPO:$TAG $DOCKERHUB_REPO:$TAG-amd64 --os linux --arch amd64
+              sudo docker manifest annotate $DOCKERHUB_REPO:$TAG $DOCKERHUB_REPO:$TAG-arm32v7 --os linux --arch arm --variant v7
+              sudo docker manifest annotate $DOCKERHUB_REPO:$TAG $DOCKERHUB_REPO:$TAG-arm64v8 --os linux --arch arm64 --variant v8
+              sudo docker manifest push $DOCKERHUB_REPO:$TAG -p
+            done
 
 workflows:
   version: 2
@@ -163,27 +150,27 @@ workflows:
 
   publish:
     jobs:
-      - publish_docker_linuxamd64:
-          filters:
-            # filters work like an or statement, specifying both tag and branch will make it run on the given branch
-            # even if the tag does not match
-            branches:
-              ignore: /.*/
-            # Only act on tagged versions
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - publish_docker_linuxarm32:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-      - publish_docker_linuxarm64:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+      - publish_docker_linuxamd64
+#          filters:
+#            # filters work like an or statement, specifying both tag and branch will make it run on the given branch
+#            # even if the tag does not match
+#            branches:
+#              ignore: /.*/
+#             Only act on tagged versions
+#            tags:
+#              only: /v[0-9]+(\.[0-9]+)*/
+      - publish_docker_linuxarm32
+#          filters:
+#            branches:
+#              ignore: /.*/
+#            tags:
+#              only: /v[0-9]+(\.[0-9]+)*/
+      - publish_docker_linuxarm64
+#          filters:
+#            branches:
+#              ignore: /.*/
+#            tags:
+#              only: /v[0-9]+(\.[0-9]+)*/
       - publish_docker_multiarch:
           requires:
             - publish_docker_linuxamd64
