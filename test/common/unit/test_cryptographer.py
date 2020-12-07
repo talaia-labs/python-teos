@@ -2,6 +2,8 @@ import os
 import pytest
 from shutil import rmtree
 from coincurve import PrivateKey, PublicKey
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from common.exceptions import InvalidKey, InvalidParameter, EncryptionError, SignatureError
 from common.cryptographer import Cryptographer
@@ -112,35 +114,35 @@ def test_generate_key():
         issued_keys.append(sk_der)
 
 
-def test_save_key_file():
+def test_save_crypto_file():
     # If the params are of the right type, the key is saved no matter if the dir exists or not.
-    key_name = "test_key"
+    key_name = "test_key.der"
     key_dir = "test_key_dir"
     assert not os.path.exists(key_dir)
     assert not os.path.exists(os.path.join(key_dir, key_name))
 
-    Cryptographer.save_key_file(bytes(33), key_name, key_dir)
+    Cryptographer.save_crypto_file(bytes(33), key_name, key_dir)
 
     assert os.path.exists(key_dir)
-    assert os.path.exists(os.path.join(key_dir, key_name + ".der"))
+    assert os.path.exists(os.path.join(key_dir, key_name))
     rmtree(key_dir)
 
 
-def test_save_key_file_wrong_params():
+def test_save_crypto_file_wrong_params():
     # Function fails if the args are not of the proper type
     no_str_nor_byte = [None, 1, 1.5, object, {}, Exception()]
 
     for wrong_val in no_str_nor_byte:
-        with pytest.raises(InvalidParameter, match="Key must be bytes"):
-            Cryptographer.save_key_file(wrong_val, "name", "dir")
+        with pytest.raises(InvalidParameter, match="Crypto data must be bytes"):
+            Cryptographer.save_crypto_file(wrong_val, "name", "dir")
 
     for wrong_val in no_str_nor_byte:
-        with pytest.raises(InvalidParameter, match="Key name must be str"):
-            Cryptographer.save_key_file(bytes(33), wrong_val, "dir")
+        with pytest.raises(InvalidParameter, match="Crypto data name must be str"):
+            Cryptographer.save_crypto_file(bytes(33), wrong_val, "dir")
 
     for wrong_val in no_str_nor_byte:
         with pytest.raises(InvalidParameter, match="Data dir must be str"):
-            Cryptographer.save_key_file(bytes(33), "name", wrong_val)
+            Cryptographer.save_crypto_file(bytes(33), "name", wrong_val)
 
 
 def test_load_key_file():
@@ -285,3 +287,35 @@ def test_get_compressed_pk_wrong_type():
 
     with pytest.raises(InvalidParameter, match="Wrong value passed as pk"):
         Cryptographer.get_compressed_pk(pk)
+
+
+def test_generate_cert_key():
+    pem_cert_key = Cryptographer.generate_cert_key()
+    assert isinstance(pem_cert_key, bytes)
+
+    # Check that the pem key is correct
+    cert_key = load_pem_private_key(pem_cert_key, None)
+    assert isinstance(cert_key, rsa.RSAPrivateKey)
+
+
+def test_generate_self_signed_cert():
+    test_dir = "test_dir"
+    test_key = "cert.key"
+    # Create test key
+    pem_cert_key = Cryptographer.generate_cert_key()
+    # save test key.
+    Cryptographer.save_crypto_file(pem_cert_key, test_key, test_dir)
+
+    cert = Cryptographer.generate_self_signed_cert(os.path.join(test_dir, test_key))
+
+    assert isinstance(cert, bytes)
+
+    rmtree(test_dir)
+
+
+def test_generate_self_signed_cert_wrong_file():
+    cert_key_path = "does_not_exist"
+
+    with pytest.raises(InvalidKey, match="Failed to load RSA key needed for TLS certificate"):
+        Cryptographer.generate_self_signed_cert(cert_key_path)
+
