@@ -142,6 +142,17 @@ class TeosDaemon:
             bitcoind_feed_params,
         )
 
+        if not os.path.exists(self.config.get("RPC_CERT_KEY")):
+            sk_pem = Cryptographer.generate_cert_key()
+            Cryptographer.save_crypto_file(sk_pem, "teos_cert.key", self.config.get("DATA_DIR"))
+
+        if not os.path.exists(self.config.get("RPC_CERT")):
+            cert = Cryptographer.generate_self_signed_cert(self.config.get("RPC_CERT_KEY"))
+            Cryptographer.save_crypto_file(cert, "teos_server.crt", self.config.get("DATA_DIR"))
+
+        sk_pem = Cryptographer.load_key_file(self.config.get("RPC_CERT_KEY"))
+        certificate = Cryptographer.load_key_file(self.config.get("RPC_CERT"))
+
         # Set up the internal API
         self.internal_api_endpoint = f'{self.config.get("INTERNAL_API_HOST")}:{self.config.get("INTERNAL_API_PORT")}'
         self.internal_api = InternalAPI(
@@ -157,6 +168,10 @@ class TeosDaemon:
                 self.internal_api_endpoint,
                 self.logging_port,
                 self.stop_event,
+                sk_pem,
+                certificate,
+                self.config.get("RPC_USER"),
+                self.config.get("RPC_PASS"),
             ),
             daemon=True,
         )
@@ -366,7 +381,7 @@ def main(config):
     if not os.path.exists(config.get("TEOS_SECRET_KEY")) or config.get("OVERWRITE_KEY"):
         logger.info("Generating a new key pair")
         sk = Cryptographer.generate_key()
-        Cryptographer.save_key_file(sk.to_der(), "teos_sk", config.get("DATA_DIR"))
+        Cryptographer.save_crypto_file(sk.to_der(), "teos_sk.der", config.get("DATA_DIR"))
 
     else:
         logger.info("Tower identity found. Loading keys")
