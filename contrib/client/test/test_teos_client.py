@@ -363,6 +363,24 @@ def test_post_request():
     assert response
 
 
+@responses.activate
+def test_post_request_onion_address():
+    onion_url = "http://4e2vhhgmozhi2ncuxk247j5zba3r5f3x33b3vy5z5tvdddwbijc2vhqd.onion:9814"
+    add_appointment_onion_endpoint = "{}/add_appointment".format(onion_url)
+
+    response = {
+        "locator": dummy_appointment.to_dict()["locator"],
+        "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
+    }
+
+    responses.add(responses.POST, add_appointment_onion_endpoint, json=response, status=200)
+    response = teos_client.post_request(json.dumps(dummy_appointment_data), add_appointment_onion_endpoint)
+
+    assert len(responses.calls) == 1
+    assert responses.calls[0].request.url == add_appointment_onion_endpoint
+    assert response
+
+
 def test_post_request_connection_error():
     with pytest.raises(ConnectionError):
         teos_client.post_request(json.dumps(dummy_appointment_data), add_appointment_endpoint)
