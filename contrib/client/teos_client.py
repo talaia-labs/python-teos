@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger()
 
 
-def register(user_id, teos_id, teos_url):
+def register(user_id, teos_id, teos_url, socks_port=9050):
     """
     Registers the user to the tower.
 
@@ -63,7 +63,7 @@ def register(user_id, teos_id, teos_url):
     data = {"public_key": user_id}
 
     logger.info("Registering in the Eye of Satoshi")
-    response = process_post_response(post_request(data, register_endpoint))
+    response = process_post_response(post_request(data, register_endpoint, socks_port))
 
     available_slots = response.get("available_slots")
     subscription_expiry = response.get("subscription_expiry")
@@ -115,7 +115,7 @@ def create_appointment(appointment_data):
     return Appointment.from_dict(appointment_data)
 
 
-def add_appointment(appointment, user_sk, teos_id, teos_url):
+def add_appointment(appointment, user_sk, teos_id, teos_url, socks_port=9050):
     """
     Manages the add_appointment command. The life cycle of the function is as follows:
         - Sign the appointment
@@ -144,7 +144,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
     # Send appointment to the server.
     logger.info("Sending appointment to the Eye of Satoshi")
     add_appointment_endpoint = "{}/add_appointment".format(teos_url)
-    response = process_post_response(post_request(data, add_appointment_endpoint))
+    response = process_post_response(post_request(data, add_appointment_endpoint, socks_port))
 
     tower_signature = response.get("signature")
     start_block = response.get("start_block")
@@ -164,7 +164,7 @@ def add_appointment(appointment, user_sk, teos_id, teos_url):
     return start_block, tower_signature
 
 
-def get_appointment(locator, user_sk, teos_id, teos_url):
+def get_appointment(locator, user_sk, teos_id, teos_url, socks_port=9050):
     """
     Gets information about an appointment from the tower.
 
@@ -195,12 +195,12 @@ def get_appointment(locator, user_sk, teos_id, teos_url):
     # Send request to the server.
     get_appointment_endpoint = "{}/get_appointment".format(teos_url)
     logger.info("Requesting appointment from the Eye of Satoshi")
-    response = process_post_response(post_request(data, get_appointment_endpoint))
+    response = process_post_response(post_request(data, get_appointment_endpoint, socks_port))
 
     return response
 
 
-def get_subscription_info(user_sk, teos_id, teos_url):
+def get_subscription_info(user_sk, teos_id, teos_url, socks_port=9050):
     """
     Gets information about a user's subscription status from the tower.
 
@@ -225,7 +225,7 @@ def get_subscription_info(user_sk, teos_id, teos_url):
     # Send request to the server.
     get_subscription_info_endpoint = "{}/get_subscription_info".format(teos_url)
     logger.info("Requesting subscription information from the Eye of Satoshi")
-    response = process_post_response(post_request(data, get_subscription_info_endpoint))
+    response = process_post_response(post_request(data, get_subscription_info_endpoint, socks_port))
 
     return response
 
@@ -290,7 +290,7 @@ def load_teos_id(teos_pk_path):
     return teos_id
 
 
-def post_request(data, endpoint):
+def post_request(data, endpoint, socks_port=9050):
     """
     Sends a post request to the tower.
 
@@ -306,7 +306,12 @@ def post_request(data, endpoint):
     """
 
     try:
-        return requests.post(url=endpoint, json=data, timeout=5)
+        if ".onion" in endpoint:
+            proxies = {"http": f"socks5h://127.0.0.1:{socks_port}", "https": f"socks5h://127.0.0.1:{socks_port}"}
+
+            return requests.post(url=endpoint, json=data, timeout=15, proxies=proxies)
+        else:
+            return requests.post(url=endpoint, json=data, timeout=5)
 
     except Timeout:
         message = "Cannot connect to the Eye of Satoshi's API. Connection timeout"
@@ -449,6 +454,8 @@ def main(command, args, command_line_conf):
     if not teos_url.startswith("http"):
         teos_url = "http://" + teos_url
 
+    socks_port = config.get("SOCKS_PORT")
+
     try:
         if os.path.exists(config.get("USER_PRIVATE_KEY")):
             logger.debug("Client id found. Loading keys")
@@ -468,7 +475,7 @@ def main(command, args, command_line_conf):
                 if not is_compressed_pk(teos_id):
                     raise InvalidParameter("Cannot register. Tower id has invalid format")
 
-                available_slots, subscription_expiry = register(user_id, teos_id, teos_url)
+                available_slots, subscription_expiry = register(user_id, teos_id, teos_url, socks_port)
                 logger.info("Registration succeeded. Available slots: {}".format(available_slots))
                 logger.info("Subscription expires at block {}".format(subscription_expiry))
 
@@ -479,7 +486,7 @@ def main(command, args, command_line_conf):
             teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
             appointment_data = parse_add_appointment_args(args)
             appointment = create_appointment(appointment_data)
-            start_block, signature = add_appointment(appointment, user_sk, teos_id, teos_url)
+            start_block, signature = add_appointment(appointment, user_sk, teos_id, teos_url, socks_port)
             save_appointment_receipt(
                 appointment.to_dict(), start_block, signature, config.get("APPOINTMENTS_FOLDER_NAME")
             )
@@ -495,7 +502,7 @@ def main(command, args, command_line_conf):
                     sys.exit(help_get_appointment())
 
                 teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
-                appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url)
+                appointment_data = get_appointment(arg_opt, user_sk, teos_id, teos_url, socks_port)
                 if appointment_data:
                     logger.info(json.dumps(appointment_data, indent=4))
 
@@ -507,7 +514,7 @@ def main(command, args, command_line_conf):
                     sys.exit(help_get_subscription_info())
 
             teos_id = load_teos_id(config.get("TEOS_PUBLIC_KEY"))
-            subscription_info = get_subscription_info(user_sk, teos_id, teos_url)
+            subscription_info = get_subscription_info(user_sk, teos_id, teos_url, socks_port)
             if subscription_info:
                 logger.info(json.dumps(subscription_info, indent=4))
 
@@ -533,7 +540,13 @@ def main(command, args, command_line_conf):
             else:
                 sys.exit(show_usage())
 
-    except (FileNotFoundError, IOError, ConnectionError, ValueError, BasicException,) as e:
+    except (
+        FileNotFoundError,
+        IOError,
+        ConnectionError,
+        ValueError,
+        BasicException,
+    ) as e:
         logger.error(str(e))
     except Exception as e:
         logger.error("Unknown error occurred", error=str(e))

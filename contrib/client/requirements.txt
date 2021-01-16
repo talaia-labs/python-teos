@@ -1,3 +1,4 @@
 cryptography>=2.8
 requests
+requests[socks]
 structlog
