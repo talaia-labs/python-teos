@@ -117,5 +117,5 @@ and for `pip3`:
  `teos` has several python dependencies that are automatically alongside the it. Should you need to install them manually, you can do so by running:
 
 ```
- pip install -r requirements.txt`
+ pip install -r requirements.txt
 ```
