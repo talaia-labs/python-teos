@@ -1,5 +1,7 @@
 pyln-client
+pyln-testing
 requests
+requests[socks]
 coincurve
 cryptography>=2.8
 pyzbase32
