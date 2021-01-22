@@ -24,7 +24,7 @@ from test.teos.conftest import (
     generate_blocks,
     config,
 )
-from test.teos.e2e.conftest import build_appointment_data, run_teosd
+from test.teos.e2e.conftest import build_appointment_data, run_teosd, create_hidden_service
 
 teos_base_endpoint = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
@@ -559,3 +559,21 @@ def test_appointment_shutdown_teos_trigger_while_offline(teosd):
     # The appointment should have been moved to the Responder
     appointment_info = get_appointment_info(teos_id, locator)
     assert appointment_info.get("status") == AppointmentStatus.DISPUTE_RESPONDED
+
+
+def test_register_request_to_onion_service(teosd, run_tor):
+    _, teos_id = teosd
+
+    run_tor
+    sleep(3)
+
+    onion_address = create_hidden_service()
+    onion_endpoint = f"http://{onion_address}:9814"
+
+    # See if a user can connect to the hidden service.
+    tmp_user_sk = PrivateKey()
+    tmp_user_id = Cryptographer.get_compressed_pk(tmp_user_sk.public_key)
+
+    available_slots, subscription_expiry = teos_client.register(tmp_user_id, teos_id, onion_endpoint, socks_port=9060)
+
+    assert available_slots == 100

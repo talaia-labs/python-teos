@@ -1,10 +1,12 @@
 import os
-import shutil
 import pytest
+from shutil import rmtree
 from time import sleep
 import multiprocessing
 from grpc import RpcError
 from multiprocessing import Process
+from stem.control import Controller
+from stem.process import launch_tor_with_config
 
 from teos.teosd import main
 from teos.cli.teos_cli import RPCClient
@@ -33,7 +35,7 @@ def teosd(run_bitcoind):
             pass
 
     teosd_process.join()
-    shutil.rmtree(".teos")
+    rmtree(".teos")
 
     # FIXME: wait some time, otherwise it might fail when multiple e2e tests are ran in the same session. Not sure why.
     sleep(1)
@@ -67,3 +69,37 @@ def build_appointment_data(commitment_tx_id, penalty_tx):
     appointment_data = {"tx": penalty_tx, "tx_id": commitment_tx_id, "to_self_delay": 20}
 
     return appointment_data
+
+
+@pytest.fixture(scope="session")
+def run_tor():
+    dirname = ".test_tor"
+
+    # Run Tor in a separate folder
+    os.makedirs(dirname, exist_ok=True)
+
+    curr_dir = os.getcwd()
+    data_dir = f"{curr_dir}/{dirname}"
+
+    tor_process = launch_tor_with_config(
+        config={
+            "SocksPort": "9060",
+            "ControlPort": "9061",
+            "DataDirectory": data_dir,
+        }
+    )
+
+    yield
+
+    tor_process.kill()
+    rmtree(dirname)
+
+
+def create_hidden_service():
+    with Controller.from_port(port=9061) as controller:
+        controller.authenticate()
+
+        hidden_service_dir = os.path.join(controller.get_conf("DataDirectory", "/tmp"), "onion_test")
+        result = controller.create_hidden_service(hidden_service_dir, 9814, target_port=9814)
+
+        return result.hostname
