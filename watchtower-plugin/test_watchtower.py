@@ -267,7 +267,9 @@ def test_watchtower_retry_offline(node_factory):
     """Tests sending data to a tower that gets offline for a while. Forces retry using ``retrytower``"""
 
     global mocked_return
-    l1, l2 = node_factory.line_graph(2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path}])
+    l1, l2 = node_factory.line_graph(
+        2, opts=[{"may_fail": True, "allow_broken_log": True}, {"plugin": plugin_path, "allow_broken_log": True}]
+    )
 
     # Send some appointments with to tower "offline"
     mocked_return = "service_unavailable"
@@ -276,6 +278,7 @@ def test_watchtower_retry_offline(node_factory):
     assert not l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
 
     l1.rpc.pay(l2.rpc.invoice(25000000, "lbl3", "desc")["bolt11"])
+    sleep(1)
     pending_appointments = [
         data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
     ]
@@ -317,6 +320,7 @@ def test_watchtower_no_slots(node_factory):
 
     # Make a payment and the appointment should be left as pending
     l1.rpc.pay(l2.rpc.invoice(25000000, "lbl3", "desc")["bolt11"])
+    sleep(1)
     pending_appointments = [
         data.get("appointment").get("locator") for data in l2.rpc.gettowerinfo(tower_id).get("pending_appointments")
     ]
