@@ -70,6 +70,11 @@ def setup_node():
             )
         )
         try:
+            info = bitcoin_cli.getnetworkinfo()
+
+            if info.get("version") >= 210000:
+                bitcoin_cli.createwallet("test_wallet")
+
             btc_addr = bitcoin_cli.getnewaddress()
             break
 
