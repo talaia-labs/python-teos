@@ -169,8 +169,12 @@ class API:
                 response["public_key"] = user_id
 
             except grpc.RpcError as e:
-                rcode = HTTP_BAD_REQUEST
-                response = {"error": e.details(), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                if e.code() == grpc.StatusCode.UNAVAILABLE:
+                    rcode = HTTP_SERVICE_UNAVAILABLE
+                    response = {"error": e.details()}
+                else:
+                    rcode = HTTP_BAD_REQUEST
+                    response = {"error": e.details(), "error_code": errors.REGISTRATION_MISSING_FIELD}
 
         else:
             rcode = HTTP_BAD_REQUEST
@@ -242,6 +246,9 @@ class API:
                     "error": f"appointment rejected. {e.details()}",
                     "error_code": errors.APPOINTMENT_ALREADY_TRIGGERED,
                 }
+            elif e.code() == grpc.StatusCode.UNAVAILABLE:
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": e.details()}
             else:
                 # This covers grpc.StatusCode.RESOURCE_EXHAUSTED (and any other return).
                 rcode = HTTP_SERVICE_UNAVAILABLE
@@ -307,15 +314,20 @@ class API:
             }
 
         except (InspectionFailed, grpc.RpcError) as e:
-            if isinstance(e, grpc.RpcError) and e.code() == grpc.StatusCode.UNAUTHENTICATED:
-                rcode = HTTP_BAD_REQUEST
-                response = {
-                    "error": e.details(),
-                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
-                }
-            else:
-                rcode = HTTP_NOT_FOUND
-                response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
+            # Default, for InspectionFailed and not-found appointments
+            rcode = HTTP_NOT_FOUND
+            response = {"locator": locator, "status": AppointmentStatus.NOT_FOUND}
+
+            if isinstance(e, grpc.RpcError):
+                if e.code() == grpc.StatusCode.UNAUTHENTICATED:
+                    rcode = HTTP_BAD_REQUEST
+                    response = {
+                        "error": e.details(),
+                        "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
+                    }
+                elif e.code() == grpc.StatusCode.UNAVAILABLE:
+                    rcode = HTTP_SERVICE_UNAVAILABLE
+                    response = {"error": e.details()}
 
         return jsonify(response), rcode
 
@@ -353,10 +365,14 @@ class API:
             rcode = HTTP_OK
 
         except grpc.RpcError as e:
-            rcode = HTTP_BAD_REQUEST
-            response = {
-                "error": e.details(),
-                "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
-            }
+            if e.code() == grpc.StatusCode.UNAUTHENTICATED:
+                rcode = HTTP_BAD_REQUEST
+                response = {
+                    "error": e.details(),
+                    "error_code": errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR,
+                }
+            else:
+                rcode = HTTP_SERVICE_UNAVAILABLE
+                response = {"error": e.details()}
 
         return jsonify(response), rcode

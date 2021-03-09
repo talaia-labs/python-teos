@@ -80,9 +80,17 @@ class _InternalAPI(TowerServicesServicer):
             )
 
         except InvalidParameter as e:
-            context.set_details(e.msg)
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return RegisterResponse()
+            msg = e.msg
+            status_code = grpc.StatusCode.INVALID_ARGUMENT
+
+        except ConnectionRefusedError:
+            msg = "Service unavailable"
+            status_code = grpc.StatusCode.UNAVAILABLE
+
+        context.set_details(msg)
+        context.set_code(status_code)
+
+        return RegisterResponse()
 
     def add_appointment(self, request, context):
         """Processes the request to add an appointment from a user."""
@@ -107,6 +115,10 @@ class _InternalAPI(TowerServicesServicer):
         except AppointmentAlreadyTriggered:
             msg = "The provided appointment has already been triggered"
             status_code = grpc.StatusCode.ALREADY_EXISTS
+
+        except ConnectionRefusedError:
+            msg = "Service unavailable"
+            status_code = grpc.StatusCode.UNAVAILABLE
 
         context.set_details(msg)
         context.set_code(status_code)
@@ -144,6 +156,10 @@ class _InternalAPI(TowerServicesServicer):
             msg = str(e)
             status_code = grpc.StatusCode.UNAUTHENTICATED
 
+        except ConnectionRefusedError:
+            msg = "Service unavailable"
+            status_code = grpc.StatusCode.UNAVAILABLE
+
         context.set_details(msg)
         context.set_code(status_code)
 
@@ -166,12 +182,18 @@ class _InternalAPI(TowerServicesServicer):
 
         except AuthenticationFailure:
             msg = "User not found. Have you registered?"
+            status_code = grpc.StatusCode.UNAUTHENTICATED
 
         except SubscriptionExpired as e:
             msg = str(e)
+            status_code = grpc.StatusCode.UNAUTHENTICATED
+
+        except ConnectionRefusedError:
+            msg = "Service unavailable"
+            status_code = grpc.StatusCode.UNAVAILABLE
 
         context.set_details(msg)
-        context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+        context.set_code(status_code)
 
         return GetUserResponse()
 

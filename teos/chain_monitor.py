@@ -41,11 +41,13 @@ class ChainMonitor:
         block_processor (:obj:`BlockProcessor <teos.block_processor.BlockProcessor>`): a :obj:`BlockProcessor` instance.
         bitcoind_feed_params (:obj:`dict`): a dict with the feed (ZMQ) connection parameters.
 
+
     Attributes:
         logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
         last_tips (:obj:`list`): A list of last chain tips. Used as a sliding window to avoid notifying about old tips.
         check_tip (:obj:`Event`): An event that is triggered at fixed time intervals and controls the polling thread.
         lock (:obj:`Condition`): A lock used to protect concurrent access to the queues by the zmq and polling threads.
+        bitcoind_reachable (:obj:`threading.Event`): signals whether bitcoind is reachable or not.
         zmqSubSocket (:obj:`socket`): A socket to connect to ``bitcoind`` via ``zmq``.
         polling_delta (:obj:`int`): Time between polls (in seconds).
         max_block_window_size (:obj:`int`): Max size of ``last_tips``.
@@ -62,6 +64,8 @@ class ChainMonitor:
 
         self.check_tip = Event()
         self.lock = Condition()
+        self.bitcoind_reachable = block_processor.bitcoind_reachable
+        self.polling_retries = 0
 
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
@@ -115,17 +119,34 @@ class ChainMonitor:
         Monitors ``bitcoind`` via polling. Once the method is fired, it keeps monitoring as long as the ``status``
         attribute is not ``ChainMonitorStatus.TERMINATED``. Polling is performed once every ``polling_delta`` seconds.
         If a new best tip is found, it is added to the internal queue.
+
+        This also keeps track of bitcoind being alive. If the connection (RPC) with bitcoind cannot be established, it
+        will keep trying (blocking any other tower thread) until the connection is reestablished.
         """
 
         while self.status != ChainMonitorStatus.TERMINATED:
             self.check_tip.wait(timeout=self.polling_delta)
+            try:
+                self.bitcoind_reachable.clear()
+                # We don't want this thread to ever block, since it's the only one that set the event
+                current_tip = self.block_processor.get_best_block_hash(blocking=False)
 
-            current_tip = self.block_processor.get_best_block_hash()
+                if self.polling_retries > 0:
+                    self.logger.info(f"Connection with bitcoind restored")
+                    self.polling_retries = 0
+                self.bitcoind_reachable.set()
 
-            # get_best_block_hash may return None if the RPC times out.
-            if current_tip and current_tip not in self.last_tips:
-                self.logger.info("New block received via polling", block_hash=current_tip)
-                self.enqueue(current_tip)
+                # get_best_block_hash may return None if the request timesout.
+                if current_tip and current_tip not in self.last_tips:
+                    self.logger.info("New block received via polling", block_hash=current_tip)
+                    self.enqueue(current_tip)
+            except ConnectionRefusedError:
+                if self.polling_retries == 0:
+                    self.logger.error("Lost connection with bitcoind")
+                else:
+                    self.logger.error(f"Cannot connect to bitcoind (reties={self.polling_retries})")
+
+                self.polling_retries += 1
 
     def monitor_chain_zmq(self):
         """
@@ -175,9 +196,13 @@ class ChainMonitor:
 
         self.status = ChainMonitorStatus.LISTENING
 
-        self.last_tips.append(self.block_processor.get_best_block_hash())
-        Thread(target=self.monitor_chain_polling, daemon=True).start()
-        Thread(target=self.monitor_chain_zmq, daemon=True).start()
+        try:
+            # Since the ChainMonitor is still bootstrapping we cannot use blocking queries
+            self.last_tips.append(self.block_processor.get_best_block_hash(blocking=False))
+            Thread(target=self.monitor_chain_polling, daemon=True).start()
+            Thread(target=self.monitor_chain_zmq, daemon=True).start()
+        except ConnectionRefusedError:
+            raise ConnectionRefusedError("Lost connection with bitcoind during bootstrap")
 
     def activate(self):
         """

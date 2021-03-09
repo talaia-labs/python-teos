@@ -107,15 +107,17 @@ class TeosDaemon:
         bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC_RPC")}
         bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 
+        bitcoind_reachable = threading.Event()
         if not can_connect_to_bitcoind(bitcoind_connect_params):
             raise RuntimeError("Cannot connect to bitcoind")
-
         elif not in_correct_network(bitcoind_connect_params, config.get("BTC_NETWORK")):
             raise RuntimeError("bitcoind is running on a different network, check teos.conf and bitcoin.conf")
+        else:
+            bitcoind_reachable.set()
 
         self.logger.info("tower_id = {}".format(Cryptographer.get_compressed_pk(sk.public_key)))
-        self.block_processor = BlockProcessor(bitcoind_connect_params)
-        carrier = Carrier(bitcoind_connect_params)
+        self.block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
+        carrier = Carrier(bitcoind_connect_params, bitcoind_reachable)
 
         gatekeeper = Gatekeeper(
             UsersDBM(self.config.get("USERS_DB_PATH")),
