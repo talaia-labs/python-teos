@@ -40,6 +40,35 @@ DEFAULT_CONF = {
 
 plugin = Plugin()
 
+# Adds OPTIONS for c-lighting config
+plugin.add_option(
+    "watchtower-default-port", DEFAULT_CONF.get("DEFAULT_PORT").get("value"), "default tower API port", "int"
+)
+plugin.add_option(
+    "watchtower-max-retries",
+    DEFAULT_CONF.get("MAX_RETRIES").get("value"),
+    "maximum post retries if the tower is unreachable",
+    "int",
+)
+plugin.add_option(
+    "watchtower-appointments-folder-name",
+    DEFAULT_CONF.get("APPOINTMENTS_FOLDER_NAME").get("value"),
+    "name of the appointments' database within the watchtower data folder",
+    "string",
+)
+plugin.add_option(
+    "watchtower-towers-db",
+    DEFAULT_CONF.get("TOWERS_DB").get("value"),
+    "name of the towers' database within the watchtower data folder",
+    "string",
+)
+plugin.add_option(
+    "watchtower-private-key",
+    DEFAULT_CONF.get("PRIVATE_KEY").get("value"),
+    "name of the private key file within the watchtower data folder",
+    "string",
+)
+
 
 class WTClient:
     """
@@ -117,6 +146,18 @@ class WTClient:
 def init(options, configuration, plugin):
     """Initializes the plugin"""
 
+    clightning_conf = {}
+    for k, v in options.items():
+        # c-lightning config options are lower case, hyphened prefixed by `watchtower_`. Internal options are upper
+        # case, underscored with no prefix
+        key = k[11:].replace("-", "_").upper()
+        value = DEFAULT_CONF.get(key).get("value")
+
+        # Avoid setting the key in clightning_conf if it matches with the defaults, since otherwise it'll rewrite the
+        # standalone conf with defaults.
+        if key in DEFAULT_CONF and v != value:
+            clightning_conf[key] = v
+
     try:
         user_sk, user_id = generate_keys(DATA_DIR)
         plugin.log(f"Generating a new key pair for the watchtower client. Keys stored at {DATA_DIR}")
@@ -125,8 +166,9 @@ def init(options, configuration, plugin):
         plugin.log("A key file for the watchtower client already exists. Loading it")
         user_sk, user_id = load_keys(DATA_DIR)
 
+    # Loads plugin config. priority is clightning conf, plugin conf, default.
     plugin.log(f"Plugin watchtower client initialized. User id = {user_id}")
-    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, {})
+    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, clightning_conf)
 
     try:
         plugin.wt_client = WTClient(user_sk, user_id, config_loader.build_config())
