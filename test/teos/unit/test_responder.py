@@ -28,7 +28,9 @@ from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
 @pytest.fixture
 def responder(db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor(
+        [Queue(), responder.block_queue], block_processor, bitcoind_feed_params, block_processor.bitcoind_reachable
+    )
     chain_monitor.monitor_chain()
     responder_thread = responder.awake()
     chain_monitor.activate()

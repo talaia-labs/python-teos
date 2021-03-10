@@ -1,5 +1,6 @@
 import pytest
 from shutil import rmtree
+from threading import Event
 from coincurve import PrivateKey
 
 from teos.carrier import Carrier
@@ -26,6 +27,8 @@ from test.teos.conftest import (
 
 bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
 bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
+bitcoind_reachable = Event()
+bitcoind_reachable.set()
 
 
 @pytest.fixture(scope="module")
@@ -52,12 +55,12 @@ def user_db_manager():
 
 @pytest.fixture(scope="module")
 def carrier(run_bitcoind):
-    return Carrier(bitcoind_connect_params)
+    return Carrier(bitcoind_connect_params, bitcoind_reachable)
 
 
 @pytest.fixture(scope="module")
 def block_processor(run_bitcoind):
-    return BlockProcessor(bitcoind_connect_params)
+    return BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
 
 
 @pytest.fixture(scope="module")

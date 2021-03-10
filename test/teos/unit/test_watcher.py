@@ -2,7 +2,7 @@ import pytest
 from uuid import uuid4
 from shutil import rmtree
 from copy import deepcopy
-from threading import Thread
+from threading import Thread, Event
 from coincurve import PrivateKey
 
 from teos.carrier import Carrier
@@ -63,8 +63,11 @@ def temp_db_manager():
 
 @pytest.fixture(scope="module")
 def watcher(run_bitcoind, db_manager, gatekeeper):
-    block_processor = BlockProcessor(bitcoind_connect_params)
-    carrier = Carrier(bitcoind_connect_params)
+    bitcoind_reachable = Event()
+    bitcoind_reachable.set()
+
+    block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
+    carrier = Carrier(bitcoind_connect_params, bitcoind_reachable)
 
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     watcher = Watcher(
