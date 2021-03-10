@@ -1,4 +1,7 @@
+import time
 import pytest
+import threading
+from copy import deepcopy
 from shutil import rmtree
 from threading import Event
 from coincurve import PrivateKey
@@ -26,6 +29,8 @@ from test.teos.conftest import (
 
 
 bitcoind_connect_params = {k: v for k, v in config.items() if k.startswith("BTC")}
+wrong_bitcoind_connect_params = deepcopy(bitcoind_connect_params)
+wrong_bitcoind_connect_params["BTC_RPC_PORT"] = 1234
 bitcoind_feed_params = {k: v for k, v in config.items() if k.startswith("BTC_FEED")}
 bitcoind_reachable = Event()
 bitcoind_reachable.set()
@@ -127,3 +132,32 @@ def generate_dummy_tracker(run_bitcoind):
         return TransactionTracker.from_dict(tracker_data)
 
     return _generate_dummy_tracker
+
+
+# Mocks the return of methods trying to query bitcoind while it cannot be reached
+def mock_connection_refused_return(*args, **kwargs):
+    raise ConnectionRefusedError()
+
+
+def set_bitcoind_reachable(bitcoind_reachable):
+    # Sets the bitcoind_reachable event after a timeout so it can be used to tests the blocking functionality
+    time.sleep(2)
+    bitcoind_reachable.set()
+
+
+def run_test_command_bitcoind_crash(command):
+    # Test without blocking
+    with pytest.raises(ConnectionRefusedError):
+        command()
+
+
+def run_test_blocking_command_bitcoind_crash(event, command):
+    # Clear the lock and try it blocking using the valid BlockProcessor
+    event.clear()
+    t = threading.Thread(target=set_bitcoind_reachable, args=[event])
+    t.start()
+
+    # This should not return an exception
+    command()
+    t.join()
+    event.set()

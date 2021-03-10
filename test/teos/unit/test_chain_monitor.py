@@ -7,7 +7,7 @@ import pytest
 from teos.chain_monitor import ChainMonitor, ChainMonitorStatus
 
 from test.teos.conftest import generate_blocks, generate_blocks_with_delay
-from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
+from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params, mock_connection_refused_return
 
 
 def test_init(block_processor):
@@ -79,7 +79,7 @@ def test_enqueue(block_processor):
     assert chain_monitor.last_tips[-1] == another_block_hash
 
 
-def test_monitor_chain_polling(block_processor):
+def test_monitor_chain_polling(block_processor, monkeypatch):
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
     chain_monitor.last_tips = [block_processor.get_best_block_hash()]
     chain_monitor.polling_delta = 0.1
@@ -98,6 +98,14 @@ def test_monitor_chain_polling(block_processor):
 
     chain_monitor.queue.get()
     assert chain_monitor.queue.empty()
+
+    # Check that the bitcoind_reachable event is cleared if the connection is lost, and set once it's recovered
+    monkeypatch.setattr(block_processor, "get_best_block_hash", mock_connection_refused_return)
+    time.sleep(0.5)
+    assert not chain_monitor.bitcoind_reachable.is_set()
+    monkeypatch.delattr(block_processor, "get_best_block_hash")
+    time.sleep(0.5)
+    assert chain_monitor.bitcoind_reachable.is_set()
 
     chain_monitor.terminate()
 

@@ -1,7 +1,17 @@
 import pytest
+from threading import Event
+
+from teos.block_processor import BlockProcessor
 from teos.watcher import InvalidTransactionFormat
+
 from test.teos.conftest import generate_blocks
-from test.teos.unit.conftest import get_random_value_hex, fork
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    fork,
+    wrong_bitcoind_connect_params,
+    run_test_command_bitcoind_crash,
+    run_test_blocking_command_bitcoind_crash,
+)
 
 
 hex_tx = (
@@ -12,6 +22,13 @@ hex_tx = (
     "ded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482e"
     "cad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000"
 )
+
+
+@pytest.fixture(scope="module")
+def block_processor_wrong_connection():
+    bitcoind_reachable = Event()
+    bitcoind_reachable.set()
+    return BlockProcessor(wrong_bitcoind_connect_params, bitcoind_reachable)
 
 
 def test_get_best_block_hash(block_processor):
@@ -104,3 +121,79 @@ def test_find_last_common_ancestor(block_processor):
     last_common_ancestor, dropped_txs = block_processor.find_last_common_ancestor(best_block_hash)
     assert last_common_ancestor == ancestor
     assert len(dropped_txs) == 3
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+
+
+def test_get_block_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    block_id = get_random_value_hex(32)
+    run_test_command_bitcoind_crash(lambda: block_processor_wrong_connection.get_block(block_id))
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable, lambda: block_processor.get_block(block_id, blocking=True)
+    )
+
+
+def test_get_best_block_hash_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(lambda: block_processor_wrong_connection.get_best_block_hash())
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable, lambda: block_processor.get_best_block_hash(blocking=True)
+    )
+
+
+def test_get_block_count_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(lambda: block_processor_wrong_connection.get_block_count())
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable, lambda: block_processor.get_block_count(blocking=True)
+    )
+
+
+def test_decode_raw_transaction_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(lambda: block_processor_wrong_connection.decode_raw_transaction(hex_tx))
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable, lambda: block_processor.decode_raw_transaction(hex_tx, blocking=True)
+    )
+
+
+def test_get_distance_to_tip_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(
+        lambda: block_processor_wrong_connection.get_distance_to_tip(get_random_value_hex(32))
+    )
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable,
+        lambda: block_processor.get_distance_to_tip(get_random_value_hex(32), blocking=True),
+    )
+
+
+def test_get_missed_blocks_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(
+        lambda: block_processor_wrong_connection.get_missed_blocks(get_random_value_hex(32))
+    )
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable,
+        lambda: block_processor.get_missed_blocks(get_random_value_hex(32), blocking=True),
+    )
+
+
+def test_is_block_in_best_chain_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(
+        lambda: block_processor_wrong_connection.is_block_in_best_chain(get_random_value_hex(32))
+    )
+
+    best_block_hash = block_processor.get_best_block_hash()
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable,
+        lambda: block_processor.is_block_in_best_chain(best_block_hash, blocking=True),
+    )
+
+
+def test_find_last_common_ancestor_bitcoind_crash(block_processor, block_processor_wrong_connection):
+    run_test_command_bitcoind_crash(
+        lambda: block_processor_wrong_connection.find_last_common_ancestor(get_random_value_hex(32))
+    )
+
+    best_block_hash = block_processor.get_best_block_hash()
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable,
+        lambda: block_processor.find_last_common_ancestor(best_block_hash, blocking=True),
+    )

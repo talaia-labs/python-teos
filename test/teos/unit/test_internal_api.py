@@ -32,7 +32,7 @@ from teos.protobuf.appointment_pb2 import (
 )
 
 from test.teos.conftest import config
-from test.teos.unit.conftest import generate_keypair, get_random_value_hex
+from test.teos.unit.conftest import generate_keypair, get_random_value_hex, mock_connection_refused_return
 
 internal_api_endpoint = "{}:{}".format(config.get("INTERNAL_API_HOST"), config.get("INTERNAL_API_PORT"))
 
@@ -483,3 +483,51 @@ def test_stop(internal_api, stub):
     stub.stop(Empty())
 
     assert internal_api.stop_command_event.is_set()
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+
+
+def test_register_bitcoind_crash(internal_api, monkeypatch, stub):
+    monkeypatch.setattr(internal_api.watcher, "register", mock_connection_refused_return)
+
+    with pytest.raises(grpc.RpcError) as e:
+        stub.register(RegisterRequest(user_id=user_id))
+    assert e.value.code() == grpc.StatusCode.UNAVAILABLE
+    assert "Service unavailable" in e.value.details()
+
+
+def test_add_appointment_bitcoind_crash(internal_api, monkeypatch, stub, generate_dummy_appointment):
+    monkeypatch.setattr(internal_api.watcher, "add_appointment", mock_connection_refused_return)
+
+    appointment, _ = generate_dummy_appointment()
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+
+    with pytest.raises(grpc.RpcError) as e:
+        send_appointment(stub, appointment, appointment_signature)
+    assert e.value.code() == grpc.StatusCode.UNAVAILABLE
+    assert "Service unavailable" in e.value.details()
+
+
+def test_get_appointment_bitcoind_crash(internal_api, monkeypatch, stub):
+    monkeypatch.setattr(internal_api.watcher, "get_appointment", mock_connection_refused_return)
+
+    locator = get_random_value_hex(32)
+    message = f"get appointment {locator}"
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+
+    with pytest.raises(grpc.RpcError) as e:
+        stub.get_appointment(GetAppointmentRequest(locator=locator, signature=request_signature))
+    assert e.value.code() == grpc.StatusCode.UNAVAILABLE
+    assert "Service unavailable" in e.value.details()
+
+
+def test_get_subscription_info_bitcoind_crash(internal_api, monkeypatch, stub):
+    monkeypatch.setattr(internal_api.watcher, "get_subscription_info", mock_connection_refused_return)
+
+    message = "get subscription info"
+    request_signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    with pytest.raises(grpc.RpcError) as e:
+        stub.get_subscription_info(GetSubscriptionInfoRequest(signature=request_signature))
+    assert e.value.code() == grpc.StatusCode.UNAVAILABLE
+    assert "Service unavailable" in e.value.details()

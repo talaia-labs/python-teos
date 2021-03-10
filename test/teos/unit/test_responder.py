@@ -1,5 +1,7 @@
+import time
 import pytest
 import random
+import threading
 from uuid import uuid4
 from queue import Queue
 from shutil import rmtree
@@ -22,15 +24,31 @@ from test.teos.conftest import (
     create_commitment_tx,
     generate_block_with_transactions,
 )
-from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    bitcoind_feed_params,
+    run_test_blocking_command_bitcoind_crash,
+    bitcoind_connect_params,
+)
+
+
+@pytest.fixture
+def standalone_responder(db_manager, gatekeeper, carrier, block_processor):
+    # This is used when we don't want a Responder tied to a ChainManager (basically so the latter does not mess with
+    # the bitcoind_reachable event that we are mocking). Therefore we need to create a fresh BlockProcessor.
+    bitcoind_reachable = threading.Event()
+    bitcoind_reachable.set()
+
+    block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+
+    return responder
 
 
 @pytest.fixture
 def responder(db_manager, gatekeeper, carrier, block_processor):
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    chain_monitor = ChainMonitor(
-        [Queue(), responder.block_queue], block_processor, bitcoind_feed_params, block_processor.bitcoind_reachable
-    )
+    chain_monitor = ChainMonitor([Queue(), responder.block_queue], block_processor, bitcoind_feed_params)
     chain_monitor.monitor_chain()
     responder_thread = responder.awake()
     chain_monitor.activate()
@@ -575,3 +593,37 @@ def test_rebroadcast(db_manager, gatekeeper, carrier, responder, block_processor
 
         assert receipt.delivered is True
         assert responder.missed_confirmations[txid] == 0
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+
+
+def test_on_sync_bitcoind_crash(responder):
+    chain_tip = responder.block_processor.get_best_block_hash()
+    run_test_blocking_command_bitcoind_crash(
+        responder.block_processor.bitcoind_reachable, lambda: responder.on_sync(chain_tip)
+    )
+
+
+def test_do_watch_bitcoind_crash(standalone_responder):
+    # Let's start to watch
+    do_watch_thread = Thread(target=standalone_responder.do_watch, daemon=True)
+    do_watch_thread.start()
+    time.sleep(2)
+
+    # Block the responder
+    standalone_responder.block_processor.bitcoind_reachable.clear()
+    assert standalone_responder.block_queue.empty()
+
+    # Mine a block and check how the Responder is blocked processing it
+    best_tip = generate_blocks_with_delay(1, 2)[0]
+    standalone_responder.block_queue.put(best_tip)
+    time.sleep(2)
+    assert standalone_responder.last_known_block != best_tip
+    assert standalone_responder.block_queue.unfinished_tasks == 1
+
+    # Reestablish the connection and check back
+    standalone_responder.block_processor.bitcoind_reachable.set()
+    time.sleep(2)
+    assert standalone_responder.last_known_block == best_tip
+    assert standalone_responder.block_queue.unfinished_tasks == 0
