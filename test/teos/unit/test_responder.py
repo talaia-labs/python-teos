@@ -418,7 +418,11 @@ def test_get_txs_to_rebroadcast(responder):
     assert txs_to_rebroadcast == list(txs_missing_too_many_conf.keys())
 
 
-def test_get_completed_trackers(db_manager, gatekeeper, carrier, responder, block_processor, generate_dummy_tracker):
+def test_get_completed_trackers(db_manager, gatekeeper, carrier, block_processor, generate_dummy_tracker):
+    # We don't want the ChainMonitor to mess around here since we'll be mocking some data structures, so we create a
+    # fresh Responder without it.
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+
     commitment_txs = [create_commitment_tx() for _ in range(30)]
     generate_block_with_transactions(commitment_txs)
     # A complete tracker is a tracker whose penalty transaction has been irrevocably resolved (i.e. has reached 100
