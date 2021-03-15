@@ -25,7 +25,7 @@ def teosd(run_bitcoind):
     stopped = False
     while not stopped:
         try:
-            rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+            rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), config.get("RPC_USER"), config.get("RPC_PASS"))
             rpc_client.stop()
             stopped = True
         except RpcError:
@@ -44,7 +44,7 @@ def run_teosd():
     if not os.path.exists(sk_file_path):
         # Generating teos sk so we can return the teos_id
         teos_sk = Cryptographer.generate_key()
-        Cryptographer.save_key_file(teos_sk.to_der(), "teos_sk", config.get("DATA_DIR"))
+        Cryptographer.save_crypto_file(teos_sk.to_der(), "teos_sk.der", config.get("DATA_DIR"))
     else:
         teos_sk = Cryptographer.load_private_key_der(Cryptographer.load_key_file(sk_file_path))
 

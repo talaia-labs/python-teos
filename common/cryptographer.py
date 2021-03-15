@@ -1,3 +1,4 @@
+import datetime
 import os.path
 import pyzbase32
 from pathlib import Path
@@ -6,6 +7,12 @@ from coincurve.utils import int_to_bytes
 from coincurve import PrivateKey, PublicKey
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography import x509
+from cryptography.x509.oid import NameOID
 
 from common.tools import is_256b_hex_str
 from common.exceptions import InvalidKey, InvalidParameter, SignatureError, EncryptionError
@@ -192,24 +199,24 @@ class Cryptographer:
         return PrivateKey()
 
     @staticmethod
-    def save_key_file(key, name, data_dir):
+    def save_crypto_file(crypto_data, name, data_dir):
         """
-        Saves a key to disk in DER format.
+        Saves cryptographic data, like a key or certificate, to disk in format.
 
         Args:
-            key (:obj:`bytes`): the key to be saved to disk.
+            crypto_data (:obj:`bytes`): the key to be saved to disk.
             name (:obj:`str`): the name of the key file to be generated.
             data_dir (:obj:`str`): the data directory where the file will be saved.
 
         Raises:
-            :obj:`InvalidParameter`: If the given key is not bytes or the name or data_dir are not strings.
+            :obj:`InvalidParameter`: If the given crypto data is not bytes or the name or data_dir are not strings.
         """
 
-        if not isinstance(key, bytes):
-            raise InvalidParameter("Key must be bytes, {} received".format(type(key)))
+        if not isinstance(crypto_data, bytes):
+            raise InvalidParameter("Crypto data must be bytes, {} received".format(type(crypto_data)))
 
         if not isinstance(name, str):
-            raise InvalidParameter("Key name must be str, {} received".format(type(name)))
+            raise InvalidParameter("Crypto data name must be str, {} received".format(type(name)))
 
         if not isinstance(data_dir, str):
             raise InvalidParameter("Data dir must be str, {} received".format(type(data_dir)))
@@ -217,19 +224,19 @@ class Cryptographer:
         # Create the output folder it it does not exist (and all the parents if they don't either)
         Path(data_dir).mkdir(parents=True, exist_ok=True)
 
-        with open(os.path.join(data_dir, "{}.der".format(name)), "wb") as der_out:
-            der_out.write(key)
+        with open(os.path.join(data_dir, "{}".format(name)), "wb") as crypto_out:
+            crypto_out.write(crypto_data)
 
     @staticmethod
     def load_key_file(file_path):
         """
-        Loads a key from a key file.
+        Loads a key or certificate from a disk file.
 
         Args:
-            file_path (:obj:`str`): the path to the key file to be loaded.
+            file_path (:obj:`str`): the path to the key or certificate file to be loaded.
 
         Returns:
-            :obj:`bytes`: The key file data if the file can be found and read.
+            :obj:`bytes`: The key or certificate file data if the file can be found and read.
 
         Raises:
              :obj:`InvalidParameter`: if the file_path has wrong format or cannot be found.
@@ -375,3 +382,77 @@ class Cryptographer:
 
         except TypeError as e:
             raise InvalidKey("PublicKey has invalid initializer", error=str(e))
+
+
+    @staticmethod
+    def generate_cert_key():
+        """
+        Generates an RSA key with which to self-sign our TSL certificate and converts it to PEM format.
+       
+        Returns:
+            :obj:`bytes`: An RSA key in PEM format.
+        """
+        sk = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+        )
+        sk_pem = sk.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        return sk_pem
+
+
+    @staticmethod
+    def generate_self_signed_cert(cert_key_path):
+        """
+        Generates a self-signed TLS certificate for securing the connection between the CLI and the server.
+
+        Args:
+            cert_key_path(:obj:`str`): Path to RSA key.
+            
+        Returns:
+            :obj:`Certificate`: A x509 certificate.
+
+        Raises:
+            :obj:`InvalidKey`: if the RSA key file is invalid or could not be found.
+
+        """
+        try:
+            sk_pem = Cryptographer.load_key_file(cert_key_path)
+
+        except (InvalidParameter, InvalidKey):
+            raise InvalidKey("Failed to load RSA key needed for TLS certificate")
+
+
+        sk = load_pem_private_key(sk_pem, None)
+
+        # get public key from private key
+        pk = sk.public_key()
+
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Teos watchtower"),
+            x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+        ])
+
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            pk
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(datetime.datetime.utcnow()).not_valid_after(
+            # Our certificate will be valid for 365 days
+            datetime.datetime.utcnow() + datetime.timedelta(days=365)
+        ).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(u"localhost")]),
+            critical=False,
+        ).sign(sk, hashes.SHA256())
+
+        cert = cert.public_bytes(serialization.Encoding.PEM)
+
+        return cert

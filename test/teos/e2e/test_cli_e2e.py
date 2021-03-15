@@ -1,5 +1,6 @@
 import pytest
 import json
+import grpc
 from time import sleep
 
 from contrib.client import teos_client
@@ -25,7 +26,12 @@ user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
 @pytest.fixture
 def rpc_client():
-    return RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    return RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), config.get("RPC_USER"), config.get("RPC_PASS"))
+
+
+@pytest.fixture
+def rpc_client_wrong():
+    return RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), "wronguser", "wrongpass")
 
 
 def get_appointment_info(teos_id, locator, sk=user_sk):
@@ -79,6 +85,11 @@ def test_get_all_appointments(teosd, rpc_client):
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
     assert len(watching) == 0 and len(responding) == 0
+
+
+def test_get_all_appointments_wrong_password(teosd, rpc_client_wrong):
+    with pytest.raises(grpc.RpcError):
+        result = rpc_client_wrong.get_all_appointments()
 
 
 def test_get_tower_info(teosd, rpc_client):

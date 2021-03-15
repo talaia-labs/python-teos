@@ -129,7 +129,7 @@ def test_appointment_life_cycle(teosd):
     assert appointment_info.get("locator") == locator
     assert appointment_info.get("appointment") == appointment.to_dict()
 
-    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), config.get("RPC_USER"), config.get("RPC_PASS"))
 
     # Check also the get_all_appointments endpoint
     all_appointments = json.loads(rpc_client.get_all_appointments())
@@ -219,7 +219,7 @@ def test_multiple_appointments_life_cycle(teosd):
         sleep(1)
 
     # Test that they all show up in get_all_appointments at the correct stages.
-    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), config.get("RPC_USER"), config.get("RPC_PASS"))
     all_appointments = json.loads(rpc_client.get_all_appointments())
     watching = all_appointments.get("watcher_appointments")
     responding = all_appointments.get("responder_trackers")
@@ -505,7 +505,7 @@ def test_appointment_shutdown_teos_trigger_back_online(teosd):
     add_appointment(teos_id, appointment)
 
     # Restart teos
-    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), config.get("RPC_USER"), config.get("RPC_PASS"))
     rpc_client.stop()
     teosd_process.join()
 
@@ -546,7 +546,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(teosd):
     assert appointment_info.get("appointment") == appointment.to_dict()
 
     # Shutdown and trigger
-    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
+    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"), config.get("RPC_CERT"), config.get("RPC_USER"), config.get("RPC_PASS"))
     rpc_client.stop()
     teosd_process.join()
 
