@@ -345,21 +345,21 @@ class TeosDaemon:
         self.start_services(self.logging_port)
 
         self.stop_command_event.wait()
-
         self.teardown()
 
 
 def main(config):
     setup_data_folder(config.get("DATA_DIR"))
 
-    silent = config.get("DAEMON")
     logging_server_ready = multiprocessing.Event()
+    stop_logging_server = multiprocessing.Event()
     logging_port = multiprocessing.Value("i")
     logging_process = multiprocessing.Process(
-        target=serve_logging, daemon=True, args=(config.get("LOG_FILE"), logging_port, silent, logging_server_ready)
+        target=serve_logging,
+        daemon=True,
+        args=(config.get("LOG_FILE"), logging_port, config.get("DAEMON"), logging_server_ready, stop_logging_server),
     )
     logging_process.start()
-
     logging_server_ready.wait()
 
     setup_logging(logging_port.value)
@@ -387,6 +387,8 @@ def main(config):
         TeosDaemon(config, sk, logger, logging_port.value).start()
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
+        stop_logging_server.set()
+        logging_process.join()
         exit(1)
 
 

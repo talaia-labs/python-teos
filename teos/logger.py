@@ -1,3 +1,4 @@
+import time
 import logging
 import logging.config
 import logging.handlers
@@ -7,9 +8,9 @@ import pickle
 import socketserver
 from signal import signal, SIGINT
 import struct
-import select
 import json
 from io import StringIO
+from threading import Thread
 
 from teos.tools import ignore_signal
 
@@ -234,19 +235,11 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
     def __init__(self, host="localhost", port=0, handler=LogRecordStreamHandler):
-        socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
-        self.timeout = 1
-
-    def serve_forever(self, poll_interval=0.5):
-        """Serves the logger server until the tower is stopped."""
-
-        while True:
-            rd, wr, ex = select.select([self.socket.fileno()], [], [], self.timeout)
-            if rd:
-                self.handle_request()
+        super().__init__((host, port), handler)
+        self.daemon_threads = True
 
 
-def serve(log_file_path, logging_port, silent, ready):
+def serve(log_file_path, logging_port, silent, ready, stop):
     """
     Sets up logging on console and file, and serves the tcp logging server on ``localhost:tcp_logging_port``.
     This method is meant to be run in a separate process and provides the logging service.
@@ -256,6 +249,7 @@ def serve(log_file_path, logging_port, silent, ready):
         logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
         silent (:obj:`bool`): if True, only ``CRITICAL`` errors are shown to console; otherwise ``INFO`` and above.
         ready (:obj:`multiprocessing.Event`): an event that is set once the logging server is ready.
+        stop (:obj:`multiprocessing.Event`): an event that is set once the logging server is asked to be stopped.
     """
 
     logging.config.dictConfig(
@@ -273,7 +267,25 @@ def serve(log_file_path, logging_port, silent, ready):
     # Ignore SIGINT so this process does not crash on CTRL+C, but comply on other signals
     signal(SIGINT, ignore_signal)
 
-    tcpserver = LogRecordSocketReceiver(port=logging_port.value)
-    logging_port.value = tcpserver.server_address[1]
+    logging_server = LogRecordSocketReceiver(port=logging_port.value)
+    logging_port.value = logging_server.server_address[1]
     ready.set()
-    tcpserver.serve_forever()
+
+    Thread(target=stop_server, args=[logging_server, stop]).start()
+    logging_server.serve_forever(poll_interval=1)
+
+
+def stop_server(logging_server, stop_signal):
+    """
+    Waits for a stop signal and shutdowns the logging server.
+
+    Args:
+        logging_server (:obj:`LogRecordSocketReceiver`): the logging server.
+        stop_signal (:obj:`multiprocessing.Event`): an event that is set once the logging server is asked to be stopped.
+    """
+
+    # The server needs to bootstrap, so we wait in case an error occurs right after starting, otherwise logs may not
+    # be recorded.
+    time.sleep(0.1)
+    stop_signal.wait()
+    logging_server.shutdown()
