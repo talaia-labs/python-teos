@@ -403,6 +403,9 @@ def run():
     # between process.
     multiprocessing.set_start_method("spawn")
 
+    # FIXME: 246-grpc-timeout. Temporary patch. gRPC name resolution default value (ares) hangs in some OSes.
+    os.environ["GRPC_DNS_RESOLVER"] = "native"
+
     command_line_conf = {}
     data_dir = DATA_DIR
 
