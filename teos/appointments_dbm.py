@@ -71,10 +71,15 @@ class AppointmentsDBM(DBManager):
 
         data = {}
 
-        for k, v in self.db.iterator(prefix=prefix.encode("utf-8")):
-            # Get uuid and appointment_data from the db
-            uuid = k[len(prefix) :].decode("utf-8")  # noqa: E203
-            data[uuid] = json.loads(v)
+        try:
+            for k, v in self.db.iterator(prefix=prefix.encode("utf-8")):
+                # Get uuid and appointment_data from the db
+                uuid = k[len(prefix) :].decode("utf-8")  # noqa: E203
+                data[uuid] = json.loads(v)
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return data
 
@@ -92,11 +97,14 @@ class AppointmentsDBM(DBManager):
             Returns :obj:`None` if the entry is not found.
         """
 
-        last_block = self.db.get(key.encode("utf-8"))
+        try:
+            last_block = self.db.get(key.encode("utf-8"))
 
-        if last_block:
-
-            last_block = last_block.decode("utf-8")
+            if last_block:
+                last_block = last_block.decode("utf-8")
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return last_block
 
@@ -116,8 +124,13 @@ class AppointmentsDBM(DBManager):
         try:
             data = self.load_entry(uuid, prefix=WATCHER_PREFIX)
             data = json.loads(data)
-        except (TypeError, json.decoder.JSONDecodeError):
+        except (TypeError, json.decoder.JSONDecodeError) as e:
+            self.logger.error(str(e))
             data = None
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return data
 
@@ -137,8 +150,13 @@ class AppointmentsDBM(DBManager):
         try:
             data = self.load_entry(uuid, prefix=RESPONDER_PREFIX)
             data = json.loads(data)
-        except (TypeError, json.decoder.JSONDecodeError):
+        except (TypeError, json.decoder.JSONDecodeError) as e:
+            self.logger.error(str(e))
             data = None
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return data
 
@@ -188,8 +206,8 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            self.create_entry(uuid, json.dumps(appointment), prefix=WATCHER_PREFIX)
             self.logger.info("Adding appointment to Watchers's db", uuid=uuid)
+            self.create_entry(uuid, json.dumps(appointment), prefix=WATCHER_PREFIX)
             return True
 
         except json.JSONDecodeError:
@@ -201,6 +219,10 @@ class AppointmentsDBM(DBManager):
         except TypeError:
             self.logger.info("Couldn't add appointment to db.", uuid=uuid, appointment=appointment)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def store_responder_tracker(self, uuid, tracker):
         """
@@ -215,8 +237,8 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            self.create_entry(uuid, json.dumps(tracker), prefix=RESPONDER_PREFIX)
             self.logger.info("Adding tracker to Responder's db", uuid=uuid)
+            self.create_entry(uuid, json.dumps(tracker), prefix=RESPONDER_PREFIX)
             return True
 
         except json.JSONDecodeError:
@@ -226,6 +248,10 @@ class AppointmentsDBM(DBManager):
         except TypeError:
             self.logger.info("Couldn't add tracker to db.", uuid=uuid, tracker=tracker)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def load_locator_map(self, locator):
         """
@@ -241,13 +267,19 @@ class AppointmentsDBM(DBManager):
         """
 
         key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
-        locator_map = self.db.get(key)
 
-        if locator_map is not None:
-            locator_map = json.loads(locator_map.decode("utf-8"))
+        try:
+            locator_map = self.db.get(key)
 
-        else:
-            self.logger.info("Locator not found in the db", locator=locator)
+            if locator_map is not None:
+                locator_map = json.loads(locator_map.decode("utf-8"))
+
+            else:
+                self.logger.info("Locator not found in the db", locator=locator)
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return locator_map
 
@@ -276,8 +308,13 @@ class AppointmentsDBM(DBManager):
             locator_map = [uuid]
             self.logger.info("Creating new locator map", locator=locator, uuid=uuid)
 
-        key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
-        self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+        try:
+            key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
+            self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def update_locator_map(self, locator, locator_map):
         """
@@ -292,8 +329,13 @@ class AppointmentsDBM(DBManager):
         current_locator_map = self.load_locator_map(locator)
 
         if set(locator_map).issubset(current_locator_map) and len(locator_map) != 0:
-            key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
-            self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+            try:
+                key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
+                self.db.put(key, json.dumps(locator_map).encode("utf-8"))
+
+            except RuntimeError as e:
+                self.logger.error(str(e))
+                raise e
 
         else:
             self.logger.error("Trying to update a locator_map with completely different, or empty, data")
@@ -310,13 +352,17 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
             self.logger.info("Deleting locator map from db", locator=locator)
+            self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
             return True
 
         except TypeError:
             self.logger.info("Couldn't delete locator map from db, locator has wrong type", locator=locator)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def delete_watcher_appointment(self, uuid):
         """
@@ -330,13 +376,17 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            self.delete_entry(uuid, prefix=WATCHER_PREFIX)
             self.logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+            self.delete_entry(uuid, prefix=WATCHER_PREFIX)
             return True
 
         except TypeError:
             self.logger.info("Couldn't delete appointment from db, uuid has wrong type", uuid=uuid)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def batch_delete_watcher_appointments(self, uuids):
         """
@@ -346,10 +396,15 @@ class AppointmentsDBM(DBManager):
            uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the appointments to be deleted.
         """
 
-        with self.db.write_batch() as b:
-            for uuid in uuids:
-                b.delete((WATCHER_PREFIX + uuid).encode("utf-8"))
-                self.logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+        try:
+            with self.db.write_batch() as b:
+                for uuid in uuids:
+                    self.logger.info("Deleting appointment from Watcher's db", uuid=uuid)
+                    b.delete((WATCHER_PREFIX + uuid).encode("utf-8"))
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def delete_responder_tracker(self, uuid):
         """
@@ -363,13 +418,17 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
             self.logger.info("Deleting tracker from Responder's db", uuid=uuid)
+            self.delete_entry(uuid, prefix=RESPONDER_PREFIX)
             return True
 
         except TypeError:
             self.logger.info("Couldn't delete tracker from db, uuid has wrong type", uuid=uuid)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def batch_delete_responder_trackers(self, uuids):
         """
@@ -379,10 +438,14 @@ class AppointmentsDBM(DBManager):
            uuids (:obj:`list`): a list of 16-byte hex-encoded strings identifying the trackers to be deleted.
         """
 
-        with self.db.write_batch() as b:
-            for uuid in uuids:
-                b.delete((RESPONDER_PREFIX + uuid).encode("utf-8"))
-                self.logger.info("Deleting appointment from Responder's db", uuid=uuid)
+        try:
+            with self.db.write_batch() as b:
+                for uuid in uuids:
+                    self.logger.info("Deleting appointment from Responder's db", uuid=uuid)
+                    b.delete((RESPONDER_PREFIX + uuid).encode("utf-8"))
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def load_last_block_hash_watcher(self):
         """
@@ -421,8 +484,13 @@ class AppointmentsDBM(DBManager):
             self.create_entry(WATCHER_LAST_BLOCK_KEY, block_hash)
             return True
 
-        except (TypeError, json.JSONDecodeError):
+        except (TypeError, json.JSONDecodeError) as e:
+            self.logger.error(str(e))
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def store_last_block_hash_responder(self, block_hash):
         """
@@ -439,8 +507,13 @@ class AppointmentsDBM(DBManager):
             self.create_entry(RESPONDER_LAST_BLOCK_KEY, block_hash)
             return True
 
-        except (TypeError, json.JSONDecodeError):
+        except (TypeError, json.JSONDecodeError) as e:
+            self.logger.error(str(e))
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def create_triggered_appointment_flag(self, uuid):
         """
@@ -450,8 +523,12 @@ class AppointmentsDBM(DBManager):
             uuid (:obj:`str`): the identifier of the flag to be created.
         """
 
-        self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
-        self.logger.info("Flagging appointment as triggered", uuid=uuid)
+        try:
+            self.logger.info("Flagging appointment as triggered", uuid=uuid)
+            self.db.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), "".encode("utf-8"))
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def batch_create_triggered_appointment_flag(self, uuids):
         """
@@ -461,10 +538,14 @@ class AppointmentsDBM(DBManager):
             uuids (:obj:`list`): a list of identifiers for the appointments to flag.
         """
 
-        with self.db.write_batch() as b:
-            for uuid in uuids:
-                b.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), b"")
-                self.logger.info("Flagging appointment as triggered", uuid=uuid)
+        try:
+            with self.db.write_batch() as b:
+                for uuid in uuids:
+                    self.logger.info("Flagging appointment as triggered", uuid=uuid)
+                    b.put((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"), b"")
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def load_all_triggered_flags(self):
         """
@@ -474,10 +555,14 @@ class AppointmentsDBM(DBManager):
              :obj:`list`: a list of all the uuids of the triggered appointments.
         """
 
-        return [
-            k.decode()[len(TRIGGERED_APPOINTMENTS_PREFIX) :]  # noqa: E203
-            for k, v in self.db.iterator(prefix=TRIGGERED_APPOINTMENTS_PREFIX.encode("utf-8"))
-        ]
+        try:
+            return [
+                k.decode()[len(TRIGGERED_APPOINTMENTS_PREFIX) :]  # noqa: E203
+                for k, v in self.db.iterator(prefix=TRIGGERED_APPOINTMENTS_PREFIX.encode("utf-8"))
+            ]
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def delete_triggered_appointment_flag(self, uuid):
         """
@@ -491,13 +576,17 @@ class AppointmentsDBM(DBManager):
         """
 
         try:
-            self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
             self.logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+            self.delete_entry(uuid, prefix=TRIGGERED_APPOINTMENTS_PREFIX)
             return True
 
         except TypeError:
             self.logger.info("Couldn't delete triggered flag from db, uuid has wrong type", uuid=uuid)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def batch_delete_triggered_appointment_flag(self, uuids):
         """
@@ -507,7 +596,12 @@ class AppointmentsDBM(DBManager):
             uuids (:obj:`list`): the identifier of the flag to be removed.
         """
 
-        with self.db.write_batch() as b:
-            for uuid in uuids:
-                b.delete((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"))
-                self.logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+        try:
+            with self.db.write_batch() as b:
+                for uuid in uuids:
+                    self.logger.info("Removing triggered flag from appointment appointment", uuid=uuid)
+                    b.delete((TRIGGERED_APPOINTMENTS_PREFIX + uuid).encode("utf-8"))
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e

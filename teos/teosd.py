@@ -331,7 +331,9 @@ class TeosDaemon:
         self.responder_thread.join()
 
         self.logger.info("Closing connection with appointments db")
-        self.db_manager.db.close()
+        self.db_manager.close()
+        self.logger.info("Closing connection with users db")
+        self.watcher.gatekeeper.user_db.close()
 
         self.logger.info("Shutting down TEOS")
         exit(0)

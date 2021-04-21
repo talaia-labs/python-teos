@@ -1,3 +1,4 @@
+import time
 import plyvel
 
 
@@ -20,6 +21,12 @@ class DBManager:
             raise ValueError("db_path must be a valid path/name")
 
         self.db = plyvel.DB(db_path, create_if_missing=True)
+
+    def close(self):
+        """Closes the database and waits until it's done"""
+        self.db.close()
+        while not self.db.closed:
+            time.sleep(1)
 
     def create_entry(self, key, value, prefix=None):
         """
