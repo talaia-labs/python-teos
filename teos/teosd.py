@@ -65,6 +65,8 @@ class TeosDaemon:
         sk (:obj:`PrivateKey`): the :obj:`PrivateKey` of the tower.
         logger (:obj:`Logger <teos.logger.Logger>`): the logger instance.
         logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
+        stop_log_event (:obj:`multiprocessing.Event`): the event to signal a stop to the logging server
+        logging_process (:obj:`multiprocessing.Process`): the logging server process
 
     Attributes:
         stop_command_event (:obj:`threading.Event`): The event that will be set to initiate a graceful shutdown.
@@ -86,10 +88,12 @@ class TeosDaemon:
         rpc_process (:obj:`multiprocessing.Process`): The instance of the internal RPC server; only set if running.
     """
 
-    def __init__(self, config, sk, logger, logging_port):
+    def __init__(self, config, sk, logger, logging_port, stop_log_event, logging_process):
         self.config = config
         self.logger = logger
         self.logging_port = logging_port
+        self.stop_log_event = stop_log_event
+        self.logging_process = logging_process
 
         # event triggered when a ``stop`` command is issued
         # Using multiprocessing.Event seems to cause a deadlock if event.set() is called in a signal handler that
@@ -336,6 +340,8 @@ class TeosDaemon:
         self.watcher.gatekeeper.user_db.close()
 
         self.logger.info("Shutting down TEOS")
+        self.stop_log_event.set()
+        self.logging_process.join()
         exit(0)
 
     def start(self):
@@ -384,7 +390,7 @@ def main(config):
         config["WSGI"] = "waitress"
 
     try:
-        TeosDaemon(config, sk, logger, logging_port.value).start()
+        TeosDaemon(config, sk, logger, logging_port.value, stop_logging_server, logging_process).start()
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         stop_logging_server.set()
