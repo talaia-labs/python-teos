@@ -11,5 +11,5 @@ plyvel
 readerwriterlock
 structlog
 python-daemon
-waitress
+waitress>=2.0.0
 gunicorn; platform_system != "Windows"
