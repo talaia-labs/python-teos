@@ -52,8 +52,8 @@ class UsersDBM(DBManager):
 
         if is_compressed_pk(user_id):
             try:
-                self.create_entry(user_id, json.dumps(user_data))
                 self.logger.info("Adding user to Gatekeeper's db", user_id=user_id)
+                self.create_entry(user_id, json.dumps(user_data))
                 return True
 
             except json.JSONDecodeError:
@@ -65,6 +65,10 @@ class UsersDBM(DBManager):
             except TypeError:
                 self.logger.info("Couldn't add user to db", user_id=user_id, user_data=user_data)
                 return False
+
+            except RuntimeError as e:
+                self.logger.error(str(e))
+                raise e
         else:
             self.logger.info("Couldn't add user to db. Wrong pk format", user_id=user_id, user_data=user_data)
             return False
@@ -86,8 +90,13 @@ class UsersDBM(DBManager):
         try:
             data = self.load_entry(user_id)
             data = json.loads(data)
-        except (TypeError, json.decoder.JSONDecodeError):
+        except (TypeError, json.decoder.JSONDecodeError) as e:
+            self.logger.error(str(e))
             data = None
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return data
 
@@ -103,13 +112,17 @@ class UsersDBM(DBManager):
         """
 
         try:
-            self.delete_entry(user_id)
             self.logger.info("Deleting user from Gatekeeper's db", uuid=user_id)
+            self.delete_entry(user_id)
             return True
 
         except TypeError:
             self.logger.info("Cannot delete user from db, user key has wrong type", uuid=user_id)
             return False
+
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
     def load_all_users(self):
         """
@@ -123,9 +136,13 @@ class UsersDBM(DBManager):
 
         data = {}
 
-        for k, v in self.db.iterator():
-            # Get uuid and appointment_data from the db
-            user_id = k.decode("utf-8")
-            data[user_id] = json.loads(v)
+        try:
+            for k, v in self.db.iterator():
+                # Get uuid and appointment_data from the db
+                user_id = k.decode("utf-8")
+                data[user_id] = json.loads(v)
+        except RuntimeError as e:
+            self.logger.error(str(e))
+            raise e
 
         return data
