@@ -94,4 +94,3 @@ class RPCClient:
     def stop(self):
         """Stops TEOS gracefully."""
         self.stub.stop(Empty())
-        print("Closing the Eye of Satoshi")
