@@ -565,12 +565,12 @@ def run():
         if command in commands:
             main(command, args, command_line_conf)
         elif not command:
-            sys.exit("No command provided. Use help to check the list of available commands")
+            sys.exit(f"No command provided.\n\n{show_usage()}")
         else:
-            sys.exit("Unknown command. Use help to check the list of available commands")
+            sys.exit(f"Unknown command.\n\n{show_usage()}")
 
     except GetoptError as e:
-        sys.exit("{}".format(e))
+        sys.exit(f"{e}\n\n{show_usage()}")
 
 
 if __name__ == "__main__":
