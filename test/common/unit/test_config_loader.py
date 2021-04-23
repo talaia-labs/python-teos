@@ -3,7 +3,7 @@ import shutil
 import pytest
 from copy import deepcopy
 from configparser import ConfigParser
-from common.config_loader import ConfigLoader
+from common.config_loader import ConfigLoader, UnknownConfigParam
 
 DEFAULT_CONF = {
     "FOO_STR": {"value": "var", "type": str},
@@ -18,7 +18,6 @@ CONF_FILE_CONF = {
     "FOO_STR": {"value": "var", "type": str},
     "FOO_INT2": {"value": 6789, "type": int},
     "FOO_STR_PATH": {"value": "foo.var", "type": str, "path": True},
-    "ADDITIONAL_FOO": {"value": "additional_var", "type": str},
 }
 
 COMMAND_LINE_CONF = {
@@ -120,9 +119,6 @@ def test_build_conf_with_command_line():
     assert foo_data_dir == config.pop("DATA_DIR")
 
     for k, v in config.items():
-        # Check that we have only loaded parameters that were already in the default conf. Additional params are not
-        # loaded
-        assert k in DEFAULT_CONF
         assert isinstance(v, DEFAULT_CONF[k].get("type"))
 
         # If a value is in the command line conf, it will overwrite the one in the default conf
@@ -150,9 +146,6 @@ def test_build_conf_with_all(conf_file_conf):
     assert data_dir == config.pop("DATA_DIR")
 
     for k, v in config.items():
-        # Check that we have only loaded parameters that were already in the default conf. Additional params are not
-        # loaded
-        assert k in DEFAULT_CONF
         assert isinstance(v, DEFAULT_CONF[k].get("type"))
 
         # The priority is: cmd, conf file, default
@@ -213,6 +206,26 @@ def test_build_invalid_data(conf_file_conf):
     conf_loader = ConfigLoader(data_dir, conf_file_name, default_conf_copy, cmd_data)
 
     with pytest.raises(ValueError):
+        conf_loader.build_config()
+
+
+def test_unknown_params():
+    # Test that the configuration dict won't be built if unknown data if found in the config file
+    aux_conf = deepcopy(CONF_FILE_CONF)
+    aux_conf["ADDITIONAL_FOO"] = {"value": "additional_var", "type": str}
+    aux_conf_file_data = {k: v["value"] for k, v in aux_conf.items()}
+    aux_conf_file_name = f"aux_{conf_file_name}"
+
+    # Save config file to disk (we don't need to delete it, the fixture cleanup will)
+    config_parser = ConfigParser()
+    config_parser["foo_section"] = aux_conf_file_data
+    with open(data_dir + aux_conf_file_name, "w") as fout:
+        config_parser.write(fout)
+
+    with pytest.raises(UnknownConfigParam):
+        default_conf_copy = deepcopy(DEFAULT_CONF)
+
+        conf_loader = ConfigLoader(data_dir, aux_conf_file_name, default_conf_copy, {})
         conf_loader.build_config()
 
 
