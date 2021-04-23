@@ -8,9 +8,9 @@ import threading
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
-from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
+from common.config_loader import ConfigLoader, UnknownConfigParam
 
 import teos.api as api
 import teos.rpc as rpc
@@ -43,6 +43,9 @@ def get_config(command_line_conf, data_dir):
 
     Returns:
         :obj:`dict`: A dictionary containing all the system's configuration parameters.
+
+    Raises:
+        UnknownConfigParam: if an unknown configuration parameter is found in the configuration file.
     """
 
     config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
@@ -417,7 +420,7 @@ def run():
     data_dir = DATA_DIR
 
     try:
-        opts, _ = getopt(
+        opts, args = getopt(
             argv[1:],
             "hd",
             [
@@ -440,6 +443,12 @@ def run():
             ],
         )
 
+        if args:
+            exit(
+                f"teosd does not expect arguments, only options. '{args[0]}' received. "
+                f"See teosd -h for a list of options."
+            )
+
         for opt, arg in opts:
             if opt in ["--apibind"]:
                 command_line_conf["API_BIND"] = arg
@@ -447,14 +456,14 @@ def run():
                 try:
                     command_line_conf["API_PORT"] = int(arg)
                 except ValueError:
-                    exit("apiport must be an integer")
+                    exit(f"apiport must be an integer, '{arg}' received")
             if opt in ["--rpcbind"]:
                 command_line_conf["RPC_BIND"] = arg
             if opt in ["--rpcport"]:
                 try:
                     command_line_conf["RPC_PORT"] = int(arg)
                 except ValueError:
-                    exit("rpcport must be an integer")
+                    exit(f"rpcport must be an integer, '{arg}' received")
             if opt in ["--btcnetwork"]:
                 command_line_conf["BTC_NETWORK"] = arg
             if opt in ["--btcrpcuser"]:
@@ -467,21 +476,21 @@ def run():
                 try:
                     command_line_conf["BTC_RPC_PORT"] = int(arg)
                 except ValueError:
-                    exit("btcrpcport must be an integer")
+                    exit(f"btcrpcport must be an integer, '{arg}' received")
             if opt in ["--btcfeedconnect"]:
                 command_line_conf["BTC_FEED_CONNECT"] = arg
             if opt in ["--btcfeedport"]:
                 try:
                     command_line_conf["BTC_FEED_PORT"] = int(arg)
                 except ValueError:
-                    exit("btcfeedport must be an integer")
+                    exit(f"btcfeedport must be an integer, '{arg}' received")
             if opt in ["--datadir"]:
                 data_dir = os.path.expanduser(arg)
             if opt in ["--wsgi"]:
                 if arg in ["gunicorn", "waitress"]:
                     command_line_conf["WSGI"] = arg
                 else:
-                    exit("wsgi must be either gunicorn or waitress")
+                    exit(f"wsgi must be either gunicorn or waitress, '{arg}' received")
             if opt in ["-d", "--daemon"]:
                 command_line_conf["DAEMON"] = True
             if opt in ["--overwritekey"]:
@@ -489,17 +498,18 @@ def run():
             if opt in ["-h", "--help"]:
                 exit(show_usage())
 
-    except GetoptError as e:
-        exit(f"{e}\n\n{show_usage()}")
-
-    config = get_config(command_line_conf, data_dir)
-
-    if config.get("DAEMON"):
-        print("Starting TEOS")
-        with daemon.DaemonContext():
+        config = get_config(command_line_conf, data_dir)
+        if config.get("DAEMON"):
+            print("Starting TEOS")
+            with daemon.DaemonContext():
+                main(config)
+        else:
             main(config)
-    else:
-        main(config)
+
+    except GetoptError as e:
+        exit(f"{e}. See teosd -h for a list of options.")
+    except UnknownConfigParam as e:
+        exit(f"{e}. Check your teos.conf file")
 
 
 if __name__ == "__main__":

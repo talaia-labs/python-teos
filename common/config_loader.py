@@ -2,6 +2,12 @@ import os
 import configparser
 
 
+class UnknownConfigParam(ValueError):
+    """An exception for unknown configuration parameters found in config files"""
+
+    pass
+
+
 class ConfigLoader:
     """
      The :class:`ConfigLoader` class is in charge of loading all the configuration parameters to create a config dict
@@ -44,6 +50,9 @@ class ConfigLoader:
 
         Returns:
             :obj:`dict`: A dictionary containing all the configuration parameters.
+
+        Raises:
+            UnknownConfigParam: if an unknown configuration value if found in the configuration file.
         """
 
         if os.path.exists(self.conf_file_path):
@@ -66,6 +75,8 @@ class ConfigLoader:
                                 self.conf_fields[k_upper]["value"] = v
 
                             self.overwritten_fields.add(k_upper)
+                        else:
+                            raise UnknownConfigParam(f"Unknown configuration value {k}")
 
         # Override the command line parameters to the defaults / conf file
         for k, v in self.command_line_conf.items():
