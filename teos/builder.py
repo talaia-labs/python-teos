@@ -94,7 +94,7 @@ class Builder:
             block_queue.put(block)
 
     @staticmethod
-    def update_states(watcher, missed_blocks_watcher, missed_blocks_responder):
+    def update_states(watcher_queue, responder_queue, missed_blocks_watcher, missed_blocks_responder):
         """
         Updates the states of both the :mod:`Watcher <teos.watcher.Watcher>` and the
         :mod:`Responder <teos.responder.Responder>`. If both have pending blocks to process they need to be updated at
@@ -103,7 +103,8 @@ class Builder:
         If only one instance has to be updated, ``populate_block_queue`` should be used.
 
         Args:
-            watcher (:obj:`Watcher <teos.watcher.Watcher>`): a :obj:`Watcher` instance (including a :obj:`Responder`).
+            watcher_queue (:obj:`Queue`): the :obj:`Watcher`'s block queue.
+            responder_queue (:obj:`Queue`): the :obj:`Responder`'s block queue.
             missed_blocks_watcher (:obj:`list`): the list of block missed by the :obj:`Watcher`.
             missed_blocks_responder (:obj:`list`): the list of block missed by the :obj:`Responder`.
 
@@ -122,20 +123,20 @@ class Builder:
             block_diff = sorted(
                 set(missed_blocks_responder).difference(missed_blocks_watcher), key=missed_blocks_responder.index
             )
-            Builder.populate_block_queue(watcher.responder.block_queue, block_diff)
-            watcher.responder.block_queue.join()
+            Builder.populate_block_queue(responder_queue, block_diff)
+            responder_queue.join()
 
         elif len(missed_blocks_watcher) > len(missed_blocks_responder):
             block_diff = sorted(
                 set(missed_blocks_watcher).difference(missed_blocks_responder), key=missed_blocks_watcher.index
             )
-            Builder.populate_block_queue(watcher.block_queue, block_diff)
-            watcher.block_queue.join()
+            Builder.populate_block_queue(watcher_queue, block_diff)
+            watcher_queue.join()
 
         # Once they are at the same height, we update them one by one
         for block in missed_blocks_watcher:
-            watcher.block_queue.put(block)
-            watcher.block_queue.join()
+            watcher_queue.put(block)
+            watcher_queue.join()
 
-            watcher.responder.block_queue.put(block)
-            watcher.responder.block_queue.join()
+            responder_queue.put(block)
+            responder_queue.join()

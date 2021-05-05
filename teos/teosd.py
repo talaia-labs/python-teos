@@ -242,7 +242,12 @@ class TeosDaemon:
 
             # Otherwise they need to be updated at the same time, block by block
             elif len(missed_blocks_responder) != 0 and len(missed_blocks_watcher) != 0:
-                Builder.update_states(self.watcher, missed_blocks_watcher, missed_blocks_responder)
+                Builder.update_states(
+                    self.watcher.block_queue,
+                    self.watcher.responder.block_queue,
+                    missed_blocks_watcher,
+                    missed_blocks_responder,
+                )
 
         # Activate ChainMonitor
         self.chain_monitor.activate()
