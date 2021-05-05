@@ -1,14 +1,21 @@
+import shutil
+import pytest
 import random
+import itertools
 from uuid import uuid4
 
 from teos.cleaner import Cleaner
+from teos.users_dbm import UsersDBM
 from teos.gatekeeper import UserInfo
 from teos.responder import TransactionTracker
+from teos.appointments_dbm import AppointmentsDBM
+
 from common.appointment import Appointment
+from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
 from test.teos.unit.conftest import get_random_value_hex
 
-from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
+flatten = itertools.chain.from_iterable
 
 CONFIRMATIONS = 6
 ITEMS = 10
@@ -16,7 +23,27 @@ MAX_ITEMS = 100
 ITERATIONS = 10
 
 
-# FIXME: 194 this is using the dummiest appointment, can be updated with the fixture once it's implemented
+@pytest.fixture(scope="module")
+def db_manager(db_name="test_db"):
+    manager = AppointmentsDBM(db_name)
+
+    yield manager
+
+    manager.db.close()
+    shutil.rmtree(db_name)
+
+
+@pytest.fixture(scope="module")
+def users_db_manager(db_name="test_users_db"):
+    manager = UsersDBM(db_name)
+
+    yield manager
+
+    manager.db.close()
+    shutil.rmtree(db_name)
+
+
+# Adds appointment data in the data structures for the cleaner to delete
 def set_up_appointments(db_manager, total_appointments):
     appointments = dict()
     locator_uuid_map = dict()
@@ -45,7 +72,7 @@ def set_up_appointments(db_manager, total_appointments):
     return appointments, locator_uuid_map
 
 
-# FIXME: 194 this is using the dummiest tracker, can be updated with the fixture once it's implemented
+# Adds trackers data in the data structures for the cleaner to delete
 def set_up_trackers(db_manager, total_trackers):
     trackers = dict()
     tx_tracker_map = dict()
@@ -57,6 +84,13 @@ def set_up_trackers(db_manager, total_trackers):
         penalty_txid = get_random_value_hex(32)
         dispute_txid = get_random_value_hex(32)
         locator = dispute_txid[:LOCATOR_LEN_HEX]
+
+        # Appointment data
+        appointment = Appointment(locator, None, None)
+
+        # Store the data in the database and create a flag
+        db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+        db_manager.create_triggered_appointment_flag(uuid)
 
         # Assign both penalty_txid and dispute_txid the same id (it shouldn't matter)
         tracker = TransactionTracker(locator, dispute_txid, penalty_txid, None, None)
@@ -76,10 +110,34 @@ def set_up_trackers(db_manager, total_trackers):
             db_manager.store_responder_tracker(uuid, tracker.to_dict())
             db_manager.create_append_locator_map(tracker.locator, uuid)
 
+            # Add them to the Watcher's db too
+            db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+            db_manager.create_triggered_appointment_flag(uuid)
+
     return trackers, tx_tracker_map
 
 
+def setup_users(users_db_manager, total_users):
+    registered_users = {}
+
+    for _ in range(total_users):
+        user_id = "02" + get_random_value_hex(32)
+        # The UserInfo params do not matter much here
+        user_info = UserInfo(available_slots=100, subscription_expiry=0)
+        registered_users[user_id] = user_info
+
+        # Add some appointments
+        for _ in range(random.randint(0, 10)):
+            uuid = get_random_value_hex(16)
+            registered_users[user_id].appointments[uuid] = 1
+
+        users_db_manager.store_user(user_id, user_info.to_dict())
+
+    return registered_users
+
+
 def test_delete_appointment_from_memory(db_manager):
+    # Tests deleting appointments only from memory
     appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
 
     for uuid in list(appointments.keys()):
@@ -91,17 +149,19 @@ def test_delete_appointment_from_memory(db_manager):
 
 
 def test_delete_appointment_from_db(db_manager):
+    # Tests deleting appointments only from the database
     appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
 
     for uuid in list(appointments.keys()):
         Cleaner.delete_appointment_from_db(uuid, db_manager)
 
-        # The appointment should have been deleted from memory, but not from the db
+        # The appointment should have been deleted from the database, but not from memory
         assert uuid in appointments
         assert db_manager.load_watcher_appointment(uuid) is None
 
 
 def test_update_delete_db_locator_map(db_manager):
+    # Tests deleting entries from the locator map
     appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
 
     for uuid, appointment in appointments.items():
@@ -110,21 +170,39 @@ def test_update_delete_db_locator_map(db_manager):
         Cleaner.update_delete_db_locator_map([uuid], locator, db_manager)
         locator_map_after = db_manager.load_locator_map(locator)
 
+        # Check that the data is there before but not after cleaning
         if locator_map_after is None:
             assert locator_map_before is not None
-
         else:
             assert uuid in locator_map_before and uuid not in locator_map_after
 
 
+# FIXME: #288
 def test_delete_outdated_appointments(db_manager):
+    # Tests deleting appointment data both from memory and the database
     for _ in range(ITERATIONS):
         appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
         outdated_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
+        # Check that the data is there before deletion
+        all_uuids = list(flatten(locator_uuid_map.values()))
+        assert set(outdated_appointments).issubset(appointments.keys())
+        assert set(outdated_appointments).issubset(all_uuids)
+
+        db_appointments = db_manager.load_watcher_appointments()
+        assert set(outdated_appointments).issubset(db_appointments.keys())
+
+        # Delete
         Cleaner.delete_outdated_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager)
 
+        # Data is not in memory anymore
+        all_uuids = list(flatten(locator_uuid_map.values()))
         assert not set(outdated_appointments).issubset(appointments.keys())
+        assert not set(outdated_appointments).issubset(all_uuids)
+
+        # And neither is in the database
+        db_appointments = db_manager.load_watcher_appointments()
+        assert not set(outdated_appointments).issubset(db_appointments.keys())
 
 
 def test_delete_completed_appointments(db_manager):
@@ -132,34 +210,46 @@ def test_delete_completed_appointments(db_manager):
         appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
         completed_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-        len_before_clean = len(appointments)
-        Cleaner.delete_completed_appointments(completed_appointments, appointments, locator_uuid_map, db_manager)
+        # Check that the data is there before deletion
+        all_uuids = list(flatten(locator_uuid_map.values()))
+        assert set(completed_appointments).issubset(appointments.keys())
+        assert set(completed_appointments).issubset(all_uuids)
 
-        # ITEMS appointments should have been deleted from memory
-        assert len(appointments) == len_before_clean - ITEMS
+        db_appointments = db_manager.load_watcher_appointments()
+        assert set(completed_appointments).issubset(db_appointments.keys())
 
-        # Make sure they are not in the db either
-        db_appointments = db_manager.load_watcher_appointments(include_triggered=True)
-        assert not set(completed_appointments).issubset(db_appointments)
+        # Delete
+        Cleaner.delete_outdated_appointments(completed_appointments, appointments, locator_uuid_map, db_manager)
+
+        # Data is not in memory anymore
+        all_uuids = list(flatten(locator_uuid_map.values()))
+        assert not set(completed_appointments).issubset(appointments.keys())
+        assert not set(completed_appointments).issubset(all_uuids)
+
+        # And neither is in the database
+        db_appointments = db_manager.load_watcher_appointments()
+        assert not set(completed_appointments).issubset(db_appointments.keys())
 
 
 def test_flag_triggered_appointments(db_manager):
+    # Test that when an appointment is flagged and triggered it is deleted from memory and the flags are added to the db
     for _ in range(ITERATIONS):
         appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
         triggered_appointments = random.sample(list(appointments.keys()), k=ITEMS)
 
-        len_before_clean = len(appointments)
+        # Flag the appointments
         Cleaner.flag_triggered_appointments(triggered_appointments, appointments, locator_uuid_map, db_manager)
 
-        # ITEMS appointments should have been deleted from memory
-        assert len(appointments) == len_before_clean - ITEMS
+        # Check that the flagged appointments are not in memory anymore
+        assert not set(triggered_appointments).issubset(appointments)
 
         # Make sure that all appointments are flagged as triggered in the db
         db_appointments = db_manager.load_all_triggered_flags()
         assert set(triggered_appointments).issubset(db_appointments)
 
 
-def test_delete_trackers_db_match(db_manager):
+def test_delete_trackers(db_manager):
+    # Tests de deletion of trackers
     # Completed and outdated trackers are deleted using the same method. The only difference is the logging message
     height = 0
 
@@ -167,106 +257,71 @@ def test_delete_trackers_db_match(db_manager):
         trackers, tx_tracker_map = set_up_trackers(db_manager, MAX_ITEMS)
         selected_trackers = random.sample(list(trackers.keys()), k=ITEMS)
 
+        # Delete the selected trackers {uuid:confirmation_count}
         completed_trackers = {tracker: 6 for tracker in selected_trackers}
-
         Cleaner.delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
 
-        assert not set(completed_trackers).issubset(trackers.keys())
+        # Check that the data is not in memory anymore
+        all_trackers = list(flatten(tx_tracker_map.values()))
+        assert not set(completed_trackers).issubset(trackers)
+        assert not set(completed_trackers).issubset(all_trackers)
+
+        # And neither is in the db
+        db_trackers = db_manager.load_responder_trackers()
+        assert not set(completed_trackers).issubset(db_trackers)
+
+        # Check that the data has also been removed from the Watchers db (appointment and triggered flag)
+        all_appointments = db_manager.load_watcher_appointments(include_triggered=True)
+        all_flags = db_manager.load_all_triggered_flags()
+
+        assert not set(completed_trackers).issubset(all_appointments)
+        assert not set(completed_trackers).issubset(all_flags)
 
 
-def test_delete_trackers_no_db_match(db_manager):
-    height = 0
-
-    for _ in range(ITERATIONS):
-        trackers, tx_tracker_map = set_up_trackers(db_manager, MAX_ITEMS)
-        selected_trackers = random.sample(list(trackers.keys()), k=ITEMS)
-
-        # Let's change some uuid's by creating new trackers that are not included in the db and share a penalty_txid
-        # with another tracker that is stored in the db.
-        for uuid in selected_trackers[: ITEMS // 2]:
-            penalty_txid = trackers[uuid].get("penalty_txid")
-            dispute_txid = get_random_value_hex(32)
-            locator = dispute_txid[:LOCATOR_LEN_HEX]
-            new_uuid = uuid4().hex
-
-            trackers[new_uuid] = {"locator": locator, "penalty_txid": penalty_txid}
-            tx_tracker_map[penalty_txid].append(new_uuid)
-            selected_trackers.append(new_uuid)
-
-        # Let's add some random data
-        for i in range(ITEMS // 2):
-            uuid = uuid4().hex
-            penalty_txid = get_random_value_hex(32)
-            dispute_txid = get_random_value_hex(32)
-            locator = dispute_txid[:LOCATOR_LEN_HEX]
-
-            trackers[uuid] = {"locator": locator, "penalty_txid": penalty_txid}
-            tx_tracker_map[penalty_txid] = [uuid]
-            selected_trackers.append(uuid)
-
-        completed_trackers = {tracker: 6 for tracker in selected_trackers}
-
-        # We should be able to delete the correct ones and not fail in the others
-        Cleaner.delete_trackers(completed_trackers, height, trackers, tx_tracker_map, db_manager)
-        assert not set(completed_trackers).issubset(trackers.keys())
-
-
-# FIXME: 194 will do with dummy gatekeeper since this is only deleting data from the structures
-def test_delete_gatekeeper_appointments(gatekeeper):
-    # delete_gatekeeper_appointments should delete the appointments from user as long as both exist
-
+def test_delete_gatekeeper_appointments(users_db_manager):
+    # Tests that the Cleaner properly deletes the appointment data from the Gatekeeper structures (both memory and db)
     appointments_not_to_delete = {}
     appointments_to_delete = {}
-    # Let's add some users and appointments to the Gatekeeper
-    for _ in range(10):
-        user_id = get_random_value_hex(16)
-        # The UserInfo params do not matter much here
-        gatekeeper.registered_users[user_id] = UserInfo(available_slots=100, subscription_expiry=0)
-        for _ in range(random.randint(0, 10)):
-            # Add some appointments
-            uuid = get_random_value_hex(16)
-            gatekeeper.registered_users[user_id].appointments[uuid] = 1
 
+    # Let's mock adding some users and appointments to the Gatekeeper (memory and db)
+    registered_users = setup_users(users_db_manager, MAX_ITEMS)
+
+    for user_id, user_info in registered_users.items():
+        for uuid in user_info.appointments.keys():
             if random.randint(0, 1) % 2:
                 appointments_to_delete[uuid] = user_id
             else:
                 appointments_not_to_delete[uuid] = user_id
 
     # Now let's delete half of them
-    Cleaner.delete_gatekeeper_appointments(appointments_to_delete, gatekeeper.registered_users, gatekeeper.user_db)
+    Cleaner.delete_gatekeeper_appointments(appointments_to_delete, registered_users, users_db_manager)
 
-    all_appointments_gatekeeper = []
     # Let's get all the appointments in the Gatekeeper
-    for user_id, user in gatekeeper.registered_users.items():
-        all_appointments_gatekeeper.extend(user.appointments)
+    all_appointments_gatekeeper = list(flatten(user.appointments for _, user in registered_users.items()))
 
     # Check that the first half of the appointments are not in the Gatekeeper, but the second half is
     assert not set(appointments_to_delete).issubset(all_appointments_gatekeeper)
     assert set(appointments_not_to_delete).issubset(all_appointments_gatekeeper)
 
+    # Also check in the database
+    db_user_data = users_db_manager.load_all_users()
+    all_appointments_db = [user_data.get("appointments") for user_data in db_user_data.values()]
+    all_appointments_db = list(flatten(all_appointments_db))
+    assert not set(appointments_to_delete).issubset(all_appointments_db)
+    assert set(appointments_not_to_delete).issubset(all_appointments_db)
 
-def test_delete_outdated_users(gatekeeper):
-    # This tests the deletion of users whose subscription has outdated (subscription expires now)
 
-    # Create some users with associated data and add them to the gatekeeper
-    users = {}
-    current_height = gatekeeper.block_processor.get_block_count()
-    for _ in range(10):
-        appointments = {get_random_value_hex(32): Appointment(get_random_value_hex(32), None, None)}
-        user_id = get_random_value_hex(16)
-        user_info = UserInfo(available_slots=100, subscription_expiry=current_height, appointments=appointments)
+def test_delete_outdated_users(users_db_manager):
+    # Tests the deletion of users whose subscription has outdated (subscription expires now)
 
-        users[user_id] = user_info
-        gatekeeper.registered_users[user_id] = user_info
-
-    # Get a list of the users that should be deleted at this block height (must match the newly generated ones)
-    users_to_be_deleted = gatekeeper.get_outdated_user_ids(current_height + gatekeeper.expiry_delta)
-    assert users_to_be_deleted == list(users.keys())
+    # Let's mock adding some users and appointments to the Gatekeeper (memory and db)
+    registered_users = setup_users(users_db_manager, MAX_ITEMS)
 
     # Delete the users
-    Cleaner.delete_outdated_users(users_to_be_deleted, gatekeeper.registered_users, gatekeeper.user_db)
+    to_be_deleted = list(registered_users.keys())
+    Cleaner.delete_outdated_users(to_be_deleted, registered_users, users_db_manager)
 
     # Check that the users are not in the gatekeeper anymore
-    for user_id in users_to_be_deleted:
-        assert user_id not in gatekeeper.registered_users
-        assert not gatekeeper.user_db.load_user(user_id)
+    for user_id in to_be_deleted:
+        assert user_id not in registered_users
+        assert not users_db_manager.load_user(user_id)

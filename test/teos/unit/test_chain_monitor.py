@@ -1,8 +1,8 @@
 import zmq
 import time
+import pytest
 from queue import Queue
 from threading import Thread, Event, Condition
-import pytest
 
 from teos.chain_monitor import ChainMonitor, ChainMonitorStatus
 
@@ -10,11 +10,9 @@ from test.teos.conftest import generate_blocks, generate_blocks_with_delay
 from test.teos.unit.conftest import get_random_value_hex, bitcoind_feed_params, mock_connection_refused_return
 
 
-def test_init(block_processor):
-    # run_bitcoind is started here instead of later on to avoid race conditions while it initializes
-
+def test_init(block_processor_mock):
     # Not much to test here, just sanity checks to make sure nothing goes south in the future
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor_mock, bitcoind_feed_params)
 
     assert chain_monitor.status == ChainMonitorStatus.IDLE
     assert isinstance(chain_monitor.last_tips, list) and len(chain_monitor.last_tips) == 0
@@ -27,10 +25,10 @@ def test_init(block_processor):
     assert isinstance(chain_monitor.receiving_queues[1], Queue)
 
 
-def test_notify_subscribers(block_processor):
+def test_notify_subscribers(block_processor_mock):
     queue1 = Queue()
     queue2 = Queue()
-    chain_monitor = ChainMonitor([queue1, queue2], block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([queue1, queue2], block_processor_mock, bitcoind_feed_params)
 
     # Queues should be empty to start with
     assert queue1.qsize() == 0
@@ -64,10 +62,10 @@ def test_notify_subscribers(block_processor):
     chain_monitor.terminate()
 
 
-def test_enqueue(block_processor):
+def test_enqueue(block_processor_mock):
     # The state is updated after receiving a new block (and only if the block is not already known).
     # Let's start by adding some hashes to last_tips
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor_mock, bitcoind_feed_params)
     chain_monitor.last_tips = [get_random_value_hex(32) for _ in range(5)]
 
     # Now we can try to update the state with an hash already seen and see how it doesn't work
@@ -79,9 +77,13 @@ def test_enqueue(block_processor):
     assert chain_monitor.last_tips[-1] == another_block_hash
 
 
-def test_monitor_chain_polling(block_processor, monkeypatch):
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
-    chain_monitor.last_tips = [block_processor.get_best_block_hash()]
+def test_monitor_chain_polling(block_processor_mock, monkeypatch):
+    # Monkeypatch the BlockProcessor so the best tip remains unchanged
+    fixed_tip = get_random_value_hex(32)
+    monkeypatch.setattr(block_processor_mock, "get_best_block_hash", lambda blocking: fixed_tip)
+
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor_mock, bitcoind_feed_params)
+    chain_monitor.last_tips = [fixed_tip]
     chain_monitor.polling_delta = 0.1
 
     # monitor_chain_polling runs until not terminated
@@ -94,22 +96,24 @@ def test_monitor_chain_polling(block_processor, monkeypatch):
         time.sleep(0.1)
 
     # And that it does if we generate a block
-    generate_blocks(1)
+    monkeypatch.setattr(block_processor_mock, "get_best_block_hash", lambda blocking: get_random_value_hex(32))
+    time.sleep(0.1)
 
     chain_monitor.queue.get()
     assert chain_monitor.queue.empty()
 
     # Check that the bitcoind_reachable event is cleared if the connection is lost, and set once it's recovered
-    monkeypatch.setattr(block_processor, "get_best_block_hash", mock_connection_refused_return)
+    monkeypatch.setattr(block_processor_mock, "get_best_block_hash", mock_connection_refused_return)
     time.sleep(0.5)
     assert not chain_monitor.bitcoind_reachable.is_set()
-    monkeypatch.delattr(block_processor, "get_best_block_hash")
+    monkeypatch.delattr(block_processor_mock, "get_best_block_hash")
     time.sleep(0.5)
     assert chain_monitor.bitcoind_reachable.is_set()
 
     chain_monitor.terminate()
 
 
+# This test needs bitcoind since the zmq interface is tested here.
 def test_monitor_chain_zmq(block_processor):
     responder_queue = Queue()
     chain_monitor = ChainMonitor([Queue(), responder_queue], block_processor, bitcoind_feed_params)
@@ -118,7 +122,7 @@ def test_monitor_chain_zmq(block_processor):
     zmq_thread = Thread(target=chain_monitor.monitor_chain_zmq, daemon=True)
     zmq_thread.start()
 
-    # the internal queue should start empty
+    # The internal queue should start empty
     assert chain_monitor.queue.empty()
 
     # And have a new block every time we generate one
@@ -159,17 +163,18 @@ def test_monitor_chain(block_processor):
     generate_blocks(1)
 
 
-def test_monitor_chain_wrong_status_raises(block_processor):
-    # calling monitor_chain when not idle should raise
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+def test_monitor_chain_wrong_status_raises(block_processor_mock, monkeypatch):
+    # Calling monitor_chain when not idle should raise
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor_mock, bitcoind_feed_params)
 
     for status in ChainMonitorStatus:
         if status != ChainMonitorStatus.IDLE:
-            chain_monitor.status = status  # mock the status
+            monkeypatch.setattr(chain_monitor, "status", status)
             with pytest.raises(RuntimeError, match="can only be called in IDLE status"):
                 chain_monitor.monitor_chain()
 
 
+# This needs bitcoind since the zmq thread is also used
 def test_activate(block_processor):
     # Not much to test here, this should launch two threads (one per monitor approach) and finish on terminate
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
@@ -194,9 +199,9 @@ def test_activate(block_processor):
     generate_blocks(1)
 
 
-def test_activate_wrong_status_raises(block_processor):
+def test_activate_wrong_status_raises(block_processor_mock):
     # calling activate when not listening should raise
-    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([Queue(), Queue()], block_processor_mock, bitcoind_feed_params)
 
     for status in ChainMonitorStatus:
         if status != ChainMonitorStatus.LISTENING:
@@ -205,11 +210,12 @@ def test_activate_wrong_status_raises(block_processor):
                 chain_monitor.activate()
 
 
+# This needs bitcoind since the zmq thread is also used
 def test_monitor_chain_single_update(block_processor):
     # This test tests that if both threads try to add the same block to the queue, only the first one will make it
     chain_monitor = ChainMonitor([Queue(), Queue()], block_processor, bitcoind_feed_params)
 
-    chain_monitor.polling_delta = 2
+    chain_monitor.polling_delta = 1
 
     # We will create a block and wait for the polling thread. Then check the queues to see that the block hash has only
     # been added once.
@@ -225,7 +231,7 @@ def test_monitor_chain_single_update(block_processor):
     assert chain_monitor.receiving_queues[0].empty()
     assert chain_monitor.receiving_queues[1].empty()
 
-    # The delta for polling is 2 secs, so let's wait and see
+    # The delta for polling is 1 sec, so let's wait and see
     time.sleep(2)
     assert chain_monitor.receiving_queues[0].empty()
     assert chain_monitor.receiving_queues[1].empty()
@@ -238,6 +244,7 @@ def test_monitor_chain_single_update(block_processor):
     generate_blocks(1)
 
 
+# This needs bitcoind since the zmq thread is also used
 def test_monitor_chain_and_activate(block_processor):
     # In this test, we generate some blocks after `monitor_chain`, then `activate` and generate few more blocks.
     # We verify that all the generated blocks are indeed sent to the queues in the right order.
@@ -280,20 +287,22 @@ def test_monitor_chain_and_activate(block_processor):
     generate_blocks(1)
 
 
-def test_terminate(block_processor):
+def test_terminate(block_processor_mock, monkeypatch):
+    # Test that the ChainMonitor is stopped on a terminate signal
     queue = Queue()
-    chain_monitor = ChainMonitor([queue, Queue()], block_processor, bitcoind_feed_params)
+    chain_monitor = ChainMonitor([queue, Queue()], block_processor_mock, bitcoind_feed_params)
     chain_monitor.polling_delta = 0.1
 
+    # Activate the monitor
     chain_monitor.monitor_chain()
     chain_monitor.activate()
 
+    # Ask it to terminate
     chain_monitor.terminate()
-
     assert chain_monitor.status == ChainMonitorStatus.TERMINATED
 
-    # generate a new block
-    generate_blocks(1)
+    # Mock generating a block generate a new block
+    monkeypatch.setattr(block_processor_mock, "get_best_block_hash", lambda blocking: get_random_value_hex(32))
     time.sleep(0.11)  # wait longer than the polling_delta
 
     # there should be only the ChainMonitor.END_MESSAGE message in the receiving queue, as the new block was generated
@@ -302,7 +311,6 @@ def test_terminate(block_processor):
     assert queue.get() == ChainMonitor.END_MESSAGE
 
 
-@pytest.mark.timeout(5)
 def test_threads_stop_when_terminated(block_processor):
     # When status is "terminated", the methods running the threads should stop immediately
 

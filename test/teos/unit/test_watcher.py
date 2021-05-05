@@ -1,19 +1,13 @@
 import time
+import queue
 import pytest
-import threading
 from uuid import uuid4
-from shutil import rmtree
 from copy import deepcopy
-from threading import Thread, Event
+from threading import Thread
 from coincurve import PrivateKey
 
-from teos.carrier import Carrier
-from teos.responder import Responder
-from teos.gatekeeper import UserInfo
-from teos.chain_monitor import ChainMonitor
-from teos.block_processor import BlockProcessor
-from teos.appointments_dbm import AppointmentsDBM
-from teos.gatekeeper import Gatekeeper, AuthenticationFailure, NotEnoughSlots, SubscriptionExpired
+from teos.carrier import Receipt
+from teos.gatekeeper import UserInfo, AuthenticationFailure, NotEnoughSlots, SubscriptionExpired
 from teos.watcher import (
     Watcher,
     AppointmentLimitReached,
@@ -21,103 +15,55 @@ from teos.watcher import (
     EncryptionError,
     InvalidTransactionFormat,
     AppointmentAlreadyTriggered,
+    InvalidParameter,
+    AppointmentStatus,
+    AppointmentNotFound,
 )
 
 import common.receipts as receipts
 from common.tools import compute_locator
-from common.appointment import Appointment
-from common.cryptographer import Cryptographer
+from common.cryptographer import Cryptographer, hash_160
 
 from test.teos.conftest import (
     config,
-    generate_blocks,
     generate_blocks_with_delay,
-    create_txs,
-    bitcoin_cli,
-    generate_block_with_transactions,
+    mock_generate_blocks,
 )
 from test.teos.unit.conftest import (
     get_random_value_hex,
     generate_keypair,
-    bitcoind_feed_params,
-    bitcoind_connect_params,
     run_test_command_bitcoind_crash,
     run_test_blocking_command_bitcoind_crash,
     mock_connection_refused_return,
+    raise_auth_failure,
+    raise_not_enough_slots,
+    raise_invalid_parameter,
 )
+from test.teos.unit.mocks import AppointmentsDBM, Gatekeeper, BlockProcessor, Responder
+
 
 APPOINTMENTS = 5
 TEST_SET_SIZE = 200
 
-signing_key, public_key = generate_keypair()
-
 # Reduce the maximum number of appointments to something we can test faster
 MAX_APPOINTMENTS = 100
 
-
-@pytest.fixture(scope="module")
-def temp_db_manager():
-    db_name = get_random_value_hex(8)
-    db_manager = AppointmentsDBM(db_name)
-
-    yield db_manager
-
-    db_manager.db.close()
-    rmtree(db_name)
+signing_key, public_key = generate_keypair()
+user_sk, user_pk = generate_keypair()
+user_id = Cryptographer.get_compressed_pk(user_pk)
 
 
 @pytest.fixture
-def standalone_watcher(run_bitcoind, db_manager, gatekeeper):
-    # This is used when we don't want a Watcher tied to a ChainManager (basically so the latter does not mess with
-    # the bitcoind_reachable event that we are mocking). Therefore we need to create a fresh BlockProcessor.
-    bitcoind_reachable = Event()
-    bitcoind_reachable.set()
-
-    block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
-    carrier = Carrier(bitcoind_connect_params, bitcoind_reachable)
-
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+def watcher(dbm_mock, gatekeeper_mock, responder_mock, block_processor_mock):
     watcher = Watcher(
-        db_manager,
-        gatekeeper,
-        block_processor,
-        responder,
+        dbm_mock,
+        gatekeeper_mock,
+        block_processor_mock,
+        responder_mock,
         signing_key,
         MAX_APPOINTMENTS,
         config.get("LOCATOR_CACHE_SIZE"),
     )
-
-    watcher.last_known_block = block_processor.get_best_block_hash()
-
-    return watcher
-
-
-@pytest.fixture(scope="module")
-def watcher(run_bitcoind, db_manager, gatekeeper):
-    bitcoind_reachable = Event()
-    bitcoind_reachable.set()
-
-    block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
-    carrier = Carrier(bitcoind_connect_params, bitcoind_reachable)
-
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    watcher = Watcher(
-        db_manager,
-        gatekeeper,
-        block_processor,
-        responder,
-        signing_key,
-        MAX_APPOINTMENTS,
-        config.get("LOCATOR_CACHE_SIZE"),
-    )
-
-    watcher.last_known_block = block_processor.get_best_block_hash()
-
-    chain_monitor = ChainMonitor(
-        [watcher.block_queue, watcher.responder.block_queue], block_processor, bitcoind_feed_params
-    )
-    chain_monitor.monitor_chain()
-    chain_monitor.activate()
 
     return watcher
 
@@ -132,51 +78,65 @@ def locator_uuid_map(txids):
     return {compute_locator(txid): uuid4().hex for txid in txids}
 
 
-# FIXME: 194 will do with dummy appointment
-def create_appointments(generate_dummy_appointment, n):
-    locator_uuid_map = dict()
-    appointments = dict()
-    dispute_txs = []
-
-    for i in range(n):
-        appointment, dispute_tx = generate_dummy_appointment()
-        uuid = uuid4().hex
-
-        appointments[uuid] = appointment
-        locator_uuid_map[appointment.locator] = [uuid]
-        dispute_txs.append(dispute_tx)
-
-    return appointments, locator_uuid_map, dispute_txs
+def mock_receipt_true(*args, **kwargs):
+    return Receipt(True)
 
 
-def test_locator_cache_init_not_enough_blocks(block_processor):
+def mock_receipt_false(*args, **kwargs):
+    return Receipt(False)
+
+
+# An authenticate_user function that simply does not raise
+def authenticate_user_mock(*args, **kwargs):
+    return get_random_value_hex(32)
+
+
+def raise_encryption_error(*args, **kwargs):
+    raise EncryptionError("encryption error msg")
+
+
+def raise_invalid_tx_format(*args, **kwargs):
+    raise InvalidTransactionFormat("invalid tx format msg")
+
+
+# LOCATOR CACHE
+
+
+def test_locator_cache_init_not_enough_blocks(block_processor_mock, monkeypatch):
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
-    # Make sure there are at least 3 blocks
-    block_count = block_processor.get_block_count()
-    if block_count < 3:
-        generate_blocks(3 - block_count)
 
-    # Simulate there are only 3 blocks
-    third_block_hash = bitcoin_cli.getblockhash(2)
-    locator_cache.init(third_block_hash, block_processor)
+    # Mock generating 3 blocks
+    blocks = dict()
+    mock_generate_blocks(3, blocks, queue.Queue())
+    third_block_hash = list(blocks.keys())[2]
+
+    # Mock the interaction with the BlockProcessor based on the mocked blocks
+    monkeypatch.setattr(block_processor_mock, "get_block", lambda x, blocking: blocks.get(x))
+    locator_cache.init(third_block_hash, block_processor_mock)
+
     assert len(locator_cache.blocks) == 3
     for k, v in locator_cache.blocks.items():
-        assert block_processor.get_block(k)
+        assert block_processor_mock.get_block(k, blocking=False)
 
 
-def test_locator_cache_init(block_processor):
+def test_locator_cache_init(block_processor_mock, monkeypatch):
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 
     # Generate enough blocks so the cache can start full
-    generate_blocks(2 * locator_cache.cache_size)
+    blocks = dict()
+    mock_generate_blocks(locator_cache.cache_size, blocks, queue.Queue())
+    best_block_hash = list(blocks.keys())[-1]
 
-    locator_cache.init(block_processor.get_best_block_hash(), block_processor)
+    # Mock the interaction with the BlockProcessor based on the mocked blocks
+    monkeypatch.setattr(block_processor_mock, "get_block", lambda x, blocking: blocks.get(x))
+    locator_cache.init(best_block_hash, block_processor_mock)
+
     assert len(locator_cache.blocks) == locator_cache.cache_size
     for k, v in locator_cache.blocks.items():
-        assert block_processor.get_block(k)
+        assert block_processor_mock.get_block(k, blocking=False)
 
 
-def test_get_txid():
+def test_cache_get_txid():
     # Not much to test here, this is shadowing dict.get
     locator = get_random_value_hex(16)
     txid = get_random_value_hex(32)
@@ -185,7 +145,6 @@ def test_get_txid():
     locator_cache.cache[locator] = txid
 
     assert locator_cache.get_txid(locator) == txid
-
     # A random locator should fail
     assert locator_cache.get_txid(get_random_value_hex(16)) is None
 
@@ -211,10 +170,12 @@ def test_update_cache():
 
 
 def test_update_cache_full():
+    # Updating a full cache should be dropping the oldest block one by one
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
     block_hashes = []
     big_map = {}
 
+    # Fill the cache first
     for i in range(locator_cache.cache_size):
         block_hash = get_random_value_hex(32)
         txs = [get_random_value_hex(32) for _ in range(10)]
@@ -252,19 +213,24 @@ def test_update_cache_full():
 
 
 def test_locator_cache_is_full():
-    # Empty cache
+    # is_full should return whether the cache is full or not.
+    # Create an empty cache
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 
+    # Fill it one by one and check it is not full
     for _ in range(locator_cache.cache_size):
         locator_cache.blocks[uuid4().hex] = 0
         assert not locator_cache.is_full()
 
+    # Add one more block and check again, it should be full now
     locator_cache.blocks[uuid4().hex] = 0
     assert locator_cache.is_full()
 
 
 def test_locator_remove_oldest_block():
-    # Empty cache
+    # remove_oldest block should drop the oldest block from the cache.
+
+    # Create an empty caches
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 
     # Add some blocks to the cache
@@ -278,9 +244,11 @@ def test_locator_remove_oldest_block():
     oldest_block_hash = list(blocks_in_cache.keys())[0]
     oldest_block_data = blocks_in_cache.get(oldest_block_hash)
     rest_of_blocks = list(blocks_in_cache.keys())[1:]
+
+    # Remove the block
     locator_cache.remove_oldest_block()
 
-    # Oldest block data is not in the cache
+    # The oldest block data is not in the cache anymore
     assert oldest_block_hash not in locator_cache.blocks
     for locator in oldest_block_data:
         assert locator not in locator_cache.cache
@@ -292,22 +260,30 @@ def test_locator_remove_oldest_block():
             assert locator in locator_cache.cache
 
 
-def test_fix_cache(block_processor):
+def test_fix_cache(block_processor_mock, monkeypatch):
     # This tests how a reorg will create a new version of the cache
     # Let's start setting a full cache. We'll mine ``cache_size`` bocks to be sure it's full
-    generate_blocks(config.get("LOCATOR_CACHE_SIZE"))
-
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
-    locator_cache.init(block_processor.get_best_block_hash(), block_processor)
+
+    # We'll need two additional blocks since we'll rollback the chain into the past
+    blocks = dict()
+    mock_generate_blocks(locator_cache.cache_size + 2, blocks, queue.Queue())
+    best_block_hash = list(blocks.keys())[-1]
+
+    # Mock the interaction with the BlockProcessor based on the mocked blocks
+    monkeypatch.setattr(block_processor_mock, "get_block", lambda x, blocking: blocks.get(x))
+    monkeypatch.setattr(block_processor_mock, "get_block_count", lambda: len(blocks))
+
+    locator_cache.init(best_block_hash, block_processor_mock)
     assert len(locator_cache.blocks) == locator_cache.cache_size
 
     # Now let's fake a reorg of less than ``cache_size``. We'll go two blocks into the past.
-    current_tip = block_processor.get_best_block_hash()
+    current_tip = best_block_hash
     current_tip_locators = locator_cache.blocks[current_tip]
-    current_tip_parent = block_processor.get_block(current_tip).get("previousblockhash")
+    current_tip_parent = block_processor_mock.get_block(current_tip, False).get("previousblockhash")
     current_tip_parent_locators = locator_cache.blocks[current_tip_parent]
-    fake_tip = block_processor.get_block(current_tip_parent).get("previousblockhash")
-    locator_cache.fix(fake_tip, block_processor)
+    fake_tip = block_processor_mock.get_block(current_tip_parent, False).get("previousblockhash")
+    locator_cache.fix(fake_tip, block_processor_mock)
 
     # The last two blocks are not in the cache nor are there any of its locators
     assert current_tip not in locator_cache.blocks and current_tip_parent not in locator_cache.blocks
@@ -322,8 +298,9 @@ def test_fix_cache(block_processor):
     # trigger a fix. We'll use a new cache to compare with the old
     old_cache_blocks = deepcopy(locator_cache.blocks)
 
-    generate_blocks((config.get("LOCATOR_CACHE_SIZE") * 2))
-    locator_cache.fix(block_processor.get_best_block_hash(), block_processor)
+    mock_generate_blocks(locator_cache.cache_size, blocks, queue.Queue())
+    best_block_hash = list(blocks.keys())[-1]
+    locator_cache.fix(best_block_hash, block_processor_mock)
 
     # None of the data from the old cache is in the new cache
     for block_hash, locators in old_cache_blocks.items():
@@ -332,12 +309,15 @@ def test_fix_cache(block_processor):
             assert locator not in locator_cache.cache
 
     # The data in the new cache corresponds to the last ``cache_size`` blocks.
-    block_count = block_processor.get_block_count()
+    block_count = block_processor_mock.get_block_count()
     for i in range(block_count, block_count - locator_cache.cache_size, -1):
-        block_hash = bitcoin_cli.getblockhash(i)
+        block_hash = list(blocks.keys())[i - 1]
         assert block_hash in locator_cache.blocks
         for locator in locator_cache.blocks[block_hash]:
             assert locator in locator_cache.cache
+
+
+# WATCHER
 
 
 def test_watcher_init(watcher):
@@ -353,93 +333,202 @@ def test_watcher_init(watcher):
     assert isinstance(watcher.locator_cache, LocatorCache)
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_non_registered(watcher, generate_dummy_appointment):
+def test_awake(watcher, monkeypatch):
+    # Tests that the Watcher's do_watch thread is launch when awake is called
+
+    # Mock the last known block and generate one on top
+    blocks = {}
+    watcher.last_known_block = get_random_value_hex(32)
+    monkeypatch.setattr(watcher.block_processor, "get_block", lambda x, blocking: blocks.get(x))
+    mock_generate_blocks(1, blocks, watcher.block_queue, watcher.last_known_block)
+
+    # Check that, before awaking the Watcher, the data is not processed
+    assert not watcher.block_queue.empty()
+    assert watcher.block_queue.unfinished_tasks == 1
+
+    # Awake the Watcher and check again
+    do_watch_thread = watcher.awake()
+    time.sleep(1)
+
+    assert do_watch_thread.is_alive()
+    assert watcher.block_queue.empty()
+    assert watcher.block_queue.unfinished_tasks == 0
+
+
+def test_register(watcher, monkeypatch):
+    # Register requests should work as long as the provided user_id is valid and bitcoind is reachable
+
+    # Mock the interaction with the Gatekeeper
+    slots = 100
+    expiry = 200
+    receipt = bytes.fromhex(get_random_value_hex(70))
+    monkeypatch.setattr(watcher.gatekeeper, "add_update_user", lambda x: (slots, expiry, receipt))
+
+    # Request a registration and check the response
+    available_slots, subscription_expiry, signature = watcher.register(user_id)
+    assert available_slots == slots
+    assert subscription_expiry == expiry
+    assert Cryptographer.recover_pk(receipt, signature) == watcher.signing_key.public_key
+
+
+def test_register_wrong_data(watcher, monkeypatch):
+    # If the provided user_id does not match the expected format, register will fail
+
+    # Mock the interaction with the Gatekeeper as if the provided data was wrong
+    monkeypatch.setattr(watcher.gatekeeper, "add_update_user", raise_invalid_parameter)
+    with pytest.raises(InvalidParameter):
+        watcher.register(get_random_value_hex(32))
+
+
+def test_get_appointment(watcher, generate_dummy_appointment, generate_dummy_tracker, monkeypatch):
+    # Get appointment should return back data as long a the user does have the requested appointment
+    locator = get_random_value_hex(32)
+    signature = get_random_value_hex(71)
+    uuid = hash_160("{}{}".format(locator, user_id))
+
+    # Mock the user being registered
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, 1))
+
+    # The appointment can either be in the Watcher of the Responder, mock the former case
+    appointment = generate_dummy_appointment()
+    monkeypatch.setitem(watcher.appointments, uuid, appointment)
+    monkeypatch.setattr(watcher.db_manager, "load_watcher_appointment", lambda x: appointment.to_dict())
+
+    # Request and check
+    appointment_data, status = watcher.get_appointment(locator, signature)
+    assert appointment_data == appointment.to_dict()
+    assert status == AppointmentStatus.BEING_WATCHED
+
+    # Do the same for the appointment being in the Responder
+    monkeypatch.delitem(watcher.appointments, uuid)
+    tracker = generate_dummy_tracker()
+    monkeypatch.setattr(watcher.responder, "has_tracker", lambda x: True)
+    monkeypatch.setattr(watcher.db_manager, "load_responder_tracker", lambda x: tracker.to_dict())
+
+    # Request and check
+    tracker_data, status = watcher.get_appointment(locator, signature)
+    assert tracker_data == tracker.to_dict()
+    assert status == AppointmentStatus.DISPUTE_RESPONDED
+
+
+def test_get_appointment_non_registered(watcher, monkeypatch):
+    # If the user is not registered, an authentication error will be returned
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", raise_auth_failure)
+
+    locator = get_random_value_hex(32)
+    signature = get_random_value_hex(71)
+    with pytest.raises(AuthenticationFailure):
+        watcher.get_appointment(locator, signature)
+
+
+def test_get_appointment_wrong_user_or_appointment(watcher, monkeypatch):
+    # Appointments are stored in the using a uuid computed as a hash of locator | user_id. If the appointment does not
+    # exist for the given user, NOT FOUND will be returned.
+
+    # This one is easy to test, since simply not adding data to the structures does the trick. Just mock the user
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, 1))
+
+    locator = get_random_value_hex(32)
+    signature = get_random_value_hex(71)
+    with pytest.raises(AppointmentNotFound, match=f"Cannot find {locator}"):
+        watcher.get_appointment(locator, signature)
+
+
+def test_get_appointment_subscription_error(watcher, monkeypatch):
+    # If the subscription has expired, the user won't be allowed to request data
+
+    # Mock and expired user
+    expiry = 100
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (True, expiry))
+
+    locator = get_random_value_hex(32)
+    signature = get_random_value_hex(71)
+    with pytest.raises(SubscriptionExpired, match=f"Your subscription expired at block {expiry}"):
+        watcher.get_appointment(locator, signature)
+
+
+def test_add_appointment_non_registered(watcher, generate_dummy_appointment, monkeypatch):
     # Appointments from non-registered users should fail
-    user_sk, user_pk = generate_keypair()
+    appointment = generate_dummy_appointment()
 
-    appointment, dispute_tx = generate_dummy_appointment()
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    # Mock the return from the Gatekeeper (user not registered)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", raise_auth_failure)
 
-    with pytest.raises(AuthenticationFailure, match="User not found"):
-        watcher.add_appointment(appointment, appointment_signature)
+    with pytest.raises(AuthenticationFailure, match="Auth failure msg"):
+        watcher.add_appointment(appointment, appointment.user_signature)
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_no_slots(watcher, generate_dummy_appointment):
+def test_add_appointment_no_slots(watcher, generate_dummy_appointment, monkeypatch):
     # Appointments from register users with no available slots should aso fail
-    user_sk, user_pk = generate_keypair()
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=0, subscription_expiry=watcher.block_processor.get_block_count() + 1
-    )
 
-    appointment, dispute_tx = generate_dummy_appointment()
+    # Mock a registered user with no enough slots (we need to mock all the way up to add_update_appointment)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, 0))
+    monkeypatch.setattr(watcher.responder, "has_tracker", lambda x: False)
+    monkeypatch.setattr(watcher.gatekeeper, "add_update_appointment", raise_not_enough_slots)
+
+    appointment = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
     with pytest.raises(NotEnoughSlots):
         watcher.add_appointment(appointment, appointment_signature)
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_expired_subscription(watcher, generate_dummy_appointment):
+def test_add_appointment_expired_subscription(watcher, generate_dummy_appointment, monkeypatch):
     # Appointments from registered users with expired subscriptions fail as well
-    user_sk, user_pk = generate_keypair()
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=10,
-        subscription_expiry=watcher.block_processor.get_block_count() - watcher.gatekeeper.expiry_delta - 1,
-    )
 
-    appointment, dispute_tx = generate_dummy_appointment()
+    # Mock a registered user with expired subscription
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (True, 42))
+
+    appointment = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
-    with pytest.raises(SubscriptionExpired):
+    with pytest.raises(SubscriptionExpired, match="Your subscription expired at block"):
         watcher.add_appointment(appointment, appointment_signature)
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment(watcher, generate_dummy_appointment):
-    # Simulate the user is registered
-    user_sk, user_pk = generate_keypair()
-    available_slots = 100
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=available_slots, subscription_expiry=watcher.block_processor.get_block_count() + 1
-    )
+def test_add_appointment(watcher, generate_dummy_appointment, monkeypatch):
+    # A registered user with no subscription issues should be able to add an appointment
+    appointment = generate_dummy_appointment()
 
-    appointment, dispute_tx = generate_dummy_appointment()
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    # Mock a registered user
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.responder, "has_tracker", lambda x: False)
+    monkeypatch.setattr(watcher.gatekeeper, "add_update_appointment", lambda x, y, z: MAX_APPOINTMENTS - 1)
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
 
-    response = watcher.add_appointment(appointment, appointment_signature)
+    response = watcher.add_appointment(appointment, appointment.user_signature)
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
         Cryptographer.recover_pk(
-            receipts.create_appointment_receipt(appointment_signature, response.get("start_block")),
+            receipts.create_appointment_receipt(appointment.user_signature, response.get("start_block")),
             response.get("signature"),
         )
     )
-    assert response.get("available_slots") == available_slots - 1
 
     # Check that we can also add an already added appointment (same locator)
-    response = watcher.add_appointment(appointment, appointment_signature)
+    response = watcher.add_appointment(appointment, appointment.user_signature)
     assert response.get("locator") == appointment.locator
     assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
         Cryptographer.recover_pk(
-            receipts.create_appointment_receipt(appointment_signature, response.get("start_block")),
+            receipts.create_appointment_receipt(appointment.user_signature, response.get("start_block")),
             response.get("signature"),
         )
     )
-    # The slot count should not have been reduced and only one copy is kept.
-    assert response.get("available_slots") == available_slots - 1
+    # One one copy is kept since the appointments were the same
+    # (the slot count should have not been reduced, but that's something to be tested in the Gatekeeper)
     assert len(watcher.locator_uuid_map[appointment.locator]) == 1
 
     # If two appointments with the same locator come from different users, they are kept.
     another_user_sk, another_user_pk = generate_keypair()
     another_user_id = Cryptographer.get_compressed_pk(another_user_pk)
-    watcher.gatekeeper.registered_users[another_user_id] = UserInfo(
-        available_slots=available_slots, subscription_expiry=watcher.block_processor.get_block_count() + 1
-    )
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: another_user_id)
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), another_user_sk)
     response = watcher.add_appointment(appointment, appointment_signature)
@@ -450,29 +539,28 @@ def test_add_appointment(watcher, generate_dummy_appointment):
             response.get("signature"),
         )
     )
-    assert response.get("available_slots") == available_slots - 1
     assert len(watcher.locator_uuid_map[appointment.locator]) == 2
 
 
-def test_add_appointment_in_cache(watcher, generate_dummy_appointment):
-    # Generate an appointment and add the dispute txid to the cache
-    user_sk, user_pk = generate_keypair()
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=watcher.block_processor.get_block_count() + 10
-    )
+def test_add_appointment_in_cache(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
+    # Adding an appointment which trigger is in the cache should be accepted
+    appointment, commitment_txid = generate_dummy_appointment_w_trigger()
+    # We need the blob and signature to be valid
+    appointment.user_signature = Cryptographer.sign(appointment.encrypted_blob.encode(), user_sk)
 
-    appointment, dispute_tx = generate_dummy_appointment()
-
-    # Broadcast the transaction and add it manually to the Watcher cache (since the Watcher is not currently watching)
-    generate_block_with_transactions(dispute_tx)
-    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
-    watcher.locator_cache.cache[appointment.locator] = dispute_txid
+    # Mock the transaction being in the cache and all the way until sending it to the Responder
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
+    monkeypatch.setattr(watcher.locator_cache, "get_txid", lambda x: commitment_txid)
+    monkeypatch.setattr(watcher.responder, "handle_breach", mock_receipt_true)
 
     # Try to add the appointment
-    user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    response = watcher.add_appointment(appointment, user_signature)
-    appointment_receipt = receipts.create_appointment_receipt(user_signature, response.get("start_block"))
+    # user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    response = watcher.add_appointment(appointment, appointment.user_signature)
+    appointment_receipt = receipts.create_appointment_receipt(appointment.user_signature, response.get("start_block"))
 
     # The appointment is accepted but it's not in the Watcher
     assert (
@@ -483,165 +571,145 @@ def test_add_appointment_in_cache(watcher, generate_dummy_appointment):
     )
     assert not watcher.locator_uuid_map.get(appointment.locator)
 
-    # It went to the Responder straightaway
-    assert appointment.locator in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
+    # It went to the Responder straightaway, we can check this by querying the database
+    for uuid, db_appointment in watcher.db_manager.load_watcher_appointments(include_triggered=True).items():
+        if db_appointment.get("locator") == appointment.locator:
+            assert uuid in watcher.db_manager.load_all_triggered_flags()
 
     # Trying to send it again should fail since it is already in the Responder
+    monkeypatch.setattr(watcher.responder, "has_tracker", lambda x: True)
     with pytest.raises(AppointmentAlreadyTriggered):
         watcher.add_appointment(appointment, Cryptographer.sign(appointment.serialize(), user_sk))
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_in_cache_invalid_blob(watcher):
-    # Generate an appointment with an invalid transaction and add the dispute txid to the cache
-    user_sk, user_pk = generate_keypair()
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=watcher.block_processor.get_block_count() + 1
-    )
+def test_add_appointment_in_cache_invalid_blob_or_tx(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
+    # Trying to add an appointment with invalid data (blob does not decrypt to a tx or the tx in not invalid) with a
+    # trigger in the cache will be accepted, but the data will de dropped.
 
-    # We need to create the appointment manually
-    commitment_tx, commitment_txid, penalty_tx = create_txs()
+    appointment, commitment_txid = generate_dummy_appointment_w_trigger()
 
-    locator = compute_locator(commitment_tx)
-    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(penalty_tx[::-1], commitment_txid)
+    # Mock the trigger being in the cache
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
+    monkeypatch.setattr(watcher.locator_cache, "get_txid", lambda x: commitment_txid)
 
-    appointment_data = {
-        "locator": locator,
-        "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-        "encrypted_blob": encrypted_blob,
-        "user_id": get_random_value_hex(16),
-    }
+    # Check for both the blob being invalid, and the transaction being invalid
+    for mocked_return in [raise_encryption_error, raise_invalid_tx_format]:
+        # Mock the data check (invalid blob)
+        monkeypatch.setattr(watcher.responder, "handle_breach", mocked_return)
 
-    appointment = Appointment.from_dict(appointment_data)
-    watcher.locator_cache.cache[appointment.locator] = commitment_txid
+        # Try to add the appointment
+        response = watcher.add_appointment(appointment, appointment.user_signature)
+        appointment_receipt = receipts.create_appointment_receipt(
+            appointment.user_signature, response.get("start_block")
+        )
 
-    # Try to add the appointment
-    user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    response = watcher.add_appointment(appointment, user_signature)
-    appointment_receipt = receipts.create_appointment_receipt(user_signature, response.get("start_block"))
+        # The appointment is accepted but dropped
+        assert (
+            response
+            and response.get("locator") == appointment.locator
+            and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
+            == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment_receipt, response.get("signature")))
+        )
 
-    # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
-    assert (
-        response
-        and response.get("locator") == appointment.locator
-        and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
-        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment_receipt, response.get("signature")))
-    )
-
-    assert not watcher.locator_uuid_map.get(appointment.locator)
-    assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
+        # Check the appointment didn't go to the Responder (by checking there are no triggered flags)
+        assert watcher.db_manager.load_all_triggered_flags() == []
 
 
-def test_add_appointment_in_cache_invalid_transaction(watcher, generate_dummy_appointment):
-    # Generate an appointment that cannot be decrypted and add the dispute txid to the cache
-    user_sk, user_pk = generate_keypair()
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=watcher.block_processor.get_block_count() + 1
-    )
+def test_add_too_many_appointments(watcher, generate_dummy_appointment, monkeypatch):
+    # Adding appointment beyond the user limit should fail
 
-    appointment, dispute_tx = generate_dummy_appointment()
-    appointment.encrypted_blob = appointment.encrypted_blob[::-1]
-    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
-    watcher.locator_cache.cache[appointment.locator] = dispute_txid
+    # Mock the user being registered
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
 
-    # Try to add the appointment
-    user_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    response = watcher.add_appointment(appointment, user_signature)
-    appointment_receipt = receipts.create_appointment_receipt(user_signature, response.get("start_block"))
-
-    # The appointment is accepted but dropped (same as an invalid appointment that gets triggered)
-    assert (
-        response
-        and response.get("locator") == appointment.locator
-        and Cryptographer.get_compressed_pk(watcher.signing_key.public_key)
-        == Cryptographer.get_compressed_pk(Cryptographer.recover_pk(appointment_receipt, response.get("signature")))
-    )
-
-    assert not watcher.locator_uuid_map.get(appointment.locator)
-    assert appointment.locator not in [tracker.get("locator") for tracker in watcher.responder.trackers.values()]
-
-
-# FIXME: 194 will do with dummy appointment
-def test_add_too_many_appointments(watcher, generate_dummy_appointment):
-    # Simulate the user is registered
-    user_sk, user_pk = generate_keypair()
-    available_slots = 100
-    user_id = Cryptographer.get_compressed_pk(user_pk)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=available_slots, subscription_expiry=watcher.block_processor.get_block_count() + 1
-    )
-
-    # Appointments on top of the limit should be rejected
-    watcher.appointments = dict()
-
-    for i in range(MAX_APPOINTMENTS):
-        appointment, dispute_tx = generate_dummy_appointment()
-        appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-        response = watcher.add_appointment(appointment, appointment_signature)
-        appointment_receipt = receipts.create_appointment_receipt(appointment_signature, response.get("start_block"))
+    for i in range(user_info.available_slots):
+        appointment = generate_dummy_appointment()
+        response = watcher.add_appointment(appointment, appointment.user_signature)
+        appointment_receipt = receipts.create_appointment_receipt(
+            appointment.user_signature, response.get("start_block")
+        )
 
         assert response.get("locator") == appointment.locator
         assert Cryptographer.get_compressed_pk(watcher.signing_key.public_key) == Cryptographer.get_compressed_pk(
             Cryptographer.recover_pk(appointment_receipt, response.get("signature"))
         )
-        assert response.get("available_slots") == available_slots - (i + 1)
 
     with pytest.raises(AppointmentLimitReached):
-        appointment, dispute_tx = generate_dummy_appointment()
+        appointment = generate_dummy_appointment()
         appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
         watcher.add_appointment(appointment, appointment_signature)
 
 
-def test_do_watch(watcher, temp_db_manager, generate_dummy_appointment):
-    watcher.db_manager = temp_db_manager
+def test_do_watch(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
+    # do_watch creates a thread in charge of watching for breaches. It also triggers data deletion when necessary, based
+    # in the block height of the received blocks.
+    # Test the following:
+    # - Adding transactions to the Watcher and trigger them
+    # - Check triggered appointments are removed from the Watcher
+    # - Outdate appointments and check they are also removed
 
-    # We will wipe all the previous data and add 5 appointments
-    appointments, locator_uuid_map, dispute_txs = create_appointments(generate_dummy_appointment, APPOINTMENTS)
+    # Mock the user being registered
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
 
-    # Set the data into the Watcher and in the db
-    watcher.locator_uuid_map = locator_uuid_map
-    watcher.appointments = {}
-    watcher.gatekeeper.registered_users = {}
+    # Mock the interactions with the Gatekeeper
+    monkeypatch.setattr(watcher.gatekeeper, "get_outdated_appointments", lambda x: [])
+    monkeypatch.setattr(watcher.responder, "handle_breach", mock_receipt_false)
 
-    # Simulate a register (times out in 10 bocks)
-    user_id = get_random_value_hex(16)
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=100, subscription_expiry=watcher.block_processor.get_block_count() + 10
-    )
+    # Add the appointments to the tower. We add them instead of mocking to avoid having to mock all the data structures
+    # plus database
+    commitment_txids = []
+    for _ in range(APPOINTMENTS):
+        appointment, commitment_txid = generate_dummy_appointment_w_trigger()
+        watcher.add_appointment(appointment, appointment.user_signature)
+        commitment_txids.append(commitment_txid)
 
-    # Add the appointments
-    for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "user_id": user_id}
-        # Assume the appointment only takes one slot
-        watcher.gatekeeper.registered_users[user_id].appointments[uuid] = 1
-        watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-        watcher.db_manager.create_append_locator_map(appointment.locator, uuid)
-
+    # Start the watching thread
     do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
     do_watch_thread.start()
 
-    # Broadcast the first two
-    for dispute_tx in dispute_txs[:2]:
-        bitcoin_cli.sendrawtransaction(dispute_tx)
+    # Mock a new block with the two first triggers in it
+    block_id = get_random_value_hex(32)
+    block = {"tx": commitment_txids[:2], "height": 1}
+    monkeypatch.setattr(watcher.block_processor, "get_block", lambda x, blocking: block)
+    watcher.block_queue.put(block_id)
+    time.sleep(0.2)
 
     # After generating a block, the appointment count should have been reduced by 2 (two breaches)
-    generate_blocks_with_delay(1)
-
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
-    # The rest of appointments will timeout after the subscription times-out (9 more blocks) + EXPIRY_DELTA
-    generate_blocks_with_delay(9 + config.get("EXPIRY_DELTA"))
+    # The rest of appointments will timeout after the subscription timesout
+    monkeypatch.setattr(watcher.gatekeeper, "get_outdated_appointments", lambda x: list(watcher.appointments.keys()))
+    mock_generate_blocks(1, {}, watcher.block_queue)
     assert len(watcher.appointments) == 0
 
-    # FIXME: We should also add cases where the transactions are invalid.
+    # FIXME: 289-add-watcher-tests: We should also add cases where the transactions are invalid.
 
 
-# TODO: depends on previous test
-def test_do_watch_cache_update(watcher):
-    # Test that data is properly added/remove to/from the cache
+def test_do_watch_cache_update(watcher, block_processor_mock, monkeypatch):
+    # The do_watch thread is also in charge of keeping the locator cache up to date. Test that adding mining a new block
+    # removed the oldest block from the cache and add the new data to it.
+
+    # Start the watching thread
+    do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
+    do_watch_thread.start()
+
+    # Generate enough blocks so the cache can start full
+    blocks = dict()
+    mock_generate_blocks(watcher.locator_cache.cache_size, blocks, watcher.block_queue)
+
+    # Mock the interaction with the BlockProcessor based on the mocked blocks
+    monkeypatch.setattr(block_processor_mock, "get_block", lambda x, blocking: blocks.get(x))
 
     for _ in range(10):
         blocks_in_cache = watcher.locator_cache.blocks
@@ -650,7 +718,8 @@ def test_do_watch_cache_update(watcher):
         rest_of_blocks = list(blocks_in_cache.keys())[1:]
         assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
 
-        generate_blocks_with_delay(1)
+        # Mock a block on top of the last tip
+        mock_generate_blocks(1, blocks, watcher.block_queue, prev_block_hash=list(blocks.keys())[-1])
 
         # The last oldest block is gone but the rest remain
         assert oldest_block_hash not in watcher.locator_cache.blocks
@@ -667,17 +736,19 @@ def test_do_watch_cache_update(watcher):
         assert len(watcher.locator_cache.blocks) == watcher.locator_cache.cache_size
 
 
-# FIXME: 194 will do with dummy watcher
 def test_get_breaches(watcher, txids, locator_uuid_map):
+    # Get breaches returns a dictionary (locator:txid) of breaches given a map of locator:txid.
+    # Test that it works with valid data
+
+    # Create a locator_uuid_map and a locators_txid_map that fully match
     watcher.locator_uuid_map = locator_uuid_map
     locators_txid_map = {compute_locator(txid): txid for txid in txids}
-    potential_breaches = watcher.get_breaches(locators_txid_map)
 
     # All the txids must breach
+    potential_breaches = watcher.get_breaches(locators_txid_map)
     assert locator_uuid_map.keys() == potential_breaches.keys()
 
 
-# FIXME: 194 will do with dummy watcher
 def test_get_breaches_random_data(watcher, locator_uuid_map):
     # The likelihood of finding a potential breach with random data should be negligible
     watcher.locator_uuid_map = locator_uuid_map
@@ -690,153 +761,167 @@ def test_get_breaches_random_data(watcher, locator_uuid_map):
     assert len(potential_breaches) == 0
 
 
-# FIXME: 194 will do with dummy watcher and appointment
-def test_check_breach(watcher, generate_dummy_appointment):
+def test_check_breach(watcher, generate_dummy_appointment_w_trigger):
     # A breach will be flagged as valid only if the encrypted blob can be properly decrypted and the resulting data
     # matches a transaction format.
     uuid = uuid4().hex
-    appointment, dispute_tx = generate_dummy_appointment()
-    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+    appointment, dispute_txid = generate_dummy_appointment_w_trigger()
 
     penalty_txid, penalty_rawtx = watcher.check_breach(uuid, appointment, dispute_txid)
     assert Cryptographer.encrypt(penalty_rawtx, dispute_txid) == appointment.encrypted_blob
 
 
-# FIXME: 194 will do with dummy watcher and appointment
-def test_check_breach_random_data(watcher, generate_dummy_appointment):
+def test_check_breach_random_data(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
     # If a breach triggers an appointment with random data as encrypted blob, the check should fail.
     uuid = uuid4().hex
-    appointment, dispute_tx = generate_dummy_appointment()
-    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+    appointment, dispute_txid = generate_dummy_appointment_w_trigger()
 
-    # Set the blob to something "random"
-    appointment.encrypted_blob = get_random_value_hex(200)
+    # Mock the interaction with the Cryptographer when trying to decrypt a blob
+    monkeypatch.setattr(Cryptographer, "decrypt", raise_encryption_error)
 
     with pytest.raises(EncryptionError):
         watcher.check_breach(uuid, appointment, dispute_txid)
 
 
-# FIXME: 194 will do with dummy watcher and appointment
-def test_check_breach_invalid_transaction(watcher, generate_dummy_appointment):
+def test_check_breach_invalid_transaction(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
     # If the breach triggers an appointment with data that can be decrypted but does not match a transaction, it should
     # fail
     uuid = uuid4().hex
-    appointment, dispute_tx = generate_dummy_appointment()
-    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+    appointment, dispute_txid = generate_dummy_appointment_w_trigger()
 
-    # Set the blob to something "random"
-    appointment.encrypted_blob = Cryptographer.encrypt(get_random_value_hex(200), dispute_txid)
+    # Mock the interaction with the BlockProcessor when trying to decode a transaction
+    monkeypatch.setattr(watcher.block_processor, "decode_raw_transaction", raise_invalid_tx_format)
 
     with pytest.raises(InvalidTransactionFormat):
         watcher.check_breach(uuid, appointment, dispute_txid)
 
 
-# FIXME: 194 will do with dummy watcher
-def test_filter_valid_breaches(watcher, generate_dummy_appointment):
-    dispute_txid = "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
-    encrypted_blob = (
-        "a62aa9bb3c8591e4d5de10f1bd49db92432ce2341af55762cdc9242c08662f97f5f47da0a1aa88373508cd6e67e87eefddeca0cee98c1"
-        "967ec1c1ecbb4c5e8bf08aa26159214e6c0bc4b2c7c247f87e7601d15c746fc4e711be95ba0e363001280138ba9a65b06c4aa6f592b21"
-        "3635ee763984d522a4c225814510c8f7ab0801f36d4a68f5ee7dd3930710005074121a172c29beba79ed647ebaf7e7fab1bbd9a208251"
-        "ef5486feadf2c46e33a7d66adf9dbbc5f67b55a34b1b3c4909dd34a482d759b0bc25ecd2400f656db509466d7479b5b92a2fadabccc9e"
-        "c8918da8979a9feadea27531643210368fee494d3aaa4983e05d6cf082a49105e2f8a7c7821899239ba7dee12940acd7d8a629894b5d31"
-        "e94b439cfe8d2e9f21e974ae5342a70c91e8"
-    )
+def test_filter_valid_breaches(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
+    # filter_breaches returns computes two collections, one with the valid breaches (breaches that properly decrypt
+    # appointments) and one with invalid ones. Test it with a single valid breach.
 
-    dummy_appointment, _ = generate_dummy_appointment()
-    dummy_appointment.encrypted_blob = encrypted_blob
-    dummy_appointment.locator = compute_locator(dispute_txid)
-    uuid = uuid4().hex
+    # Create a new appointment
+    dummy_appointment, dispute_txid = generate_dummy_appointment_w_trigger()
 
-    appointments = {uuid: dummy_appointment}
-    locator_uuid_map = {dummy_appointment.locator: [uuid]}
-    breaches = {dummy_appointment.locator: dispute_txid}
+    # Mock the interaction with the Gatekeeper. We'll the appointment to the Watcher instead of mocking all the
+    # structures + db
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
+    watcher.add_appointment(dummy_appointment, dummy_appointment.user_signature)
 
-    for uuid, appointment in appointments.items():
-        watcher.appointments[uuid] = {"locator": appointment.locator, "user_id": appointment.user_id}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
-        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
-
-    watcher.locator_uuid_map = locator_uuid_map
-
-    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
+    # Filter the data and check
+    potential_breaches = {dummy_appointment.locator: dispute_txid}
+    valid_breaches, invalid_breaches = watcher.filter_breaches(potential_breaches)
 
     # We have "triggered" a single breach and it was valid.
     assert len(invalid_breaches) == 0 and len(valid_breaches) == 1
 
 
-# FIXME: 194 will do with dummy watcher and appointment
-def test_filter_breaches_random_data(watcher, generate_dummy_appointment):
-    appointments = {}
-    locator_uuid_map = {}
-    breaches = {}
+def test_filter_breaches_random_data(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
+    # Filtering breaches with random data should return all invalid breaches
+    potential_breaches = {}
 
-    for i in range(TEST_SET_SIZE):
-        dummy_appointment, _ = generate_dummy_appointment()
-        uuid = uuid4().hex
-        appointments[uuid] = {"locator": dummy_appointment.locator, "user_id": dummy_appointment.user_id}
-        watcher.db_manager.store_watcher_appointment(uuid, dummy_appointment.to_dict())
-        watcher.db_manager.create_append_locator_map(dummy_appointment.locator, uuid)
+    # Mock the interaction with the Gatekeeper. We'll the appointment to the Watcher instead of mocking all the
+    # structures + db
+    expiry = 100
+    user_info = UserInfo(MAX_APPOINTMENTS, expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
 
-        locator_uuid_map[dummy_appointment.locator] = [uuid]
+    for i in range(TEST_SET_SIZE // 2):
+        dummy_appointment, dispute_txid = generate_dummy_appointment_w_trigger()
 
+        # Only half of the data will be tagged as a breach
         if i % 2:
             dispute_txid = get_random_value_hex(32)
-            breaches[dummy_appointment.locator] = dispute_txid
+            potential_breaches[dummy_appointment.locator] = dispute_txid
 
-    watcher.locator_uuid_map = locator_uuid_map
-    watcher.appointments = appointments
+        watcher.add_appointment(dummy_appointment, dummy_appointment.user_signature)
 
-    valid_breaches, invalid_breaches = watcher.filter_breaches(breaches)
+    # Filter the data and check
+    valid_breaches, invalid_breaches = watcher.filter_breaches(potential_breaches)
 
-    # We have "triggered" TEST_SET_SIZE/2 breaches, all of them invalid.
-    assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE / 2
+    # We have "triggered" TEST_SET_SIZE/4 breaches, all of them invalid.
+    assert len(valid_breaches) == 0 and len(invalid_breaches) == TEST_SET_SIZE // 4
 
 
-def test_get_subscription_info(block_processor, watcher, generate_dummy_appointment, generate_dummy_tracker):
-    user_sk, user_pk = generate_keypair()
-    user_id = Cryptographer.get_compressed_pk(user_pk)
+def test_get_subscription_info(watcher, generate_dummy_appointment, generate_dummy_tracker, monkeypatch):
+    # Tests how get_subscription_info should return no data for empty subscriptions, and the info matching the
+    # subscriptions otherwise.
 
-    # Need to simulate registration for this user.
-    available_slots = 1
-    subscription_expiry = block_processor.get_block_count() + 1
-    watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots, subscription_expiry)
+    # Mock a registered user
+    available_slots = MAX_APPOINTMENTS
+    subscription_expiry = 100
+    user_info = UserInfo(available_slots, subscription_expiry)
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (False, subscription_expiry))
+    monkeypatch.setattr(watcher.gatekeeper, "get_user_info", lambda x: user_info)
 
     message = "get subscription info"
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
 
+    # Empty subscription
     sub_info, locators = watcher.get_subscription_info(signature)
-
     assert len(locators) == 0
     assert sub_info.available_slots == available_slots
     assert sub_info.subscription_expiry == subscription_expiry
 
-    uuid = get_random_value_hex(32)
-    uuid2 = get_random_value_hex(32)
-
-    appointment, _ = generate_dummy_appointment()
+    # Generate some subscription data
+    uuid = uuid4().hex
+    uuid2 = uuid4().hex
+    appointment = generate_dummy_appointment()
     tracker = generate_dummy_tracker()
-    watcher.appointments = {uuid: appointment.get_summary()}
-    watcher.responder.trackers = {uuid2: tracker.get_summary()}
 
-    # The gatekeeper appointments dict format is of the form uuid:required_slots
-    watcher.gatekeeper.registered_users[user_id].appointments[uuid] = {uuid: 1}
-    watcher.gatekeeper.registered_users[user_id].appointments[uuid2] = {uuid2: 1}
+    # Mock the Watcher, Responder and Gatekeeper's data structures
+    monkeypatch.setattr(watcher, "appointments", {uuid: appointment.get_summary()})
+    monkeypatch.setattr(watcher.responder, "trackers", {uuid2: tracker.get_summary()})
+    user_info.appointments = {uuid: 1, uuid2: 1}
+
+    # And the interaction with the Responder
+    monkeypatch.setattr(watcher.responder, "has_tracker", lambda x: True)
+    monkeypatch.setattr(watcher.responder, "get_tracker", lambda x: tracker.get_summary())
 
     sub_info, locators = watcher.get_subscription_info(signature)
-
-    assert set(locators) == set([appointment.locator, tracker.locator])
+    assert set(locators) == {appointment.locator, tracker.locator}
     assert sub_info.available_slots == available_slots
     assert sub_info.subscription_expiry == subscription_expiry
 
 
-# TESTS WITH BITCOIND UNREACHABLE
-# An authenticate_user function that simply does not raise
-def authenticate_user_mock(*args, **kwargs):
-    return get_random_value_hex(32)
+def test_get_subscription_info_non_registered(watcher, monkeypatch):
+    # If the user is not registered, an authentication error will be returned
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", raise_auth_failure)
+
+    signature = get_random_value_hex(71)
+    with pytest.raises(AuthenticationFailure):
+        watcher.get_subscription_info(signature)
+
+
+def test_get_subscription_info_subscription_error(watcher, monkeypatch):
+    # If the subscription has expired, the user won't be allowed to request data
+
+    # Mock and expired user
+    expiry = 100
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", lambda x, y: user_id)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", lambda x: (True, expiry))
+
+    signature = get_random_value_hex(71)
+    with pytest.raises(SubscriptionExpired, match=f"Your subscription expired at block {expiry}"):
+        watcher.get_subscription_info(signature)
+
+
+# TESTS WITH BITCOIND UNREACHABLE.
+# There are two approaches for the following tests:
+#   - For blocking functionality we check that the command does not raise (but block) and that after the blocking event
+#     is set, the command returns.
+#   - For non-blocking functionality we check that the command raises
 
 
 def test_locator_cache_init_bitcoind_crash(block_processor):
+    # A real BlockProcessor is required to test blocking functionality, since the mock does not implement that stuff
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 
     run_test_blocking_command_bitcoind_crash(
@@ -846,6 +931,7 @@ def test_locator_cache_init_bitcoind_crash(block_processor):
 
 
 def test_fix_cache_bitcoind_crash(block_processor):
+    # A real BlockProcessor is required to test blocking functionality, since the mock does not implement that stuff
     locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
 
     run_test_blocking_command_bitcoind_crash(
@@ -875,7 +961,7 @@ def test_add_appointment_bitcoind_crash(watcher, generate_dummy_appointment, mon
     monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", authenticate_user_mock)
     monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", mock_connection_refused_return)
 
-    appointment, _ = generate_dummy_appointment()
+    appointment = generate_dummy_appointment()
     run_test_command_bitcoind_crash(lambda: watcher.add_appointment(appointment, get_random_value_hex(73)))
 
 
@@ -887,34 +973,40 @@ def test_get_subscription_info_bitcoind_crash(watcher, monkeypatch):
     run_test_command_bitcoind_crash(lambda: watcher.get_subscription_info(get_random_value_hex(73)))
 
 
-def test_do_watch_bitcoind_crash(standalone_watcher):
+def test_do_watch_bitcoind_crash(watcher, block_processor):
+    # A real BlockProcessor is required to test blocking functionality, since the mock does not implement that stuff
     # Let's start to watch
-    do_watch_thread = Thread(target=standalone_watcher.do_watch, daemon=True)
+    watcher.block_processor = block_processor
+    do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
     do_watch_thread.start()
     time.sleep(2)
 
     # Block the watcher
-    standalone_watcher.block_processor.bitcoind_reachable.clear()
-    assert standalone_watcher.block_queue.empty()
+    watcher.block_processor.bitcoind_reachable.clear()
+    assert watcher.block_queue.empty()
 
     # Mine a block and check how the Watcher is blocked processing it
     best_tip = generate_blocks_with_delay(1, 2)[0]
-    standalone_watcher.block_queue.put(best_tip)
+    watcher.block_queue.put(best_tip)
     time.sleep(2)
-    assert standalone_watcher.last_known_block != best_tip
-    assert standalone_watcher.block_queue.unfinished_tasks == 1
+    assert watcher.last_known_block != best_tip
+    assert watcher.block_queue.unfinished_tasks == 1
 
     # Reestablish the connection and check back
-    standalone_watcher.block_processor.bitcoind_reachable.set()
+    watcher.block_processor.bitcoind_reachable.set()
     time.sleep(2)
-    assert standalone_watcher.last_known_block == best_tip
-    assert standalone_watcher.block_queue.unfinished_tasks == 0
+    assert watcher.last_known_block == best_tip
+    assert watcher.block_queue.unfinished_tasks == 0
 
 
-def test_check_breach_bitcoind_crash(watcher, generate_dummy_appointment):
+def test_check_breach_bitcoind_crash(watcher, block_processor, generate_dummy_appointment_w_trigger, monkeypatch):
     uuid = uuid4().hex
-    appointment, dispute_tx = generate_dummy_appointment()
-    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+    appointment, dispute_txid = generate_dummy_appointment_w_trigger()
+
+    # A real BlockProcessor is required to test blocking functionality, since the mock does not implement that stuff
+    # We also need to  mock decoding the transaction given we're using dummy data
+    watcher.block_processor = block_processor
+    monkeypatch.setattr(block_processor, "decode_raw_transaction", lambda x, blocking: {})
 
     run_test_blocking_command_bitcoind_crash(
         watcher.block_processor.bitcoind_reachable, lambda: watcher.check_breach(uuid, appointment, dispute_txid)

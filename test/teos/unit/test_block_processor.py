@@ -4,10 +4,10 @@ from threading import Event
 from teos.block_processor import BlockProcessor
 from teos.watcher import InvalidTransactionFormat
 
-from test.teos.conftest import generate_blocks
+from test.teos.conftest import generate_blocks, fork
 from test.teos.unit.conftest import (
     get_random_value_hex,
-    fork,
+    bitcoind_connect_params,
     wrong_bitcoind_connect_params,
     run_test_command_bitcoind_crash,
     run_test_blocking_command_bitcoind_crash,
@@ -24,7 +24,14 @@ hex_tx = (
 )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
+def block_processor(run_bitcoind):
+    bitcoind_reachable = Event()
+    bitcoind_reachable.set()
+    return BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
+
+
+@pytest.fixture
 def block_processor_wrong_connection():
     bitcoind_reachable = Event()
     bitcoind_reachable.set()
@@ -32,14 +39,14 @@ def block_processor_wrong_connection():
 
 
 def test_get_best_block_hash(block_processor):
-    best_block_hash = block_processor.get_best_block_hash()
     # As long as bitcoind is running we should always get a block hash
+    best_block_hash = block_processor.get_best_block_hash()
     assert best_block_hash is not None and isinstance(best_block_hash, str)
 
 
 def test_get_block(block_processor):
-    best_block_hash = block_processor.get_best_block_hash()
     # Getting a block from a block hash we are aware of should return data
+    best_block_hash = block_processor.get_best_block_hash()
     block = block_processor.get_block(best_block_hash)
 
     # Checking that the received block has at least the fields we need
@@ -48,28 +55,32 @@ def test_get_block(block_processor):
 
 
 def test_get_random_block(block_processor):
+    # Trying to query a random block should return None
     block = block_processor.get_block(get_random_value_hex(32))
 
     assert block is None
 
 
 def test_get_block_count(block_processor):
+    # We should be able to get the block count as long as bitcoind is reachable
     block_count = block_processor.get_block_count()
     assert isinstance(block_count, int) and block_count >= 0
 
 
 def test_decode_raw_transaction(block_processor):
+    # Decoding a raw transaction should return a dictionary.
     # We cannot exhaustively test this (we rely on bitcoind for this) but we can try to decode a correct transaction
-    assert block_processor.decode_raw_transaction(hex_tx) is not None
+    assert isinstance(block_processor.decode_raw_transaction(hex_tx), dict)
 
 
 def test_decode_raw_transaction_invalid(block_processor):
-    # Same but with an invalid one
+    # Decoding an invalid raw transaction should raise
     with pytest.raises(InvalidTransactionFormat):
         block_processor.decode_raw_transaction(hex_tx[::-1])
 
 
 def test_get_missed_blocks(block_processor):
+    # get_missed_blocks returns the list of blocks from a given block hash to the chain tip
     target_block = block_processor.get_best_block_hash()
 
     # Generate some blocks and store the hash in a list
@@ -87,6 +98,7 @@ def test_get_missed_blocks(block_processor):
 
 
 def test_get_distance_to_tip(block_processor):
+    # get_distance_to_tip returns how many blocks the best chain contains from a given block hash to the best tip
     target_distance = 5
 
     target_block = block_processor.get_best_block_hash()
@@ -99,17 +111,21 @@ def test_get_distance_to_tip(block_processor):
 
 
 def test_is_block_in_best_chain(block_processor):
+    # is_block_in_best_chain returns whether a given block hash is in the best chain
+
+    # Testing it with the chain tip should return True
     best_block_hash = block_processor.get_best_block_hash()
     best_block = block_processor.get_block(best_block_hash)
 
     assert block_processor.is_block_in_best_chain(best_block_hash)
 
+    # Forking the chain and trying the old best tip again should return False
     fork(best_block.get("previousblockhash"), 2)
-
     assert not block_processor.is_block_in_best_chain(best_block_hash)
 
 
 def test_find_last_common_ancestor(block_processor):
+    # find_last_common_ancestor finds the last common block between the best tip and a given block
     ancestor = block_processor.get_best_block_hash()
     blocks = generate_blocks(3)
     best_block_hash = blocks[-1]
@@ -124,6 +140,8 @@ def test_find_last_common_ancestor(block_processor):
 
 
 # TESTS WITH BITCOIND UNREACHABLE
+# All BlockProcessor methods should work in a blocking and non-blocking way. The former raises a ConnectionRefusedError,
+# while the latter hangs until the event is set back.
 
 
 def test_get_block_bitcoind_crash(block_processor, block_processor_wrong_connection):

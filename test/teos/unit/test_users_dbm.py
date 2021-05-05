@@ -1,28 +1,33 @@
+import pytest
+import shutil
 from teos.users_dbm import UsersDBM
 from teos.gatekeeper import UserInfo
 
 from test.teos.unit.conftest import get_random_value_hex
 
-stored_users = {}
 
+@pytest.fixture
+def user_db_manager(db_name="test_user_db"):
+    manager = UsersDBM(db_name)
 
-def open_create_db(db_path):
+    yield manager
 
-    try:
-        db_manager = UsersDBM(db_path)
-
-        return db_manager
-
-    except ValueError:
-        return False
+    manager.db.close()
+    shutil.rmtree(db_name)
 
 
 def test_store_user(user_db_manager):
+    # Tests that users can be properly stored in the database
+
     # Store user should work as long as the user_pk is properly formatted and data is a dictionary
     user_id = "02" + get_random_value_hex(32)
     user_info = UserInfo(available_slots=42, subscription_expiry=100)
-    stored_users[user_id] = user_info.to_dict()
+
     assert user_db_manager.store_user(user_id, user_info.to_dict()) is True
+
+
+def test_store_user_wrong(user_db_manager):
+    # Tests that trying to store wrong data will fail
 
     # Wrong pks should return False on adding
     user_id = "04" + get_random_value_hex(32)
@@ -37,9 +42,19 @@ def test_store_user(user_db_manager):
 
 
 def test_load_user(user_db_manager):
-    # Loading a user we have stored should work
-    for user_id, user_data in stored_users.items():
-        assert user_db_manager.load_user(user_id) == user_data
+    # Tests that loading a user should work, as long as the user is there
+
+    # Add the user first
+    user_id = "02" + get_random_value_hex(32)
+    user_info = UserInfo(available_slots=42, subscription_expiry=100)
+    user_db_manager.store_user(user_id, user_info.to_dict())
+
+    # Now load it
+    assert user_db_manager.load_user(user_id) == user_info.to_dict()
+
+
+def test_load_user_wrong(user_db_manager):
+    # Tests that wrong data won't load
 
     # Random keys should fail
     assert user_db_manager.load_user(get_random_value_hex(33)) is None
@@ -49,21 +64,38 @@ def test_load_user(user_db_manager):
 
 
 def test_delete_user(user_db_manager):
-    # Deleting an existing user should work
+    # Tests that deleting existing users should work
+    stored_users = {}
+
+    # Add some users first
+    for _ in range(10):
+        user_id = "02" + get_random_value_hex(32)
+        user_info = UserInfo(available_slots=42, subscription_expiry=100)
+        user_db_manager.store_user(user_id, user_info.to_dict())
+        stored_users[user_id] = user_info
+
+    # Deleting existing users should work
     for user_id, user_data in stored_users.items():
         assert user_db_manager.delete_user(user_id) is True
 
-    for user_id, user_data in stored_users.items():
-        assert user_db_manager.load_user(user_id) is None
+    # There should be no users anymore
+    assert not user_db_manager.load_all_users()
 
-    # But deleting a non existing one should not fail
+
+def test_delete_user_wrong(user_db_manager):
+    # Tests that deleting users with wrong data should fail
+
+    # Non-existing user
     assert user_db_manager.delete_user(get_random_value_hex(32)) is True
 
-    # Keys of wrong type should fail
+    # Keys of wrong type
     assert user_db_manager.delete_user(42) is False
 
 
 def test_load_all_users(user_db_manager):
+    # Tests loading all the users in the database
+    stored_users = {}
+
     # There should be no users at the moment
     assert user_db_manager.load_all_users() == {}
     stored_users = {}
@@ -76,7 +108,4 @@ def test_load_all_users(user_db_manager):
         stored_users[user_id] = user_info.to_dict()
 
     all_users = user_db_manager.load_all_users()
-
-    assert set(all_users.keys()) == set(stored_users.keys())
-    for k, v in all_users.items():
-        assert stored_users[k] == v
+    assert all_users == stored_users
