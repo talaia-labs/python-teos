@@ -1,11 +1,19 @@
 import grpc
 from concurrent import futures
+from google.protobuf.empty_pb2 import Empty
 from google.protobuf.struct_pb2 import Struct
 
-from teos.logger import get_logger
-from common.appointment import Appointment, AppointmentStatus
-from common.exceptions import InvalidParameter
 
+from common.exceptions import InvalidParameter
+from common.appointment import Appointment, AppointmentStatus
+
+
+from teos.logger import get_logger
+from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
+from teos.protobuf.user_pb2 import RegisterResponse, GetUserResponse, GetUsersResponse
+from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure, SubscriptionExpired
+from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
 from teos.protobuf.appointment_pb2 import (
     Appointment as AppointmentProto,
     Tracker as TrackerProto,
@@ -14,12 +22,6 @@ from teos.protobuf.appointment_pb2 import (
     GetAppointmentResponse,
     GetAllAppointmentsResponse,
 )
-from teos.protobuf.user_pb2 import RegisterResponse, GetUserResponse, GetUsersResponse
-from teos.protobuf.tower_services_pb2 import GetTowerInfoResponse
-from teos.protobuf.tower_services_pb2_grpc import TowerServicesServicer, add_TowerServicesServicer_to_server
-from teos.gatekeeper import NotEnoughSlots, AuthenticationFailure, SubscriptionExpired
-from teos.watcher import AppointmentLimitReached, AppointmentAlreadyTriggered, AppointmentNotFound
-from google.protobuf.empty_pb2 import Empty
 
 
 class InternalAPI:

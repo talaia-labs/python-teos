@@ -277,6 +277,7 @@ class Watcher:
             registration receipt by the Watcher.
 
         Raises:
+            :obj:`InvalidParameter`: if the user_id does not match the expected format.
             :obj:`ConnectionRefusedError`: if bitcoind cannot be reached.
         """
 
@@ -300,6 +301,7 @@ class Watcher:
                 ``AppointmentStatus.BEING_WATCHED`` or ``AppointmentStatus.DISPUTE_RESPONDED``
 
         Raises:
+            :obj:`AuthenticationFailure`: if the user cannot be authenticated.
             :obj:`AppointmentNotFound`: if the appointment is not found in the tower.
             :obj:`SubscriptionExpired`: If the user subscription has expired.
             :obj:`ConnectionRefusedError`: If bitcoind cannot be reached.
@@ -451,7 +453,7 @@ class Watcher:
                 "start_block": extended_appointment.start_block,
                 "signature": signature,
                 "available_slots": available_slots,
-                "subscription_expiry": self.gatekeeper.registered_users[user_id].subscription_expiry,
+                "subscription_expiry": self.gatekeeper.get_user_info(user_id).subscription_expiry,
             }
 
     def do_watch(self):
@@ -697,6 +699,7 @@ class Watcher:
             list of locators associated with the appointments that match the subscription.
 
         Raises:
+            :obj:`AuthenticationFailure`: if the user cannot be authenticated.
             :obj:`SubscriptionExpired`: If the user subscription has expired.
             :obj:`ConnectionRefusedError`: If bitcoind cannot be reached.
         """

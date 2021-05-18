@@ -186,13 +186,13 @@ class Cleaner:
         (from the :obj:`Responder`'s and :obj:`Watcher`'s databases).
 
         Args:
+            completed_trackers (:obj:`dict`): a dict of completed/outdated trackers to be deleted
+                (``uuid:confirmations``).
             trackers (:obj:`dict`): a dictionary containing all the :obj:`Responder <teos.responder.Responder>`
                 trackers.
             height (:obj:`int`): the block height at which the trackers were completed.
             tx_tracker_map (:obj:`dict`): a ``penalty_txid:uuid`` map for the :obj:`Responder
                 <teos.responder.Responder>` trackers.
-            completed_trackers (:obj:`dict`): a dict of completed/outdated trackers to be deleted
-                (``uuid:confirmations``).
             db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
                 database manager to interact with the database.
             outdated (:obj:`bool`): whether the trackers have been outdated or not. Defaults to False.
