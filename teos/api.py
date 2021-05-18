@@ -231,7 +231,7 @@ class API:
             )
         except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
-            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
+            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.errno}
 
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.UNAUTHENTICATED:

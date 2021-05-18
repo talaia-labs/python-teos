@@ -18,8 +18,8 @@ BLOCKS_IN_A_MONTH = 4320  # 4320 = roughly a month in blocks
 class InspectionFailed(Exception):
     """Raise this the inspector finds a problem with any of the appointment fields."""
 
-    def __init__(self, erno, reason):
-        self.erno = erno
+    def __init__(self, errno, reason):
+        self.errno = errno
         self.reason = reason
 
 
