@@ -1,4 +1,6 @@
 import grpc
+import requests
+from time import sleep
 from google.protobuf import json_format
 from waitress import serve as wsgi_serve
 from flask import Flask, request, jsonify
@@ -7,7 +9,7 @@ import common.errors as errors
 from common.tools import intify
 from common.exceptions import InvalidParameter
 from common.appointment import AppointmentStatus
-from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
+from common.constants import HTTP_OK, HTTP_EMPTY, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 from teos.logger import setup_logging, get_logger
 from teos.inspector import Inspector, InspectionFailed
@@ -63,7 +65,7 @@ def serve(internal_api_endpoint, endpoint, logging_port, min_to_self_delay, auto
     """
     Starts the API.
 
-    This method can be handled either form an external WSGI (like gunicorn) or by the Flask development server.
+    This method can be handled either form an external WSGI (like gunicorn) or by the Waitress.
 
     Args:
         internal_api_endpoint (:obj:`str`): endpoint where the internal api is running (``host:port``).
@@ -71,7 +73,7 @@ def serve(internal_api_endpoint, endpoint, logging_port, min_to_self_delay, auto
         logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
         min_to_self_delay (:obj:`str`): the minimum to_self_delay accepted by the :obj:`Inspector`.
         auto_run (:obj:`bool`): whether the server should be started by this process. False if run with an external
-            WSGI. True is run by Flask.
+            WSGI. True is run by Waitress.
 
     Returns:
         The application object needed by the WSGI server to run if ``auto_run`` is False, :obj:`None` otherwise.
@@ -89,6 +91,23 @@ def serve(internal_api_endpoint, endpoint, logging_port, min_to_self_delay, auto
         wsgi_serve(api.app, listen=endpoint.replace("localhost", "127.0.0.1"))
     else:
         return api.app
+
+
+def wait_until_ready(api_endpoint):
+    """
+    Waits until the API is ready by polling the info endpoint until an HTTP_OK is received.
+
+    Args:
+        api_endpoint: endpoint where the http api will be running (``host:port``).
+    """
+
+    ping_endpoint = f"{api_endpoint}/ping"
+    if not api_endpoint.startswith("http"):
+        ping_endpoint = f"http://{ping_endpoint}"
+
+    # Wait for the API
+    while requests.get(ping_endpoint).status_code != HTTP_EMPTY:
+        sleep(1)
 
 
 class API:
@@ -118,6 +137,7 @@ class API:
 
         # Adds all the routes to the functions listed above.
         routes = {
+            "/ping": (self.ping, ["GET"]),
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
@@ -126,6 +146,19 @@ class API:
 
         for url, params in routes.items():
             self.app.add_url_rule(url, view_func=params[0], methods=params[1])
+
+    def ping(self):
+        """
+        Ping endpoint. Serves the purpose of checking the status of the tower.
+
+        Returns:
+            :obj:`tuple`: A tuple containing the response (:obj:`str`) and response code (:obj:`int`). Currently the
+            response is empty.
+        """
+
+        remote_addr = get_remote_addr()
+        self.logger.info("Received info request", from_addr="{}".format(remote_addr))
+        return "", HTTP_EMPTY
 
     def register(self):
         """

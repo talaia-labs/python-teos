@@ -2,6 +2,7 @@ import grpc
 import functools
 from concurrent import futures
 from signal import signal, SIGINT
+from multiprocessing import Event
 
 from teos.tools import ignore_signal
 from teos.logger import setup_logging, get_logger
@@ -34,6 +35,7 @@ class RPC:
         self.endpoint = f"{rpc_bind}:{rpc_port}"
         self.rpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.rpc_server.add_insecure_port(self.endpoint)
+        self.ready = Event()
         add_TowerServicesServicer_to_server(_RPC(internal_api_endpoint, self.logger), self.rpc_server)
 
     def teardown(self):
@@ -99,7 +101,7 @@ class _RPC(TowerServicesServicer):
         return self.stub.stop(request)
 
 
-def serve(rpc_bind, rpc_port, internal_api_endpoint, logging_port, stop_event):
+def serve(rpc_bind, rpc_port, internal_api_endpoint, logging_port, rpc_ready, stop_event):
     """
     Serves the external RPC API at the given endpoint and connects it to the internal api.
 
@@ -121,6 +123,7 @@ def serve(rpc_bind, rpc_port, internal_api_endpoint, logging_port, stop_event):
     rpc.rpc_server.start()
 
     rpc.logger.info(f"Initialized. Serving at {rpc.endpoint}")
+    rpc_ready.set()
 
     stop_event.wait()
 
