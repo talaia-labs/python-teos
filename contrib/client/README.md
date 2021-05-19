@@ -26,10 +26,18 @@ Refer to [INSTALL.md](INSTALL.md)
 
 The client has four commands:
 
+- `ping`: pings the tower to check if it's online.
 - `register`: registers your user with the tower.
 - `add_appointment`: sends a json formatted appointment to the tower.
 - `get_appointment`: gets json formatted data about an appointment from the tower.
 - `help`: shows a list of commands or help for a specific command.
+
+### ping
+This command is used to check the status of the tower.
+
+#### Usage
+
+	teos-client ping
 
 ### register
 This commands serves as registration. It sends your public key to the tower to create a subscription (free at the moment) and returns a number of available appointment slots in the tower. Topping up the subscription can be done by simply sending a register message again.

@@ -29,11 +29,41 @@ from contrib.client.help import (
     help_get_appointment,
     help_get_subscription_info,
     help_register,
+    help_ping,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 logger = logging.getLogger()
+
+
+def ping(teos_url):
+    """
+    Pings the tower to check if it is online.
+
+    Args:
+        teos_url (:obj:`str`): the teos base url.
+
+    Raises:
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
+        :obj:`ConnectionError`: if the client cannot connect to the tower.
+    """
+
+    ping_endpoint = "{}/ping".format(teos_url)
+
+    logger.info(f"Pinging the Eye of Satoshi at {teos_url}")
+
+    try:
+        response = requests.get(ping_endpoint)
+
+        if response.status_code == constants.HTTP_EMPTY:
+            logger.info(f"The Eye of Satoshi is alive")
+        else:
+            raise TowerResponseError(
+                "The server returned an error", status_code=response.status_code, reason=response.reason, data=response,
+            )
+    except ConnectionError:
+        raise ConnectionError(f"The Eye of Satoshi is down")
 
 
 def register(user_id, teos_id, teos_url):
@@ -51,8 +81,7 @@ def register(user_id, teos_id, teos_url):
     Raises:
         :obj:`InvalidParameter`: if `user_id` is invalid.
         :obj:`ConnectionError`: if the client cannot connect to the tower.
-        :obj:`TowerResponseError`: if the tower responded with an error, or the
-            response was invalid.
+        :obj:`TowerResponseError`: if the tower responded with an error, or the response was invalid.
     """
 
     if not is_compressed_pk(user_id):
@@ -460,6 +489,9 @@ def main(command, args, command_line_conf):
             Cryptographer.save_key_file(user_sk.to_der(), "user_sk", config.get("DATA_DIR"))
             user_id = Cryptographer.get_compressed_pk(user_sk.public_key)
 
+        if command == "ping":
+            ping(teos_url)
+
         if command == "register":
             if not args:
                 raise InvalidParameter("Cannot register. No tower id was given")
@@ -515,6 +547,9 @@ def main(command, args, command_line_conf):
             if args:
                 command = args.pop(0)
 
+                if command == "ping":
+                    sys.exit(help_ping())
+
                 if command == "register":
                     sys.exit(help_register())
 
@@ -541,7 +576,7 @@ def main(command, args, command_line_conf):
 
 def run():
     command_line_conf = {}
-    commands = ["register", "add_appointment", "get_appointment", "get_subscription_info", "help"]
+    commands = ["ping", "register", "add_appointment", "get_appointment", "get_subscription_info", "help"]
 
     try:
         opts, args = getopt(argv[1:], "h", ["apiconnect=", "apiport=", "help"])
