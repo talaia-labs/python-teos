@@ -8,6 +8,7 @@ commitment transaction is generated. It also keeps a summary of the messages sen
 
 The plugin has the following methods:
 
+- `pingtower ip[:port]`: pings a tower to check if it's online.
 - `registertower tower_id` : registers the user id (compressed public key) with a given tower.
 - `list_towers`: lists all registered towers.
 - `gettowerinfo tower_id`: gets all the locally stored data about a given tower.
