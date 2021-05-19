@@ -416,29 +416,30 @@ def run():
     command_line_conf = {}
     data_dir = DATA_DIR
 
-    opts, _ = getopt(
-        argv[1:],
-        "hd",
-        [
-            "apibind=",
-            "apiport=",
-            "rpcbind=",
-            "rpcport=",
-            "btcnetwork=",
-            "btcrpcuser=",
-            "btcrpcpassword=",
-            "btcrpcconnect=",
-            "btcrpcport=",
-            "btcfeedconnect=",
-            "btcfeedport=",
-            "datadir=",
-            "wsgi=",
-            "daemon",
-            "overwritekey",
-            "help",
-        ],
-    )
     try:
+        opts, _ = getopt(
+            argv[1:],
+            "hd",
+            [
+                "apibind=",
+                "apiport=",
+                "rpcbind=",
+                "rpcport=",
+                "btcnetwork=",
+                "btcrpcuser=",
+                "btcrpcpassword=",
+                "btcrpcconnect=",
+                "btcrpcport=",
+                "btcfeedconnect=",
+                "btcfeedport=",
+                "datadir=",
+                "wsgi=",
+                "daemon",
+                "overwritekey",
+                "help",
+            ],
+        )
+
         for opt, arg in opts:
             if opt in ["--apibind"]:
                 command_line_conf["API_BIND"] = arg
@@ -489,7 +490,7 @@ def run():
                 exit(show_usage())
 
     except GetoptError as e:
-        exit(e)
+        exit(f"{e}\n\n{show_usage()}")
 
     config = get_config(command_line_conf, data_dir)
 

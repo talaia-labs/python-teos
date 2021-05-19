@@ -313,7 +313,7 @@ def run():
     try:
         command_index = next(i for i in range(len(argv)) if i > 0 and not argv[i].startswith("-"))
     except StopIteration:
-        sys.exit(show_usage())
+        sys.exit(f"No command found\n\n{show_usage()}")
 
     command = argv[command_index]
     global_options = argv[1:command_index]
@@ -345,7 +345,7 @@ def run():
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
     except GetoptError as e:
-        sys.exit("{}".format(e))
+        sys.exit(f"{e}\n\n{show_usage()}")
 
     if command in CLI.COMMANDS:
         cli = CLI(data_dir, command_line_conf)
