@@ -101,7 +101,6 @@ class AppointmentsDBM:
     def __init__(self):
         self.appointments = dict()
         self.trackers = dict()
-        self.locator_map = dict()
         self.triggered_appointments = set()
         self.last_known_block_watcher = None
         self.last_known_block_responder = None
@@ -140,21 +139,6 @@ class AppointmentsDBM:
 
     def store_responder_tracker(self, uuid, tracker):
         self.trackers[uuid] = tracker
-
-    def load_locator_map(self, locator):
-        return self.locator_map.get(locator)
-
-    def create_append_locator_map(self, locator, uuid):
-        if locator in self.locator_map:
-            self.locator_map[locator].append(uuid)
-        else:
-            self.locator_map[locator] = [uuid]
-
-    def update_locator_map(self, locator, locator_map):
-        self.locator_map[locator] = locator_map
-
-    def delete_locator_map(self, locator):
-        del self.locator_map[locator]
 
     def delete_watcher_appointment(self, uuid):
         del self.appointments[uuid]

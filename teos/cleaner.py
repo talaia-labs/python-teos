@@ -50,44 +50,14 @@ class Cleaner:
         db_manager.delete_triggered_appointment_flag(uuid)
 
     @staticmethod
-    def update_delete_db_locator_map(uuids, locator, db_manager):
+    def delete_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager, outdated=False):
         """
-        Updates the ``locator:uuid`` map of a given locator from the database by removing a given uuid. If the uuid is
-        the only element of the map, the map is deleted, otherwise the uuid is simply removed and the database is
-        updated.
-
-        If either the uuid of the locator are not found, the data is not modified.
-
-        Args:
-            uuids (:obj:`list`): a list of identifiers to be removed from the map.
-            locator (:obj:`str`): the identifier of the map to be either updated or deleted.
-            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
-                database manager to interact with the database.
-        """
-
-        locator_map = db_manager.load_locator_map(locator)
-
-        if locator_map is not None:
-            if set(locator_map).issuperset(uuids):
-                # Remove the map if all keys are requested to be deleted
-                if set(locator_map) == set(uuids):
-                    db_manager.delete_locator_map(locator)
-                else:
-                    # Otherwise remove only the selected keys
-                    locator_map = list(set(locator_map).difference(uuids))
-                    db_manager.update_locator_map(locator, locator_map)
-
-            else:
-                Cleaner.logger.error("Some UUIDs not found in the db", locator=locator, all_uuids=uuids)
-
-        else:
-            Cleaner.logger.error("Locator map not found in the db", locator=locator)
-
-    @staticmethod
-    def delete_outdated_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager):
-        """
-        Deletes appointments that have outdated (with no trigger) both from memory
+        Deletes appointments that have completed (with no trigger), or outdated, both from memory
         (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
+
+        Currently, an appointment is only completed if it cannot make it to the
+        (:obj:`Responder <teos.responder.Responder>`), otherwise, it will be flagged as triggered and removed once the
+        tracker is completed.
 
         Args:
             outdated_appointments (:obj:`list`): a list of appointments to be deleted.
@@ -97,67 +67,22 @@ class Cleaner:
                 appointments.
             db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
                 database manager to interact with the database.
+            outdated (:obj:`bool`): whether the appointments have been outdated or completed.
         """
-
-        locator_maps_to_update = {}
 
         for uuid in outdated_appointments:
             locator = appointments[uuid].get("locator")
-            Cleaner.logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
+            if outdated:
+                Cleaner.logger.info("End time reached with no breach. Deleting appointment", locator=locator, uuid=uuid)
+            else:
+                Cleaner.logger.warning(
+                    "Appointment cannot be completed, it contains invalid data. Deleting", locator=locator, uuid=uuid
+                )
 
             Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
-
-            if locator not in locator_maps_to_update:
-                locator_maps_to_update[locator] = []
-
-            locator_maps_to_update[locator].append(uuid)
-
-        for locator, uuids in locator_maps_to_update.items():
-            Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
 
         # Outdated appointments are not flagged, so they can be deleted without caring about the db flag.
         db_manager.batch_delete_watcher_appointments(outdated_appointments)
-
-    @staticmethod
-    def delete_completed_appointments(completed_appointments, appointments, locator_uuid_map, db_manager):
-        """
-        Deletes a completed appointment from memory (:obj:`Watcher <teos.watcher.Watcher>`) and disk.
-
-        Currently, an appointment is only completed if it cannot make it to the
-        (:obj:`Responder <teos.responder.Responder>`), otherwise, it will be flagged as triggered and removed once the
-        tracker is completed.
-
-        Args:
-            completed_appointments (:obj:`list`): a list of appointments to be deleted.
-            appointments (:obj:`dict`): a dictionary containing all the :obj:`Watcher <teos.watcher.Watcher>`
-                appointments.
-            locator_uuid_map (:obj:`dict`): a ``locator:uuid`` map for the :obj:`Watcher <teos.watcher.Watcher>`
-                appointments.
-            db_manager (:obj:`AppointmentsDBM <teos.appointments_dbm.AppointmentsDBM>`): an instance of the appointment
-                database manager to interact with the database.
-        """
-
-        locator_maps_to_update = {}
-
-        for uuid in completed_appointments:
-            locator = appointments[uuid].get("locator")
-
-            Cleaner.logger.warning(
-                "Appointment cannot be completed, it contains invalid data. Deleting", locator=locator, uuid=uuid
-            )
-
-            Cleaner.delete_appointment_from_memory(uuid, appointments, locator_uuid_map)
-
-            if locator not in locator_maps_to_update:
-                locator_maps_to_update[locator] = []
-
-            locator_maps_to_update[locator].append(uuid)
-
-        for locator, uuids in locator_maps_to_update.items():
-            # Update / delete the locator map
-            Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
-
-        db_manager.batch_delete_watcher_appointments(completed_appointments)
 
     @staticmethod
     def flag_triggered_appointments(triggered_appointments, appointments, locator_uuid_map, db_manager):
@@ -198,8 +123,6 @@ class Cleaner:
             outdated (:obj:`bool`): whether the trackers have been outdated or not. Defaults to False.
         """
 
-        locator_maps_to_update = {}
-
         for uuid in completed_trackers:
 
             if outdated:
@@ -214,7 +137,6 @@ class Cleaner:
                 )
 
             penalty_txid = trackers[uuid].get("penalty_txid")
-            locator = trackers[uuid].get("locator")
             trackers.pop(uuid)
 
             if len(tx_tracker_map[penalty_txid]) == 1:
@@ -224,15 +146,6 @@ class Cleaner:
 
             else:
                 tx_tracker_map[penalty_txid].remove(uuid)
-
-            if locator not in locator_maps_to_update:
-                locator_maps_to_update[locator] = []
-
-            locator_maps_to_update[locator].append(uuid)
-
-        for locator, uuids in locator_maps_to_update.items():
-            # Update / delete the locator map
-            Cleaner.update_delete_db_locator_map(uuids, locator, db_manager)
 
         # Delete appointment from the db (from watcher's and responder's db) and remove flag
         db_manager.batch_delete_responder_trackers(completed_trackers)

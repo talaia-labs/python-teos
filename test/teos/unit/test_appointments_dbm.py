@@ -7,11 +7,9 @@ from teos.appointments_dbm import AppointmentsDBM
 from teos.appointments_dbm import (
     WATCHER_LAST_BLOCK_KEY,
     RESPONDER_LAST_BLOCK_KEY,
-    LOCATOR_MAP_PREFIX,
     TRIGGERED_APPOINTMENTS_PREFIX,
 )
 
-from common.constants import LOCATOR_LEN_BYTES
 
 from test.teos.unit.conftest import get_random_value_hex
 
@@ -80,110 +78,6 @@ def test_load_watcher_appointments_empty(db_manager):
 def test_load_responder_trackers_empty(db_manager):
     # Loadings the trackers dict from an empty db should return an empty dict
     assert not db_manager.load_responder_trackers()
-
-
-def test_load_locator_map_empty(db_manager):
-    # Loadings the locators map from an empty db should return an empty dict
-    assert not db_manager.load_locator_map(get_random_value_hex(LOCATOR_LEN_BYTES))
-
-
-def test_create_append_locator_map(db_manager):
-    # Test adding a new entry to the locator map
-    uuid = uuid4().hex
-    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-    db_manager.create_append_locator_map(locator, uuid)
-
-    # Check that the locator map has been properly stored
-    assert db_manager.load_locator_map(locator) == [uuid]
-
-    # If we try to add the same uuid again the list shouldn't change
-    db_manager.create_append_locator_map(locator, uuid)
-    assert db_manager.load_locator_map(locator) == [uuid]
-
-    # Add another uuid to the same locator and check that it also works
-    uuid2 = uuid4().hex
-    db_manager.create_append_locator_map(locator, uuid2)
-
-    assert set(db_manager.load_locator_map(locator)) == {uuid, uuid2}
-
-
-def test_update_locator_map(db_manager):
-    # Tests updating an entry from the locator map
-    # Let's create a couple of appointments with the same locator and add them to the map
-    locator = get_random_value_hex(32)
-    uuid1 = uuid4().hex
-    uuid2 = uuid4().hex
-    db_manager.create_append_locator_map(locator, uuid1)
-    db_manager.create_append_locator_map(locator, uuid2)
-
-    # Check that both entries are in the map
-    locator_map = db_manager.load_locator_map(locator)
-    assert uuid1 in locator_map and uuid2 in locator_map
-
-    # Remove one of the entries and update the map
-    locator_map.remove(uuid1)
-    db_manager.update_locator_map(locator, locator_map)
-
-    # Check that only one entry is in the map now
-    locator_map_after = db_manager.load_locator_map(locator)
-    assert uuid1 not in locator_map_after and uuid2 in locator_map_after and len(locator_map_after) == 1
-
-
-def test_update_locator_map_wong_data(db_manager):
-    # Tests updating the locator map with a different list of uuids. An update can only go through if the new data is
-    # a subset of the old one
-
-    # Add a map first
-    locator = get_random_value_hex(32)
-    db_manager.create_append_locator_map(locator, uuid4().hex)
-    db_manager.create_append_locator_map(locator, uuid4().hex)
-    locator_map = db_manager.load_locator_map(locator)
-
-    # Try to update
-    wrong_map_update = [uuid4().hex]
-    db_manager.update_locator_map(locator, wrong_map_update)
-    locator_map_after = db_manager.load_locator_map(locator)
-
-    assert locator_map_after == locator_map
-
-
-def test_update_locator_map_empty(db_manager):
-    # We shouldn't be able to update a map with an empty list
-    locator = get_random_value_hex(32)
-    db_manager.create_append_locator_map(locator, uuid4().hex)
-    db_manager.create_append_locator_map(locator, uuid4().hex)
-
-    locator_map = db_manager.load_locator_map(locator)
-    db_manager.update_locator_map(locator, [])
-    locator_map_after = db_manager.load_locator_map(locator)
-
-    assert locator_map_after == locator_map
-
-
-def test_delete_locator_map(db_manager):
-    # Tests the deletion of data in a locator map
-
-    # Add some data to be deleted
-    for _ in range(5):
-        uuid = uuid4().hex
-        locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-        db_manager.create_append_locator_map(locator, uuid)
-
-    locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
-
-    # Now that there are some locators we can start the test
-    assert len(locator_maps) != 0
-
-    for locator, uuids in locator_maps.items():
-        assert db_manager.delete_locator_map(locator) is True
-
-    locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
-    assert len(locator_maps) == 0
-
-
-def test_delete_locator_map_wrong(db_manager):
-    # Keys of wrong type should fail
-    assert db_manager.delete_locator_map(42) is False
 
 
 def test_store_watcher_appointment_wrong(db_manager, watcher_appointments):
