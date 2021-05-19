@@ -1,31 +1,14 @@
 import pytest
 
-from common.constants import LOCATOR_LEN_BYTES
-from common.cryptographer import Cryptographer
 from teos.extended_appointment import ExtendedAppointment
 
-from test.teos.unit.conftest import get_random_value_hex, generate_keypair
+
+@pytest.fixture
+def ext_appointment_data(generate_dummy_appointment):
+    return generate_dummy_appointment().to_dict()
 
 
 # Parent methods are not tested.
-@pytest.fixture
-def ext_appointment_data():
-    sk, pk = generate_keypair()
-    locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-    encrypted_blob_data = get_random_value_hex(100)
-    to_self_delay = 20
-    user_id = Cryptographer.get_compressed_pk(pk)
-    user_signature = Cryptographer.sign(encrypted_blob_data.encode("utf-8"), sk)
-    start_block = 300
-
-    return {
-        "locator": locator,
-        "to_self_delay": to_self_delay,
-        "encrypted_blob": encrypted_blob_data,
-        "user_id": user_id,
-        "user_signature": user_signature,
-        "start_block": start_block,
-    }
 
 
 def test_init_ext_appointment(ext_appointment_data):

@@ -3,20 +3,20 @@ from uuid import uuid4
 from queue import Queue
 
 from teos.builder import Builder
-from teos.watcher import Watcher
-from teos.responder import Responder
+from test.teos.unit.conftest import get_random_value_hex
 
-from test.teos.conftest import config, generate_blocks
-from test.teos.unit.conftest import get_random_value_hex, generate_keypair
+# FIXME: IMPROVE THE COMMENTS IN THIS SUITE
 
 
-# FIXME: 194 will do with dummy appointment
 def test_build_appointments(generate_dummy_appointment):
+    # build_appointments builds two dictionaries: appointments (uuid:ExtendedAppointment) and locator_uuid_map
+    # (locator:uuid). These are populated with data pulled from the database and used as initial state by the Watcher
+    # during bootstrap
     appointments_data = {}
 
     # Create some appointment data
     for i in range(10):
-        appointment, _ = generate_dummy_appointment()
+        appointment = generate_dummy_appointment()
         uuid = uuid4().hex
 
         appointments_data[uuid] = appointment.to_dict()
@@ -24,7 +24,7 @@ def test_build_appointments(generate_dummy_appointment):
         # Add some additional appointments that share the same locator to test all the builder's cases
         if i % 2 == 0:
             locator = appointment.locator
-            appointment, _ = generate_dummy_appointment()
+            appointment = generate_dummy_appointment()
             uuid = uuid4().hex
             appointment.locator = locator
 
@@ -41,8 +41,9 @@ def test_build_appointments(generate_dummy_appointment):
         assert uuid in locator_uuid_map[appointment.get("locator")]
 
 
-# FIXME: 194 will do with dummy tracker
 def test_build_trackers(generate_dummy_tracker):
+    # build_trackers builds two dictionaries: trackers (uuid: TransactionTracker) and tx_tracker_map (txid:uuid)
+    # These are populated with data pulled from the database and used as initial state by the Responder during bootstrap
     trackers_data = {}
 
     # Create some trackers data
@@ -72,6 +73,8 @@ def test_build_trackers(generate_dummy_tracker):
 
 
 def test_populate_block_queue():
+    # populate_block_queue sets the initial state of the Watcher / Responder block queue
+
     # Create some random block hashes and construct the queue with them
     blocks = [get_random_value_hex(32) for _ in range(10)]
     queue = Queue()
@@ -86,69 +89,51 @@ def test_populate_block_queue():
     assert len(blocks) == 0
 
 
-def test_update_states_empty_list(db_manager, gatekeeper, carrier, block_processor):
-    w = Watcher(
-        db_manager=db_manager,
-        gatekeeper=gatekeeper,
-        block_processor=block_processor,
-        responder=Responder(db_manager, gatekeeper, carrier, block_processor),
-        sk=generate_keypair()[0],
-        max_appointments=config.get("MAX_APPOINTMENTS"),
-        blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
-    )
+def test_update_states_empty_list():
+    # update_states feed data to both the Watcher and the Responder block queue and waits until it is processed. It is
+    # used to bring both components up to date during bootstrap. This is only used iof both have missed blocks,
+    # otherwise populate_block_queue must be used.
 
+    # Test the case where one of the components does not have any data to update with
+
+    watcher_queue = Queue()
+    responder_queue = Queue()
     missed_blocks_watcher = []
     missed_blocks_responder = [get_random_value_hex(32)]
 
     # Any combination of empty list must raise a ValueError
     with pytest.raises(ValueError):
-        Builder.update_states(w, missed_blocks_watcher, missed_blocks_responder)
+        Builder.update_states(watcher_queue, responder_queue, missed_blocks_watcher, missed_blocks_responder)
 
     with pytest.raises(ValueError):
-        Builder.update_states(w, missed_blocks_responder, missed_blocks_watcher)
+        Builder.update_states(watcher_queue, responder_queue, missed_blocks_responder, missed_blocks_watcher)
 
 
-# FIXME: 194 will do with watcher, since no functionality is being used, this is only populating the data structures
-def test_update_states_responder_misses_more(db_manager, gatekeeper, carrier, block_processor):
-    w = Watcher(
-        db_manager=db_manager,
-        gatekeeper=gatekeeper,
-        block_processor=block_processor,
-        responder=Responder(db_manager, gatekeeper, carrier, block_processor),
-        sk=generate_keypair()[0],
-        max_appointments=config.get("MAX_APPOINTMENTS"),
-        blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
-    )
+def test_update_states_responder_misses_more(monkeypatch):
+    # Test the case where both components have data that need to be updated, but the Responder has more.
+    blocks = [get_random_value_hex(32) for _ in range(5)]
+    watcher_queue = Queue()
+    responder_queue = Queue()
 
-    blocks = generate_blocks(5)
+    # Monkeypatch so there's no join, since the queues are not tied to a Watcher and a Responder for the test
+    monkeypatch.setattr(watcher_queue, "join", lambda: None)
+    monkeypatch.setattr(responder_queue, "join", lambda: None)
+    Builder.update_states(watcher_queue, responder_queue, blocks, blocks[1:])
 
-    # Updating the states should bring both to the same last known block.
-    w.awake()
-    w.responder.awake()
-    Builder.update_states(w, blocks, blocks[1:])
-
-    assert db_manager.load_last_block_hash_watcher() == blocks[-1]
-    assert w.responder.last_known_block == blocks[-1]
+    assert responder_queue.queue.pop() == blocks[-1]
+    assert watcher_queue.queue.pop() == blocks[-1]
 
 
-# FIXME: 194 will do with watcher, since no functionality is being used, this is only populating the data structures
-def test_update_states_watcher_misses_more(db_manager, gatekeeper, carrier, block_processor):
-    # Same as before, but data is now in the Responder
-    w = Watcher(
-        db_manager=db_manager,
-        gatekeeper=gatekeeper,
-        block_processor=block_processor,
-        responder=Responder(db_manager, gatekeeper, carrier, block_processor),
-        sk=generate_keypair()[0],
-        max_appointments=config.get("MAX_APPOINTMENTS"),
-        blocks_in_cache=config.get("LOCATOR_CACHE_SIZE"),
-    )
+def test_update_states_watcher_misses_more(monkeypatch):
+    # Test the case where both components have data that need to be updated, but the Watcher has more.
+    blocks = [get_random_value_hex(32) for _ in range(5)]
+    watcher_queue = Queue()
+    responder_queue = Queue()
 
-    blocks = generate_blocks(5)
+    # Monkeypatch so there's no join, since the queues are not tied to a Watcher and a Responder for the test
+    monkeypatch.setattr(watcher_queue, "join", lambda: None)
+    monkeypatch.setattr(responder_queue, "join", lambda: None)
+    Builder.update_states(watcher_queue, responder_queue, blocks[1:], blocks)
 
-    w.awake()
-    w.responder.awake()
-    Builder.update_states(w, blocks[1:], blocks)
-
-    assert db_manager.load_last_block_hash_watcher() == blocks[-1]
-    assert db_manager.load_last_block_hash_responder() == blocks[-1]
+    assert responder_queue.queue.pop() == blocks[-1]
+    assert watcher_queue.queue.pop() == blocks[-1]

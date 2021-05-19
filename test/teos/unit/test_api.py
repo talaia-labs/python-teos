@@ -1,34 +1,37 @@
+import grpc
 import pytest
-from multiprocessing import Event
-from shutil import rmtree
 
 from teos.api import API
-import common.errors as errors
-from teos.watcher import Watcher
-from teos.inspector import Inspector
-from teos.gatekeeper import UserInfo
-from teos.internal_api import InternalAPI
-from common.appointment import Appointment, AppointmentStatus
-from teos.appointments_dbm import AppointmentsDBM
-from teos.responder import Responder
-
-from test.teos.conftest import config, create_txs
-from test.teos.unit.conftest import (
-    get_random_value_hex,
-    generate_keypair,
-    compute_locator,
-    mock_connection_refused_return,
+from teos.inspector import Inspector, InspectionFailed
+from teos.internal_api import (
+    RegisterResponse,
+    AddAppointmentResponse,
+    GetAppointmentResponse,
+    AppointmentData,
+    AppointmentProto,
+    TrackerProto,
+    Struct,
+    GetUserResponse,
 )
 
+
+import common.errors as errors
 import common.receipts as receipts
-from common.cryptographer import Cryptographer, hash_160
+from common.cryptographer import Cryptographer
+from common.appointment import Appointment, AppointmentStatus
 from common.constants import (
     HTTP_OK,
     HTTP_NOT_FOUND,
     HTTP_BAD_REQUEST,
     HTTP_SERVICE_UNAVAILABLE,
     LOCATOR_LEN_BYTES,
-    ENCRYPTED_BLOB_MAX_SIZE_HEX,
+)
+
+from test.teos.conftest import config
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    generate_keypair,
+    raise_invalid_parameter,
 )
 
 internal_api_endpoint = "{}:{}".format(config.get("INTERNAL_API_HOST"), config.get("INTERNAL_API_PORT"))
@@ -41,13 +44,7 @@ get_all_appointment_endpoint = "{}/get_all_appointments".format(TEOS_API)
 get_subscription_info_endpoint = "{}/get_subscription_info".format(TEOS_API)
 
 # Reduce the maximum number of appointments to something we can test faster
-MAX_APPOINTMENTS = 100
 MULTIPLE_APPOINTMENTS = 10
-
-TWO_SLOTS_BLOTS = "A" * ENCRYPTED_BLOB_MAX_SIZE_HEX + "AA"
-
-appointments = {}
-locator_dispute_tx_map = {}
 
 
 user_sk, user_pk = generate_keypair()
@@ -56,36 +53,23 @@ user_id = Cryptographer.get_compressed_pk(user_pk)
 teos_sk, teos_pk = generate_keypair()
 teos_id = Cryptographer.get_compressed_pk(teos_sk.public_key)
 
+# Error code for gRPC error returns
+rpc_error = grpc.RpcError()
+rpc_error.code = None
+rpc_error.details = None
+
 
 # A function that ignores the arguments and returns user_id; used in some tests to mock the result of authenticate_user
 def mock_authenticate_user(*args, **kwargs):
     return user_id
 
 
-@pytest.fixture()
-def get_all_db_manager():
-    manager = AppointmentsDBM("get_all_tmp_db")
-    # Add last know block for the Responder in the db
-
-    yield manager
-
-    manager.db.close()
-    rmtree("get_all_tmp_db")
+def raise_grpc_error(*args, **kwargs):
+    raise rpc_error
 
 
-@pytest.fixture(scope="module")
-def internal_api(run_bitcoind, db_manager, gatekeeper, carrier, block_processor):
-    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
-    watcher = Watcher(
-        db_manager, gatekeeper, block_processor, responder, teos_sk, MAX_APPOINTMENTS, config.get("LOCATOR_CACHE_SIZE")
-    )
-    watcher.last_known_block = block_processor.get_best_block_hash()
-    i_api = InternalAPI(watcher, internal_api_endpoint, config.get("INTERNAL_API_WORKERS"), Event())
-    i_api.rpc_server.start()
-
-    yield i_api
-
-    i_api.rpc_server.stop(None)
+def raise_inspection_failed(*args, **kwargs):
+    raise InspectionFailed(args[0], args[1])
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -107,109 +91,106 @@ def client(app):
     return app.test_client()
 
 
-@pytest.fixture
-def appointment(generate_dummy_appointment):
-    appointment, dispute_tx = generate_dummy_appointment()
-    locator_dispute_tx_map[appointment.locator] = dispute_tx
-
-    return appointment
-
-
-def add_appointment(client, appointment_data, user_id):
-    r = client.post(add_appointment_endpoint, json=appointment_data)
-
-    if r.status_code == HTTP_OK:
-        locator = appointment_data.get("appointment").get("locator")
-        uuid = hash_160("{}{}".format(locator, user_id))
-        appointments[uuid] = appointment_data["appointment"]
-
-    return r
-
-
-def test_register(internal_api, client):
+def test_register(api, client, monkeypatch):
     # Tests registering a user within the tower
-    current_height = internal_api.watcher.block_processor.get_block_count()
+
+    # Monkeypatch the response from the InternalAPI so the user is accepted
+    slots = config.get("SUBSCRIPTION_SLOTS")
+    expiry = config.get("SUBSCRIPTION_DURATION")
+    receipt = receipts.create_registration_receipt(user_id, slots, expiry)
+    signature = Cryptographer.sign(receipt, teos_sk)
+    response = RegisterResponse(
+        user_id=user_id, available_slots=slots, subscription_expiry=expiry, subscription_signature=signature,
+    )
+    monkeypatch.setattr(api.stub, "register", lambda x: response)
+
+    #  Send the register request
     data = {"public_key": user_id}
     r = client.post(register_endpoint, json=data)
+
+    # Check the reply
     assert r.status_code == HTTP_OK
     assert r.json.get("public_key") == user_id
     assert r.json.get("available_slots") == config.get("SUBSCRIPTION_SLOTS")
-    assert r.json.get("subscription_expiry") == current_height + config.get("SUBSCRIPTION_DURATION")
-
-    slots = r.json.get("available_slots")
-    expiry = r.json.get("subscription_expiry")
-    subscription_receipt = receipts.create_registration_receipt(user_id, slots, expiry)
-    rpk = Cryptographer.recover_pk(subscription_receipt, r.json.get("subscription_signature"))
+    assert r.json.get("subscription_expiry") == config.get("SUBSCRIPTION_DURATION")
+    rpk = Cryptographer.recover_pk(receipt, r.json.get("subscription_signature"))
     assert Cryptographer.get_compressed_pk(rpk) == teos_id
 
 
-def test_register_top_up(internal_api, client):
-    # Calling register more than once will give us SUBSCRIPTION_SLOTS * number_of_calls slots.
-    # It will also refresh the expiry.
-    temp_sk, tmp_pk = generate_keypair()
-    tmp_user_id = Cryptographer.get_compressed_pk(tmp_pk)
-    current_height = internal_api.watcher.block_processor.get_block_count()
-
-    data = {"public_key": tmp_user_id}
-
-    for i in range(10):
-        r = client.post(register_endpoint, json=data)
-        slots = r.json.get("available_slots")
-        expiry = r.json.get("subscription_expiry")
-        assert r.status_code == HTTP_OK
-        assert r.json.get("public_key") == tmp_user_id
-        assert slots == config.get("SUBSCRIPTION_SLOTS") * (i + 1)
-        assert expiry == current_height + config.get("SUBSCRIPTION_DURATION")
-
-        subscription_receipt = receipts.create_registration_receipt(tmp_user_id, slots, expiry)
-        rpk = Cryptographer.recover_pk(subscription_receipt, r.json.get("subscription_signature"))
-        assert Cryptographer.get_compressed_pk(rpk) == teos_id
-
-
 def test_register_no_client_pk(client):
-    # Test trying to register a user without sending the user public key in the request
-    data = {}
-    r = client.post(register_endpoint, json=data)
+    # Register requests must contain the user public key, otherwise they will fail
+
+    r = client.post(register_endpoint, json={})
     assert r.status_code == HTTP_BAD_REQUEST
+    assert r.json.get("error") == "public_key not found in register message"
+    assert r.json.get("error_code") == errors.REGISTRATION_MISSING_FIELD
 
 
-def test_register_wrong_client_pk(client):
-    # Test trying to register a user sending an invalid user public key
+def test_register_wrong_client_pk(api, client, monkeypatch):
+    # Register requests with a wrongly formatter public key will also fail
+
+    # MonkeyPatch the InternalAPI response
+    e_code = grpc.StatusCode.INVALID_ARGUMENT
+    monkeypatch.setattr(api.stub, "register", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
+
     data = {"public_key": user_id + user_id}
     r = client.post(register_endpoint, json=data)
     assert r.status_code == HTTP_BAD_REQUEST
+    assert r.json.get("error_code") == errors.REGISTRATION_WRONG_FIELD_FORMAT
 
 
-def test_register_no_json(client):
-    # Test trying to register a user sending a non json body
+def test_register_no_json(api, client, monkeypatch):
+    # Register requests with non-json bodies should fail
     r = client.post(register_endpoint, data="random_message")
+
+    # MonkeyPatch the InternalAPI response
+    monkeypatch.setattr(api.stub, "register", raise_invalid_parameter)
+
     assert r.status_code == HTTP_BAD_REQUEST
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-def test_register_json_no_inner_dict(client):
-    # Test trying to register a user sending an incorrectly formatted json body
+def test_register_json_no_inner_dict(api, client, monkeypatch):
+    # Register requests with wrongly formatted json bodies should fail
     r = client.post(register_endpoint, json="random_message")
+
+    # MonkeyPatch the InternalAPI response
+    monkeypatch.setattr(api.stub, "register", raise_invalid_parameter)
+
     assert r.status_code == HTTP_BAD_REQUEST
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-def test_add_appointment(internal_api, client, appointment, block_processor):
-    # Simulate the user registration (end time does not matter here as long as it is in the future)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
-    )
+def test_add_appointment(api, client, generate_dummy_appointment, monkeypatch):
+    # Test adding a properly formatted appointment
+
+    # Monkeypatch the InternalAPI return
+    slots = 10
+    subscription_expiry = 100
+    appointment = generate_dummy_appointment()
+    response = {
+        "locator": appointment.locator,
+        "start_block": appointment.start_block,
+        "signature": get_random_value_hex(70),
+        "available_slots": slots,
+        "subscription_expiry": subscription_expiry,
+    }
+    monkeypatch.setattr(api.stub, "add_appointment", lambda x: AddAppointmentResponse(**response))
 
     # Properly formatted appointment
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
+    r = client.post(
+        add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
+    )
+
     assert r.status_code == HTTP_OK
-    assert r.json.get("available_slots") == 0
-    assert r.json.get("start_block") == block_processor.get_block_count()
+    assert r.json == response
 
 
 def test_add_appointment_no_json(client):
-    # No JSON data
+    # An add_appointment request with a non-json body should fail
     r = client.post(add_appointment_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Request is not json encoded" in r.json.get("error")
@@ -217,255 +198,108 @@ def test_add_appointment_no_json(client):
 
 
 def test_add_appointment_json_no_inner_dict(client):
-    # JSON data with no inner dict (invalid data format)
+    # An add_appointment request with a wrongly formatted json body should also fail (no inner dict)
     r = client.post(add_appointment_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Invalid request content" in r.json.get("error")
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_wrong(internal_api, client, appointment):
-    # Simulate the user registration (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
+def test_add_appointment_wrong(api, client, generate_dummy_appointment, monkeypatch):
+    # An add_appointment requests with properly formatted appointment but wrong data should fail
 
-    # Incorrect appointment (properly formatted, wrong data)
-    appointment.to_self_delay = 0
+    # Mock an inspection failure in add_appointment
+    errno = errors.APPOINTMENT_FIELD_TOO_SMALL
+    errmsg = "inspection error msg"
+    monkeypatch.setattr(
+        api.inspector, "inspect", lambda x: raise_inspection_failed(errno, errmsg),
+    )
+
+    # Send the request
+    appointment = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
+    r = client.post(
+        add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
+    )
     assert r.status_code == HTTP_BAD_REQUEST
-    assert errors.APPOINTMENT_FIELD_TOO_SMALL == r.json.get("error_code")
+    assert r.json.get("error_code") == errno and errmsg in r.json.get("error")
 
 
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_not_registered(internal_api, client, appointment):
-    # Properly formatted appointment, user is not registered
-    tmp_sk, tmp_pk = generate_keypair()
-    tmp_user_id = Cryptographer.get_compressed_pk(tmp_pk)
+def test_add_appointment_not_registered_no_enough_slots(api, client, generate_dummy_appointment, monkeypatch):
+    # A properly formatted add appointment request:
+    #   - from a non-registered user
+    #   - from a user with no free slots
+    #   - from a user with no enough free slots
+    # should fail. To prevent probing, they all fail as UNAUTHENTICATED. Further testing can be done in the Watcher
+    # but it's transparent from the API POV.
 
-    appointment_signature = Cryptographer.sign(appointment.serialize(), tmp_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, tmp_user_id)
-    assert r.status_code == HTTP_BAD_REQUEST
-    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR == r.json.get("error_code")
+    # Mock the non-registered user (gRPC UNAUTHENTICATED error)
+    e_code = grpc.StatusCode.UNAUTHENTICATED
+    monkeypatch.setattr(api.stub, "add_appointment", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
 
-
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_registered_no_free_slots(internal_api, client, appointment):
-    # Empty the user slots (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=0, subscription_expiry=0)
-
-    # Properly formatted appointment, user has no available slots
+    # Send the data
+    appointment = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_BAD_REQUEST
-    assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR == r.json.get("error_code")
-
-
-# FIXME: 194 will do with dummy appointment
-def test_add_appointment_registered_not_enough_free_slots(internal_api, client, appointment):
-    # Give some slots to the user (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(available_slots=1, subscription_expiry=0)
-
-    # Properly formatted appointment, user has not enough slots
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-
-    # Let's create a big blob
-    appointment.encrypted_blob = TWO_SLOTS_BLOTS
-
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
+    r = client.post(
+        add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
+    )
     assert r.status_code == HTTP_BAD_REQUEST
     assert errors.APPOINTMENT_INVALID_SIGNATURE_OR_SUBSCRIPTION_ERROR == r.json.get("error_code")
 
 
-# FIXME: 194 will do with dummy appointment and block_processor
-def test_add_appointment_multiple_times_same_user(
-    internal_api, client, appointment, block_processor, n=MULTIPLE_APPOINTMENTS
-):
-    # Multiple appointments with the same locator should be valid and count as updates
+def test_add_appointment_multiple_times_same_user(api, client, generate_dummy_appointment, monkeypatch):
+    # Multiple appointments with the same locator should be valid. At the API level we only need to test that
+    # the request goes trough.
+    appointment = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
-    # Simulate registering enough slots (end time does not matter here)
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=n, subscription_expiry=block_processor.get_block_count() + 1
-    )
-    for _ in range(n):
-        r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-        assert r.status_code == HTTP_OK
-        assert r.json.get("available_slots") == n - 1
-        assert r.json.get("start_block") == block_processor.get_block_count()
-
-    # Since all updates came from the same user, only the last one is stored
-    assert len(internal_api.watcher.locator_uuid_map[appointment.locator]) == 1
-
-
-# FIXME: 194 will do with dummy appointment and block_processor
-def test_add_appointment_multiple_times_different_users(
-    internal_api, client, appointment, block_processor, n=MULTIPLE_APPOINTMENTS
-):
-    # If the same appointment comes from different users, all are kept
-    # Create user keys and appointment signatures
-    user_keys = [generate_keypair() for _ in range(n)]
-    signatures = [Cryptographer.sign(appointment.serialize(), key[0]) for key in user_keys]
-    tmp_user_ids = [Cryptographer.get_compressed_pk(pk) for _, pk in user_keys]
-
-    # Add one slot per public key
-    for pair in user_keys:
-        user_id = Cryptographer.get_compressed_pk(pair[1])
-        internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-            available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
-        )
-
-    # Send the appointments
-    for compressed_pk, signature in zip(tmp_user_ids, signatures):
-        r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": signature}, compressed_pk)
-        assert r.status_code == HTTP_OK
-        assert r.json.get("available_slots") == 0
-        assert r.json.get("start_block") == block_processor.get_block_count()
-
-    # Check that all the appointments have been added and that there are no duplicates
-    assert len(set(internal_api.watcher.locator_uuid_map[appointment.locator])) == n
-
-
-# FIXME: 194 will do with dummy appointment and block_processor
-def test_add_appointment_update_same_size(internal_api, client, appointment, block_processor):
-    # Update an appointment by one of the same size and check that no additional slots are filled
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
-    )
-
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-    # The user has no additional slots, but it should be able to update
-    # Let's just reverse the encrypted blob for example
-    appointment.encrypted_blob = appointment.encrypted_blob[::-1]
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-
-# FIXME: 194 will do with dummy appointment and block_processor
-def test_add_appointment_update_bigger(internal_api, client, appointment, block_processor):
-    # Update an appointment by one bigger, and check additional slots are filled
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=2, subscription_expiry=block_processor.get_block_count() + 1
-    )
-
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_OK and r.json.get("available_slots") == 1
-
-    # The user has one slot, so it should be able to update as long as it only takes 1 additional slot
-    appointment.encrypted_blob = TWO_SLOTS_BLOTS
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-    # Check that it'll fail if no enough slots are available
-    # Double the size from before
-    appointment.encrypted_blob = TWO_SLOTS_BLOTS + TWO_SLOTS_BLOTS
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert r.status_code == HTTP_BAD_REQUEST
-
-
-# FIXME: 194 will do with dummy appointment and block_processor
-def test_add_appointment_update_smaller(internal_api, client, appointment, block_processor):
-    # Update an appointment by one bigger, and check slots are freed
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=2, subscription_expiry=block_processor.get_block_count() + 1
-    )
-    # This should take 2 slots
-    appointment.encrypted_blob = TWO_SLOTS_BLOTS
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-    # Let's update with one just small enough
-    appointment.encrypted_blob = "A" * (ENCRYPTED_BLOB_MAX_SIZE_HEX - 2)
-    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 1
-        and r.json.get("start_block") == block_processor.get_block_count()
-    )
-
-
-def test_add_appointment_in_cache_invalid_transaction(internal_api, client, block_processor):
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=1, subscription_expiry=block_processor.get_block_count() + 1
-    )
-
-    # We need to create the appointment manually
-    commitment_tx, commitment_txid, penalty_tx = create_txs()
-
-    locator = compute_locator(commitment_tx)
-    dummy_appointment_data = {"tx": penalty_tx, "tx_id": commitment_txid, "to_self_delay": 20}
-    encrypted_blob = Cryptographer.encrypt(penalty_tx[::-1], commitment_txid)
-
-    appointment_data = {
-        "locator": locator,
-        "to_self_delay": dummy_appointment_data.get("to_self_delay"),
-        "encrypted_blob": encrypted_blob,
+    # Monkeypatch the InternalAPI return
+    slots = 10
+    subscription_expiry = 100
+    appointment = generate_dummy_appointment()
+    response = {
+        "locator": appointment.locator,
+        "start_block": appointment.start_block,
+        "signature": get_random_value_hex(70),
+        "available_slots": slots,
+        "subscription_expiry": subscription_expiry,
     }
+    monkeypatch.setattr(api.stub, "add_appointment", lambda x: AddAppointmentResponse(**response))
 
-    appointment = Appointment.from_dict(appointment_data)
-    internal_api.watcher.locator_cache.cache[appointment.locator] = commitment_txid
+    for _ in range(MULTIPLE_APPOINTMENTS):
+        r = client.post(
+            add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
+        )
+        assert r.status_code == HTTP_OK
+        assert r.json.get("available_slots") == slots
+        assert r.json.get("start_block") == appointment.start_block
+
+
+# DISCUSS: Any other add_appointment test were the appointment is accepted should be tested in the Watcher, given the
+#          API is simply a passthrough for valid appointments, so they cannot be meaningfully tested from here.
+
+
+def test_add_too_many_appointment(api, client, generate_dummy_appointment, monkeypatch):
+    # If the appointment limit is reached, any other add_appointment request will fail
+    appointment = generate_dummy_appointment()
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
 
-    # Add the data to the cache
-    internal_api.watcher.locator_cache.cache[commitment_txid] = appointment.locator
+    # Mock the tower being out of slots (gRPC RESOURCE EXHAUSTED error)
+    e_code = grpc.StatusCode.RESOURCE_EXHAUSTED
+    monkeypatch.setattr(api.stub, "add_appointment", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
 
-    # The appointment should be accepted
-    r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-    assert (
-        r.status_code == HTTP_OK
-        and r.json.get("available_slots") == 0
-        and r.json.get("start_block") == block_processor.get_block_count()
+    r = client.post(
+        add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
     )
-
-
-# FIXME: 194 will do with dummy appointment and block processor
-def test_add_too_many_appointment(internal_api, client, block_processor, generate_dummy_appointment):
-    # Give slots to the user
-    internal_api.watcher.gatekeeper.registered_users[user_id] = UserInfo(
-        available_slots=200, subscription_expiry=block_processor.get_block_count() + 1
-    )
-
-    free_appointment_slots = MAX_APPOINTMENTS - len(internal_api.watcher.appointments)
-
-    for i in range(free_appointment_slots + 1):
-        appointment, dispute_tx = generate_dummy_appointment()
-        locator_dispute_tx_map[appointment.locator] = dispute_tx
-
-        appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
-        r = add_appointment(client, {"appointment": appointment.to_dict(), "signature": appointment_signature}, user_id)
-
-        if i < free_appointment_slots:
-            assert r.status_code == HTTP_OK and r.json.get("start_block") == block_processor.get_block_count()
-        else:
-            assert r.status_code == HTTP_SERVICE_UNAVAILABLE
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
 
 def test_get_appointment_no_json(client):
+    # get_appointment requests with no json data must fail
     r = client.post(add_appointment_endpoint, data="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Request is not json encoded" in r.json.get("error")
@@ -473,154 +307,188 @@ def test_get_appointment_no_json(client):
 
 
 def test_get_appointment_json_no_inner_dict(client):
+    # get_appointment requests with json data but no inner dict must fail
     r = client.post(add_appointment_endpoint, json="random_message")
     assert r.status_code == HTTP_BAD_REQUEST
     assert "Invalid request content" in r.json.get("error")
     assert errors.INVALID_REQUEST_FORMAT == r.json.get("error_code")
 
 
-def test_get_random_appointment_registered_user(client, user_sk=user_sk):
+def test_get_random_appointment_registered_user_or_non_registered(api, client, monkeypatch):
+    # The tower is designed so a not found appointment and a request from a non-registered user return the same error to
+    # prevent probing.
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     message = "get appointment {}".format(locator)
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+
+    # Mock the user not having the appointment (gRPC NOT FOUND error)
+    e_code = grpc.StatusCode.NOT_FOUND
+    monkeypatch.setattr(api.stub, "get_appointment", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
 
     data = {"locator": locator, "signature": signature}
     r = client.post(get_appointment_endpoint, json=data)
 
     # We should get a 404 not found since we are using a made up locator
-    received_appointment = r.json
     assert r.status_code == HTTP_NOT_FOUND
-    assert received_appointment.get("status") == AppointmentStatus.NOT_FOUND
+    assert r.json.get("status") == AppointmentStatus.NOT_FOUND
 
 
-def test_get_appointment_not_registered_user(client):
-    # Not registered users have no associated appointments, so this should fail
-    tmp_sk, tmp_pk = generate_keypair()
-
-    # The tower is designed so a not found appointment and a request from a non-registered user return the same error to
-    # prevent probing.
-    test_get_random_appointment_registered_user(client, tmp_sk)
-
-
-# FIXME: 194 will do with dummy appointment
-def test_get_appointment_in_watcher(internal_api, client, appointment, monkeypatch):
+def test_get_appointment_watcher(api, client, generate_dummy_appointment, monkeypatch):
     # Mock the appointment in the Watcher
-    uuid = hash_160("{}{}".format(appointment.locator, user_id))
-    extended_appointment_summary = {"locator": appointment.locator, "user_id": user_id}
-    internal_api.watcher.appointments[uuid] = extended_appointment_summary
-    internal_api.watcher.db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+    appointment = generate_dummy_appointment()
+    app_data = AppointmentData(
+        appointment=AppointmentProto(
+            locator=appointment.locator,
+            encrypted_blob=appointment.encrypted_blob,
+            to_self_delay=appointment.to_self_delay,
+        )
+    )
+    status = AppointmentStatus.BEING_WATCHED
+    monkeypatch.setattr(
+        api.stub, "get_appointment", lambda x: GetAppointmentResponse(appointment_data=app_data, status=status)
+    )
 
-    # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
-    monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
-
-    # Next we can request it
+    # Request it
     message = "get appointment {}".format(appointment.locator)
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
     data = {"locator": appointment.locator, "signature": signature}
     r = client.post(get_appointment_endpoint, json=data)
     assert r.status_code == HTTP_OK
 
-    # Check that the appointment is on the Watcher
-    assert r.json.get("status") == AppointmentStatus.BEING_WATCHED
-
+    # Check that requested appointment data matches the mocked one
     # Cast the extended appointment (used by the tower) to a regular appointment (used by the user)
-    appointment = Appointment.from_dict(appointment.to_dict())
-
-    # Check the the sent appointment matches the received one
-    assert r.json.get("locator") == appointment.locator
-    assert appointment.to_dict() == r.json.get("appointment")
+    local_appointment = Appointment.from_dict(appointment.to_dict())
+    assert r.json.get("status") == AppointmentStatus.BEING_WATCHED
+    assert r.json.get("appointment") == local_appointment.to_dict()
 
 
-# FIXME: 194 will do with dummy tracker
-def test_get_appointment_in_responder(internal_api, client, generate_dummy_tracker, monkeypatch):
-    tx_tracker = generate_dummy_tracker()
-
+def test_get_appointment_in_responder(api, client, generate_dummy_tracker, monkeypatch):
     # Mock the appointment in the Responder
-    uuid = hash_160("{}{}".format(tx_tracker.locator, user_id))
-    internal_api.watcher.responder.trackers[uuid] = tx_tracker.get_summary()
-    internal_api.watcher.responder.db_manager.store_responder_tracker(uuid, tx_tracker.to_dict())
+    tracker = generate_dummy_tracker()
+    track_data = AppointmentData(
+        tracker=TrackerProto(
+            locator=tracker.locator,
+            dispute_txid=tracker.dispute_txid,
+            penalty_txid=tracker.penalty_txid,
+            penalty_rawtx=tracker.penalty_rawtx,
+        )
+    )
+    status = AppointmentStatus.DISPUTE_RESPONDED
+    monkeypatch.setattr(
+        api.stub, "get_appointment", lambda x: GetAppointmentResponse(appointment_data=track_data, status=status)
+    )
 
-    # mock the gatekeeper (user won't be registered if the previous tests weren't ran)
-    monkeypatch.setattr(internal_api.watcher.gatekeeper, "authenticate_user", mock_authenticate_user)
-
-    # Request back the data
-    message = "get appointment {}".format(tx_tracker.locator)
+    # Request it
+    message = "get appointment {}".format(tracker.locator)
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
-    data = {"locator": tx_tracker.locator, "signature": signature}
-
-    # Next we can request it
+    data = {"locator": tracker.locator, "signature": signature}
     r = client.post(get_appointment_endpoint, json=data)
     assert r.status_code == HTTP_OK
 
-    # Check that the appointment is on the Responder
-    assert r.json.get("status") == AppointmentStatus.DISPUTE_RESPONDED
-
-    # Check the the sent appointment matches the received one
-    assert tx_tracker.locator == r.json.get("locator")
-    assert tx_tracker.dispute_txid == r.json.get("appointment").get("dispute_txid")
-    assert tx_tracker.penalty_txid == r.json.get("appointment").get("penalty_txid")
-    assert tx_tracker.penalty_rawtx == r.json.get("appointment").get("penalty_rawtx")
+    # Check the received tracker data matches the mocked one
+    assert tracker.locator == r.json.get("locator")
+    assert tracker.dispute_txid == r.json.get("appointment").get("dispute_txid")
+    assert tracker.penalty_txid == r.json.get("appointment").get("penalty_txid")
+    assert tracker.penalty_rawtx == r.json.get("appointment").get("penalty_rawtx")
 
 
-def test_get_subscription_info(internal_api, client):
-    internal_api.watcher.gatekeeper.add_update_user(user_id)
+def test_get_subscription_info(api, client, monkeypatch):
+    # MonkeyPatch the InternalAPI response (user being in the tower)
+    available_slots = 42
+    subscription_expiry = 1234
+    appointments = [get_random_value_hex(32)]
 
-    # Need to mock a user
-    internal_api.watcher.gatekeeper.registered_users[user_id].available_slots = 100
-    internal_api.watcher.gatekeeper.registered_users[user_id].subscription_expiry = 700
-    internal_api.watcher.gatekeeper.registered_users[user_id].appointments = {}
+    user_struct = Struct()
+    user_struct.update(
+        {"subscription_expiry": subscription_expiry, "available_slots": available_slots, "appointments": appointments}
+    )
+    monkeypatch.setattr(api.stub, "get_subscription_info", lambda x: GetUserResponse(user=user_struct))
 
-    # Request back the data
+    # Request the data
     message = "get subscription info"
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
     data = {"signature": signature}
-
-    # Next we can request the subscription info
     r = client.post(get_subscription_info_endpoint, json=data)
+
+    # Check the data matches
     assert r.status_code == HTTP_OK
-    assert r.get_json().get("available_slots") == 100
-    assert r.get_json().get("subscription_expiry") == 700
-    assert r.get_json().get("appointments") == []
+    assert r.get_json().get("available_slots") == available_slots
+    assert r.get_json().get("subscription_expiry") == subscription_expiry
+    assert r.get_json().get("appointments") == appointments
+
+
+def test_get_subscription_info_unregistered_or_subscription_error(api, client, monkeypatch):
+    # Mock the user not being registered (gRPC UNAUTHENTICATED error)
+    e_code = grpc.StatusCode.UNAUTHENTICATED
+    monkeypatch.setattr(api.stub, "get_subscription_info", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
+
+    # Request the data
+    message = "get subscription info"
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    data = {"signature": signature}
+    r = client.post(get_subscription_info_endpoint, json=data)
+
+    assert r.status_code == HTTP_BAD_REQUEST
 
 
 # TESTS WITH BITCOIND UNREACHABLE
+# All cases must return a gRPC UNAVAILABLE error
 
 
-def test_register_bitcoind_crash(internal_api, client, monkeypatch):
-    # Monkeypatch register so it raises a ConnectionRejectedError
-    monkeypatch.setattr(internal_api.watcher, "register", mock_connection_refused_return)
+def test_register_bitcoind_crash(api, client, monkeypatch):
+    # Monkeypatch register so it raises a ConnectionRejectedError (gRPC UNAVAILABLE)
+    e_code = grpc.StatusCode.UNAVAILABLE
+    monkeypatch.setattr(api.stub, "register", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
 
     data = {"public_key": user_id}
     r = client.post(register_endpoint, json=data)
-    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
 
-def test_add_appointment_bitcoind_crash(internal_api, client, appointment, monkeypatch):
-    # Monkeypatch add_appointment so it raises a ConnectionRejectedError
-    monkeypatch.setattr(internal_api.watcher, "add_appointment", mock_connection_refused_return)
+def test_add_appointment_bitcoind_crash(api, client, generate_dummy_appointment, monkeypatch):
+    # Monkeypatch add_appointment so it raises a ConnectionRejectedError (gRPC UNAVAILABLE)
+    e_code = grpc.StatusCode.UNAVAILABLE
+    monkeypatch.setattr(api.stub, "add_appointment", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
+
+    appointment = generate_dummy_appointment()
 
     appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
     r = client.post(
         add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
     )
-    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
 
-def test_get_appointment_bitcoind_crash(internal_api, client, appointment, monkeypatch):
-    # Monkeypatch add_appointment so it raises a ConnectionRejectedError
-    monkeypatch.setattr(internal_api.watcher, "get_appointment", mock_connection_refused_return)
+def test_get_appointment_bitcoind_crash(api, client, monkeypatch):
+    # Monkeypatch add_appointment so it raises a ConnectionRejectedError (gRPC UNAVAILABLE)
+    e_code = grpc.StatusCode.UNAVAILABLE
+    monkeypatch.setattr(api.stub, "get_appointment", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
 
     # Next we can request it
-    message = "get appointment {}".format(appointment.locator)
+    locator = get_random_value_hex(16)
+    message = "get appointment {}".format(locator)
     signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
-    data = {"locator": appointment.locator, "signature": signature}
+    data = {"locator": locator, "signature": signature}
     r = client.post(get_appointment_endpoint, json=data)
-    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE
 
 
-def test_get_subscription_info_bitcoind_crash(internal_api, client, monkeypatch):
-    # Monkeypatch get_subscription_info so it raises a ConnectionRejectedError
-    monkeypatch.setattr(internal_api.watcher, "get_subscription_info", mock_connection_refused_return)
+def test_get_subscription_info_bitcoind_crash(api, client, monkeypatch):
+    # Monkeypatch get_subscription_info so it raises a ConnectionRejectedError (gRPC UNAVAILABLE)
+    e_code = grpc.StatusCode.UNAVAILABLE
+    monkeypatch.setattr(api.stub, "get_subscription_info", raise_grpc_error)
+    monkeypatch.setattr(rpc_error, "code", lambda: e_code)
+    monkeypatch.setattr(rpc_error, "details", lambda: "")
 
     # Request back the data
     message = "get subscription info"
@@ -629,4 +497,4 @@ def test_get_subscription_info_bitcoind_crash(internal_api, client, monkeypatch)
 
     # Next we can request the subscription info
     r = client.post(get_subscription_info_endpoint, json=data)
-    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE

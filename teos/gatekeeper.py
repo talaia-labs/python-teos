@@ -160,7 +160,7 @@ class Gatekeeper:
             expiry (in absolute block height), and the registration_receipt.
 
         Raises:
-            :obj:`InvalidParameter`: if the user_pk does not match the expected format.
+            :obj:`InvalidParameter`: if the user_id does not match the expected format.
             :obj:`ConnectionRefusedError`: if bitcoind cannot be reached.
         """
 

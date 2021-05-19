@@ -1,9 +1,10 @@
 import pytest
 
 from teos.tools import in_correct_network, get_default_rpc_port
-from test.teos.unit.conftest import bitcoind_connect_params
 
 from common.constants import MAINNET_RPC_PORT, TESTNET_RPC_PORT, REGTEST_RPC_PORT
+
+from test.teos.unit.conftest import bitcoind_connect_params
 
 
 def test_in_correct_network(run_bitcoind):

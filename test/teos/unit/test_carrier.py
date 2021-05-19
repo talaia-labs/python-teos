@@ -1,17 +1,25 @@
+import pytest
+from threading import Event
+
+from teos.carrier import Carrier
 from teos.utils.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
-from test.teos.conftest import generate_blocks
-from test.teos.conftest import create_commitment_tx, bitcoin_cli
+from test.teos.conftest import generate_blocks, create_commitment_tx, bitcoin_cli
 from test.teos.unit.conftest import (
+    bitcoind_connect_params,
     get_random_value_hex,
     run_test_blocking_command_bitcoind_crash,
 )
 
 
-# FIXME: This test do not fully cover the carrier since the simulator does not support every single error bitcoind may
-#        return for RPC_VERIFY_REJECTED and RPC_VERIFY_ERROR. Further development of the simulator / mocks or simulation
-#        with bitcoind is required
-# TODO: Given we are getting rid of the mock, test the uncovered cases.
+# FIXME: #184-further-test-carrier: Add tests to cover all the errors that can be returned by bitcoind when pushing txs
+
+
+@pytest.fixture(scope="module")
+def carrier(run_bitcoind):
+    bitcoind_reachable = Event()
+    bitcoind_reachable.set()
+    return Carrier(bitcoind_connect_params, bitcoind_reachable)
 
 
 sent_txs = []
@@ -34,7 +42,7 @@ def test_send_double_spending_transaction(carrier):
     receipt = carrier.send_transaction(tx, txid)
     sent_txs.append(txid)
 
-    # Wait for a block to be mined. Issued receipts is reset from the Responder every block, so we should do it too.
+    # Wait for a block to be mined. Issued receipts are reset from the Responder every block, so we should do it too.
     generate_blocks(2)
     carrier.issued_receipts = {}
 
@@ -73,6 +81,7 @@ def test_get_non_existing_transaction(carrier):
 
 
 def test_send_transaction_bitcoind_crash(carrier):
+    # Trying to send a transaction if bitcoind is unreachable should block the thread until it becomes reachable again
     tx = create_commitment_tx()
     txid = bitcoin_cli.decoderawtransaction(tx).get("txid")
 
@@ -82,6 +91,7 @@ def test_send_transaction_bitcoind_crash(carrier):
 
 
 def test_get_transaction_bitcoind_crash(carrier):
+    # Trying to get a transaction if bitcoind is unreachable should block the thread until it becomes reachable again
     run_test_blocking_command_bitcoind_crash(
         carrier.bitcoind_reachable, lambda: carrier.get_transaction(get_random_value_hex(32)),
     )

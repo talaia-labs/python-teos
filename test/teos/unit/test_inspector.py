@@ -1,11 +1,10 @@
 import pytest
 
 import common.errors as errors
-from teos.inspector import Inspector, InspectionFailed
-
 from common.constants import LOCATOR_LEN_BYTES, LOCATOR_LEN_HEX
 
 from test.teos.conftest import config
+from teos.inspector import Inspector, InspectionFailed
 from test.teos.unit.conftest import get_random_value_hex
 
 NO_HEX_STRINGS = [
@@ -29,10 +28,14 @@ WRONG_TYPES = [
 WRONG_TYPES_NO_STR = [[], bytes.fromhex(get_random_value_hex(LOCATOR_LEN_BYTES)), 3.2, 2.0, (), object, {}, object()]
 
 MIN_TO_SELF_DELAY = config.get("MIN_TO_SELF_DELAY")
-inspector = Inspector(MIN_TO_SELF_DELAY)
 
 
-def test_check_locator():
+@pytest.fixture(scope="module")
+def inspector():
+    return Inspector(MIN_TO_SELF_DELAY)
+
+
+def test_check_locator(inspector):
     # Right appointment type, size and format
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     assert inspector.check_locator(locator) is None
@@ -44,7 +47,7 @@ def test_check_locator():
             inspector.check_locator(locator)
 
         except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_WRONG_FIELD_SIZE
+            assert e.errno == errors.APPOINTMENT_WRONG_FIELD_SIZE
             raise e
 
     # Wrong size (too small)
@@ -54,7 +57,7 @@ def test_check_locator():
             inspector.check_locator(locator)
 
         except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_WRONG_FIELD_SIZE
+            assert e.errno == errors.APPOINTMENT_WRONG_FIELD_SIZE
             raise e
 
     # Empty
@@ -64,7 +67,7 @@ def test_check_locator():
             inspector.check_locator(locator)
 
         except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
+            assert e.errno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong type (several types tested, it should do for anything that is not a string)
@@ -76,7 +79,7 @@ def test_check_locator():
                 inspector.check_locator(locator)
 
             except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.errno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
     # Wrong format (no hex)
@@ -87,11 +90,11 @@ def test_check_locator():
                 inspector.check_locator(locator)
 
             except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_FORMAT
+                assert e.errno == errors.APPOINTMENT_WRONG_FIELD_FORMAT
                 raise e
 
 
-def test_check_to_self_delay():
+def test_check_to_self_delay(inspector):
     # Right value, right format
     to_self_delays = [MIN_TO_SELF_DELAY, MIN_TO_SELF_DELAY + 1, MIN_TO_SELF_DELAY + 1000]
     for to_self_delay in to_self_delays:
@@ -105,7 +108,7 @@ def test_check_to_self_delay():
                 inspector.check_to_self_delay(to_self_delay)
 
             except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_FIELD_TOO_SMALL
+                assert e.errno == errors.APPOINTMENT_FIELD_TOO_SMALL
                 raise e
 
     # Empty field
@@ -115,7 +118,7 @@ def test_check_to_self_delay():
             inspector.check_to_self_delay(to_self_delay)
 
         except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
+            assert e.errno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong data type
@@ -126,11 +129,11 @@ def test_check_to_self_delay():
                 inspector.check_to_self_delay(to_self_delay)
 
             except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.errno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
 
-def test_check_blob():
+def test_check_blob(inspector):
     # Right format and length
     encrypted_blob = get_random_value_hex(120)
     assert inspector.check_blob(encrypted_blob) is None
@@ -143,7 +146,7 @@ def test_check_blob():
                 inspector.check_blob(encrypted_blob)
 
             except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_TYPE
+                assert e.errno == errors.APPOINTMENT_WRONG_FIELD_TYPE
                 raise e
 
     # Empty field
@@ -153,7 +156,7 @@ def test_check_blob():
             inspector.check_blob(encrypted_blob)
 
         except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
+            assert e.errno == errors.APPOINTMENT_EMPTY_FIELD
             raise e
 
     # Wrong format (no hex)
@@ -164,11 +167,11 @@ def test_check_blob():
                 inspector.check_blob(encrypted_blob)
 
             except InspectionFailed as e:
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD_FORMAT
+                assert e.errno == errors.APPOINTMENT_WRONG_FIELD_FORMAT
                 raise e
 
 
-def test_inspect():
+def test_inspect(inspector):
     # Valid appointment
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     to_self_delay = MIN_TO_SELF_DELAY
@@ -185,7 +188,7 @@ def test_inspect():
     )
 
 
-def test_inspect_wrong():
+def test_inspect_wrong(inspector):
     # Wrong types (taking out empty dict, since that's a different error)
     wrong_types = WRONG_TYPES.pop(WRONG_TYPES.index({}))
     for data in wrong_types:
@@ -194,7 +197,7 @@ def test_inspect_wrong():
                 inspector.inspect(data)
             except InspectionFailed as e:
                 print(data)
-                assert e.erno == errors.APPOINTMENT_WRONG_FIELD
+                assert e.errno == errors.APPOINTMENT_WRONG_FIELD
                 raise e
 
     # None data
@@ -202,5 +205,5 @@ def test_inspect_wrong():
         try:
             inspector.inspect(None)
         except InspectionFailed as e:
-            assert e.erno == errors.APPOINTMENT_EMPTY_FIELD
+            assert e.errno == errors.APPOINTMENT_EMPTY_FIELD
             raise e

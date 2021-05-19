@@ -3,18 +3,17 @@ from google.protobuf import json_format
 from waitress import serve as wsgi_serve
 from flask import Flask, request, jsonify
 
-
 import common.errors as errors
-from common.appointment import AppointmentStatus
-from common.exceptions import InvalidParameter
-from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 from common.tools import intify
-from teos.inspector import Inspector, InspectionFailed
-from teos.protobuf.user_pb2 import RegisterRequest, GetSubscriptionInfoRequest
-from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
-from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
+from common.exceptions import InvalidParameter
+from common.appointment import AppointmentStatus
+from common.constants import HTTP_OK, HTTP_BAD_REQUEST, HTTP_SERVICE_UNAVAILABLE, HTTP_NOT_FOUND
 
 from teos.logger import setup_logging, get_logger
+from teos.inspector import Inspector, InspectionFailed
+from teos.protobuf.tower_services_pb2_grpc import TowerServicesStub
+from teos.protobuf.user_pb2 import RegisterRequest, GetSubscriptionInfoRequest
+from teos.protobuf.appointment_pb2 import Appointment, AddAppointmentRequest, GetAppointmentRequest
 
 
 # NOTCOVERED: not sure how to monkey patch this one. May be related to #77
@@ -174,13 +173,13 @@ class API:
                     response = {"error": e.details()}
                 else:
                     rcode = HTTP_BAD_REQUEST
-                    response = {"error": e.details(), "error_code": errors.REGISTRATION_MISSING_FIELD}
+                    response = {"error": e.details(), "error_code": errors.REGISTRATION_WRONG_FIELD_FORMAT}
 
         else:
             rcode = HTTP_BAD_REQUEST
             response = {
                 "error": "public_key not found in register message",
-                "error_code": errors.REGISTRATION_WRONG_FIELD_FORMAT,
+                "error_code": errors.REGISTRATION_MISSING_FIELD,
             }
 
         self.logger.info("Sending response and disconnecting", from_addr="{}".format(remote_addr), response=response)
@@ -231,7 +230,7 @@ class API:
             )
         except InspectionFailed as e:
             rcode = HTTP_BAD_REQUEST
-            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.erno}
+            response = {"error": "appointment rejected. {}".format(e.reason), "error_code": e.errno}
 
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.UNAUTHENTICATED:

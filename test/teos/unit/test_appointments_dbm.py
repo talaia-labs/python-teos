@@ -1,4 +1,3 @@
-import os
 import json
 import pytest
 import shutil
@@ -17,31 +16,28 @@ from common.constants import LOCATOR_LEN_BYTES
 from test.teos.unit.conftest import get_random_value_hex
 
 
-# FIXME: 194 will do with dummy appointments
 @pytest.fixture(scope="module")
 def watcher_appointments(generate_dummy_appointment):
-    return {uuid4().hex: generate_dummy_appointment()[0] for _ in range(10)}
+    return {uuid4().hex: generate_dummy_appointment() for _ in range(10)}
 
 
-# FIXME: 194 will do with dummy trackers
 @pytest.fixture(scope="module")
 def responder_trackers(generate_dummy_tracker):
     return {uuid4().hex: generate_dummy_tracker().locator for _ in range(10)}
 
 
-def open_create_db(db_path):
+@pytest.fixture
+def db_manager(db_name="test_db"):
+    manager = AppointmentsDBM(db_name)
 
-    try:
-        db_manager = AppointmentsDBM(db_path)
+    yield manager
 
-        return db_manager
-
-    except ValueError:
-        return False
+    manager.db.close()
+    shutil.rmtree(db_name)
 
 
 def test_load_appointments_db(db_manager):
-    # Let's made up a prefix and try to load data from the database using it
+    # Let's make up a prefix and try to load data from the database using it
     prefix = "XX"
     db_appointments = db_manager.load_appointments_db(prefix)
 
@@ -56,27 +52,16 @@ def test_load_appointments_db(db_manager):
 
         db_manager.db.put((prefix + key).encode("utf-8"), json.dumps({"value": value}).encode("utf-8"))
 
-    db_appointments = db_manager.load_appointments_db(prefix)
-
     # Check that both keys and values are the same
+    db_appointments = db_manager.load_appointments_db(prefix)
     assert db_appointments.keys() == local_appointments.keys()
-
     values = [appointment["value"] for appointment in db_appointments.values()]
     assert set(values) == set(local_appointments.values()) and (len(values) == len(local_appointments))
 
 
-def test_get_last_known_block():
-    db_path = "empty_db"
-
-    # First we check if the db exists, and if so we delete it
-    if os.path.isdir(db_path):
-        shutil.rmtree(db_path)
-
-    # Check that the db can be created if it does not exist
-    db_manager = open_create_db(db_path)
-
-    # Trying to get any last block for either the watcher or the responder should return None for an empty db
-
+def test_get_last_known_block(db_manager):
+    # Trying to get any last block for either the Watcher or the Responder should return None for an empty db
+    # (the db is freshly created in every test)
     for key in [WATCHER_LAST_BLOCK_KEY, RESPONDER_LAST_BLOCK_KEY]:
         assert db_manager.get_last_known_block(key) is None
 
@@ -86,23 +71,24 @@ def test_get_last_known_block():
         db_manager.db.put(key.encode("utf-8"), block_hash.encode("utf-8"))
         assert db_manager.get_last_known_block(key) == block_hash
 
-    # Removing test db
-    shutil.rmtree(db_path)
-
 
 def test_load_watcher_appointments_empty(db_manager):
-    assert len(db_manager.load_watcher_appointments()) == 0
+    # Loadings the appointments dict from an empty db should return an empty dict
+    assert not db_manager.load_watcher_appointments()
 
 
 def test_load_responder_trackers_empty(db_manager):
-    assert len(db_manager.load_responder_trackers()) == 0
+    # Loadings the trackers dict from an empty db should return an empty dict
+    assert not db_manager.load_responder_trackers()
 
 
 def test_load_locator_map_empty(db_manager):
-    assert db_manager.load_locator_map(get_random_value_hex(LOCATOR_LEN_BYTES)) is None
+    # Loadings the locators map from an empty db should return an empty dict
+    assert not db_manager.load_locator_map(get_random_value_hex(LOCATOR_LEN_BYTES))
 
 
 def test_create_append_locator_map(db_manager):
+    # Test adding a new entry to the locator map
     uuid = uuid4().hex
     locator = get_random_value_hex(LOCATOR_LEN_BYTES)
     db_manager.create_append_locator_map(locator, uuid)
@@ -118,34 +104,42 @@ def test_create_append_locator_map(db_manager):
     uuid2 = uuid4().hex
     db_manager.create_append_locator_map(locator, uuid2)
 
-    assert set(db_manager.load_locator_map(locator)) == set([uuid, uuid2])
+    assert set(db_manager.load_locator_map(locator)) == {uuid, uuid2}
 
 
 def test_update_locator_map(db_manager):
-    # Let's create a couple of appointments with the same locator
+    # Tests updating an entry from the locator map
+    # Let's create a couple of appointments with the same locator and add them to the map
     locator = get_random_value_hex(32)
     uuid1 = uuid4().hex
     uuid2 = uuid4().hex
     db_manager.create_append_locator_map(locator, uuid1)
     db_manager.create_append_locator_map(locator, uuid2)
 
+    # Check that both entries are in the map
     locator_map = db_manager.load_locator_map(locator)
-    assert uuid1 in locator_map
+    assert uuid1 in locator_map and uuid2 in locator_map
 
+    # Remove one of the entries and update the map
     locator_map.remove(uuid1)
     db_manager.update_locator_map(locator, locator_map)
 
+    # Check that only one entry is in the map now
     locator_map_after = db_manager.load_locator_map(locator)
     assert uuid1 not in locator_map_after and uuid2 in locator_map_after and len(locator_map_after) == 1
 
 
 def test_update_locator_map_wong_data(db_manager):
-    # Let's try to update the locator map with a different list of uuids
+    # Tests updating the locator map with a different list of uuids. An update can only go through if the new data is
+    # a subset of the old one
+
+    # Add a map first
     locator = get_random_value_hex(32)
     db_manager.create_append_locator_map(locator, uuid4().hex)
     db_manager.create_append_locator_map(locator, uuid4().hex)
-
     locator_map = db_manager.load_locator_map(locator)
+
+    # Try to update
     wrong_map_update = [uuid4().hex]
     db_manager.update_locator_map(locator, wrong_map_update)
     locator_map_after = db_manager.load_locator_map(locator)
@@ -167,19 +161,17 @@ def test_update_locator_map_empty(db_manager):
 
 
 def test_delete_locator_map(db_manager):
+    # Tests the deletion of data in a locator map
+
+    # Add some data to be deleted
+    for _ in range(5):
+        uuid = uuid4().hex
+        locator = get_random_value_hex(LOCATOR_LEN_BYTES)
+        db_manager.create_append_locator_map(locator, uuid)
+
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
 
-    # Make sure there are some locators before starting the test
-    # (needed so that the test can be ran individually from the others)
-    if not locator_maps:
-        for _ in range(5):
-            uuid = uuid4().hex
-            locator = get_random_value_hex(LOCATOR_LEN_BYTES)
-            db_manager.create_append_locator_map(locator, uuid)
-
-        locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
-
-    # Now that there are some locators, we can start the test
+    # Now that there are some locators we can start the test
     assert len(locator_maps) != 0
 
     for locator, uuids in locator_maps.items():
@@ -188,28 +180,34 @@ def test_delete_locator_map(db_manager):
     locator_maps = db_manager.load_appointments_db(prefix=LOCATOR_MAP_PREFIX)
     assert len(locator_maps) == 0
 
+
+def test_delete_locator_map_wrong(db_manager):
     # Keys of wrong type should fail
     assert db_manager.delete_locator_map(42) is False
 
 
 def test_store_watcher_appointment_wrong(db_manager, watcher_appointments):
-    # Wrong uuid types should fail
+    # Trying to store appointments with wrong uuid types should fail
     for _, appointment in watcher_appointments.items():
         assert db_manager.store_watcher_appointment(42, appointment.to_dict()) is False
 
 
 def test_load_watcher_appointment_wrong(db_manager):
-    # Random keys should fail
+    # Trying to load random keys should fail
     assert db_manager.load_watcher_appointment(get_random_value_hex(16)) is None
 
-    # Wrong format keys should also return None
+    # Same for keys with wrong format
     assert db_manager.load_watcher_appointment(42) is None
 
 
 def test_store_load_watcher_appointment(db_manager, watcher_appointments):
+    # Tests that storing and loading data matches
+
+    # Store the data first
     for uuid, appointment in watcher_appointments.items():
         assert db_manager.store_watcher_appointment(uuid, appointment.to_dict()) is True
 
+    # Load it
     db_watcher_appointments = db_manager.load_watcher_appointments()
 
     # Check that the two appointment collections are equal by checking:
@@ -223,42 +221,43 @@ def test_store_load_watcher_appointment(db_manager, watcher_appointments):
 
 
 def test_store_load_triggered_appointment(generate_dummy_appointment, db_manager):
-    db_watcher_appointments = db_manager.load_watcher_appointments()
-    db_watcher_appointments_with_triggered = db_manager.load_watcher_appointments(include_triggered=True)
-
-    assert db_watcher_appointments == db_watcher_appointments_with_triggered
+    # Check that stored and loaded (triggered) appointments match
 
     # Create an appointment flagged as triggered
-    triggered_appointment, _ = generate_dummy_appointment()
+    triggered_appointment = generate_dummy_appointment()
     uuid = uuid4().hex
     assert db_manager.store_watcher_appointment(uuid, triggered_appointment.to_dict()) is True
+    # Create the flag
     db_manager.create_triggered_appointment_flag(uuid)
 
     # The new appointment is grabbed only if we set include_triggered
-    assert db_watcher_appointments == db_manager.load_watcher_appointments()
-    assert uuid in db_manager.load_watcher_appointments(include_triggered=True)
+    assert not db_manager.load_watcher_appointments()
+    assert db_manager.load_watcher_appointments(include_triggered=True) == {uuid: triggered_appointment.to_dict()}
 
 
 def test_store_responder_trackers_wrong(db_manager, responder_trackers):
-    # Wrong uuid types should fail
+    # Trying to store tracker with wrong uuid types should fail
     for _, tracker in responder_trackers.items():
         assert db_manager.store_responder_tracker(42, {"value": tracker}) is False
 
 
 def test_load_responder_tracker_wrong(db_manager):
-    # Random keys should fail
+    # Trying to load random keys should fail
     assert db_manager.load_responder_tracker(get_random_value_hex(16)) is None
 
-    # Wrong format keys should also return None
+    # Same for keys with wrong format
     assert db_manager.load_responder_tracker(42) is None
 
 
 def test_store_load_responder_trackers(db_manager, responder_trackers):
+    # Tests that storing and loading data matches
+
+    # Store the data first
     for key, value in responder_trackers.items():
         assert db_manager.store_responder_tracker(key, {"value": value}) is True
 
+    # Load it
     db_responder_trackers = db_manager.load_responder_trackers()
-
     values = [tracker["value"] for tracker in db_responder_trackers.values()]
 
     assert responder_trackers.keys() == db_responder_trackers.keys()
@@ -266,28 +265,28 @@ def test_store_load_responder_trackers(db_manager, responder_trackers):
 
 
 def test_delete_watcher_appointment(db_manager, watcher_appointments):
-    # make sure that some appointments were added
-    # (needed in case the test is ran individually rather than as part of the suite)
-    db_watcher_appointments = db_manager.load_watcher_appointments(include_triggered=True)
-    if not db_watcher_appointments:
-        for uuid, appointment in watcher_appointments.items():
-            db_manager.store_watcher_appointment(uuid, appointment.to_dict())
+    # Tests the deletion of appointments
 
-    # Let's delete all we added
-    db_watcher_appointments = db_manager.load_watcher_appointments(include_triggered=True)
-    assert len(db_watcher_appointments) != 0
+    # Add some data to be deleted
+    for uuid, appointment in watcher_appointments.items():
+        db_manager.store_watcher_appointment(uuid, appointment.to_dict())
 
+    # Let's delete all the data we added
     for key in watcher_appointments.keys():
         assert db_manager.delete_watcher_appointment(key) is True
 
     db_watcher_appointments = db_manager.load_watcher_appointments()
     assert len(db_watcher_appointments) == 0
 
-    # Keys of wrong type should fail
+
+def test_delete_watcher_appointment_wrong(db_manager, watcher_appointments):
+    # Trying to delete appointments with keys of wrong type should fail
     assert db_manager.delete_watcher_appointment(42) is False
 
 
 def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
+    # Tests deleting appointment in batch
+
     # Let's start by adding a bunch of appointments
     for uuid, appointment in watcher_appointments.items():
         assert db_manager.store_watcher_appointment(uuid, appointment.to_dict()) is True
@@ -298,6 +297,7 @@ def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
     # Let's now delete half of them in a batch update
     db_manager.batch_delete_watcher_appointments(first_half)
 
+    # Check that the first half is not there
     db_watcher_appointments = db_manager.load_watcher_appointments()
     assert not set(db_watcher_appointments.keys()).issuperset(first_half)
     assert set(db_watcher_appointments.keys()).issuperset(second_half)
@@ -311,29 +311,29 @@ def test_batch_delete_watcher_appointments(db_manager, watcher_appointments):
 
 
 def test_delete_responder_tracker(db_manager, responder_trackers):
-    # make sure that some trackers were added
-    # (needed in case the test is ran individually rather than as part of the suite)
-    db_responder_trackers = db_manager.load_responder_trackers()
-    if not db_responder_trackers:
-        for key, value in responder_trackers.items():
-            db_manager.store_responder_tracker(key, {"value": value})
+    # Tests the deletion of appointments
 
-    # Same for the responder
-    db_responder_trackers = db_manager.load_responder_trackers()
-    assert len(db_responder_trackers) != 0
+    # Add some data to be deleted
+    for key, value in responder_trackers.items():
+        db_manager.store_responder_tracker(key, {"value": value})
 
+    # Let's delete all the data we added
     for key in responder_trackers.keys():
         assert db_manager.delete_responder_tracker(key) is True
 
     db_responder_trackers = db_manager.load_responder_trackers()
     assert len(db_responder_trackers) == 0
 
-    # Keys of wrong type should fail
+
+def test_delete_responder_tracker_wrong(db_manager, responder_trackers):
+    # Trying to delete trackers with keys of wrong type should fail
     assert db_manager.delete_responder_tracker(42) is False
 
 
 def test_batch_delete_responder_trackers(db_manager, responder_trackers):
-    # Let's start by adding a bunch of appointments
+    # Tests deleting trackers in batch
+
+    # Let's start by adding a bunch of trackers
     for uuid, value in responder_trackers.items():
         assert db_manager.store_responder_tracker(uuid, {"value": value}) is True
 
@@ -343,6 +343,7 @@ def test_batch_delete_responder_trackers(db_manager, responder_trackers):
     # Let's now delete half of them in a batch update
     db_manager.batch_delete_responder_trackers(first_half)
 
+    # Check that the first half is not there
     db_responder_trackers = db_manager.load_responder_trackers()
     assert not set(db_responder_trackers.keys()).issuperset(first_half)
     assert set(db_responder_trackers.keys()).issuperset(second_half)
@@ -356,36 +357,45 @@ def test_batch_delete_responder_trackers(db_manager, responder_trackers):
 
 
 def test_store_load_last_block_hash_watcher(db_manager):
+    # Tests that storing and loading the last known block of the Watcher matches
+
     # Let's first create a made up block hash
     local_last_block_hash = get_random_value_hex(32)
     assert db_manager.store_last_block_hash_watcher(local_last_block_hash) is True
 
+    # Check that the values match
     db_last_block_hash = db_manager.load_last_block_hash_watcher()
-
     assert local_last_block_hash == db_last_block_hash
 
-    # Wrong types for last block should fail for both store and load
+
+def test_store_last_block_hash_watcher_wrong(db_manager):
+    # Trying to store the last block hash with wrong type should fail
     assert db_manager.store_last_block_hash_watcher(42) is False
 
 
 def test_store_load_last_block_hash_responder(db_manager):
-    # Same for the responder
+    # Tests that storing and loading the last known block of the Responder matches
+
+    # Let's first create a made up block hash
     local_last_block_hash = get_random_value_hex(32)
     assert db_manager.store_last_block_hash_responder(local_last_block_hash) is True
 
+    # Check that the values match
     db_last_block_hash = db_manager.load_last_block_hash_responder()
-
     assert local_last_block_hash == db_last_block_hash
 
-    # Wrong types for last block should fail for both store and load
+
+def test_store_load_last_block_hash_responder_wrong(db_manager):
+    # Trying to store the last block hash with wrong type should fail
     assert db_manager.store_last_block_hash_responder(42) is False
 
 
 def test_create_triggered_appointment_flag(db_manager):
-    # Test that flags are added
+    # Tests that flags are added
+
+    # Create a new flag and check that it's there
     key = get_random_value_hex(16)
     db_manager.create_triggered_appointment_flag(key)
-
     assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + key).encode("utf-8")) is not None
 
     # Test to get a random one that we haven't added
@@ -394,61 +404,70 @@ def test_create_triggered_appointment_flag(db_manager):
 
 
 def test_batch_create_triggered_appointment_flag(db_manager):
-    # Test that flags are added in batch
-    keys = [get_random_value_hex(16) for _ in range(10)]
+    # Tests that flags are added in batch
+    flags = [get_random_value_hex(16) for _ in range(10)]
 
-    # Checked that non of the flags is already in the db
+    # Checked that none of the flags is already in the db
     db_flags = db_manager.load_all_triggered_flags()
-    assert not set(db_flags).issuperset(keys)
+    assert not db_flags
 
     # Make sure that they are now
-    db_manager.batch_create_triggered_appointment_flag(keys)
+    db_manager.batch_create_triggered_appointment_flag(flags)
     db_flags = db_manager.load_all_triggered_flags()
-    assert set(db_flags).issuperset(keys)
+    assert set(db_flags) == set(flags) and len(db_flags) == len(flags)
 
 
 def test_load_all_triggered_flags(db_manager):
-    # There should be a some flags in the db from the previous tests. Let's load them
-    flags = db_manager.load_all_triggered_flags()
+    # Tests that flags can be loaded from the database
 
-    # We can add another flag and see that there's two now
-    new_uuid = uuid4().hex
-    db_manager.create_triggered_appointment_flag(new_uuid)
-    flags.append(new_uuid)
+    # First let add some flags
+    flags = [get_random_value_hex(16) for _ in range(10)]
+    db_manager.batch_create_triggered_appointment_flag(flags)
 
-    assert set(db_manager.load_all_triggered_flags()) == set(flags)
+    # Check that we get exactly what we added
+    db_flags = db_manager.load_all_triggered_flags()
+    assert set(db_flags) == set(flags) and len(db_flags) == len(flags)
 
 
 def test_delete_triggered_appointment_flag(db_manager):
-    # Test data is properly deleted.
-    keys = db_manager.load_all_triggered_flags()
+    # Tests that the triggers are properly deleted
+
+    # First let add some flags
+    flags = [get_random_value_hex(16) for _ in range(10)]
+    db_manager.batch_create_triggered_appointment_flag(flags)
 
     # Delete all entries
-    for k in keys:
-        assert db_manager.delete_triggered_appointment_flag(k) is True
+    for flag in flags:
+        assert db_manager.delete_triggered_appointment_flag(flag) is True
 
     # Try to load them back
-    for k in keys:
-        assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + k).encode("utf-8")) is None
+    for flag in flags:
+        assert db_manager.db.get((TRIGGERED_APPOINTMENTS_PREFIX + flag).encode("utf-8")) is None
 
-    # Keys of wrong type should fail
+
+def test_delete_triggered_appointment_flag_wrong(db_manager):
+    # Tests that trying to delete keys of wrong type should fail
     assert db_manager.delete_triggered_appointment_flag(42) is False
 
 
 def test_batch_delete_triggered_appointment_flag(db_manager):
+    # Tests that flags are properly deleted in batch
+
     # Let's add some flags first
     keys = [get_random_value_hex(16) for _ in range(10)]
     db_manager.batch_create_triggered_appointment_flag(keys)
 
-    # And now let's delete in batch
     first_half = keys[: len(keys) // 2]
     second_half = keys[len(keys) // 2 :]  # noqa: E203
 
+    # And now let's delete in batch
     db_manager.batch_delete_triggered_appointment_flag(first_half)
-    db_falgs = db_manager.load_all_triggered_flags()
-    assert not set(db_falgs).issuperset(first_half)
-    assert set(db_falgs).issuperset(second_half)
+    db_flags = db_manager.load_all_triggered_flags()
 
-    # Delete the rest
+    # The first half should be gone
+    assert not set(db_flags).issuperset(first_half)
+    assert set(db_flags).issuperset(second_half)
+
+    # Delete the rest and check
     db_manager.batch_delete_triggered_appointment_flag(second_half)
     assert not db_manager.load_all_triggered_flags()

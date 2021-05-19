@@ -127,6 +127,27 @@ def get_utxo():
     return utxo
 
 
+def mock_generate_blocks(n, blocks, queue, prev_block_hash=get_random_value_hex(32), txs=None, delay=0.2):
+    if txs is not None and not isinstance(txs, list):
+        raise ValueError("txs must be list or None")
+
+    for i in range(n):
+        block_id = get_random_value_hex(32)
+        blocks[block_id] = {
+            "previousblockhash": prev_block_hash,
+            "tx": txs if txs else [get_random_value_hex(32) for _ in range(10)],
+            "hash": block_id,
+        }
+        queue.put(block_id)
+        prev_block_hash = block_id
+    sleep(delay)
+
+
+def fork(block_hash, blocks):
+    bitcoin_cli.invalidateblock(block_hash)
+    bitcoin_cli.generatetoaddress(blocks, bitcoin_cli.getnewaddress())
+
+
 def generate_blocks(n):
     return bitcoin_cli.generatetoaddress(n, btc_addr)
 
