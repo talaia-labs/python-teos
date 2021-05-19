@@ -1,7 +1,9 @@
+import time
 import pytest
 from copy import deepcopy
 
 from teos.users_dbm import UsersDBM
+from teos.gatekeeper import Gatekeeper
 from teos.chain_monitor import ChainMonitor
 from teos.block_processor import BlockProcessor
 from teos.constants import OUTDATED_USERS_CACHE_SIZE_BLOCKS
@@ -11,8 +13,27 @@ from common.cryptographer import Cryptographer
 from common.exceptions import InvalidParameter
 from common.constants import ENCRYPTED_BLOB_MAX_SIZE_HEX
 
+from test.teos.unit.test_block_processor import block_processor_wrong_connection  # noqa: F401
 from test.teos.conftest import config, generate_blocks, generate_blocks_with_delay
-from test.teos.unit.conftest import get_random_value_hex, generate_keypair
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    generate_keypair,
+    bitcoind_connect_params,
+    wrong_bitcoind_connect_params,
+    run_test_command_bitcoind_crash,
+    run_test_blocking_command_bitcoind_crash,
+)
+
+
+@pytest.fixture(scope="module")
+def gatekeeper_wrong_connection(user_db_manager, block_processor_wrong_connection):  # noqa: F811
+    return Gatekeeper(
+        user_db_manager,
+        block_processor_wrong_connection,
+        config.get("SUBSCRIPTION_SLOTS"),
+        config.get("SUBSCRIPTION_DURATION"),
+        config.get("EXPIRY_DELTA"),
+    )
 
 
 # FIXME: 194 this whole test file could work with a gatekeeper build using a dummy block_processor
@@ -73,6 +94,36 @@ def test_manage_subscription_expiry(gatekeeper):
     assert block_height_deletion in gatekeeper.outdated_users_cache
     generate_blocks_with_delay(1)
     assert block_height_deletion not in gatekeeper.outdated_users_cache
+
+
+def test_manage_subscription_expiry_bitcoind_crash(gatekeeper):
+    # Test that the data is not deleted until bitcoind comes back online
+    current_height = gatekeeper.block_processor.get_block_count()
+    user_id = get_random_value_hex(32)
+    expiring_users = {user_id: UserInfo(available_slots=10, subscription_expiry=current_height + 1)}
+    gatekeeper.registered_users.update(expiring_users)
+
+    # Since the gatekeeper is not currently hooked to any ChainMonitor, it won't be notified.
+    block_id = generate_blocks(1)[0]
+
+    # Now we can set wrong connection params and feed the block to mock a crash with bitcoind
+    gatekeeper.block_processor.btc_connect_params = wrong_bitcoind_connect_params
+    gatekeeper.block_queue.put(block_id)
+    time.sleep(1)
+
+    # The gatekeeper's subscription manager thread should be blocked now.  The thread cannot check if the subscription
+    # has expired, and the query is blocking
+    assert not gatekeeper.block_processor.bitcoind_reachable.is_set()
+    with pytest.raises(ConnectionRefusedError):
+        gatekeeper.has_subscription_expired(user_id)
+
+    # Setting te event should unblock the thread and expire the subscription
+    gatekeeper.block_processor.btc_connect_params = bitcoind_connect_params
+    gatekeeper.block_processor.bitcoind_reachable.set()
+    time.sleep(1)
+
+    has_subscription_expired, _ = gatekeeper.has_subscription_expired(user_id)
+    assert has_subscription_expired
 
 
 def test_add_update_user(gatekeeper):
@@ -423,3 +474,26 @@ def test_update_outdated_users_cache_remove_data(gatekeeper):
         assert target_block - OUTDATED_USERS_CACHE_SIZE_BLOCKS in gatekeeper.outdated_users_cache
         gatekeeper.update_outdated_users_cache(target_block)
         assert target_block - OUTDATED_USERS_CACHE_SIZE_BLOCKS not in gatekeeper.outdated_users_cache
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+
+
+def test_add_update_user_bitcoind_crash(gatekeeper, gatekeeper_wrong_connection):
+    user_id = "02" + get_random_value_hex(32)
+    run_test_command_bitcoind_crash(lambda: gatekeeper_wrong_connection.add_update_user(user_id))
+    run_test_blocking_command_bitcoind_crash(
+        gatekeeper.block_processor.bitcoind_reachable, lambda: gatekeeper.add_update_user(user_id)
+    )
+
+
+def test_has_subscription_expired_bitcoind_crash(gatekeeper, gatekeeper_wrong_connection):
+    user_id = "02" + get_random_value_hex(32)
+    # Add the user to both the gatekeeper's so there's data to check against
+    gatekeeper_wrong_connection.registered_users.update({user_id: UserInfo(available_slots=10, subscription_expiry=1)})
+    gatekeeper.registered_users.update({user_id: UserInfo(available_slots=10, subscription_expiry=1)})
+
+    run_test_command_bitcoind_crash(lambda: gatekeeper_wrong_connection.has_subscription_expired(user_id))
+    run_test_blocking_command_bitcoind_crash(
+        gatekeeper.block_processor.bitcoind_reachable, lambda: gatekeeper.has_subscription_expired(user_id)
+    )

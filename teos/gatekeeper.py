@@ -144,7 +144,7 @@ class Gatekeeper:
                 break
 
             # Expired user deletion is delayed. Users are deleted when their subscription is outdated, not expired.
-            block_height = self.block_processor.get_block(block_hash).get("height")
+            block_height = self.block_processor.get_block(block_hash, blocking=True).get("height")
             self.update_outdated_users_cache(block_height)
             Cleaner.delete_outdated_users(self.get_outdated_user_ids(block_height), self.registered_users, self.user_db)
 
@@ -161,15 +161,17 @@ class Gatekeeper:
 
         Raises:
             :obj:`InvalidParameter`: if the user_pk does not match the expected format.
+            :obj:`ConnectionRefusedError`: if bitcoind cannot be reached.
         """
 
         if not is_compressed_pk(user_id):
             raise InvalidParameter("Provided public key does not match expected format (33-byte hex string)")
 
         with self.rw_lock.gen_wlock():
+            block_count = self.block_processor.get_block_count()
             if user_id not in self.registered_users:
                 self.registered_users[user_id] = UserInfo(
-                    self.subscription_slots, self.block_processor.get_block_count() + self.subscription_duration
+                    self.subscription_slots, block_count + self.subscription_duration,
                 )
             else:
                 # FIXME: For now new calls to register add subscription_slots to the current count and reset the expiry
@@ -178,9 +180,7 @@ class Gatekeeper:
                     raise InvalidParameter("Maximum slots reached for the subscription")
 
                 self.registered_users[user_id].available_slots += self.subscription_slots
-                self.registered_users[user_id].subscription_expiry = (
-                    self.block_processor.get_block_count() + self.subscription_duration
-                )
+                self.registered_users[user_id].subscription_expiry = block_count + self.subscription_duration
 
             self.user_db.store_user(user_id, self.registered_users[user_id].to_dict())
             receipt = create_registration_receipt(
@@ -278,6 +278,9 @@ class Gatekeeper:
         Returns:
             :obj:`tuple`: A tuple ``(bool:int)`` containing whether or not the subscription has expired, and the expiry
                 time.
+
+        Raises:
+            :obj:`ConnectionRefusedError`: If bitcoind cannot be reached.
         """
 
         with self.rw_lock.gen_rlock():

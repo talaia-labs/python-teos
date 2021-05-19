@@ -1,8 +1,10 @@
+import time
 import pytest
+import threading
 from uuid import uuid4
 from shutil import rmtree
 from copy import deepcopy
-from threading import Thread
+from threading import Thread, Event
 from coincurve import PrivateKey
 
 from teos.carrier import Carrier
@@ -39,6 +41,9 @@ from test.teos.unit.conftest import (
     generate_keypair,
     bitcoind_feed_params,
     bitcoind_connect_params,
+    run_test_command_bitcoind_crash,
+    run_test_blocking_command_bitcoind_crash,
+    mock_connection_refused_return,
 )
 
 APPOINTMENTS = 5
@@ -61,10 +66,39 @@ def temp_db_manager():
     rmtree(db_name)
 
 
+@pytest.fixture
+def standalone_watcher(run_bitcoind, db_manager, gatekeeper):
+    # This is used when we don't want a Watcher tied to a ChainManager (basically so the latter does not mess with
+    # the bitcoind_reachable event that we are mocking). Therefore we need to create a fresh BlockProcessor.
+    bitcoind_reachable = Event()
+    bitcoind_reachable.set()
+
+    block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
+    carrier = Carrier(bitcoind_connect_params, bitcoind_reachable)
+
+    responder = Responder(db_manager, gatekeeper, carrier, block_processor)
+    watcher = Watcher(
+        db_manager,
+        gatekeeper,
+        block_processor,
+        responder,
+        signing_key,
+        MAX_APPOINTMENTS,
+        config.get("LOCATOR_CACHE_SIZE"),
+    )
+
+    watcher.last_known_block = block_processor.get_best_block_hash()
+
+    return watcher
+
+
 @pytest.fixture(scope="module")
 def watcher(run_bitcoind, db_manager, gatekeeper):
-    block_processor = BlockProcessor(bitcoind_connect_params)
-    carrier = Carrier(bitcoind_connect_params)
+    bitcoind_reachable = Event()
+    bitcoind_reachable.set()
+
+    block_processor = BlockProcessor(bitcoind_connect_params, bitcoind_reachable)
+    carrier = Carrier(bitcoind_connect_params, bitcoind_reachable)
 
     responder = Responder(db_manager, gatekeeper, carrier, block_processor)
     watcher = Watcher(
@@ -794,3 +828,94 @@ def test_get_subscription_info(block_processor, watcher, generate_dummy_appointm
     assert set(locators) == set([appointment.locator, tracker.locator])
     assert sub_info.available_slots == available_slots
     assert sub_info.subscription_expiry == subscription_expiry
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+# An authenticate_user function that simply does not raise
+def authenticate_user_mock(*args, **kwargs):
+    return get_random_value_hex(32)
+
+
+def test_locator_cache_init_bitcoind_crash(block_processor):
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable,
+        lambda: locator_cache.init(block_processor.get_best_block_hash(), block_processor),
+    )
+
+
+def test_fix_cache_bitcoind_crash(block_processor):
+    locator_cache = LocatorCache(config.get("LOCATOR_CACHE_SIZE"))
+
+    run_test_blocking_command_bitcoind_crash(
+        block_processor.bitcoind_reachable,
+        lambda: locator_cache.fix(block_processor.get_best_block_hash(), block_processor),
+    )
+
+
+def test_register_bitcoind_crash(watcher, monkeypatch):
+    monkeypatch.setattr(watcher.gatekeeper, "add_update_user", mock_connection_refused_return)
+
+    run_test_command_bitcoind_crash(lambda: watcher.register(get_random_value_hex(32)))
+
+
+def test_get_appointment_bitcoind_crash(watcher, monkeypatch):
+    # We don't need to get the right user, just not to fail, checking if a subscription has expired will return
+    # ConnectionRefusedError, which is what we need to test for.
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", authenticate_user_mock)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", mock_connection_refused_return)
+
+    run_test_command_bitcoind_crash(lambda: watcher.get_appointment(get_random_value_hex(32), get_random_value_hex(32)))
+
+
+def test_add_appointment_bitcoind_crash(watcher, generate_dummy_appointment, monkeypatch):
+    # Same as with the previous test, we just need to check that the ConnectionRefusedError raised by
+    # has_subscription_expired is forwarded.
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", authenticate_user_mock)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", mock_connection_refused_return)
+
+    appointment, _ = generate_dummy_appointment()
+    run_test_command_bitcoind_crash(lambda: watcher.add_appointment(appointment, get_random_value_hex(73)))
+
+
+def test_get_subscription_info_bitcoind_crash(watcher, monkeypatch):
+    # Same approach as the two previous tests
+    monkeypatch.setattr(watcher.gatekeeper, "authenticate_user", authenticate_user_mock)
+    monkeypatch.setattr(watcher.gatekeeper, "has_subscription_expired", mock_connection_refused_return)
+
+    run_test_command_bitcoind_crash(lambda: watcher.get_subscription_info(get_random_value_hex(73)))
+
+
+def test_do_watch_bitcoind_crash(standalone_watcher):
+    # Let's start to watch
+    do_watch_thread = Thread(target=standalone_watcher.do_watch, daemon=True)
+    do_watch_thread.start()
+    time.sleep(2)
+
+    # Block the watcher
+    standalone_watcher.block_processor.bitcoind_reachable.clear()
+    assert standalone_watcher.block_queue.empty()
+
+    # Mine a block and check how the Watcher is blocked processing it
+    best_tip = generate_blocks_with_delay(1, 2)[0]
+    standalone_watcher.block_queue.put(best_tip)
+    time.sleep(2)
+    assert standalone_watcher.last_known_block != best_tip
+    assert standalone_watcher.block_queue.unfinished_tasks == 1
+
+    # Reestablish the connection and check back
+    standalone_watcher.block_processor.bitcoind_reachable.set()
+    time.sleep(2)
+    assert standalone_watcher.last_known_block == best_tip
+    assert standalone_watcher.block_queue.unfinished_tasks == 0
+
+
+def test_check_breach_bitcoind_crash(watcher, generate_dummy_appointment):
+    uuid = uuid4().hex
+    appointment, dispute_tx = generate_dummy_appointment()
+    dispute_txid = watcher.block_processor.decode_raw_transaction(dispute_tx).get("txid")
+
+    run_test_blocking_command_bitcoind_crash(
+        watcher.block_processor.bitcoind_reachable, lambda: watcher.check_breach(uuid, appointment, dispute_txid)
+    )

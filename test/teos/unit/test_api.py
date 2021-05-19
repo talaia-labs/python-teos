@@ -13,7 +13,12 @@ from teos.appointments_dbm import AppointmentsDBM
 from teos.responder import Responder
 
 from test.teos.conftest import config, create_txs
-from test.teos.unit.conftest import get_random_value_hex, generate_keypair, compute_locator
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    generate_keypair,
+    compute_locator,
+    mock_connection_refused_return,
+)
 
 import common.receipts as receipts
 from common.cryptographer import Cryptographer, hash_160
@@ -576,3 +581,52 @@ def test_get_subscription_info(internal_api, client):
     assert r.get_json().get("available_slots") == 100
     assert r.get_json().get("subscription_expiry") == 700
     assert r.get_json().get("appointments") == []
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+
+
+def test_register_bitcoind_crash(internal_api, client, monkeypatch):
+    # Monkeypatch register so it raises a ConnectionRejectedError
+    monkeypatch.setattr(internal_api.watcher, "register", mock_connection_refused_return)
+
+    data = {"public_key": user_id}
+    r = client.post(register_endpoint, json=data)
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+
+
+def test_add_appointment_bitcoind_crash(internal_api, client, appointment, monkeypatch):
+    # Monkeypatch add_appointment so it raises a ConnectionRejectedError
+    monkeypatch.setattr(internal_api.watcher, "add_appointment", mock_connection_refused_return)
+
+    appointment_signature = Cryptographer.sign(appointment.serialize(), user_sk)
+    r = client.post(
+        add_appointment_endpoint, json={"appointment": appointment.to_dict(), "signature": appointment_signature}
+    )
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+
+
+def test_get_appointment_bitcoind_crash(internal_api, client, appointment, monkeypatch):
+    # Monkeypatch add_appointment so it raises a ConnectionRejectedError
+    monkeypatch.setattr(internal_api.watcher, "get_appointment", mock_connection_refused_return)
+
+    # Next we can request it
+    message = "get appointment {}".format(appointment.locator)
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    data = {"locator": appointment.locator, "signature": signature}
+    r = client.post(get_appointment_endpoint, json=data)
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"
+
+
+def test_get_subscription_info_bitcoind_crash(internal_api, client, monkeypatch):
+    # Monkeypatch get_subscription_info so it raises a ConnectionRejectedError
+    monkeypatch.setattr(internal_api.watcher, "get_subscription_info", mock_connection_refused_return)
+
+    # Request back the data
+    message = "get subscription info"
+    signature = Cryptographer.sign(message.encode("utf-8"), user_sk)
+    data = {"signature": signature}
+
+    # Next we can request the subscription info
+    r = client.post(get_subscription_info_endpoint, json=data)
+    assert r.status_code == HTTP_SERVICE_UNAVAILABLE and r.json.get("error") == "Service unavailable"

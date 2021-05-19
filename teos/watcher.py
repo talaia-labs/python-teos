@@ -76,7 +76,7 @@ class LocatorCache:
             if not target_block_hash:
                 break
 
-            target_block = block_processor.get_block(target_block_hash)
+            target_block = block_processor.get_block(target_block_hash, blocking=True)
             if not target_block:
                 break
 
@@ -149,7 +149,7 @@ class LocatorCache:
         # be filled with less than cache_size blocks.
         target_block_hash = last_known_block
         for _ in range(tmp_cache.cache_size):
-            target_block = block_processor.get_block(target_block_hash)
+            target_block = block_processor.get_block(target_block_hash, blocking=True)
             if target_block:
                 # Compute the locator:txid pair for every transaction in the block and update both the cache and
                 # the block mapping.
@@ -275,6 +275,9 @@ class Watcher:
         Returns:
             :obj:`tuple`: A tuple containing the available slots, the subscription expiry, and the signature of the
             registration receipt by the Watcher.
+
+        Raises:
+            :obj:`ConnectionRefusedError`: if bitcoind cannot be reached.
         """
 
         available_slots, subscription_expiry, registration_receipt = self.gatekeeper.add_update_user(user_id)
@@ -299,6 +302,7 @@ class Watcher:
         Raises:
             :obj:`AppointmentNotFound`: if the appointment is not found in the tower.
             :obj:`SubscriptionExpired`: If the user subscription has expired.
+            :obj:`ConnectionRefusedError`: If bitcoind cannot be reached.
         """
 
         message = "get appointment {}".format(locator).encode("utf-8")
@@ -350,6 +354,7 @@ class Watcher:
             :obj:`AuthenticationFailure`: If the user cannot be authenticated.
             :obj:`NotEnoughSlots`: If the user does not have enough available slots, so the appointment is rejected.
             :obj:`SubscriptionExpired`: If the user subscription has expired.
+            :obj:`ConnectionRefusedError`: If bitcoind cannot be reached.
         """
 
         with self.rw_lock.gen_wlock():
@@ -459,7 +464,7 @@ class Watcher:
 
         # Distinguish fresh bootstraps from bootstraps from db
         if self.last_known_block is None:
-            self.last_known_block = self.block_processor.get_best_block_hash()
+            self.last_known_block = self.block_processor.get_best_block_hash(blocking=True)
             self.db_manager.store_last_block_hash_watcher(self.last_known_block)
 
         # Initialise the locator cache with the last ``cache_size`` blocks.
@@ -472,7 +477,7 @@ class Watcher:
             if block_hash == ChainMonitor.END_MESSAGE:
                 break
 
-            block = self.block_processor.get_block(block_hash)
+            block = self.block_processor.get_block(block_hash, blocking=True)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
             )
@@ -594,7 +599,7 @@ class Watcher:
 
         try:
             penalty_rawtx = Cryptographer.decrypt(appointment.encrypted_blob, dispute_txid)
-            penalty_tx = self.block_processor.decode_raw_transaction(penalty_rawtx)
+            penalty_tx = self.block_processor.decode_raw_transaction(penalty_rawtx, blocking=True)
 
         except EncryptionError as e:
             self.logger.info("Transaction cannot be decrypted", uuid=uuid)
@@ -693,6 +698,7 @@ class Watcher:
 
         Raises:
             :obj:`SubscriptionExpired`: If the user subscription has expired.
+            :obj:`ConnectionRefusedError`: If bitcoind cannot be reached.
         """
 
         message = "get subscription info".encode("utf-8")

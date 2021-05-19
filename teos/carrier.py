@@ -36,9 +36,13 @@ class Carrier:
     The :class:`Carrier` is in charge of interacting with ``bitcoind`` to send/get transactions. It uses :obj:`Receipt`
     objects to report about the sending outcome.
 
+    All methods of the ``Carrier`` are blocking, meaning they will wait for bitcoind to come back online if a method is called
+    while it cannot be reached.
+
     Args:
         btc_connect_params (:obj:`dict`): a dictionary with the parameters to connect to bitcoind
             (``rpc user, rpc password, host and port``).
+        bitcoind_reachable (:obj:`threading.Event`): signals whether bitcoind is reachable or not.
 
     Attributes:
         logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
@@ -47,9 +51,10 @@ class Carrier:
 
     """
 
-    def __init__(self, btc_connect_params):
+    def __init__(self, btc_connect_params, bitcoind_reachable):
         self.logger = get_logger(component=Carrier.__name__)
         self.btc_connect_params = btc_connect_params
+        self.bitcoind_reachable = bitcoind_reachable
         self.issued_receipts = {}
 
     # NOTCOVERED
@@ -72,6 +77,8 @@ class Carrier:
             return receipt
 
         try:
+            self.bitcoind_reachable.wait()
+
             self.logger.info("Pushing transaction to the network", txid=txid, rawtx=rawtx)
             bitcoin_cli(self.btc_connect_params).sendrawtransaction(rawtx)
 
@@ -121,6 +128,11 @@ class Carrier:
                 self.logger.error("JSONRPCException", method="Carrier.send_transaction", error=e.error)
                 receipt = Receipt(delivered=False, reason=UNKNOWN_JSON_RPC_EXCEPTION)
 
+        except ConnectionRefusedError:
+            self.logger.error(f"Cannot connect to bitcoind. Waiting for it to come back online")
+            self.bitcoind_reachable.clear()
+            receipt = self.send_transaction(rawtx, txid)
+
         self.issued_receipts[txid] = receipt
 
         return receipt
@@ -137,9 +149,10 @@ class Carrier:
             chain. :obj:`None` otherwise.
         """
 
+        self.bitcoind_reachable.wait()
+
         try:
             tx_info = bitcoin_cli(self.btc_connect_params).getrawtransaction(txid, 1)
-            return tx_info
 
         except JSONRPCException as e:
             # While it's quite unlikely, the transaction that was already in the blockchain could have been
@@ -152,4 +165,11 @@ class Carrier:
                 # If something else happens (unlikely but possible) log it so we can treat it in future releases
                 self.logger.error("JSONRPCException", method="Carrier.get_transaction", error=e.error)
 
-            return None
+            tx_info = None
+
+        except ConnectionRefusedError:
+            self.logger.error(f"Cannot connect to bitcoind. Waiting for it to come back online")
+            self.bitcoind_reachable.clear()
+            tx_info = self.get_transaction(txid)
+
+        return tx_info

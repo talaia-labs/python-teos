@@ -1,8 +1,11 @@
-from test.teos.conftest import generate_blocks
-from test.teos.unit.conftest import get_random_value_hex
 from teos.utils.rpc_errors import RPC_VERIFY_ALREADY_IN_CHAIN, RPC_DESERIALIZATION_ERROR
 
+from test.teos.conftest import generate_blocks
 from test.teos.conftest import create_commitment_tx, bitcoin_cli
+from test.teos.unit.conftest import (
+    get_random_value_hex,
+    run_test_blocking_command_bitcoind_crash,
+)
 
 
 # FIXME: This test do not fully cover the carrier since the simulator does not support every single error bitcoind may
@@ -64,3 +67,21 @@ def test_get_non_existing_transaction(carrier):
     tx_info = carrier.get_transaction(get_random_value_hex(32))
 
     assert tx_info is None
+
+
+# TESTS WITH BITCOIND UNREACHABLE
+
+
+def test_send_transaction_bitcoind_crash(carrier):
+    tx = create_commitment_tx()
+    txid = bitcoin_cli.decoderawtransaction(tx).get("txid")
+
+    run_test_blocking_command_bitcoind_crash(
+        carrier.bitcoind_reachable, lambda: carrier.send_transaction(tx, txid),
+    )
+
+
+def test_get_transaction_bitcoind_crash(carrier):
+    run_test_blocking_command_bitcoind_crash(
+        carrier.bitcoind_reachable, lambda: carrier.get_transaction(get_random_value_hex(32)),
+    )

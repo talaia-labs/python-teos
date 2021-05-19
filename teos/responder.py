@@ -197,7 +197,7 @@ class Responder:
             :obj:`bool`: Whether or not the :obj:`Responder` and ``bitcoind`` are on sync.
         """
 
-        distance_from_tip = self.block_processor.get_distance_to_tip(block_hash)
+        distance_from_tip = self.block_processor.get_distance_to_tip(block_hash, blocking=True)
 
         if distance_from_tip is not None and distance_from_tip > 1:
             synchronized = False
@@ -287,7 +287,7 @@ class Responder:
 
         # Distinguish fresh bootstraps from bootstraps from db
         if self.last_known_block is None:
-            self.last_known_block = self.block_processor.get_best_block_hash()
+            self.last_known_block = self.block_processor.get_best_block_hash(blocking=True)
             self.db_manager.store_last_block_hash_responder(self.last_known_block)
 
         while True:
@@ -297,7 +297,7 @@ class Responder:
             if block_hash == ChainMonitor.END_MESSAGE:
                 break
 
-            block = self.block_processor.get_block(block_hash)
+            block = self.block_processor.get_block(block_hash, blocking=True)
             self.logger.info(
                 "New block received", block_hash=block_hash, prev_block_hash=block.get("previousblockhash")
             )
