@@ -8,7 +8,6 @@ from threading import Thread, Lock
 import common.receipts as receipts
 from common.tools import compute_locator
 from common.appointment import Appointment
-from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.exceptions import (
     InvalidParameter,
@@ -17,6 +16,7 @@ from common.exceptions import (
     TowerConnectionError,
     TowerResponseError,
 )
+from common.config_loader import ConfigLoader, UnknownConfigParam
 
 import arg_parser
 from retrier import Retrier
@@ -171,11 +171,15 @@ def init(options, configuration, plugin):
     config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, clightning_conf)
 
     try:
-        plugin.wt_client = WTClient(user_sk, user_id, config_loader.build_config())
+        conf = config_loader.build_config()
+        plugin.wt_client = WTClient(user_sk, user_id, conf)
     except plyvel.IOError:
         error = "Cannot load towers db. Resource temporarily unavailable"
         plugin.log("Cannot load towers db. Resource temporarily unavailable")
         raise IOError(error)
+    except UnknownConfigParam as e:
+        plugin.log(str(e), level="error")
+        exit(1)
 
 
 @plugin.method("registertower", desc="Register your public key (user id) with the tower.")

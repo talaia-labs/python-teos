@@ -16,9 +16,9 @@ from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
 from common import constants
 import common.receipts as receipts
 from common.appointment import Appointment
-from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
 from common.tools import setup_data_folder
+from common.config_loader import ConfigLoader, UnknownConfigParam
 from common.exceptions import BasicException, InvalidKey, InvalidParameter, TowerResponseError
 from common.tools import is_256b_hex_str, is_locator, compute_locator, is_compressed_pk
 
@@ -436,11 +436,7 @@ def save_appointment_receipt(appointment, start_block, signature, appointments_f
         raise IOError("There was an error while saving the appointment. {}".format(e))
 
 
-def main(command, args, command_line_conf):
-    # Loads config and sets up the data folder and log file
-    config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
-    config = config_loader.build_config()
-
+def main(command, args, config):
     setup_data_folder(config.get("DATA_DIR"))
 
     # Set the teos url
@@ -563,7 +559,9 @@ def run():
 
         command = args.pop(0) if args else None
         if command in commands:
-            main(command, args, command_line_conf)
+            config_loader = ConfigLoader(DATA_DIR, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+            config = config_loader.build_config()
+            main(command, args, config)
         elif not command:
             sys.exit(f"No command provided.\n\n{show_usage()}")
         else:
@@ -571,6 +569,8 @@ def run():
 
     except GetoptError as e:
         sys.exit(f"{e}\n\n{show_usage()}")
+    except UnknownConfigParam as e:
+        exit(f"{e}. Check your teos_client.conf file")
 
 
 if __name__ == "__main__":

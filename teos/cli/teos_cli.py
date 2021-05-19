@@ -4,9 +4,9 @@ from sys import argv
 from getopt import getopt, GetoptError
 import grpc
 
-from common.config_loader import ConfigLoader
 from common.tools import setup_data_folder
 from common.exceptions import InvalidParameter
+from common.config_loader import ConfigLoader, UnknownConfigParam
 
 from teos import DEFAULT_CONF, DATA_DIR, CONF_FILE_NAME
 from teos.cli.rpc_client import RPCClient
@@ -100,7 +100,7 @@ class CLI:
 
     Args:
         data_dir (:obj:`str`): the path to the data directory where the configuration file may be found.
-        command_line_conf (:obj:`dict`): the command line settings, parsed in a dictionary.
+        config (:obj:`dict`): the configuration object.
 
     Attributes:
         rpc_client (:class:`RpcClient`): the rpc client that is passed to the ``run`` method of the commands.
@@ -110,17 +110,9 @@ class CLI:
     # It is populated by the ``command`` decorator.
     COMMANDS = {}
 
-    def __init__(self, data_dir, command_line_conf):
-        # Loads config and sets up the data folder and log file
-        config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
-        config = config_loader.build_config()
-
+    def __init__(self, data_dir, config):
         setup_data_folder(data_dir)
-
-        teos_rpc_host = config.get("RPC_BIND")
-        teos_rpc_port = config.get("RPC_PORT")
-
-        self.rpc_client = RPCClient(teos_rpc_host, teos_rpc_port)
+        self.rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
 
     @classmethod
     def command(cls, command_cls):
@@ -344,18 +336,25 @@ def run():
 
             if opt in ["-h", "--help"]:
                 sys.exit(show_usage())
+
+        config_loader = ConfigLoader(data_dir, CONF_FILE_NAME, DEFAULT_CONF, command_line_conf)
+        config = config_loader.build_config()
+
+        if command in CLI.COMMANDS:
+            cli = CLI(data_dir, config)
+            result = cli.run(command, command_args)
+            if result:
+                print(result)
+
+        elif not command:
+            sys.exit("No command provided. Use help to check the list of available commands")
+        else:
+            sys.exit("Unknown command. Use help to check the list of available commands")
+
     except GetoptError as e:
         sys.exit(f"{e}\n\n{show_usage()}")
-
-    if command in CLI.COMMANDS:
-        cli = CLI(data_dir, command_line_conf)
-        result = cli.run(command, command_args)
-        if result:
-            print(result)
-    elif not command:
-        sys.exit("No command provided. Use help to check the list of available commands")
-    else:
-        sys.exit("Unknown command. Use help to check the list of available commands")
+    except UnknownConfigParam as e:
+        exit(f"{e}. Check your teos.conf file")
 
 
 if __name__ == "__main__":
