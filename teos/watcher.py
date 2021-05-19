@@ -412,7 +412,6 @@ class Watcher:
                     # Otherwise it is dropped.
                     if receipt.delivered:
                         self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
-                        self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
                         self.db_manager.create_triggered_appointment_flag(uuid)
 
                 except (EncryptionError, InvalidTransactionFormat):
@@ -434,7 +433,6 @@ class Watcher:
                     self.locator_uuid_map[extended_appointment.locator] = [uuid]
 
                 self.db_manager.store_watcher_appointment(uuid, extended_appointment.to_dict())
-                self.db_manager.create_append_locator_map(extended_appointment.locator, uuid)
 
             try:
                 signature = Cryptographer.sign(

@@ -8,7 +8,6 @@ WATCHER_PREFIX = "w"
 WATCHER_LAST_BLOCK_KEY = "bw"
 RESPONDER_PREFIX = "r"
 RESPONDER_LAST_BLOCK_KEY = "br"
-LOCATOR_MAP_PREFIX = "m"
 TRIGGERED_APPOINTMENTS_PREFIX = "ta"
 
 
@@ -23,21 +22,18 @@ class AppointmentsDBM(DBManager):
         - ``RESPONDER_PREFIX``, defines as ``b'r``, is used to store :obj:`Responder <teos.responder.Responder>` trackers.
         - ``WATCHER_LAST_BLOCK_KEY``, defined as ``b'bw``, is used to store the last block hash known by the :obj:`Watcher <teos.watcher.Watcher>`.
         - ``RESPONDER_LAST_BLOCK_KEY``, defined as ``b'br``, is used to store the last block hash known by the :obj:`Responder <teos.responder.Responder>`.
-        - ``LOCATOR_MAP_PREFIX``, defined as ``b'm``, is used to store the ``locator:uuid`` maps.
         - ``TRIGGERED_APPOINTMENTS_PREFIX``, defined as ``b'ta``, is used to stored triggered appointments (appointments that have been handed to the :obj:`Responder <teos.responder.Responder>`.)
 
     Args:
         db_path (:obj:`str`): the path (relative or absolute) to the system folder containing the database. A fresh
             database will be created if the specified path does not contain one.
-            
+   
     Attributes:
         logger (:obj:`Logger <teos.logger.Logger>`): the logger for this component.
 
     Raises:
         :obj:`ValueError`: If the provided ``db_path`` is not a string.
         :obj:`plyvel.Error`: If the db is currently unavailable (being used by another process).
-
-
     """  # noqa: E501
 
     def __init__(self, db_path):
@@ -247,117 +243,6 @@ class AppointmentsDBM(DBManager):
 
         except TypeError:
             self.logger.info("Couldn't add tracker to db.", uuid=uuid, tracker=tracker)
-            return False
-
-        except RuntimeError as e:
-            self.logger.error(str(e))
-            raise e
-
-    def load_locator_map(self, locator):
-        """
-        Loads the ``locator:uuid`` map of a given ``locator`` from the database.
-
-        Args:
-            locator (:obj:`str`): a 16-byte hex-encoded string representing the appointment locator.
-
-        Returns:
-            :obj:`dict` or :obj:`None`: The requested ``locator:uuid`` map if found.
-
-            Returns :obj:`None` otherwise.
-        """
-
-        key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
-
-        try:
-            locator_map = self.db.get(key)
-
-            if locator_map is not None:
-                locator_map = json.loads(locator_map.decode("utf-8"))
-
-            else:
-                self.logger.info("Locator not found in the db", locator=locator)
-
-        except RuntimeError as e:
-            self.logger.error(str(e))
-            raise e
-
-        return locator_map
-
-    def create_append_locator_map(self, locator, uuid):
-        """
-        Creates a ``locator:uuid`` map.
-
-        If the map already exists, the new ``uuid`` is appended to the existing ones (if it is not already there).
-
-        Args:
-            locator (:obj:`str`): a 16-byte hex-encoded string used as the key of the map.
-            uuid (:obj:`str`): a 16-byte hex-encoded unique id to create (or add to) the map.
-        """
-
-        locator_map = self.load_locator_map(locator)
-
-        if locator_map is not None:
-            if uuid not in locator_map:
-                locator_map.append(uuid)
-                self.logger.info("Updating locator map", locator=locator, uuid=uuid)
-
-            else:
-                self.logger.info("UUID already in the map", locator=locator, uuid=uuid)
-
-        else:
-            locator_map = [uuid]
-            self.logger.info("Creating new locator map", locator=locator, uuid=uuid)
-
-        try:
-            key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
-            self.db.put(key, json.dumps(locator_map).encode("utf-8"))
-
-        except RuntimeError as e:
-            self.logger.error(str(e))
-            raise e
-
-    def update_locator_map(self, locator, locator_map):
-        """
-        Updates a ``locator:uuid`` map in the database by deleting one of it's uuid. It will only work as long as
-        the given ``locator_map`` is a subset of the current one and it's not empty.
-
-        Args:
-            locator (:obj:`str`): a 16-byte hex-encoded string used as the key of the map.
-            locator_map (:obj:`list`): a list of uuids to replace the current one on the db.
-        """
-
-        current_locator_map = self.load_locator_map(locator)
-
-        if set(locator_map).issubset(current_locator_map) and len(locator_map) != 0:
-            try:
-                key = (LOCATOR_MAP_PREFIX + locator).encode("utf-8")
-                self.db.put(key, json.dumps(locator_map).encode("utf-8"))
-
-            except RuntimeError as e:
-                self.logger.error(str(e))
-                raise e
-
-        else:
-            self.logger.error("Trying to update a locator_map with completely different, or empty, data")
-
-    def delete_locator_map(self, locator):
-        """
-        Deletes a ``locator:uuid`` map.
-
-        Args:
-            locator (:obj:`str`): a 16-byte hex-encoded string identifying the map to delete.
-
-        Returns:
-            :obj:`bool`: True if the locator map was deleted from the database or it was non-existent, False otherwise.
-        """
-
-        try:
-            self.logger.info("Deleting locator map from db", locator=locator)
-            self.delete_entry(locator, prefix=LOCATOR_MAP_PREFIX)
-            return True
-
-        except TypeError:
-            self.logger.info("Couldn't delete locator map from db, locator has wrong type", locator=locator)
             return False
 
         except RuntimeError as e:

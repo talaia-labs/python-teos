@@ -57,7 +57,6 @@ def set_up_appointments(db_manager, total_appointments):
         locator_uuid_map[locator] = [uuid]
 
         db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-        db_manager.create_append_locator_map(locator, uuid)
 
         # Each locator can have more than one uuid assigned to it.
         if i % 2:
@@ -67,7 +66,6 @@ def set_up_appointments(db_manager, total_appointments):
             locator_uuid_map[locator].append(uuid)
 
             db_manager.store_watcher_appointment(uuid, appointment.to_dict())
-            db_manager.create_append_locator_map(locator, uuid)
 
     return appointments, locator_uuid_map
 
@@ -98,7 +96,6 @@ def set_up_trackers(db_manager, total_trackers):
         tx_tracker_map[penalty_txid] = [uuid]
 
         db_manager.store_responder_tracker(uuid, tracker.to_dict())
-        db_manager.create_append_locator_map(tracker.locator, uuid)
 
         # Each penalty_txid can have more than one uuid assigned to it.
         if i % 2:
@@ -108,7 +105,6 @@ def set_up_trackers(db_manager, total_trackers):
             tx_tracker_map[penalty_txid].append(uuid)
 
             db_manager.store_responder_tracker(uuid, tracker.to_dict())
-            db_manager.create_append_locator_map(tracker.locator, uuid)
 
             # Add them to the Watcher's db too
             db_manager.store_watcher_appointment(uuid, appointment.to_dict())
@@ -158,23 +154,6 @@ def test_delete_appointment_from_db(db_manager):
         # The appointment should have been deleted from the database, but not from memory
         assert uuid in appointments
         assert db_manager.load_watcher_appointment(uuid) is None
-
-
-def test_update_delete_db_locator_map(db_manager):
-    # Tests deleting entries from the locator map
-    appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
-
-    for uuid, appointment in appointments.items():
-        locator = appointment.get("locator")
-        locator_map_before = db_manager.load_locator_map(locator)
-        Cleaner.update_delete_db_locator_map([uuid], locator, db_manager)
-        locator_map_after = db_manager.load_locator_map(locator)
-
-        # Check that the data is there before but not after cleaning
-        if locator_map_after is None:
-            assert locator_map_before is not None
-        else:
-            assert uuid in locator_map_before and uuid not in locator_map_after
 
 
 def test_delete_appointments(db_manager):
