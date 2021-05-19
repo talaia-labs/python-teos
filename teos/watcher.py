@@ -499,8 +499,8 @@ class Watcher:
                     # Make sure we only try to delete what is on the Watcher (some appointments may have been triggered)
                     outdated_appointments = list(set(outdated_appointments).intersection(self.appointments.keys()))
 
-                    Cleaner.delete_outdated_appointments(
-                        outdated_appointments, self.appointments, self.locator_uuid_map, self.db_manager
+                    Cleaner.delete_appointments(
+                        outdated_appointments, self.appointments, self.locator_uuid_map, self.db_manager, outdated=True
                     )
 
                     valid_breaches, invalid_breaches = self.filter_breaches(self.get_breaches(locator_txid_map))
@@ -541,7 +541,7 @@ class Watcher:
                     }
                     self.db_manager.batch_create_triggered_appointment_flag(triggered_flags)
 
-                    Cleaner.delete_completed_appointments(
+                    Cleaner.delete_appointments(
                         appointments_to_delete, self.appointments, self.locator_uuid_map, self.db_manager
                     )
                     # Remove invalid appointments from the Gatekeeper

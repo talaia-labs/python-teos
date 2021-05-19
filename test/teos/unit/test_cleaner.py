@@ -177,8 +177,7 @@ def test_update_delete_db_locator_map(db_manager):
             assert uuid in locator_map_before and uuid not in locator_map_after
 
 
-# FIXME: #288
-def test_delete_outdated_appointments(db_manager):
+def test_delete_appointments(db_manager):
     # Tests deleting appointment data both from memory and the database
     for _ in range(ITERATIONS):
         appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
@@ -193,7 +192,7 @@ def test_delete_outdated_appointments(db_manager):
         assert set(outdated_appointments).issubset(db_appointments.keys())
 
         # Delete
-        Cleaner.delete_outdated_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager)
+        Cleaner.delete_appointments(outdated_appointments, appointments, locator_uuid_map, db_manager)
 
         # Data is not in memory anymore
         all_uuids = list(flatten(locator_uuid_map.values()))
@@ -203,32 +202,6 @@ def test_delete_outdated_appointments(db_manager):
         # And neither is in the database
         db_appointments = db_manager.load_watcher_appointments()
         assert not set(outdated_appointments).issubset(db_appointments.keys())
-
-
-def test_delete_completed_appointments(db_manager):
-    for _ in range(ITERATIONS):
-        appointments, locator_uuid_map = set_up_appointments(db_manager, MAX_ITEMS)
-        completed_appointments = random.sample(list(appointments.keys()), k=ITEMS)
-
-        # Check that the data is there before deletion
-        all_uuids = list(flatten(locator_uuid_map.values()))
-        assert set(completed_appointments).issubset(appointments.keys())
-        assert set(completed_appointments).issubset(all_uuids)
-
-        db_appointments = db_manager.load_watcher_appointments()
-        assert set(completed_appointments).issubset(db_appointments.keys())
-
-        # Delete
-        Cleaner.delete_outdated_appointments(completed_appointments, appointments, locator_uuid_map, db_manager)
-
-        # Data is not in memory anymore
-        all_uuids = list(flatten(locator_uuid_map.values()))
-        assert not set(completed_appointments).issubset(appointments.keys())
-        assert not set(completed_appointments).issubset(all_uuids)
-
-        # And neither is in the database
-        db_appointments = db_manager.load_watcher_appointments()
-        assert not set(completed_appointments).issubset(db_appointments.keys())
 
 
 def test_flag_triggered_appointments(db_manager):
