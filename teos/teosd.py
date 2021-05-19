@@ -1,20 +1,18 @@
 import os
 import daemon
-import subprocess
-from sys import argv, exit
-import multiprocessing
 import threading
-
+import subprocess
+import multiprocessing
+from sys import argv, exit
 from getopt import getopt, GetoptError
 from signal import signal, SIGINT, SIGQUIT, SIGTERM
 
+from common.tools import setup_data_folder
 from common.config_loader import ConfigLoader
 from common.cryptographer import Cryptographer
-from common.tools import setup_data_folder
 
 import teos.api as api
 import teos.rpc as rpc
-from teos.logger import setup_logging, get_logger, serve as serve_logging
 from teos.help import show_usage
 from teos.watcher import Watcher
 from teos.builder import Builder
@@ -24,11 +22,12 @@ from teos.responder import Responder
 from teos.gatekeeper import Gatekeeper
 from teos.internal_api import InternalAPI
 from teos.chain_monitor import ChainMonitor
+from teos.constants import SHUTDOWN_GRACE_TIME
 from teos.block_processor import BlockProcessor
 from teos.appointments_dbm import AppointmentsDBM
 from teos import DATA_DIR, DEFAULT_CONF, CONF_FILE_NAME
+from teos.logger import setup_logging, get_logger, serve as serve_logging
 from teos.tools import can_connect_to_bitcoind, in_correct_network, get_default_rpc_port
-from teos.constants import SHUTDOWN_GRACE_TIME
 
 parent_pid = os.getpid()
 
@@ -64,9 +63,10 @@ class TeosDaemon:
         config (:obj:`dict`): the configuration object.
         sk (:obj:`PrivateKey`): the :obj:`PrivateKey` of the tower.
         logger (:obj:`Logger <teos.logger.Logger>`): the logger instance.
-        logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port)
-        stop_log_event (:obj:`multiprocessing.Event`): the event to signal a stop to the logging server
-        logging_process (:obj:`multiprocessing.Process`): the logging server process
+        logging_port (:obj:`int`): the port where the logging server can be reached (localhost:logging_port).
+        teosd_ready (:obj:`multiprocessing.Event`): the event to signal that teosd is done bootstrapping.
+        stop_log_event (:obj:`multiprocessing.Event`): the event to signal a stop to the logging server.
+        logging_process (:obj:`multiprocessing.Process`): the logging server process.
 
     Attributes:
         stop_command_event (:obj:`threading.Event`): The event that will be set to initiate a graceful shutdown.
@@ -88,12 +88,15 @@ class TeosDaemon:
         rpc_process (:obj:`multiprocessing.Process`): The instance of the internal RPC server; only set if running.
     """
 
-    def __init__(self, config, sk, logger, logging_port, stop_log_event, logging_process):
+    def __init__(self, config, sk, logger, logging_port, teosd_ready, stop_log_event, logging_process):
         self.config = config
         self.logger = logger
         self.logging_port = logging_port
         self.stop_log_event = stop_log_event
         self.logging_process = logging_process
+
+        self.rpc_ready = multiprocessing.Event()
+        self.teosd_ready = teosd_ready
 
         # event triggered when a ``stop`` command is issued
         # Using multiprocessing.Event seems to cause a deadlock if event.set() is called in a signal handler that
@@ -162,6 +165,7 @@ class TeosDaemon:
                 self.config.get("RPC_PORT"),
                 self.internal_api_endpoint,
                 self.logging_port,
+                self.rpc_ready,
                 self.stop_event,
             ),
             daemon=True,
@@ -302,6 +306,12 @@ class TeosDaemon:
             )
             self.api_proc.start()
 
+        self.rpc_ready.wait()
+        api.wait_until_ready(api_endpoint)
+
+        self.teosd_ready.set()
+        self.logger.info("TEOS is up and running")
+
     def handle_signals(self, signum, frame):
         """Handles signals by initiating a graceful shutdown."""
         self.logger.debug(f"Signal {signum} received. Stopping")
@@ -361,7 +371,7 @@ class TeosDaemon:
         self.teardown()
 
 
-def main(config):
+def main(config, teosd_ready):
     setup_data_folder(config.get("DATA_DIR"))
 
     logging_server_ready = multiprocessing.Event()
@@ -397,7 +407,7 @@ def main(config):
         config["WSGI"] = "waitress"
 
     try:
-        TeosDaemon(config, sk, logger, logging_port.value, stop_logging_server, logging_process).start()
+        TeosDaemon(config, sk, logger, logging_port.value, teosd_ready, stop_logging_server, logging_process).start()
     except Exception as e:
         logger.error("An error occurred: {}. Shutting down".format(e))
         stop_logging_server.set()
@@ -492,13 +502,14 @@ def run():
         exit(e)
 
     config = get_config(command_line_conf, data_dir)
+    teosd_ready = multiprocessing.Event()
 
     if config.get("DAEMON"):
         print("Starting TEOS")
         with daemon.DaemonContext():
-            main(config)
+            main(config, teosd_ready)
     else:
-        main(config)
+        main(config, teosd_ready)
 
 
 if __name__ == "__main__":

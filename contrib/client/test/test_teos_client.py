@@ -28,6 +28,7 @@ another_sk = PrivateKey.from_int(3)
 
 teos_url = "http://{}:{}".format(config.get("API_CONNECT"), config.get("API_PORT"))
 add_appointment_endpoint = "{}/add_appointment".format(teos_url)
+ping_endpoint = "{}/ping".format(teos_url)
 register_endpoint = "{}/register".format(teos_url)
 get_appointment_endpoint = "{}/get_appointment".format(teos_url)
 get_all_appointments_endpoint = "{}/get_all_appointments".format(teos_url)
@@ -81,6 +82,22 @@ def post_response():
         "locator": dummy_appointment.to_dict()["locator"],
         "signature": Cryptographer.sign(dummy_appointment.serialize(), dummy_teos_sk),
     }
+
+
+@responses.activate
+def test_ping():
+    # Simulate a ping response with the tower offline
+    with pytest.raises(ConnectionError):
+        teos_client.ping(teos_url)
+
+    # Simulate a ping response with the tower online
+    responses.add(responses.GET, ping_endpoint, status=204)
+    teos_client.ping(teos_url)
+
+    # Simulate a ping response with the tower erroring
+    with pytest.raises(TowerResponseError):
+        responses.replace(responses.GET, ping_endpoint, status=404)
+        teos_client.ping(teos_url)
 
 
 @responses.activate

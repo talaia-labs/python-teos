@@ -24,7 +24,7 @@ from test.teos.conftest import (
     generate_blocks,
     config,
 )
-from test.teos.e2e.conftest import build_appointment_data, run_teosd
+from test.teos.e2e.conftest import build_appointment_data, run_teosd, stop_teosd
 
 teos_base_endpoint = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
 teos_add_appointment_endpoint = "{}/add_appointment".format(teos_base_endpoint)
@@ -505,9 +505,7 @@ def test_appointment_shutdown_teos_trigger_back_online(teosd):
     add_appointment(teos_id, appointment)
 
     # Restart teos
-    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
-    rpc_client.stop()
-    teosd_process.join()
+    stop_teosd(teosd_process)
 
     teosd_process, _ = run_teosd()
 
@@ -546,10 +544,7 @@ def test_appointment_shutdown_teos_trigger_while_offline(teosd):
     assert appointment_info.get("appointment") == appointment.to_dict()
 
     # Shutdown and trigger
-    rpc_client = RPCClient(config.get("RPC_BIND"), config.get("RPC_PORT"))
-    rpc_client.stop()
-    teosd_process.join()
-
+    stop_teosd(teosd_process)
     generate_block_with_transactions(commitment_tx)
 
     # Restart

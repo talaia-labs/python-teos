@@ -23,7 +23,7 @@ from retrier import Retrier
 from tower_info import TowerInfo
 from towers_dbm import TowersDBM
 from keys import generate_keys, load_keys
-from net.http import post_request, process_post_response, add_appointment
+from net.http import get_request, post_request, process_post_response, add_appointment
 
 
 DATA_DIR = os.getenv("TOWERS_DATA_DIR", os.path.expanduser("~/.watchtower/"))
@@ -176,6 +176,40 @@ def init(options, configuration, plugin):
         error = "Cannot load towers db. Resource temporarily unavailable"
         plugin.log("Cannot load towers db. Resource temporarily unavailable")
         raise IOError(error)
+
+
+@plugin.method("pingtower", desc="Pings a tower to check if its online")
+def ping(plugin, host, port=None):
+    """
+    Pings a tower to check if its online
+
+    Args:
+        plugin (:obj:`Plugin`): this plugin.
+        host (:obj:`str`): the ip or hostname to connect to.
+        port (:obj:`int`): the port to connect to, optional.
+    """
+
+    response = {"alive": True}
+
+    try:
+        tower_netaddr = arg_parser.parse_ping_arguments(host, port, plugin.wt_client.config)
+
+        # Defaulting to http hosts for now
+        if not tower_netaddr.startswith("http"):
+            tower_netaddr = "http://" + tower_netaddr
+
+        # Send request to the server.
+        ping_endpoint = f"{tower_netaddr}/ping"
+        plugin.log(f"Pinging the Eye of Satoshi at {tower_netaddr}")
+        get_request(ping_endpoint)
+        plugin.log(f"The Eye of Satoshi is alive")
+
+    except (InvalidParameter, TowerConnectionError, TowerResponseError) as e:
+        plugin.log(str(e), level="warn")
+        response["alive"] = False
+        response["reason"] = str(e)
+
+    return response
 
 
 @plugin.method("registertower", desc="Register your public key (user id) with the tower.")

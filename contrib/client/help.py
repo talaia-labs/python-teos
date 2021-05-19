@@ -3,6 +3,7 @@ def show_usage():
         "USAGE: "
         "\n\tteos-client [global options] command [command options] [arguments]"
         "\n\nCOMMANDS:"
+        "\n\tping \t\t\tPings the tower to check if it's online."
         "\n\tregister \t\tRegisters your user public key with the tower."
         "\n\tadd_appointment \tRegisters a json formatted appointment with the tower."
         "\n\tget_appointment \tGets json formatted data about an appointment from the tower."
@@ -13,6 +14,17 @@ def show_usage():
         "\n\t--apiport \tAPI port where to send the requests. Defaults to '9814' (modifiable in conf file)."
         "\n\t-d, --debug \tShows debug information."
         "\n\t-h, --help \tShows this message."
+    )
+
+
+def help_ping():
+    return (
+        "NAME:"
+        "\n\n\tping"
+        "\n\nUSAGE:"
+        "\n\n\tteos-client ping"
+        "\n\nDESCRIPTION:"
+        "\n\n\tPings the tower to check if it is online."
     )
 
 

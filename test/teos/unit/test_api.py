@@ -21,6 +21,7 @@ from common.cryptographer import Cryptographer
 from common.appointment import Appointment, AppointmentStatus
 from common.constants import (
     HTTP_OK,
+    HTTP_EMPTY,
     HTTP_NOT_FOUND,
     HTTP_BAD_REQUEST,
     HTTP_SERVICE_UNAVAILABLE,
@@ -37,6 +38,7 @@ from test.teos.unit.conftest import (
 internal_api_endpoint = "{}:{}".format(config.get("INTERNAL_API_HOST"), config.get("INTERNAL_API_PORT"))
 
 TEOS_API = "http://{}:{}".format(config.get("API_BIND"), config.get("API_PORT"))
+ping_endpoint = "{}/ping".format(TEOS_API)
 register_endpoint = "{}/register".format(TEOS_API)
 add_appointment_endpoint = "{}/add_appointment".format(TEOS_API)
 get_appointment_endpoint = "{}/get_appointment".format(TEOS_API)
@@ -89,6 +91,11 @@ def app(api):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+def test_ping(client):
+    r = client.get(ping_endpoint)
+    assert r.status_code == HTTP_EMPTY
 
 
 def test_register(api, client, monkeypatch):

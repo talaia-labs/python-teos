@@ -4,6 +4,40 @@ from common.tools import is_compressed_pk, is_locator, is_256b_hex_str
 from common.exceptions import InvalidParameter
 
 
+def parse_ping_arguments(host, port, config):
+    """
+    Parses the arguments of the ping command and checks that they are correct.
+
+    Args:
+        host (:obj:`str`): the ip or hostname to connect to.
+        port (:obj:`int`): the port to connect to, optional.
+        config: (:obj:`dict`): the configuration dictionary.
+
+    Returns:
+        :obj:`tuple`: the network address.
+
+    Raises:
+        :obj:`common.exceptions.InvalidParameter`: if any of the parameters is wrong or missing.
+    """
+
+    if not isinstance(host, str):
+        raise InvalidParameter(f"host must be string not {str(host)}")
+
+    # host and port specified
+    if host and port:
+        tower_netaddr = f"{host}:{port}"
+    else:
+        # host was specified, but no port, defaulting
+        if ":" not in host:
+            tower_netaddr = f"{host}:{config.get('DEFAULT_PORT')}"
+        elif host.endswith(":"):
+            tower_netaddr = f"{host}{config.get('DEFAULT_PORT')}"
+        else:
+            tower_netaddr = host
+
+    return tower_netaddr
+
+
 def parse_register_arguments(tower_id, host, port, config):
     """
     Parses the arguments of the register command and checks that they are correct.
@@ -11,7 +45,7 @@ def parse_register_arguments(tower_id, host, port, config):
     Args:
         tower_id (:obj:`str`): the identifier of the tower to connect to (a compressed public key).
         host (:obj:`str`): the ip or hostname to connect to, optional.
-        host (:obj:`int`): the port to connect to, optional.
+        port (:obj:`int`): the port to connect to, optional.
         config: (:obj:`dict`): the configuration dictionary.
 
     Returns:

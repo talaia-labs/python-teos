@@ -93,6 +93,38 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
     return response
 
 
+def get_request(endpoint):
+    """
+    Sends a get request to the tower.
+
+    Args:
+        endpoint (:obj:`str`): the endpoint to send the post request.
+
+    Returns:
+        :obj:`Response`: a Response object with the obtained data.
+
+    Raises:
+        :obj:`ConnectionError`: if the client cannot connect to the tower.
+        :obj:`TowerResponseError`: if the returned status code is not a 200-family code.
+    """
+
+    try:
+        response = requests.get(url=endpoint)
+
+        if response.ok:
+            return response
+        else:
+            raise TowerResponseError(
+                "The server returned an error", status_code=response.status_code, reason=response.reason, data=response,
+            )
+
+    except ConnectionError:
+        raise TowerConnectionError(f"Cannot connect to {endpoint}. Tower cannot be reached")
+
+    except (InvalidSchema, MissingSchema, InvalidURL):
+        raise TowerConnectionError(f"Invalid URL. No schema, or invalid schema, found (url={endpoint})")
+
+
 def post_request(data, endpoint, tower_id):
     """
     Sends a post request to the tower.

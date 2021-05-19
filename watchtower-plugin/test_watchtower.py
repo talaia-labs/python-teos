@@ -37,6 +37,7 @@ class TowerMock:
 
         # Adds all the routes to the functions listed above.
         routes = {
+            "/ping": (self.ping, ["GET"]),
             "/register": (self.register, ["POST"]),
             "/add_appointment": (self.add_appointment, ["POST"]),
             "/get_appointment": (self.get_appointment, ["POST"]),
@@ -48,6 +49,14 @@ class TowerMock:
         # Setting Flask log to ERROR only so it does not mess with our logging. Also disabling flask initial messages
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
         os.environ["WERKZEUG_RUN_MAIN"] = "true"
+
+    def ping(self):
+        if mocked_return == "online":
+            return ping_online()
+        elif mocked_return == "offline":
+            return ping_offline()
+        elif mocked_return == "error":
+            return ping_error()
 
     def register(self):
         user_id = request.get_json().get("public_key")
@@ -125,6 +134,18 @@ def add_appointment_success(appointment, signature, user, tower_sk):
         user["appointments"] = {appointment.locator: appointment.to_dict()}
 
     return response, rcode
+
+
+def ping_online():
+    return "", constants.HTTP_EMPTY
+
+
+def ping_offline():
+    raise ConnectionError()
+
+
+def ping_error():
+    return "", constants.HTTP_NOT_FOUND
 
 
 def add_appointment_reject_no_slots():
@@ -213,6 +234,36 @@ def test_helpme_starts(node_factory):
     # Then statically
     l1.daemon.opts["plugin"] = plugin_path
     l1.start()
+
+
+def test_watchtower_ping_offline(node_factory):
+    global mocked_return
+
+    mocked_return = "offline"
+
+    l1 = node_factory.get_node(options={"plugin": plugin_path})
+    r = l1.rpc.pingtower(tower_netaddr, tower_port)
+    assert r.get("alive") is False
+
+
+def test_watchtower_ping_online(node_factory):
+    global mocked_return
+
+    mocked_return = "online"
+
+    l1 = node_factory.get_node(options={"plugin": plugin_path})
+    r = l1.rpc.pingtower(tower_netaddr, tower_port)
+    assert r.get("alive") is True
+
+
+def test_watchtower_ping_error(node_factory):
+    global mocked_return
+
+    mocked_return = "error"
+
+    l1 = node_factory.get_node(options={"plugin": plugin_path})
+    r = l1.rpc.pingtower(tower_netaddr, tower_port)
+    assert r.get("alive") is False
 
 
 def test_watchtower(node_factory):
