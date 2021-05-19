@@ -694,7 +694,7 @@ def test_do_watch(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
     # This two first should have gone to the Responder, we can check the trigger flags to validate
-    assert watcher.db_manager.load_all_triggered_flags() == triggered_valid
+    assert set(watcher.db_manager.load_all_triggered_flags()) == set(triggered_valid)
 
     # Mock two more transactions being triggered, this time with invalid data
     monkeypatch.setattr(watcher.responder, "handle_breach", mock_receipt_false)
@@ -707,7 +707,7 @@ def test_do_watch(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
     # Two more appointments should be gone but none of them should have gone trough the Responder
     assert len(watcher.appointments) == APPOINTMENTS - 4
     # Check the triggers are the same as before
-    assert watcher.db_manager.load_all_triggered_flags() == triggered_valid
+    assert set(watcher.db_manager.load_all_triggered_flags()) == set(triggered_valid)
 
     # The rest of appointments will timeout after the subscription timesout
     monkeypatch.setattr(watcher.gatekeeper, "get_outdated_appointments", lambda x: list(watcher.appointments.keys()))
