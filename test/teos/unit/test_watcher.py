@@ -664,15 +664,20 @@ def test_do_watch(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
 
     # Mock the interactions with the Gatekeeper
     monkeypatch.setattr(watcher.gatekeeper, "get_outdated_appointments", lambda x: [])
-    monkeypatch.setattr(watcher.responder, "handle_breach", mock_receipt_false)
+    monkeypatch.setattr(watcher.responder, "handle_breach", mock_receipt_true)
 
     # Add the appointments to the tower. We add them instead of mocking to avoid having to mock all the data structures
     # plus database
     commitment_txids = []
-    for _ in range(APPOINTMENTS):
+    triggered_valid = []
+    for i in range(APPOINTMENTS):
         appointment, commitment_txid = generate_dummy_appointment_w_trigger()
         watcher.add_appointment(appointment, appointment.user_signature)
         commitment_txids.append(commitment_txid)
+
+        uuid = hash_160("{}{}".format(appointment.locator, user_id))
+        if i < 2:
+            triggered_valid.append(uuid)
 
     # Start the watching thread
     do_watch_thread = Thread(target=watcher.do_watch, daemon=True)
@@ -688,12 +693,26 @@ def test_do_watch(watcher, generate_dummy_appointment_w_trigger, monkeypatch):
     # After generating a block, the appointment count should have been reduced by 2 (two breaches)
     assert len(watcher.appointments) == APPOINTMENTS - 2
 
+    # This two first should have gone to the Responder, we can check the trigger flags to validate
+    assert watcher.db_manager.load_all_triggered_flags() == triggered_valid
+
+    # Mock two more transactions being triggered, this time with invalid data
+    monkeypatch.setattr(watcher.responder, "handle_breach", mock_receipt_false)
+    block_id = get_random_value_hex(32)
+    block = {"tx": commitment_txids[2:4], "height": 2}
+    monkeypatch.setattr(watcher.block_processor, "get_block", lambda x, blocking: block)
+    watcher.block_queue.put(block_id)
+    time.sleep(0.2)
+
+    # Two more appointments should be gone but none of them should have gone trough the Responder
+    assert len(watcher.appointments) == APPOINTMENTS - 4
+    # Check the triggers are the same as before
+    assert watcher.db_manager.load_all_triggered_flags() == triggered_valid
+
     # The rest of appointments will timeout after the subscription timesout
     monkeypatch.setattr(watcher.gatekeeper, "get_outdated_appointments", lambda x: list(watcher.appointments.keys()))
     mock_generate_blocks(1, {}, watcher.block_queue)
     assert len(watcher.appointments) == 0
-
-    # FIXME: 289-add-watcher-tests: We should also add cases where the transactions are invalid.
 
 
 def test_do_watch_cache_update(watcher, block_processor_mock, monkeypatch):
