@@ -33,8 +33,10 @@ def parse_register_arguments(tower_id, host, port, config):
                 raise InvalidParameter("no tower endpoint was provided")
 
             # Only host was specified or colons where specified but not port
-            if ":" not in tower_netaddr or tower_netaddr.endswith(":"):
+            if ":" not in tower_netaddr:
                 tower_netaddr = f"{tower_netaddr}:{config.get('DEFAULT_PORT')}"
+            elif tower_netaddr.endswith(":"):
+                tower_netaddr = f"{tower_netaddr}{config.get('DEFAULT_PORT')}"
 
         else:
             raise InvalidParameter("cannot specify host as both xxx@yyy and separate arguments")
