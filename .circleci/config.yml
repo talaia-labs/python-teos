@@ -26,7 +26,7 @@ jobs:
           name: Install bitcoind (0.20.0)
           command: |
             if [ ! -d "bitcoin" ]; then
-              wget https://bitcoin.org/bin/bitcoin-core-0.20.0/bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
+              wget https://bitcoincore.org/bin/bitcoin-core-0.20.0/bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
               tar -xzf bitcoin-0.20.0-x86_64-linux-gnu.tar.gz
               mv bitcoin-0.20.0 bitcoin
             fi
