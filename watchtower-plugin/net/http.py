@@ -93,7 +93,7 @@ def send_appointment(tower_id, tower, appointment_dict, signature):
     return response
 
 
-def post_request(data, endpoint, tower_id):
+def post_request(data, endpoint, tower_id, socks_port=9050):
     """
     Sends a post request to the tower.
 
@@ -110,13 +110,21 @@ def post_request(data, endpoint, tower_id):
     """
 
     try:
-        return requests.post(url=endpoint, json=data, timeout=5)
+        if ".onion" in endpoint:
+            proxies = {"http": f"socks5h://127.0.0.1:{socks_port}", "https": f"socks5h://127.0.0.1:{socks_port}"}
+
+            return requests.post(url=endpoint, json=data, timeout=15, proxies=proxies)
+        else:
+            return requests.post(url=endpoint, json=data, timeout=5)
 
     except ConnectTimeout:
         message = f"Cannot connect to {tower_id}. Connection timeout"
 
     except ConnectionError:
-        message = f"Cannot connect to {tower_id}. Tower cannot be reached"
+        if ".onion" in endpoint:
+            message = f"Cannot connect to {tower_id}. Trying to connect to a Tor onion address. Are you running Tor?"
+        else:
+            message = f"Cannot connect to {tower_id}. Tower cannot be reached"
 
     except (InvalidSchema, MissingSchema, InvalidURL):
         message = f"Invalid URL. No schema, or invalid schema, found (url={endpoint}, tower_id={tower_id})"

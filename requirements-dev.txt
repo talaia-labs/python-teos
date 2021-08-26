@@ -5,3 +5,4 @@ flake8
 responses
 riemann-tx
 grpcio-tools
+stem

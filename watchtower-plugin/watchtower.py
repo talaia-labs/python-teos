@@ -35,6 +35,7 @@ DEFAULT_CONF = {
     "APPOINTMENTS_FOLDER_NAME": {"value": "appointment_receipts", "type": str, "path": True},
     "TOWERS_DB": {"value": "towers", "type": str, "path": True},
     "PRIVATE_KEY": {"value": "sk.der", "type": str, "path": True},
+    "SOCKS_PORT": {"value": 9050, "type": int},
 }
 
 
@@ -74,7 +75,7 @@ class WTClient:
     """
     Holds all the data regarding the watchtower client.
 
-    Fires an additional tread to take care of retries.
+    Fires an additional thread to take care of retries.
 
     Args:
         sk (:obj:`PrivateKey): the user private key. Used to sign appointment sent to the towers.
@@ -98,6 +99,7 @@ class WTClient:
         self.retrier = Retrier(config.get("MAX_RETRIES"), Queue())
         self.config = config
         self.lock = Lock()
+        self.socks_port = config.get("SOCKS_PORT")
 
         # Populate the towers dict with data from the db
         for tower_id, tower_info in self.db_manager.load_all_tower_records().items():
@@ -216,7 +218,9 @@ def register(plugin, tower_id, host=None, port=None):
 
         plugin.log(f"Registering in the Eye of Satoshi (tower_id={tower_id})")
 
-        response = process_post_response(post_request(data, register_endpoint, tower_id))
+        response = process_post_response(
+            post_request(data, register_endpoint, tower_id, socks_port=plugin.wt_client.socks_port)
+        )
         available_slots = response.get("available_slots")
         subscription_expiry = response.get("subscription_expiry")
         tower_signature = response.get("subscription_signature")
@@ -280,7 +284,9 @@ def get_appointment(plugin, tower_id, locator):
         get_appointment_endpoint = f"{tower_netaddr}/get_appointment"
         plugin.log(f"Requesting appointment from {tower_id}")
 
-        response = process_post_response(post_request(data, get_appointment_endpoint, tower_id))
+        response = process_post_response(
+            post_request(data, get_appointment_endpoint, tower_id, socks_port=plugin.wt_client.socks_port)
+        )
         return response
 
     except (InvalidParameter, TowerConnectionError, TowerResponseError) as e:
