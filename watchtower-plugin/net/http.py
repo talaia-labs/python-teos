@@ -1,7 +1,6 @@
 import json
 import requests
-from requests import ConnectionError, ConnectTimeout
-from requests.exceptions import MissingSchema, InvalidSchema, InvalidURL
+from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout, ReadTimeout, MissingSchema, InvalidSchema, InvalidURL
 
 from common import errors
 from common import constants
@@ -110,10 +109,13 @@ def post_request(data, endpoint, tower_id):
     """
 
     try:
-        return requests.post(url=endpoint, json=data, timeout=5)
+        return requests.post(url=endpoint, json=data, timeout=(6.10, 30))
 
     except ConnectTimeout:
         message = f"Cannot connect to {tower_id}. Connection timeout"
+
+    except ReadTimeout: 
+        message = f"Data cannot be read from {tower_id}. Read timeout"
 
     except ConnectionError:
         message = f"Cannot connect to {tower_id}. Tower cannot be reached"
