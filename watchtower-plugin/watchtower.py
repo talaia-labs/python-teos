@@ -32,7 +32,6 @@ CONF_FILE_NAME = "watchtower.conf"
 DEFAULT_CONF = {
     "DEFAULT_PORT": {"value": 9814, "type": int},
     "MAX_RETRIES": {"value": 30, "type": int},
-    "APPOINTMENTS_FOLDER_NAME": {"value": "appointment_receipts", "type": str, "path": True},
     "TOWERS_DB": {"value": "towers", "type": str, "path": True},
     "PRIVATE_KEY": {"value": "sk.der", "type": str, "path": True},
 }
@@ -49,12 +48,6 @@ plugin.add_option(
     DEFAULT_CONF.get("MAX_RETRIES").get("value"),
     "maximum post retries if the tower is unreachable",
     "int",
-)
-plugin.add_option(
-    "watchtower-appointments-folder-name",
-    DEFAULT_CONF.get("APPOINTMENTS_FOLDER_NAME").get("value"),
-    "name of the appointments' database within the watchtower data folder",
-    "string",
 )
 plugin.add_option(
     "watchtower-towers-db",
@@ -122,8 +115,6 @@ class WTClient:
         if "status" in tower_update:
             tower_info.status = tower_update.get("status")
         if "appointment" in tower_update:
-            locator, signature = tower_update.get("appointment")
-            tower_info.appointments[locator] = signature
             tower_info.available_slots = tower_update.get("available_slots")
         if "pending_appointment" in tower_update:
             data, action = tower_update.get("pending_appointment")

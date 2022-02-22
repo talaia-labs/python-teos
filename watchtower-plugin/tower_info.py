@@ -13,7 +13,6 @@ class TowerInfo:
             misbehaving: if the tower has been caught misbehaving (e.g: an invalid signature has been received).
 
     Attributes:
-        appointments (:obj:`dict`): a collection of accepted appointments.
         pending_appointments (:obj:`list`): a collection of pending appointments. Appointments are pending when the
             tower is unreachable or the subscription has expired / run out of slots.
         invalid_appointments (:obj:`list`): a collection of invalid appointments. Appointments are invalid if the tower
@@ -26,7 +25,6 @@ class TowerInfo:
         self.available_slots = available_slots
         self.status = status
 
-        self.appointments = {}
         self.pending_appointments = []
         self.invalid_appointments = []
         self.misbehaving_proof = {}
@@ -49,19 +47,19 @@ class TowerInfo:
         netaddr = tower_data.get("netaddr")
         available_slots = tower_data.get("available_slots")
         status = tower_data.get("status")
-        appointments = tower_data.get("appointments")
+
         pending_appointments = tower_data.get("pending_appointments")
         invalid_appointments = tower_data.get("invalid_appointments")
         misbehaving_proof = tower_data.get("misbehaving_proof")
 
         if any(
             v is None
-            for v in [netaddr, available_slots, status, appointments, pending_appointments, invalid_appointments]
+            for v in [netaddr, available_slots, status, pending_appointments, invalid_appointments]
         ):
             raise ValueError("Wrong appointment data, some fields are missing")
 
         tower = cls(netaddr, available_slots, status)
-        tower.appointments = appointments
+
         tower.pending_appointments = pending_appointments
         tower.invalid_appointments = invalid_appointments
         tower.misbehaving_proof = misbehaving_proof
