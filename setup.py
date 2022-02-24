@@ -8,8 +8,6 @@ from teos import __version__
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-with open("requirements.txt") as f:
-    requirements = [r for r in f.read().split("\n") if len(r)]
 
 # Remove undesired files
 wildcards = ["**/__pycache__", "**/.DS_Store"]
@@ -20,23 +18,19 @@ for entry in wildcards:
         elif os.path.isfile(file_dir):
             os.remove(file_dir)
 
-PACKAGES = ["common", "teos", "teos.cli", "teos.protobuf", "teos.utils"]
+# Installing common library only
+if os.getenv("COMMON_ONLY", False):
+    PACKAGES = ["common"]
+    CONSOLE_SCRIPTS = []
 
+    with open("common/requirements.txt") as f:
+        requirements = [r for r in f.read().split("\n") if len(r)]
+else:
+    PACKAGES = ["common", "teos", "teos.cli", "teos.protobuf", "teos.utils"]
+    CONSOLE_SCRIPTS = ["teosd=teos.teosd:run", "teos-cli=teos.cli.teos_cli:run"]
 
-CLASSIFIERS = [
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3 :: Only",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Topic :: Internet",
-    "Topic :: Utilities",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
-
-CONSOLE_SCRIPTS = ["teosd=teos.teosd:run", "teos-cli=teos.cli.teos_cli:run"]
+    with open("requirements.txt") as f:
+        requirements = [r for r in f.read().split("\n") if len(r)]
 
 # Add additional scripts if DEV=1
 if os.getenv("DEV", False):
@@ -51,6 +45,20 @@ if os.getenv("DEV", False):
 
     # Add console scripts
     CONSOLE_SCRIPTS.append("teos-client=contrib.client.teos_client:run")
+
+CLASSIFIERS = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Internet",
+    "Topic :: Utilities",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
 
 setuptools.setup(
     name="python-teos",

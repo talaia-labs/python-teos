@@ -33,7 +33,7 @@ def teosd(run_bitcoind):
             pass
 
     teosd_process.join()
-    shutil.rmtree(".teos")
+    shutil.rmtree(".teos", ignore_errors=True)
 
     # FIXME: wait some time, otherwise it might fail when multiple e2e tests are ran in the same session. Not sure why.
     sleep(1)
