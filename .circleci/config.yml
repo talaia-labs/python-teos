@@ -3,7 +3,7 @@ version: 2
 jobs:
   tests:
     machine:
-      image: ubuntu-1604:201903-01
+      image: ubuntu-2004:202111-02
 
     steps:
       - checkout
@@ -14,8 +14,8 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            pyenv local 3.7.0
-            python -m venv .venv
+            sudo apt-get update && sudo apt-get install -y python3.8-venv
+            python3.8 -m venv .venv
             source .venv/bin/activate
             python -m pip install --upgrade pip
             pip install -r requirements.txt
