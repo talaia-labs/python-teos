@@ -127,7 +127,7 @@ class LocatorCache:
     def remove_oldest_block(self):
         """ Removes the oldest block from the cache."""
         with self.rw_lock.gen_wlock():
-            block_hash, locators = self.blocks.popitem(last=False)
+            block_hash, locators = self.blocks.popitem()
             for locator in locators:
                 del self.cache[locator]
 
