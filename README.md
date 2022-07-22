@@ -1,8 +1,7 @@
-## State of the Code
+## State of the project
+### This is not the codebase you're looking for.
+This codebase has been discontinued in favour of its rust counterpart. Please, do check [the new codebase](https://github.com/talaia-labs/rust-teos).
 
-Currently working on updating the software to match [BOLT13 rev1](https://github.com/sr-gi/bolt13).
-
-If you have any questions or comments regarding the project or watchtowers in general, feel free to reach out on [Slack](https://join.slack.com/t/talaialabs/shared_invite/zt-syx8f3hi-XqurRIIQEm7YHw9I9hK7UA).
 # The Eye of Satoshi (TEOS)
 
 The Eye of Satoshi is a Lightning watchtower compliant with [BOLT13](https://github.com/sr-gi/bolt13), written in Python 3.
