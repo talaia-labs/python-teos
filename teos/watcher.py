@@ -1,6 +1,5 @@
 from queue import Queue
 from threading import Thread
-from collections import OrderedDict
 from readerwriterlock import rwlock
 
 from teos.logger import get_logger
@@ -44,7 +43,7 @@ class LocatorCache:
         logger (:obj:`Logger <teos.logger.Logger>`): The logger for this component.
         cache (:obj:`dict`): A dictionary of ``locator:dispute_txid`` pairs that received appointments are checked
             against.
-        blocks (:obj:`OrderedDict`): An ordered dictionary of the last ``blocks_in_cache`` blocks
+        blocks (:obj:`dict`): An ordered dictionary of the last ``blocks_in_cache`` blocks
             (``block_hash:locators``). Used to keep track of what data belongs to what block, so data can be pruned
             accordingly. Also needed to rebuild the cache in case of reorgs.
         cache_size (:obj:`int`): The size of the cache in blocks.
@@ -54,7 +53,7 @@ class LocatorCache:
     def __init__(self, blocks_in_cache):
         self.logger = get_logger(component=LocatorCache.__name__)
         self.cache = dict()
-        self.blocks = OrderedDict()
+        self.blocks = dict()
         self.cache_size = blocks_in_cache
         self.rw_lock = rwlock.RWLockWrite()
 
@@ -85,7 +84,7 @@ class LocatorCache:
             self.blocks[target_block_hash] = list(locator_txid_map.keys())
             target_block_hash = target_block.get("previousblockhash")
 
-        self.blocks = OrderedDict(reversed((list(self.blocks.items()))))
+        self.blocks = dict(reversed((list(self.blocks.items()))))
 
     def get_txid(self, locator):
         """
@@ -128,7 +127,7 @@ class LocatorCache:
     def remove_oldest_block(self):
         """ Removes the oldest block from the cache."""
         with self.rw_lock.gen_wlock():
-            block_hash, locators = self.blocks.popitem(last=False)
+            block_hash, locators = self.blocks.popitem()
             for locator in locators:
                 del self.cache[locator]
 
@@ -159,7 +158,7 @@ class LocatorCache:
                 target_block_hash = target_block.get("previousblockhash")
 
         with self.rw_lock.gen_wlock():
-            self.blocks = OrderedDict(reversed((list(tmp_cache.blocks.items()))))
+            self.blocks = dict(reversed((list(tmp_cache.blocks.items()))))
             self.cache = tmp_cache.cache
 
 
